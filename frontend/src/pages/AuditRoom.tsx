@@ -1,8 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { AuditTurn, NodeType, TurnResultResponse } from '../types'
 
 type Phase = 'loading' | 'active' | 'passed' | 'failed' | 'reflected'
+
+// Decision note (M3 "语音讲解"): the whitepaper's end-state (§4.2) is sending
+// raw audio to a multimodal model, but the backend has no audio pipeline and
+// the offline MockProvider can't consume audio at all. Instead we use the
+// browser-native Web Speech API to transcribe speech to text client-side and
+// feed the result into the existing text `input` state / submitTurn flow
+// unchanged. This ships the actual user-facing feature ("speak instead of
+// type") without backend changes, and works the same regardless of which
+// LLM provider is configured.
+function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
+  if (typeof window === 'undefined') return null
+  return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null
+}
 
 export default function AuditRoom({
   skillId,
@@ -24,6 +37,53 @@ export default function AuditRoom({
   const [principleTitle, setPrincipleTitle] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [listening, setListening] = useState(false)
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
+  const speechSupported = getSpeechRecognitionCtor() !== null
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop()
+    }
+  }, [])
+
+  function toggleListening() {
+    if (listening) {
+      recognitionRef.current?.stop()
+      return
+    }
+    const Ctor = getSpeechRecognitionCtor()
+    if (!Ctor) return
+    const recognition = new Ctor()
+    recognition.lang = 'zh-CN'
+    recognition.continuous = true
+    recognition.interimResults = false
+    recognition.onresult = (event) => {
+      let transcript = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        if (result.isFinal) transcript += result[0].transcript
+      }
+      if (transcript) {
+        setInput((prev) => (prev ? `${prev}${transcript}` : transcript))
+      }
+    }
+    recognition.onerror = (event) => {
+      setError(
+        event.error === 'not-allowed' || event.error === 'permission-denied'
+          ? '麦克风权限被拒绝，无法使用语音输入'
+          : `语音识别出错：${event.error}`,
+      )
+      setListening(false)
+    }
+    recognition.onend = () => {
+      setListening(false)
+    }
+    recognitionRef.current = recognition
+    setError(null)
+    setListening(true)
+    recognition.start()
+  }
 
   useEffect(() => {
     api
@@ -100,14 +160,35 @@ export default function AuditRoom({
               onChange={(e) => setInput(e.target.value)}
               disabled={submitting}
             />
-            <button
-              className="accent"
-              style={{ marginTop: 8 }}
-              onClick={submitTurn}
-              disabled={submitting || !input.trim()}
-            >
-              {submitting ? `${roleLabel}思考中…` : isTask ? '提交说明' : '提交解释'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                className="accent"
+                onClick={submitTurn}
+                disabled={submitting || !input.trim()}
+              >
+                {submitting ? `${roleLabel}思考中…` : isTask ? '提交说明' : '提交解释'}
+              </button>
+              {speechSupported && (
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  disabled={submitting}
+                  style={
+                    listening
+                      ? { borderColor: 'var(--danger)', color: 'var(--danger)' }
+                      : undefined
+                  }
+                  title="语音输入"
+                >
+                  {listening ? '● 录音中…' : '语音输入'}
+                </button>
+              )}
+              {!speechSupported && (
+                <button type="button" disabled title="此浏览器不支持语音输入">
+                  语音输入
+                </button>
+              )}
+            </div>
           </div>
         )}
 

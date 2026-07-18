@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
 import AuditRoom from './AuditRoom'
 import { api } from '../api'
 import type { StartAuditResponse } from '../types'
@@ -29,6 +29,7 @@ function startAuditResponse(skillId: number): StartAuditResponse {
 
 describe('AuditRoom', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(api.startAudit).mockImplementation((skillId) =>
       Promise.resolve(startAuditResponse(skillId)),
     )
@@ -76,5 +77,70 @@ describe('AuditRoom', () => {
     await user.click(screen.getByRole('button', { name: '提交说明' }))
 
     await waitFor(() => expect(screen.getByText(/✗ 还没做到/)).toBeInTheDocument())
+  })
+
+  describe('voice input', () => {
+    let lastInstance: FakeSpeechRecognition | null = null
+
+    class FakeSpeechRecognition {
+      lang = ''
+      continuous = false
+      interimResults = false
+      onresult: ((event: unknown) => void) | null = null
+      onerror: ((event: unknown) => void) | null = null
+      onend: (() => void) | null = null
+      start = vi.fn()
+      stop = vi.fn()
+      constructor() {
+        lastInstance = this
+      }
+    }
+
+    afterEach(() => {
+      lastInstance = null
+      delete window.SpeechRecognition
+      delete window.webkitSpeechRecognition
+    })
+
+    it('shows the mic button when SpeechRecognition is available and populates input on a result', async () => {
+      // @ts-expect-error assigning a minimal fake to the browser global for testing
+      window.SpeechRecognition = FakeSpeechRecognition
+
+      const user = (await import('@testing-library/user-event')).default.setup()
+      render(<AuditRoom skillId={1} nodeType="concept" onDone={vi.fn()} />)
+
+      const micButton = await screen.findByRole('button', { name: '语音输入' })
+      expect(micButton).toBeEnabled()
+      await user.click(micButton)
+
+      const textarea = screen.getByPlaceholderText(
+        '讲给一个完全没听说过的人听…',
+      ) as HTMLTextAreaElement
+
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: /录音中/ })).toBeInTheDocument(),
+      )
+
+      expect(lastInstance).not.toBeNull()
+      act(() => {
+        lastInstance!.onresult?.({
+          resultIndex: 0,
+          results: [{ isFinal: true, 0: { transcript: '这是语音转文字的结果' } }],
+        })
+      })
+
+      expect(textarea.value).toBe('这是语音转文字的结果')
+      // does not auto-submit; user must still click the submit button
+      expect(api.submitTurn).not.toHaveBeenCalled()
+    })
+
+    it('hides/disables the mic button when SpeechRecognition is unsupported', async () => {
+      render(<AuditRoom skillId={1} nodeType="concept" onDone={vi.fn()} />)
+
+      await screen.findByPlaceholderText('讲给一个完全没听说过的人听…')
+
+      const micButton = screen.getByRole('button', { name: '语音输入' })
+      expect(micButton).toBeDisabled()
+    })
   })
 })
