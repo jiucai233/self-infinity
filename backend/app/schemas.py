@@ -1,10 +1,19 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.models import AuditStatus, NodeType, SkillStatus
 
 
+def _not_blank(value: str) -> str:
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError("must not be empty or whitespace-only")
+    return stripped
+
+
 class GenerateTreeRequest(BaseModel):
     topic: str
+
+    _validate_topic = field_validator("topic")(_not_blank)
 
 
 class SkillNodeOut(BaseModel):
@@ -41,6 +50,8 @@ class StartAuditResponse(BaseModel):
 class SubmitTurnRequest(BaseModel):
     content: str
 
+    _validate_content = field_validator("content")(_not_blank)
+
 
 class TurnResultResponse(BaseModel):
     type: str  # "probe" | "verdict"
@@ -54,6 +65,8 @@ class TurnResultResponse(BaseModel):
 
 class ReflectionRequest(BaseModel):
     reflection: str
+
+    _validate_reflection = field_validator("reflection")(_not_blank)
 
 
 class PrincipleOut(BaseModel):
