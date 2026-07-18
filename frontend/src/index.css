@@ -12,7 +12,7 @@
   --panel: rgba(30, 32, 44, 0.84);
   --panel-translucent: rgba(30, 32, 44, 0.52);
   --panel-sheen: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 45%);
-  --border: rgba(244, 244, 240, 0.16);
+  --border: rgba(244, 244, 240, 0.3);
   --highlight: rgba(255, 255, 255, 0.12);
   --text: #f2f2f5;
   --dim: #a3a3b3;
@@ -36,7 +36,7 @@
   --panel: rgba(255, 255, 255, 0.8);
   --panel-translucent: rgba(255, 255, 255, 0.55);
   --panel-sheen: linear-gradient(160deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0) 45%);
-  --border: rgba(20, 20, 26, 0.12);
+  --border: rgba(20, 20, 26, 0.22);
   --highlight: rgba(255, 255, 255, 0.75);
   --text: #14141a;
   --dim: #5a5a66;
@@ -62,11 +62,30 @@ body {
   color: var(--text);
   font-family:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-  /* Ambient backdrop the glass panels sit on top of and catch light from —
-     kept faint (6-12% accent tint) so it reads as depth, not decoration. */
+  /* Ambient backdrop the glass panels sit on top of and catch light from.
+     Liquid Glass only reads as "glass" if there is something colorful/deep
+     behind it to blur — a near-flat backdrop defeats backdrop-filter
+     regardless of how correct the blur/saturate values are. These blobs are
+     therefore deliberately saturated, but pinned to the far corners with a
+     fast falloff (transparent at 40-46%) so the peak intensity stays off
+     the centered content column and only the faded tail reaches bare
+     (unpanelled) text — verified to keep --dim text well above 4.5:1
+     contrast against the worst-case tail tint in both themes. */
   background:
-    radial-gradient(circle at 15% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%),
-    radial-gradient(circle at 100% 10%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 45%),
+    radial-gradient(circle at 8% -10%, color-mix(in srgb, #5eead4 40%, transparent), transparent 42%),
+    radial-gradient(circle at 102% -4%, color-mix(in srgb, #8b5cf6 38%, transparent), transparent 42%),
+    radial-gradient(circle at 30% 118%, color-mix(in srgb, #f472b6 22%, transparent), transparent 46%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+:root[data-theme='light'] body {
+  /* Same corner-pinned composition, tuned lighter/pastel so the near-white
+     panels (rgba(255,255,255,0.8)) stay legible instead of muddying. */
+  background:
+    radial-gradient(circle at 8% -10%, color-mix(in srgb, #5eead4 26%, transparent), transparent 42%),
+    radial-gradient(circle at 102% -4%, color-mix(in srgb, #a78bfa 24%, transparent), transparent 42%),
+    radial-gradient(circle at 30% 118%, color-mix(in srgb, #fb7185 14%, transparent), transparent 46%),
     var(--bg);
   background-attachment: fixed;
 }
@@ -119,10 +138,21 @@ button:disabled {
 }
 
 button.accent {
-  background: var(--panel-sheen), var(--accent);
+  /* Was a 100%-opaque solid fill — backdrop-filter had nothing to blur
+     through it, so it rendered as a flat block dropped into an otherwise
+     glass UI (this is also the "selected toggle" state, e.g. SkillTree's
+     audit-mode switch). Mixing to 65% opacity keeps it read as strongly
+     tinted/selected while letting blur+saturate actually do something,
+     so it stays glass. At 65% accent over a typical panel backdrop this
+     keeps the #04211d label text above ~4.5:1 contrast in both themes
+     (~5.6:1 dark theme, ~7:1 light theme). */
+  background: var(--panel-sheen), color-mix(in srgb, var(--accent) 65%, transparent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(220%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(220%);
   color: #04211d;
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent),
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 

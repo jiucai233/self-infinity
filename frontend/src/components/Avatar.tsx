@@ -24,41 +24,50 @@ function Bar({
   max,
   trackMax,
   color,
+  compact = false,
 }: {
   label: string
   value: number
   max: number
   trackMax: number
   color: string
+  compact?: boolean
 }) {
   const trackWidthPct = Math.max(0, Math.min(100, (max / trackMax) * 100))
   const fillWidthPct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0
+  const track = (
+    <div
+      data-testid={`bar-track-${label}`}
+      title={compact ? `${label} ${Math.round(value)}/${Math.round(max)}` : undefined}
+      style={{
+        width: `${trackWidthPct}%`,
+        height: compact ? 4 : 8,
+        border: '1px solid var(--border)',
+        borderRadius: 999,
+        background: 'var(--bg)',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        data-testid={`bar-fill-${label}`}
+        style={{
+          width: `${fillWidthPct}%`,
+          height: '100%',
+          background: color,
+          borderRadius: 999,
+        }}
+      />
+    </div>
+  )
+
+  if (compact) return track
+
   return (
     <div style={{ fontSize: 11 }}>
       <div className="dim" style={{ marginBottom: 2 }}>
         {label} {Math.round(value)}/{Math.round(max)}
       </div>
-      <div
-        data-testid={`bar-track-${label}`}
-        style={{
-          width: `${trackWidthPct}%`,
-          height: 8,
-          border: '1px solid var(--border)',
-          borderRadius: 999,
-          background: 'var(--bg)',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          data-testid={`bar-fill-${label}`}
-          style={{
-            width: `${fillWidthPct}%`,
-            height: '100%',
-            background: color,
-            borderRadius: 999,
-          }}
-        />
-      </div>
+      {track}
     </div>
   )
 }
@@ -73,13 +82,14 @@ function ForceField({ band }: { band: FocusBand }) {
   )
 }
 
-function PixelFigure() {
+function PixelFigure({ size = 48 }: { size?: number }) {
   // A handful of hard-edged rectangles standing in for the "cyber avatar" —
   // deliberately a placeholder silhouette, not a rendered character.
+  const height = (size / 12) * 16
   return (
     <svg
-      width="48"
-      height="64"
+      width={size}
+      height={height}
       viewBox="0 0 12 16"
       shapeRendering="crispEdges"
       style={{ position: 'relative', zIndex: 1 }}
@@ -119,16 +129,75 @@ export default function Avatar({ compact = false }: { compact?: boolean }) {
 
   const band = focusBand(focus?.focus_score ?? null)
 
+  if (compact) {
+    // Lives inline in App's nav row, next to 技能树/分身/原则卷轴 — styled as
+    // one more glass pill at the same height/alignment as those buttons
+    // (not a separate floating widget), with Health/Sanity as small inline
+    // bars stacked next to a mini icon instead of stacked text labels
+    // floating above it.
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '6px 10px',
+          borderRadius: 'var(--radius-pill)',
+          background: 'var(--panel-sheen), var(--panel-translucent)',
+          backdropFilter: 'blur(var(--glass-blur)) saturate(180%)',
+          WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(180%)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-soft-sm), inset 0 1px 0 var(--highlight)',
+        }}
+      >
+        <div
+          style={{
+            position: 'relative',
+            width: 26,
+            height: 32,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <ForceField band={band} />
+          <PixelFigure size={20} />
+        </div>
+
+        {vitality && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, width: 44 }}>
+            <Bar
+              compact
+              label="Health"
+              value={vitality.health}
+              max={100}
+              trackMax={100}
+              color="var(--accent)"
+            />
+            <Bar
+              compact
+              label="Sanity"
+              value={vitality.sanity}
+              max={vitality.sanity_cap}
+              trackMax={SANITY_REFERENCE_MAX}
+              color="#facc15"
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div
-      className={compact ? undefined : 'panel'}
+      className="panel"
       style={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         gap: 8,
-        padding: compact ? 0 : undefined,
-        width: compact ? 96 : 220,
+        width: 220,
       }}
     >
       {vitality && (
@@ -164,15 +233,13 @@ export default function Avatar({ compact = false }: { compact?: boolean }) {
         <PixelFigure />
       </div>
 
-      {!compact && (
-        <p className="dim" style={{ fontSize: 11, textAlign: 'center' }}>
-          {loaded
-            ? focus
-              ? `专注度 ${Math.round(focus.focus_score ?? 0)}`
-              : '尚无专注度数据'
-            : '加载中…'}
-        </p>
-      )}
+      <p className="dim" style={{ fontSize: 11, textAlign: 'center' }}>
+        {loaded
+          ? focus
+            ? `专注度 ${Math.round(focus.focus_score ?? 0)}`
+            : '尚无专注度数据'
+          : '加载中…'}
+      </p>
     </div>
   )
 }
