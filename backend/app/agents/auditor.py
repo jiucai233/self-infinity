@@ -39,6 +39,11 @@ TASK_SYSTEM_PROMPT = """\
 不要输出 JSON 之外的任何文字。
 """
 
+PRINCIPLE_INJECTION_TEMPLATE = """\
+
+该用户过去在类似问题上暴露过以下原则，请在提问时纳入考虑：
+{principle_lines}"""
+
 
 @dataclass
 class AuditorTurnResult:
@@ -60,6 +65,7 @@ class Auditor:
         skill_description: str,
         history: list[Message],
         node_type: NodeType = NodeType.concept,
+        relevant_principles: list[str] | None = None,
     ) -> AuditorTurnResult:
         max_turns = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
         template = CONCEPT_SYSTEM_PROMPT if node_type == NodeType.concept else TASK_SYSTEM_PROMPT
@@ -68,6 +74,9 @@ class Auditor:
             skill_description=skill_description,
             max_turns=max_turns,
         )
+        if relevant_principles:
+            principle_lines = "\n".join(f"- {p}" for p in relevant_principles)
+            system += PRINCIPLE_INJECTION_TEMPLATE.format(principle_lines=principle_lines)
         messages: list[Message] = [{"role": "system", "content": system}, *history]
 
         logger.info(

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.agents.auditor import Auditor
+from app.agents.retrieval import find_relevant_principles
 from app.agents.scribe import Scribe
 from app.db import get_session
 from app.llm import get_provider
@@ -97,9 +98,18 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
         for t in prior_turns
     ]
 
+    relevant_principles = find_relevant_principles(session, skill)
+    principle_texts = [f"{p.title}：{p.body}" for p in relevant_principles]
+
     auditor = Auditor(get_provider())
     try:
-        result = auditor.next_turn(skill.title, skill.description, history, node_type=skill.node_type)
+        result = auditor.next_turn(
+            skill.title,
+            skill.description,
+            history,
+            node_type=skill.node_type,
+            relevant_principles=principle_texts,
+        )
     except Exception:
         session.commit()
         raise HTTPException(502, "审计官暂时无法响应，请稍后重试")
