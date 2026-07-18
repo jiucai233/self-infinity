@@ -143,11 +143,9 @@ export default function Avatar({ compact = false }: { compact?: boolean }) {
           gap: 8,
           padding: '6px 10px',
           borderRadius: 'var(--radius-pill)',
-          background: 'var(--panel-sheen), var(--panel-translucent)',
-          backdropFilter: 'blur(var(--glass-blur)) saturate(180%)',
-          WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(180%)',
+          background: 'var(--panel-translucent)',
           border: '1px solid var(--border)',
-          boxShadow: 'var(--shadow-soft-sm), inset 0 1px 0 var(--highlight)',
+          boxShadow: 'none',
         }}
       >
         <div

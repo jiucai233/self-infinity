@@ -1,49 +1,44 @@
 :root {
-  /* Liquid Glass — dark theme.
-     --panel / --panel-translucent are pre-composited rgba() values (not raw
-     components) so every consumer can just drop them straight into
-     `background:` without rebuilding rgba() by hand. --panel is the "near
-     solid" layer used wherever body text sits directly on the surface
-     (panels, inputs) — kept at ~84% opacity so contrast never depends on
-     what happens to be behind it. --panel-translucent is the airier variant
-     for chrome that mostly carries short, high-contrast labels (buttons,
-     nav). */
-  --bg: #0a0c12;
-  --panel: rgba(30, 32, 44, 0.84);
-  --panel-translucent: rgba(30, 32, 44, 0.52);
-  --panel-sheen: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 45%);
-  --border: rgba(244, 244, 240, 0.3);
-  --highlight: rgba(255, 255, 255, 0.12);
-  --text: #f2f2f5;
-  --dim: #a3a3b3;
+  /* Notion — dark theme. Flat, opaque surfaces only: no blur, no
+     translucency, no gradients, no glow. --panel and --panel-translucent
+     are both solid (alpha 1) colors; the "translucent" name is kept only
+     because some chrome (nav) wants a very slightly different flat tone
+     than page-level panels, not because it is see-through. */
+  --bg: #191919;
+  --panel: #191919;
+  --panel-translucent: #202020;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --hover-wash: rgba(255, 255, 255, 0.055);
+  --text: #e9e9e7;
+  --dim: #9b9b96;
   --accent: #5eead4;
+  --accent-fill: #37352f;
+  --accent-fill-text: #ffffff;
   --danger: #ff6b6b;
   --gap: 20px;
-  --glass-blur: 20px;
-  --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.38);
-  --shadow-soft-sm: 0 6px 18px rgba(0, 0, 0, 0.28);
-  --radius-panel: 18px;
-  --radius-control: 12px;
+  --shadow-popover: 0 0 0 1px rgba(15, 15, 15, 0.05), 0 3px 6px rgba(15, 15, 15, 0.1),
+    0 9px 24px rgba(15, 15, 15, 0.2);
+  --radius-panel: 6px;
+  --radius-control: 4px;
   --radius-pill: 999px;
   color-scheme: dark;
 }
 
 :root[data-theme='light'] {
-  /* Liquid Glass — light theme. Frosted-white surfaces over a soft
-     blue-gray backdrop; same opacity budget as dark so legibility rules
-     stay consistent between themes. */
-  --bg: #eef0f4;
-  --panel: rgba(255, 255, 255, 0.8);
-  --panel-translucent: rgba(255, 255, 255, 0.55);
-  --panel-sheen: linear-gradient(160deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0) 45%);
-  --border: rgba(20, 20, 26, 0.22);
-  --highlight: rgba(255, 255, 255, 0.75);
-  --text: #14141a;
-  --dim: #5a5a66;
+  /* Notion — light theme. */
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-translucent: #ffffff;
+  --border: rgba(55, 53, 47, 0.09);
+  --border-strong: rgba(55, 53, 47, 0.16);
+  --hover-wash: rgba(55, 53, 47, 0.08);
+  --text: #37352f;
+  --dim: #787774;
   --accent: #0f8f7d;
+  --accent-fill: #37352f;
+  --accent-fill-text: #ffffff;
   --danger: #c9362c;
-  --shadow-soft: 0 16px 40px rgba(20, 20, 30, 0.14);
-  --shadow-soft-sm: 0 6px 18px rgba(20, 20, 30, 0.1);
   color-scheme: light;
 }
 
@@ -60,34 +55,10 @@ body,
 body {
   margin: 0;
   color: var(--text);
+  background: var(--bg);
   font-family:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-  /* Ambient backdrop the glass panels sit on top of and catch light from.
-     Liquid Glass only reads as "glass" if there is something colorful/deep
-     behind it to blur — a near-flat backdrop defeats backdrop-filter
-     regardless of how correct the blur/saturate values are. These blobs are
-     therefore deliberately saturated, but pinned to the far corners with a
-     fast falloff (transparent at 40-46%) so the peak intensity stays off
-     the centered content column and only the faded tail reaches bare
-     (unpanelled) text — verified to keep --dim text well above 4.5:1
-     contrast against the worst-case tail tint in both themes. */
-  background:
-    radial-gradient(circle at 8% -10%, color-mix(in srgb, #5eead4 40%, transparent), transparent 42%),
-    radial-gradient(circle at 102% -4%, color-mix(in srgb, #8b5cf6 38%, transparent), transparent 42%),
-    radial-gradient(circle at 30% 118%, color-mix(in srgb, #f472b6 22%, transparent), transparent 46%),
-    var(--bg);
-  background-attachment: fixed;
-}
-
-:root[data-theme='light'] body {
-  /* Same corner-pinned composition, tuned lighter/pastel so the near-white
-     panels (rgba(255,255,255,0.8)) stay legible instead of muddying. */
-  background:
-    radial-gradient(circle at 8% -10%, color-mix(in srgb, #5eead4 26%, transparent), transparent 42%),
-    radial-gradient(circle at 102% -4%, color-mix(in srgb, #a78bfa 24%, transparent), transparent 42%),
-    radial-gradient(circle at 30% 118%, color-mix(in srgb, #fb7185 14%, transparent), transparent 46%),
-    var(--bg);
-  background-attachment: fixed;
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica,
+    'Apple Color Emoji', Arial, sans-serif, 'Segoe UI Emoji', 'Segoe UI Symbol';
 }
 
 #root {
@@ -99,6 +70,7 @@ h1,
 h2,
 h3 {
   font-weight: 600;
+  color: var(--text);
   margin: 0 0 8px;
   letter-spacing: -0.01em;
 }
@@ -110,26 +82,22 @@ p {
 button {
   font-family: inherit;
   cursor: pointer;
-  background: var(--panel-sheen), var(--panel-translucent);
-  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  background: transparent;
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
-  box-shadow: var(--shadow-soft-sm), inset 0 1px 0 var(--highlight);
+  box-shadow: none;
   padding: 9px 16px;
   font-size: 14px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.1s ease;
 }
 
 button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-soft), inset 0 1px 0 var(--highlight);
+  background: var(--hover-wash);
 }
 
 button:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), inset 0 1px 0 var(--highlight);
+  background: var(--hover-wash);
 }
 
 button:disabled {
@@ -138,47 +106,43 @@ button:disabled {
 }
 
 button.accent {
-  /* Was a 100%-opaque solid fill — backdrop-filter had nothing to blur
-     through it, so it rendered as a flat block dropped into an otherwise
-     glass UI (this is also the "selected toggle" state, e.g. SkillTree's
-     audit-mode switch). Mixing to 65% opacity keeps it read as strongly
-     tinted/selected while letting blur+saturate actually do something,
-     so it stays glass. At 65% accent over a typical panel backdrop this
-     keeps the #04211d label text above ~4.5:1 contrast in both themes
-     (~5.6:1 dark theme, ~7:1 light theme). */
-  background: var(--panel-sheen), color-mix(in srgb, var(--accent) 65%, transparent);
-  backdrop-filter: blur(var(--glass-blur)) saturate(220%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(220%);
-  color: #04211d;
-  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent),
-    0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  /* Notion-style solid "primary" fill — flat, no gradient, no glow. */
+  background: var(--accent-fill);
+  color: var(--accent-fill-text);
+  border-color: transparent;
+}
+
+button.accent:hover:not(:disabled) {
+  background: var(--accent-fill);
+  opacity: 0.9;
 }
 
 textarea,
 input {
   font-family: inherit;
-  /* Inputs carry longer, user-authored reading text, so they get the more
-     opaque "near solid" surface rather than the airier button treatment. */
   background: var(--panel);
-  backdrop-filter: blur(calc(var(--glass-blur) / 2)) saturate(160%);
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur) / 2)) saturate(160%);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
   padding: 10px 12px;
   font-size: 14px;
   width: 100%;
+  box-shadow: none;
+  outline: none;
+}
+
+textarea:focus,
+input:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .panel {
-  background: var(--panel-sheen), var(--panel);
-  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-  border: 1px solid var(--border);
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-soft), inset 0 1px 0 var(--highlight);
+  box-shadow: none;
   padding: var(--gap);
 }
 
@@ -186,83 +150,39 @@ input {
   color: var(--dim);
 }
 
-/* V2 力场 — 环绕角色的玻璃光环，密度/辉光绑定专注度评分。
-   专注时凝实发光（实线 + 柔和脉冲），分心时出现坏点（虚线 + 抖动 + 低透明度）。 */
+/* 力场 — 专注度指示环。V2 的发光/脉冲玻璃效果与 Notion 的纯平设计语言冲突，
+   简化为一个纯色实心圆环：颜色（而非辉光强度）表达 idle/low/mid/high 四档，
+   不使用 blur / box-shadow 光晕 / 动画。 */
 .force-field {
   position: absolute;
   inset: -4px;
   border-radius: var(--radius-pill);
   pointer-events: none;
   box-sizing: border-box;
+  border: 2px solid transparent;
 }
 
 .force-field--idle {
-  border: 1px dashed var(--border);
-  opacity: 0.3;
+  border-color: var(--border-strong);
 }
 
 .force-field--low {
-  border: 1px dashed var(--danger);
-  opacity: 0.55;
-  box-shadow: 0 0 16px color-mix(in srgb, var(--danger) 45%, transparent);
-  animation: force-field-glitch 0.6s steps(4) infinite;
+  border-color: var(--danger);
 }
 
 .force-field--mid {
-  border: 1px solid var(--dim);
-  opacity: 0.7;
-  box-shadow: 0 0 14px color-mix(in srgb, var(--dim) 35%, transparent);
+  border-color: #d9a441;
 }
 
 .force-field--high {
-  border: 1px solid var(--accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent),
-    0 0 24px color-mix(in srgb, var(--accent) 55%, transparent);
-  animation: force-field-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes force-field-glitch {
-  0% {
-    transform: translate(0, 0);
-    opacity: 0.55;
-  }
-  25% {
-    transform: translate(1px, -1px);
-    opacity: 0.25;
-  }
-  50% {
-    transform: translate(-1px, 1px);
-    opacity: 0.55;
-  }
-  75% {
-    transform: translate(1px, 1px);
-    opacity: 0.2;
-  }
-  100% {
-    transform: translate(0, 0);
-    opacity: 0.55;
-  }
-}
-
-@keyframes force-field-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent),
-      0 0 16px color-mix(in srgb, var(--accent) 45%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent),
-      0 0 30px color-mix(in srgb, var(--accent) 65%, transparent);
-  }
+  border-color: var(--accent);
 }
 
 nav {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: var(--panel-sheen), var(--panel-translucent);
-  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  background: var(--panel-translucent);
   border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow-soft-sm);
+  box-shadow: none;
 }

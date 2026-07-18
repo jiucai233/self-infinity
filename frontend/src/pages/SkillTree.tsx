@@ -140,8 +140,7 @@ export default function SkillTree({
                     background:
                       skill.status === 'mastered' ? STATUS_COLOR.mastered : 'var(--bg)',
                     border: `1px solid ${STATUS_COLOR[skill.status]}`,
-                    borderRadius: 8,
-                    boxShadow: `0 0 10px color-mix(in srgb, ${STATUS_COLOR[skill.status]} 40%, transparent)`,
+                    borderRadius: 4,
                     marginBottom: 8,
                   }}
                 />
