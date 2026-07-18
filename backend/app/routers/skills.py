@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.agents.architect import Architect, GeneratedNode
@@ -19,7 +19,10 @@ def list_skills(session: Session = Depends(get_session)):
 @router.post("/generate", response_model=list[SkillNodeOut])
 def generate_tree(body: GenerateTreeRequest, session: Session = Depends(get_session)):
     architect = Architect(get_provider())
-    nodes = architect.generate(body.topic)
+    try:
+        nodes = architect.generate(body.topic)
+    except Exception:
+        raise HTTPException(502, "技能树规划失败，请稍后重试")
 
     taken_slugs = set(session.exec(select(SkillNode.slug)).all())
 

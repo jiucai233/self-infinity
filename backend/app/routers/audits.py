@@ -98,7 +98,11 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
     ]
 
     auditor = Auditor(get_provider())
-    result = auditor.next_turn(skill.title, skill.description, history, node_type=skill.node_type)
+    try:
+        result = auditor.next_turn(skill.title, skill.description, history, node_type=skill.node_type)
+    except Exception:
+        session.commit()
+        raise HTTPException(502, "审计官暂时无法响应，请稍后重试")
 
     if not result.is_verdict:
         session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=result.question))
@@ -149,7 +153,10 @@ def submit_reflection(audit_id: int, body: ReflectionRequest, session: Session =
     gaps = json.loads(audit.gaps_json) if audit.gaps_json else []
 
     scribe = Scribe(get_provider())
-    title, principle_body = scribe.distill(skill.title, gaps, body.reflection)
+    try:
+        title, principle_body = scribe.distill(skill.title, gaps, body.reflection)
+    except Exception:
+        raise HTTPException(502, "原则蒸馏失败，请稍后重试")
 
     principle = Principle(title=title, body=principle_body, source_session_id=audit.id)
     session.add(principle)

@@ -54,6 +54,19 @@ GEMINI_API_KEY=your-key
 LLM_MODEL=gemini-2.5-flash    # 可替换为 gemini-3 系列的 model id
 ```
 
+## 校准评估（M2 验收）
+
+`backend/eval/` 下有 30 条人工标注的审计场景（概念/任务对半，通过/不通过对半）和一个
+离线评估脚本，用于衡量裁决准确率与「放水率」（本该不通过却被判通过的比例）：
+
+```bash
+cd backend
+.venv/bin/python eval/run_calibration.py --provider mock     # 离线冒烟，非验收基准
+.venv/bin/python eval/run_calibration.py --provider gemini    # 配置 GEMINI_API_KEY 后的真实验收
+```
+
+M2 验收线：真实模型跑 30 条校准集，准确率 ≥ 80%，放水率 ≤ 10%。详见 `backend/eval/README.md`。
+
 ## 路线图
 
 - **V1** 费曼审计闭环（当前）
