@@ -13,11 +13,14 @@ from app.models import (
     AuditSession,
     AuditStatus,
     AuditTurn,
+    FocusSession,
     NodeType,
     Principle,
+    RewardEvent,
     SkillNode,
     SkillStatus,
     TurnRole,
+    utcnow,
 )
 from app.schemas import (
     AuditSessionOut,
@@ -28,6 +31,9 @@ from app.schemas import (
     SubmitTurnRequest,
     TurnResultResponse,
 )
+from app.services.focus import compute_focus_score
+from app.services.incentive import compute_reward
+from app.services.vitality import apply_audit_result
 
 router = APIRouter(prefix="/api", tags=["audits"])
 
@@ -124,12 +130,16 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
     audit.gaps_json = json.dumps(result.gaps or [])
     audit.comment = result.comment
     session.add(audit)
+    apply_audit_result(session, result.passed)
 
     unlocked_ids: list[int] = []
+    reward_amount: int | None = None
+    reward_multiplier: float | None = None
     if result.passed:
         skill.status = SkillStatus.mastered
         skill.mastery_score = result.score
         session.add(skill)
+        session.flush()
 
         children = session.exec(
             select(SkillNode).where(SkillNode.parent_id == skill.id, SkillNode.status == SkillStatus.locked)
@@ -138,6 +148,19 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
             child.status = SkillStatus.available
             session.add(child)
             unlocked_ids.append(child.id)
+
+        reward_amount, reward_multiplier = compute_reward(session, skill)
+        session.add(RewardEvent(session_id=audit.id, amount=reward_amount, multiplier=reward_multiplier))
+
+    focus_score = compute_focus_score([t.created_at for t in prior_turns], result.passed)
+    session.add(
+        FocusSession(
+            started_at=audit.created_at,
+            ended_at=utcnow(),
+            focus_score=focus_score,
+            source="audit_engagement",
+        )
+    )
 
     session.commit()
 
@@ -148,6 +171,8 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
         gaps=result.gaps or [],
         comment=result.comment,
         unlocked_skill_ids=unlocked_ids,
+        reward_amount=reward_amount,
+        reward_multiplier=reward_multiplier,
     )
 
 

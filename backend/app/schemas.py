@@ -63,6 +63,8 @@ class TurnResultResponse(BaseModel):
     gaps: list[str] | None = None
     comment: str | None = None
     unlocked_skill_ids: list[int] = []
+    reward_amount: int | None = None
+    reward_multiplier: float | None = None
 
 
 class ReflectionRequest(BaseModel):
