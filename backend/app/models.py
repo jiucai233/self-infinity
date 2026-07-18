@@ -1,3 +1,4 @@
+from datetime import date as date_
 from datetime import datetime, timezone
 from enum import StrEnum
 
@@ -65,3 +66,37 @@ class Principle(SQLModel, table=True):
     body: str
     source_session_id: int = Field(foreign_key="auditsession.id")
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class RewardEvent(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    session_id: int = Field(foreign_key="auditsession.id")
+    amount: int
+    multiplier: float
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class DailyCheckIn(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    date: date_ = Field(index=True, unique=True)
+    spending_rating: int
+    activity_rating: int
+    eating_rating: int
+
+
+class VitalityState(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    health: float
+    sanity: float
+    sanity_cap: float
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class FocusSession(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    started_at: datetime = Field(default_factory=utcnow)
+    ended_at: datetime | None = None
+    focus_score: int | None = None
+    # source is intentionally free-text (e.g. "audit_engagement"), not tied
+    # to desktop screen-capture monitoring, which was deferred per §3 ADRs.
+    source: str

@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 from pydantic import BaseModel, field_validator
 
 from app.models import AuditStatus, NodeType, SkillStatus
@@ -74,3 +76,51 @@ class PrincipleOut(BaseModel):
     title: str
     body: str
     source_session_id: int
+
+
+class RewardEventOut(BaseModel):
+    id: int
+    session_id: int
+    amount: int
+    multiplier: float
+    created_at: datetime
+
+
+class DailyCheckInOut(BaseModel):
+    id: int
+    date: date
+    spending_rating: int
+    activity_rating: int
+    eating_rating: int
+
+
+class VitalityStateOut(BaseModel):
+    id: int
+    health: float
+    sanity: float
+    sanity_cap: float
+    updated_at: datetime
+
+
+class FocusSessionOut(BaseModel):
+    id: int
+    started_at: datetime
+    ended_at: datetime | None
+    focus_score: int | None
+    source: str
+
+
+def _validate_rating(value: int) -> int:
+    if not 1 <= value <= 3:
+        raise ValueError("must be between 1 and 3")
+    return value
+
+
+class CheckInRequest(BaseModel):
+    spending_rating: int
+    activity_rating: int
+    eating_rating: int
+
+    _validate_spending_rating = field_validator("spending_rating")(_validate_rating)
+    _validate_activity_rating = field_validator("activity_rating")(_validate_rating)
+    _validate_eating_rating = field_validator("eating_rating")(_validate_rating)
