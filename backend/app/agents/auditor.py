@@ -86,6 +86,10 @@ class Auditor:
         try:
             data = json.loads(raw)
             if data.get("action") in ("probe", "verdict"):
+                # 协议兜底：即使模型输出合法 JSON，若已达最大追问轮次仍执意 probe，
+                # 也不能放任其无限追问——系统必须强制收敛为裁决。
+                if data["action"] == "probe" and user_turn_count >= max_turns:
+                    return Auditor._forced_verdict()
                 return data
         except (json.JSONDecodeError, AttributeError):
             pass
@@ -94,6 +98,10 @@ class Auditor:
         # 超过上限强制 fail 裁决——系统必须收敛，不允许审计悬而不决。
         if user_turn_count < max_turns:
             return {"action": "probe", "question": "能再具体说说你的理解吗？"}
+        return Auditor._forced_verdict()
+
+    @staticmethod
+    def _forced_verdict() -> dict:
         return {
             "action": "verdict",
             "pass": False,
