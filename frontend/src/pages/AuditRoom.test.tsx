@@ -67,6 +67,8 @@ describe('AuditRoom', () => {
       gaps: ['缺少边界情况'],
       comment: '还差一点',
       unlocked_skill_ids: [],
+      reward_amount: null,
+      reward_multiplier: null,
     })
 
     const user = (await import('@testing-library/user-event')).default.setup()
@@ -77,6 +79,29 @@ describe('AuditRoom', () => {
     await user.click(screen.getByRole('button', { name: '提交说明' }))
 
     await waitFor(() => expect(screen.getByText(/✗ 还没做到/)).toBeInTheDocument())
+  })
+
+  it('shows reward feedback when the verdict includes a reward', async () => {
+    vi.mocked(api.submitTurn).mockResolvedValue({
+      type: 'verdict',
+      passed: true,
+      score: 90,
+      gaps: [],
+      comment: '讲得很清楚',
+      unlocked_skill_ids: [],
+      reward_amount: 50,
+      reward_multiplier: 1.5,
+    })
+
+    const user = (await import('@testing-library/user-event')).default.setup()
+    render(<AuditRoom skillId={1} nodeType="concept" onDone={vi.fn()} />)
+
+    const textarea = await screen.findByPlaceholderText('讲给一个完全没听说过的人听…')
+    await user.type(textarea, '这是我的解释')
+    await user.click(screen.getByRole('button', { name: '提交解释' }))
+
+    await waitFor(() => expect(screen.getByText(/\+50 奖励/)).toBeInTheDocument())
+    expect(screen.getByText(/×1\.5/)).toBeInTheDocument()
   })
 
   describe('voice input', () => {

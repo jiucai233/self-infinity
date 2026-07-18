@@ -98,3 +98,68 @@ input {
 .dim {
   color: var(--dim);
 }
+
+/* V2 力场 — 环绕角色的像素圆环，密度/噪点绑定专注度评分。
+   专注时凝实流动（实线 + 发光脉冲），分心时出现坏点（虚线 + 抖动 + 低透明度）。 */
+.force-field {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.force-field--idle {
+  border: 2px dashed var(--border);
+  opacity: 0.25;
+}
+
+.force-field--low {
+  border: 2px dashed var(--danger);
+  opacity: 0.5;
+  animation: force-field-glitch 0.6s steps(4) infinite;
+}
+
+.force-field--mid {
+  border: 2px solid var(--dim);
+  opacity: 0.7;
+}
+
+.force-field--high {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 12px var(--accent);
+  animation: force-field-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes force-field-glitch {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0.5;
+  }
+  25% {
+    transform: translate(1px, -1px);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translate(-1px, 1px);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translate(1px, 1px);
+    opacity: 0.15;
+  }
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.5;
+  }
+}
+
+@keyframes force-field-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px var(--accent), 0 0 8px var(--accent);
+  }
+  50% {
+    box-shadow: 0 0 0 2px var(--accent), 0 0 18px var(--accent);
+  }
+}

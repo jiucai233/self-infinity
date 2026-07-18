@@ -1,8 +1,11 @@
 import type {
+  CheckInRequest,
+  FocusSession,
   Principle,
   SkillNode,
   StartAuditResponse,
   TurnResultResponse,
+  VitalityState,
 } from './types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -42,4 +45,23 @@ export const api = {
     }),
 
   listPrinciples: () => request<Principle[]>('/principles'),
+
+  getVitality: () => request<VitalityState>('/vitality'),
+
+  submitCheckIn: (body: CheckInRequest) =>
+    request<VitalityState>('/checkins', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // GET /api/focus/latest 404s if no audit has ever reached a verdict yet —
+  // treat that as "no focus data" rather than an error.
+  getLatestFocus: async (): Promise<FocusSession | null> => {
+    try {
+      return await request<FocusSession>('/focus/latest')
+    } catch (e) {
+      if (e instanceof Error && /^404\b/.test(e.message)) return null
+      throw e
+    }
+  },
 }

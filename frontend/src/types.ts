@@ -41,6 +41,8 @@ export interface TurnResultResponse {
   gaps?: string[]
   comment?: string
   unlocked_skill_ids: number[]
+  reward_amount: number | null
+  reward_multiplier: number | null
 }
 
 export interface Principle {
@@ -48,4 +50,26 @@ export interface Principle {
   title: string
   body: string
   source_session_id: number
+}
+
+export interface VitalityState {
+  id: number
+  health: number
+  sanity: number
+  sanity_cap: number
+  updated_at: string
+}
+
+export interface FocusSession {
+  id: number
+  started_at: string
+  ended_at: string | null
+  focus_score: number | null
+  source: string
+}
+
+export interface CheckInRequest {
+  spending_rating: 1 | 2 | 3
+  activity_rating: 1 | 2 | 3
+  eating_rating: 1 | 2 | 3
 }

@@ -210,6 +210,12 @@ export default function AuditRoom({
                   : '✗ 审计未通过'}{' '}
               · {verdict.score} 分
             </p>
+            {verdict.passed && verdict.reward_amount != null && (
+              <p style={{ fontSize: 13, marginTop: 2, color: 'var(--accent)' }}>
+                +{verdict.reward_amount} 奖励
+                {verdict.reward_multiplier != null && ` （×${verdict.reward_multiplier}）`}
+              </p>
+            )}
             <p className="dim" style={{ fontSize: 13, marginTop: 4 }}>
               {verdict.comment}
             </p>
