@@ -149,7 +149,9 @@ Architect 不需要比 Auditor 更强的能力：拆解是结构性任务，验�
 
 ### 4.4 激励引擎（V1.5 → V2.1）
 
-**V1.5（确定性规则系统）**：`reward = base × difficulty × level_multiplier^k`，只在审计通过时结算。等级越高、完成同等杠杆任务的奖励系数越大（复利式放大）。明确声明：这是确定性规则，不是学习算法。
+**V1.5（确定性规则系统）**：`reward = base × difficulty × level_multiplier^k`，只在审计通过时结算。等级越高、完成同等杠杆任务的奖励系数越大（复利式放大）。明确声明：这是确定性规则，不是学习算法。已实现：`base=10`；`difficulty` 由 node_type（concept 2x / task 1x）与树深度共同决定；`level` 由全局已 mastered 节点数推出（单用户应用不存在账号体系，无法按用户维度分层）；`level_multiplier=1.1`。
+
+**关于 focus score（力场可视化的数据来源）**：§7 的力场设计假设有一个 0-100 的专注度评分驱动视觉状态，原稿设想由桌面端屏幕监控写入（`FocusSession.source`）；但 ADR-2 已明确不做屏幕监控。实现改为从审计追问的时间间隔推导 focus_score 的工程代理指标（答题节奏落在合理区间给高分，过快疑似瞎蒙、过慢疑似分心都会降分），`FocusSession.source` 字段因此保留为通用字符串（如 `"audit_engagement"`）而非绑定屏幕捕获语义。这是诚实的替代方案，不是真实专注力测量——如果未来真的接入屏幕监控，只需换一个 source 值和对应的采集逻辑，不需要改数据模型或前端可视化。
 
 **V2.1（可学习组件）**：引入 contextual bandit（LinUCB 或 Thompson Sampling）。
 
@@ -207,8 +209,9 @@ SQLite 起步（零运维、单用户够用），schema 不依赖 SQLite 特性�
 | POST | `/api/audits/{id}/turns` | 提交解释，返回追问或裁决 |
 | POST | `/api/audits/{id}/reflection` | 失败后提交反思，返回蒸馏出的原则 |
 | GET | `/api/principles` | 原则卷轴列表 |
-| POST | `/api/checkins` *(V2)* | 提交每日签到，返回更新后的 Vitality 状态 |
-| GET | `/api/vitality` *(V2)* | 当前 health / sanity / sanity_cap |
+| POST | `/api/checkins` | 提交每日签到，返回更新后的 Vitality 状态 |
+| GET | `/api/vitality` | 当前 health / sanity / sanity_cap（首次访问自动创建默认状态） |
+| GET | `/api/focus/latest` | 最近一次审计的 focus_score（本文档原定由桌面监控写入，实际改为审计追问间隔的工程代理指标，见 §4.4 附注） |
 | GET | `/api/health` | 健康检查 + 当前 LLM provider |
 
 ---
@@ -243,11 +246,11 @@ SQLite 起步（零运维、单用户够用），schema 不依赖 SQLite 特性�
 |---|---|---|---|---|
 | M1 | 第 1–2 周 | 审计闭环骨架 + 动态技能树生成 | MockProvider 下全流程离线可演示：给主题 → Architect 拆解 → 选节点 → 审计 → 裁决 → 方块/卷轴 | 已完成 |
 | M2 | 第 3–4 周 | 接入 Gemini + 校准集 | 30 条校准集裁决准确率 ≥ 80%，放水率 ≤ 10% | 代码就绪（GeminiProvider 加固、`/backend/eval` 30 条校准集与评估脚本、路由层 502 兜底、Auditor 强制收敛、输入校验、前端测试、CI 均已落地）；真实验收待配置 `GEMINI_API_KEY` 后跑 `eval/run_calibration.py --provider gemini` |
-| M3 | 第 5–6 周 | 语音讲解 + 原则检索注入 | 语音审计可用；历史原则出现在审计上下文并影响追问 | 未开始 |
-| M4 | 第 7–8 周 | 激励引擎 + 力场可视化 + 体力系统 | 奖励结算入库；力场与 focus score 实时绑定；每日签到驱动 Health/Sanity 且可视化联动 | 未开始 |
+| M3 | 第 5–6 周 | 语音讲解 + 原则检索注入 | 语音审计可用；历史原则出现在审计上下文并影响追问 | 已完成（语音讲解用浏览器原生 Web Speech API 转写接入已有文本审计流程，而非直传多模态模型——MockProvider 无法处理音频，这样才能离线可跑；原则检索用字符 bigram + 词元重叠代替向量检索，因为项目里没有向量库基础设施） |
+| M4 | 第 7–8 周 | 激励引擎 + 力场可视化 + 体力系统 | 奖励结算入库；力场与 focus score 实时绑定；每日签到驱动 Health/Sanity 且可视化联动 | 已完成（focus score 来源见 §4.4 附注：审计追问间隔代替屏幕监控） |
 | M5 | 第 9 周起 | 评估与报告 | §8 用户维度两项数据成文 | 未开始 |
 
-V1 范围 = M1–M2。本文档即范围冻结：V1 只实现 §4.1–4.3，其余按里程碑排队，不插队。
+本文档不再是"V1=M1-M2"的范围冻结——M3/M4 已应用户要求提前实现（详见各节内正文标注的范围决策）。M5（用户维度评估）待真实使用数据积累后进行，无法靠离线开发产出。
 
 ---
 
