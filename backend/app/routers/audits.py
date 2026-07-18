@@ -22,11 +22,13 @@ from app.models import (
     TurnRole,
     utcnow,
 )
+from app.config import settings
 from app.schemas import (
     AuditSessionOut,
     AuditTurnOut,
     PrincipleOut,
     ReflectionRequest,
+    StartAuditRequest,
     StartAuditResponse,
     SubmitTurnRequest,
     TurnResultResponse,
@@ -46,6 +48,11 @@ def _opening_question(skill: SkillNode) -> str:
     return template.format(title=skill.title)
 
 
+def _resolve_max_turns(node_type: NodeType, mode: str) -> int:
+    base = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
+    return base * 2 if mode == "night" else base
+
+
 def _session_out(session: Session, audit: AuditSession) -> AuditSessionOut:
     turns = session.exec(
         select(AuditTurn).where(AuditTurn.session_id == audit.id).order_by(AuditTurn.created_at)
@@ -62,14 +69,15 @@ def _session_out(session: Session, audit: AuditSession) -> AuditSessionOut:
 
 
 @router.post("/skills/{skill_id}/audits", response_model=StartAuditResponse)
-def start_audit(skill_id: int, session: Session = Depends(get_session)):
+def start_audit(skill_id: int, body: StartAuditRequest = StartAuditRequest(), session: Session = Depends(get_session)):
     skill = session.get(SkillNode, skill_id)
     if skill is None:
         raise HTTPException(404, "skill not found")
     if skill.status == SkillStatus.locked:
         raise HTTPException(400, "skill is locked")
 
-    audit = AuditSession(skill_id=skill_id, status=AuditStatus.active)
+    max_turns = _resolve_max_turns(skill.node_type, body.mode)
+    audit = AuditSession(skill_id=skill_id, status=AuditStatus.active, max_turns=max_turns)
     session.add(audit)
     session.flush()
 
@@ -115,6 +123,7 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
             history,
             node_type=skill.node_type,
             relevant_principles=principle_texts,
+            max_turns=audit.max_turns,
         )
     except Exception:
         session.commit()

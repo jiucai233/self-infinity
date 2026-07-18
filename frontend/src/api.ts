@@ -1,4 +1,5 @@
 import type {
+  AuditMode,
   CheckInRequest,
   FocusSession,
   Principle,
@@ -29,8 +30,11 @@ export const api = {
       body: JSON.stringify({ topic }),
     }),
 
-  startAudit: (skillId: number) =>
-    request<StartAuditResponse>(`/skills/${skillId}/audits`, { method: 'POST' }),
+  startAudit: (skillId: number, mode: AuditMode = 'day') =>
+    request<StartAuditResponse>(`/skills/${skillId}/audits`, {
+      method: 'POST',
+      body: JSON.stringify({ mode }),
+    }),
 
   submitTurn: (auditId: number, content: string) =>
     request<TurnResultResponse>(`/audits/${auditId}/turns`, {

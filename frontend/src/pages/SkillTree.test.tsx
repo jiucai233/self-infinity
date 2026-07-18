@@ -70,7 +70,7 @@ describe('SkillTree', () => {
     const button = within(card).getByRole('button', { name: '发起审计' })
     await user.click(button)
 
-    expect(onAudit).toHaveBeenCalledWith(2, 'task')
+    expect(onAudit).toHaveBeenCalledWith(2, 'task', 'day')
   })
 
   it('disables the audit button for a locked node', async () => {
@@ -82,5 +82,33 @@ describe('SkillTree', () => {
     const card = screen.getByText('锁定的概念').closest('.panel') as HTMLElement
     const button = within(card).getByRole('button', { name: '发起审计' })
     expect(button).toBeDisabled()
+  })
+
+  it('defaults to day mode and calls onAudit with "day" when starting an audit', async () => {
+    const onAudit = vi.fn()
+    const user = userEvent.setup()
+    render(<SkillTree onAudit={onAudit} />)
+
+    await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+
+    const card = screen.getByText('可审计的任务').closest('.panel') as HTMLElement
+    await user.click(within(card).getByRole('button', { name: '发起审计' }))
+
+    expect(onAudit).toHaveBeenCalledWith(2, 'task', 'day')
+  })
+
+  it('switching to night mode calls onAudit with "night"', async () => {
+    const onAudit = vi.fn()
+    const user = userEvent.setup()
+    render(<SkillTree onAudit={onAudit} />)
+
+    await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+
+    await user.click(screen.getByRole('button', { name: '夜晚（深度）' }))
+
+    const card = screen.getByText('可审计的任务').closest('.panel') as HTMLElement
+    await user.click(within(card).getByRole('button', { name: '发起审计' }))
+
+    expect(onAudit).toHaveBeenCalledWith(2, 'task', 'night')
   })
 })

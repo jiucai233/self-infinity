@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import type { SkillNode } from '../types'
+import type { AuditMode, SkillNode } from '../types'
 
 const STATUS_LABEL: Record<SkillNode['status'], string> = {
   locked: '未解锁',
@@ -42,13 +42,14 @@ function buildLevels(skills: SkillNode[]): SkillNode[][] {
 export default function SkillTree({
   onAudit,
 }: {
-  onAudit: (skillId: number, nodeType: SkillNode['node_type']) => void
+  onAudit: (skillId: number, nodeType: SkillNode['node_type'], mode: AuditMode) => void
 }) {
   const [skills, setSkills] = useState<SkillNode[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [topic, setTopic] = useState('')
   const [generating, setGenerating] = useState(false)
+  const [auditMode, setAuditMode] = useState<AuditMode>('day')
 
   const refresh = () => api.listSkills().then(setSkills).catch((e) => setError(String(e)))
 
@@ -82,6 +83,28 @@ export default function SkillTree({
         点亮一个「原理方块」，必须先通过费曼审计官的压力测试。学习内容不设限——
         给一个主题或一个想完成的大任务，规划官会拆成小节点接到树上。
       </p>
+
+      <div
+        className="panel"
+        style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}
+      >
+        <span style={{ fontSize: 12 }}>审计模式：</span>
+        <button
+          className={auditMode === 'day' ? 'accent' : undefined}
+          onClick={() => setAuditMode('day')}
+        >
+          白天（标准）
+        </button>
+        <button
+          className={auditMode === 'night' ? 'accent' : undefined}
+          onClick={() => setAuditMode('night')}
+        >
+          夜晚（深度）
+        </button>
+        <span className="dim" style={{ fontSize: 11 }}>
+          夜晚模式追问轮数翻倍，适合难啃的硬骨头话题
+        </span>
+      </div>
 
       <div className="panel" style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         <input
@@ -140,7 +163,7 @@ export default function SkillTree({
                 <button
                   className={skill.status === 'available' ? 'accent' : undefined}
                   disabled={skill.status !== 'available'}
-                  onClick={() => onAudit(skill.id, skill.node_type)}
+                  onClick={() => onAudit(skill.id, skill.node_type, auditMode)}
                 >
                   {skill.status === 'mastered' ? '已通过审计' : '发起审计'}
                 </button>

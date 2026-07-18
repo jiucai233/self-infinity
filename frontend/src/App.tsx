@@ -4,9 +4,11 @@ import AuditRoom from './pages/AuditRoom'
 import PrincipleShelf from './pages/PrincipleShelf'
 import AvatarPage from './pages/AvatarPage'
 import Avatar from './components/Avatar'
-import type { NodeType } from './types'
+import type { AuditMode, NodeType } from './types'
 
-type View = { name: 'tree' } | { name: 'audit'; skillId: number; nodeType: NodeType }
+type View =
+  | { name: 'tree' }
+  | { name: 'audit'; skillId: number; nodeType: NodeType; mode: AuditMode }
 type Panel = 'none' | 'principles' | 'avatar'
 
 function App() {
@@ -53,12 +55,15 @@ function App() {
           <AvatarPage />
         ) : view.name === 'tree' ? (
           <SkillTree
-            onAudit={(skillId, nodeType) => setView({ name: 'audit', skillId, nodeType })}
+            onAudit={(skillId, nodeType, mode) =>
+              setView({ name: 'audit', skillId, nodeType, mode })
+            }
           />
         ) : (
           <AuditRoom
             skillId={view.skillId}
             nodeType={view.nodeType}
+            mode={view.mode}
             onDone={() => setView({ name: 'tree' })}
           />
         )}

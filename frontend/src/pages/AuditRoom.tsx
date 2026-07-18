@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
-import type { AuditTurn, NodeType, TurnResultResponse } from '../types'
+import type { AuditMode, AuditTurn, NodeType, TurnResultResponse } from '../types'
 
 type Phase = 'loading' | 'active' | 'passed' | 'failed' | 'reflected'
 
@@ -20,10 +20,12 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 export default function AuditRoom({
   skillId,
   nodeType,
+  mode = 'day',
   onDone,
 }: {
   skillId: number
   nodeType: NodeType
+  mode?: AuditMode
   onDone: () => void
 }) {
   const isTask = nodeType === 'task'
@@ -87,14 +89,14 @@ export default function AuditRoom({
 
   useEffect(() => {
     api
-      .startAudit(skillId)
+      .startAudit(skillId, mode)
       .then((res) => {
         setAuditId(res.session.id)
         setTurns(res.session.turns)
         setPhase('active')
       })
       .catch((e) => setError(String(e)))
-  }, [skillId])
+  }, [skillId, mode])
 
   async function submitTurn() {
     if (!auditId || !input.trim()) return

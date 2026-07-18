@@ -66,8 +66,10 @@ class Auditor:
         history: list[Message],
         node_type: NodeType = NodeType.concept,
         relevant_principles: list[str] | None = None,
+        max_turns: int | None = None,
     ) -> AuditorTurnResult:
-        max_turns = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
+        if max_turns is None:
+            max_turns = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
         template = CONCEPT_SYSTEM_PROMPT if node_type == NodeType.concept else TASK_SYSTEM_PROMPT
         system = template.format(
             skill_title=skill_title,

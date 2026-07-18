@@ -1,6 +1,7 @@
 export type SkillStatus = 'locked' | 'available' | 'mastered'
 export type AuditStatus = 'active' | 'passed' | 'failed'
 export type NodeType = 'concept' | 'task'
+export type AuditMode = 'day' | 'night'
 
 export interface SkillNode {
   id: number

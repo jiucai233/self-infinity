@@ -49,6 +49,9 @@ class AuditSession(SQLModel, table=True):
     score: int | None = None
     gaps_json: str | None = None
     comment: str | None = None
+    # 会话创建时按 mode + node_type 一次性算出的追问上限，此后终身固定，
+    # 不再随全局配置变化而漂移（见 AuditMode / start_audit）。
+    max_turns: int = 4
     created_at: datetime = Field(default_factory=utcnow)
 
 
