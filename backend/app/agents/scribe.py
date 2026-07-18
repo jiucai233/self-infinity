@@ -1,6 +1,9 @@
 import json
+import logging
 
 from app.llm.base import LLMProvider, Message, complete_with_json_retry
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
 你是原则蒸馏官（Scribe）。用户在技能「{skill_title}」的费曼审计中失败了，
@@ -29,11 +32,13 @@ class Scribe:
             {"role": "system", "content": system},
             {"role": "user", "content": reflection},
         ]
+        logger.info("scribe.distill() calling provider=%s", self._provider.name)
         raw = complete_with_json_retry(self._provider, messages)
         try:
             data = json.loads(raw)
             return data["title"], data["body"]
         except (json.JSONDecodeError, KeyError, TypeError):
+            logger.warning("scribe.distill() failed to parse provider response, using fallback principle")
             return (
                 f"{skill_title}：先讲机制再讲结论",
                 "当我再次解释这个概念时，我将先说出它为什么成立，再说它是什么。",

@@ -1,9 +1,12 @@
 import json
+import logging
 from dataclasses import dataclass
 
 from app.config import settings
 from app.llm.base import LLMProvider, Message, complete_with_json_retry
 from app.models import NodeType
+
+logger = logging.getLogger(__name__)
 
 CONCEPT_SYSTEM_PROMPT = """\
 你是费曼审计官（Feynman Auditor）。用户正在尝试证明自己真正理解了知识点「{skill_title}」
@@ -67,6 +70,11 @@ class Auditor:
         )
         messages: list[Message] = [{"role": "system", "content": system}, *history]
 
+        logger.info(
+            "auditor.next_turn() calling provider=%s node_type=%s",
+            self._provider.name,
+            node_type.value,
+        )
         raw = complete_with_json_retry(self._provider, messages)
         user_turn_count = sum(1 for m in history if m["role"] == "user")
         data = self._parse(raw, user_turn_count=user_turn_count, max_turns=max_turns)

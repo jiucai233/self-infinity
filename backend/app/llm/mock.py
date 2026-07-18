@@ -1,6 +1,10 @@
 import json
+import logging
+import time
 
 from app.llm.base import Message
+
+logger = logging.getLogger(__name__)
 
 _FIRST_PROBE = "为什么这个方法能生效？如果去掉关键的那一步，会发生什么？"
 _ERROR_INJECTION_PROBE = (
@@ -25,14 +29,19 @@ class MockProvider:
     name = "mock"
 
     def complete(self, messages: list[Message]) -> str:
+        start = time.perf_counter()
         system = next((m["content"] for m in messages if m["role"] == "system"), "")
         if "原则蒸馏官" in system:
-            return self._distill(messages)
-        if "技能树规划官" in system:
-            return self._generate_tree(messages)
-        if "任务核验官" in system:
-            return self._audit_task(messages)
-        return self._audit_concept(messages)
+            result = self._distill(messages)
+        elif "技能树规划官" in system:
+            result = self._generate_tree(messages)
+        elif "任务核验官" in system:
+            result = self._audit_task(messages)
+        else:
+            result = self._audit_concept(messages)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info("mock complete() success elapsed_ms=%.0f", elapsed_ms)
+        return result
 
     @staticmethod
     def _generate_tree(messages: list[Message]) -> str:

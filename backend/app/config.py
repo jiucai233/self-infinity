@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./self_infinity.db"
     audit_max_turns: int = 4
     task_max_turns: int = 2
+    gemini_timeout_seconds: float = 30.0
 
 
 settings = Settings()

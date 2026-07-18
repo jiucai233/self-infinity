@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,6 +8,8 @@ from app.db import get_session, init_db
 from app.llm import get_provider
 from app.routers import audits, principles, skills
 from app.seed import seed_skill_tree
+
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager

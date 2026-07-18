@@ -1,8 +1,11 @@
 import json
+import logging
 from dataclasses import dataclass
 
 from app.llm.base import LLMProvider, Message, complete_with_json_retry
 from app.models import NodeType
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
 你是技能树规划官（Architect）。用户会给你一个学习主题，或者一个想完成的大任务。
@@ -48,6 +51,7 @@ class Architect:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": topic},
         ]
+        logger.info("architect.generate() calling provider=%s", self._provider.name)
         raw = complete_with_json_retry(self._provider, messages)
         try:
             data = json.loads(raw)
@@ -64,6 +68,7 @@ class Architect:
                 for item in data
             ]
         except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            logger.warning("architect.generate() failed to parse provider response, falling back to root-only tree")
             nodes = [
                 GeneratedNode(
                     slug="root",
