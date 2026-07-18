@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 
-from app.llm.base import LLMProvider, Message
+from app.llm.base import LLMProvider, Message, complete_with_json_retry
 from app.models import NodeType
 
 SYSTEM_PROMPT = """\
@@ -48,7 +48,7 @@ class Architect:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": topic},
         ]
-        raw = self._provider.complete(messages)
+        raw = complete_with_json_retry(self._provider, messages)
         try:
             data = json.loads(raw)
             if not isinstance(data, list) or not data:

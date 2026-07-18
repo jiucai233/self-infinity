@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 
 from app.config import settings
-from app.llm.base import LLMProvider, Message
+from app.llm.base import LLMProvider, Message, complete_with_json_retry
 from app.models import NodeType
 
 CONCEPT_SYSTEM_PROMPT = """\
@@ -67,7 +67,7 @@ class Auditor:
         )
         messages: list[Message] = [{"role": "system", "content": system}, *history]
 
-        raw = self._provider.complete(messages)
+        raw = complete_with_json_retry(self._provider, messages)
         user_turn_count = sum(1 for m in history if m["role"] == "user")
         data = self._parse(raw, user_turn_count=user_turn_count, max_turns=max_turns)
 

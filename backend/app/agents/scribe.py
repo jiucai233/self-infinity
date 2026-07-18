@@ -1,6 +1,6 @@
 import json
 
-from app.llm.base import LLMProvider, Message
+from app.llm.base import LLMProvider, Message, complete_with_json_retry
 
 SYSTEM_PROMPT = """\
 你是原则蒸馏官（Scribe）。用户在技能「{skill_title}」的费曼审计中失败了，
@@ -29,7 +29,7 @@ class Scribe:
             {"role": "system", "content": system},
             {"role": "user", "content": reflection},
         ]
-        raw = self._provider.complete(messages)
+        raw = complete_with_json_retry(self._provider, messages)
         try:
             data = json.loads(raw)
             return data["title"], data["body"]

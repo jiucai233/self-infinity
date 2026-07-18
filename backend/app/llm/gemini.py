@@ -4,6 +4,10 @@ from app.config import settings
 from app.llm.base import Message
 
 
+class GeminiEmptyResponseError(RuntimeError):
+    """Gemini 返回了空响应，例如被安全过滤器拦截。"""
+
+
 class GeminiProvider:
     name = "gemini"
 
@@ -25,4 +29,19 @@ class GeminiProvider:
                 "response_mime_type": "application/json",
             },
         )
-        return response.text
+        text = response.text
+        if not text:
+            raise GeminiEmptyResponseError("Gemini 返回了空响应，可能被安全过滤器拦截")
+        return self._strip_code_fence(text)
+
+    @staticmethod
+    def _strip_code_fence(text: str) -> str:
+        stripped = text.strip()
+        if not stripped.startswith("```"):
+            return stripped
+        lines = stripped.splitlines()
+        if len(lines) >= 2 and lines[-1].strip() == "```":
+            lines = lines[1:-1]
+        else:
+            lines = lines[1:]
+        return "\n".join(lines).strip()

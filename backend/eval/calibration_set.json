@@ -1,0 +1,362 @@
+[
+  {
+    "id": "recursion-pass",
+    "node_type": "concept",
+    "skill_title": "递归",
+    "skill_description": "函数直接或间接调用自身来解决问题的编程技巧",
+    "student_turns": [
+      "递归就是函数调用自身，把一个大问题拆成规模更小的同类子问题，一直拆到一个不能再拆的 base case，然后从那里把结果一层层返回上来。",
+      "因为每次调用传入的子问题规模都必须严格缩小并且最终收敛到 base case；如果没有 base case，或者子问题并没有真正变小，调用栈会一直增长下去，最后栈溢出，这就是为什么终止条件是必须的。",
+      "不是的，如果输入不满足'规模会缩小'这个前提条件，比如递归时忘记减一或者参数传错导致子问题和原问题一样大，就永远到不了边界情况，程序会一直往下调用直到爆栈，所以这不是任何情况下都成立的。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "机制解释清楚，能说明为何需要 base case，且顶住了埋错追问，指出了边界条件。"
+  },
+  {
+    "id": "big-o-pass",
+    "node_type": "concept",
+    "skill_title": "大 O 时间复杂度",
+    "skill_description": "用渐进增长率描述算法运行时间随输入规模变化的趋势",
+    "student_turns": [
+      "大 O 描述的是当输入规模 n 趋于无穷大时，算法运行时间增长的趋势，只看主导项，忽略常数和低阶项。",
+      "因为当 n 很大的时候，低阶项和常数因子对整体增长趋势的影响会被主导项淹没，比如 n^2+100n 在 n 足够大时基本就是 n^2 在起作用，所以我们只保留最高阶的那一项。",
+      "不是，如果 n 很小，常数项反而可能占主导，比如一个 O(n^2) 但常数很小的算法在小规模数据下可能比 O(n log n) 但常数很大的算法更快，大 O 只保证渐进趋势，不代表任何规模下都更快，这是有前提条件的。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "抓住渐进增长这个核心，且能指出大 O 在小规模数据下的局限，边界条件说得清楚。"
+  },
+  {
+    "id": "hash-table-pass",
+    "node_type": "concept",
+    "skill_title": "哈希表",
+    "skill_description": "通过哈希函数把键映射到数组下标从而实现平均 O(1) 查找的数据结构",
+    "student_turns": [
+      "哈希表用一个哈希函数把 key 算成一个数组下标，把值存在对应位置，查找的时候用同样的哈希函数算出下标直接定位，所以平均是 O(1)。",
+      "因为好的哈希函数能把 key 均匀分散到各个桶里，如果哈希函数分布不均匀，很多 key 会冲突到同一个桶，退化成链表遍历，最坏情况就变成 O(n) 了，这也是为什么装载因子和哈希函数质量很关键。",
+      "不是的，哈希表的 O(1) 是平均情况下的，不是任何情况都成立，如果所有 key 都哈希冲突到同一个桶，或者没有做扩容导致装载因子过高，查找就会退化，这是有边界条件的，不能说恒定是 O(1)。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "解释了哈希映射机制和冲突退化的原因，正确纠正了'恒定 O(1)'的错误暗示。"
+  },
+  {
+    "id": "tcp-handshake-pass",
+    "node_type": "concept",
+    "skill_title": "TCP 三次握手",
+    "skill_description": "TCP 建立连接时客户端与服务端交换 SYN/SYN-ACK/ACK 的过程",
+    "student_turns": [
+      "客户端先发 SYN 表示想建立连接并带上初始序列号，服务端回 SYN-ACK 既确认收到又发自己的序列号，客户端再回 ACK 确认，这样双方都确认了彼此的发送和接收能力，连接就建立好了。",
+      "因为只有三次交换才能让双方都确认'我发的你收到了，你发的我也收到了'，如果只两次握手，服务端没法确认客户端有没有收到自己的确认，如果客户端的第一个 SYN 是网络里滞留的旧包，服务端可能会误建立一个无效连接，所以需要第三次 ACK 来防止这种情况。",
+      "不是，两次握手在网络延迟、丢包或者旧的重复连接请求存在的情况下是不够的，三次握手正是为了应对这些异常边界情况才设计出来的，不是随便定的次数。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "准确说明每次握手要解决的具体问题，并能指出为什么两次握手不够、边界场景讲得清楚。"
+  },
+  {
+    "id": "mutex-deadlock-pass",
+    "node_type": "concept",
+    "skill_title": "互斥锁与死锁",
+    "skill_description": "用互斥锁保护共享资源时可能出现的死锁问题及成因",
+    "student_turns": [
+      "互斥锁保证同一时刻只有一个线程能进入临界区操作共享资源，死锁是指多个线程互相持有对方需要的锁，同时又在等待对方释放，谁也不退让，程序就卡住了。",
+      "因为死锁需要同时满足互斥、持有并等待、不可抢占、循环等待这几个条件，如果破坏其中任何一个条件，比如强制按固定顺序加锁避免循环等待，死锁就不会发生，这也是为什么统一加锁顺序能解决问题。",
+      "不是，死锁不是加了锁就一定会发生，如果所有线程都按同一个全局顺序申请锁，或者用超时机制主动放弃等待，就不会形成循环等待，所以死锁是有前提条件的，不是用锁必然导致死锁。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "准确列出死锁四个必要条件并给出破坏条件的解法，纠正了'用锁就会死锁'的误解。"
+  },
+  {
+    "id": "binary-search-pass",
+    "node_type": "concept",
+    "skill_title": "二分查找",
+    "skill_description": "在有序数组中通过不断折半缩小查找范围来定位目标值",
+    "student_turns": [
+      "二分查找每次拿中间元素跟目标比较，如果目标更大就丢弃左半边，更小就丢弃右半边，这样每次都能把候选范围减半，直到找到或者范围为空。",
+      "因为数组是有序的，所以只要知道中间元素和目标的大小关系，就能确定目标只可能在哪一半里，另一半可以直接排除，这就是为什么每次能砍掉一半而不用遍历，如果数组没排序，这个排除逻辑就不成立了。",
+      "不是，二分查找的前提条件是数组必须有序，如果数组是乱序的，中间元素比目标大也不代表目标一定在左边，这个算法就完全失效了，所以有序是不能少的边界条件。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "讲清楚折半排除的核心逻辑，并准确指出有序性是不可或缺的前提。"
+  },
+  {
+    "id": "dynamic-programming-pass",
+    "node_type": "concept",
+    "skill_title": "动态规划中的记忆化",
+    "skill_description": "通过缓存子问题的结果避免重复计算来优化递归",
+    "student_turns": [
+      "记忆化是把已经算过的子问题结果存起来，下次再遇到同样的子问题直接查表返回，不用重新递归计算，这样能把很多重复子问题的指数级计算量降下来。",
+      "因为很多递归问题（比如斐波那契）的子问题会被重复调用很多次，如果不缓存，每次都要重新展开计算，时间是指数级的；如果缓存了，每个子问题只算一次，之后都是 O(1) 查表，整体复杂度能降到多项式级别，这就是为什么记忆化有效。",
+      "不是，记忆化只有在子问题存在大量重叠的情况下才有加速效果，如果每个子问题都是独一无二、互不重复的，缓存起来反而只是多占内存没有加速效果，所以前提条件是要有重叠子问题结构。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "准确说明重叠子问题是记忆化生效的前提，并纠正了'记忆化总是有用'的错误暗示。"
+  },
+  {
+    "id": "consistent-hashing-pass",
+    "node_type": "concept",
+    "skill_title": "一致性哈希",
+    "skill_description": "分布式系统中用一致性哈希环减少节点增减时数据迁移量的技术",
+    "student_turns": [
+      "一致性哈希把节点和数据都映射到同一个哈希环上，数据顺时针找到第一个节点就归它管，加减节点的时候只影响环上相邻的一小段数据，不用像普通哈希取模那样全部重新分配。",
+      "因为普通哈希取模的方式在节点数变化时，几乎所有 key 的目标节点都会变，等于全量搬迁数据；而一致性哈希只是环上局部的邻接关系发生变化，只有那一小段数据需要迁移，如果没有这个环形结构和顺时针查找规则，就没法把影响范围限制在局部。",
+      "不是，如果节点在环上分布得不均匀，还是会出现某几个节点负载特别重的问题，这就是为什么实际系统要引入虚拟节点来打散分布，一致性哈希本身不能完全保证负载均衡，是有前提条件的。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "清楚说明减少数据迁移的机制原因，并主动指出负载不均的边界情况和虚拟节点的解法。"
+  },
+  {
+    "id": "b-tree-fail",
+    "node_type": "concept",
+    "skill_title": "B 树",
+    "skill_description": "一种自平衡的多路搜索树，常用于数据库和文件系统索引",
+    "student_turns": [
+      "B 树就是一种树结构，用来存索引的，反正数据库底层都用它。",
+      "说不太清楚，大概是因为节点能放好多个key，效率比较高吧，具体怎么回事我也不确定。",
+      "应该是吧，反正大家都这么用，没细想过有没有例外。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "全程复述结论、承认说不清楚原理，没有触及第一性原理，面对埋错追问也没能纠正。"
+  },
+  {
+    "id": "quicksort-worst-case-fail",
+    "node_type": "concept",
+    "skill_title": "快速排序的最坏情况",
+    "skill_description": "快速排序在特定输入下退化为 O(n^2) 的原因",
+    "student_turns": [
+      "快排就是选个基准然后分成两半递归排，平均挺快的，最坏情况嘛，就是变慢了呗。",
+      "大概是因为运气不好选到了不合适的基准，具体怎么个不合适法说不太上来。",
+      "反正就是这样，我记得是对的，没细想过是不是所有情况都这样。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "没有说明基准选取导致划分不均衡这一具体机制，回答空洞、循环复述。"
+  },
+  {
+    "id": "garbage-collection-fail",
+    "node_type": "concept",
+    "skill_title": "标记清除垃圾回收",
+    "skill_description": "从根对象出发标记可达对象、清除不可达对象来回收内存的算法",
+    "student_turns": [
+      "垃圾回收就是自动把没用的内存清理掉，java 和 python 都有，反正不用自己管内存了。",
+      "应该是系统自己会判断哪些没用了吧，具体怎么判断的不太清楚。",
+      "大概是这样吧，我没细想过有没有例外情况。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "只停留在'自动回收'的表面认知，完全没触及标记-清除的具体机制，追问后仍说不清楚。"
+  },
+  {
+    "id": "cap-theorem-fail",
+    "node_type": "concept",
+    "skill_title": "CAP 定理",
+    "skill_description": "分布式系统中一致性、可用性、分区容错性三者不可兼得的权衡理论",
+    "student_turns": [
+      "CAP 就是三个东西不能同时要，具体哪三个我记得不太准，反正是权衡取舍。",
+      "应该是因为分布式系统比较复杂吧，大概就是这个道理，说不清楚具体为什么。",
+      "不知道，可能有例外吧，没细想过。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "连三个字母代表什么都说不准确，全程回避具体机制，属于典型的循环复述而非理解。"
+  },
+  {
+    "id": "virtual-memory-paging-fail",
+    "node_type": "concept",
+    "skill_title": "虚拟内存分页",
+    "skill_description": "操作系统把物理内存划分成固定大小页面并按需换入换出的机制",
+    "student_turns": [
+      "虚拟内存就是让程序以为自己有很大的内存，操作系统在背后偷偷管理，反正能用就行。",
+      "大概是因为内存不够用的时候会用硬盘顶一下吧，具体流程说不太清楚。",
+      "应该是这样，没细想过是不是任何情况都这样。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "只有笼统印象，没能说明分页、页表、缺页中断等具体机制，属于表层复述。"
+  },
+  {
+    "id": "hash-collision-fail",
+    "node_type": "concept",
+    "skill_title": "哈希冲突解决",
+    "skill_description": "不同 key 被哈希到同一个桶时如何处理的策略，如链地址法和开放寻址法",
+    "student_turns": [
+      "哈希冲突就是两个 key 算出来的位置一样了，反正哈希表内部会自己处理好。",
+      "应该是有什么办法解决吧，具体是链表还是别的我记不清了，大概就是这样。",
+      "不知道有没有例外，没细想过。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "承认记不清具体解决策略，无法说明链地址法/开放寻址法的机制差异，是空泛复述。"
+  },
+  {
+    "id": "index-btree-vs-hash-fail",
+    "node_type": "concept",
+    "skill_title": "B+树索引与哈希索引的区别",
+    "skill_description": "数据库中 B+树索引支持范围查询而哈希索引不支持的原因",
+    "student_turns": [
+      "反正 B+树索引比哈希索引好用，数据库一般默认都用 B+树。",
+      "应该是因为 B+树更快吧，具体为什么快说不太上来。",
+      "大概就是这样吧，没细想过是不是所有场景都这样。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "只给出'B+树更好'的结论，说不出范围查询与有序性的关系，属于循环复述无机制。"
+  },
+  {
+    "id": "deploy-static-site-pass",
+    "node_type": "task",
+    "skill_title": "把静态网站部署到 GitHub Pages",
+    "skill_description": "把一个写好的静态网站发布上线，能通过公开链接访问",
+    "student_turns": [
+      "我会先把 HTML/CSS/JS 文件放进仓库根目录，写一个 index.html 作为入口，然后在仓库 Settings 里的 Pages 选项选择 main 分支和根目录作为发布源，保存后 GitHub 会给我一个 username.github.io/repo 的链接，用浏览器打开确认页面能正常显示。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "步骤具体、可执行，说明了发布源设置和验证方式，没有空话。"
+  },
+  {
+    "id": "git-init-repo-pass",
+    "node_type": "task",
+    "skill_title": "初始化一个 git 仓库并完成第一次提交",
+    "skill_description": "在本地新建项目并纳入 git 版本管理",
+    "student_turns": [
+      "在项目目录下执行 git init，然后写一个 .gitignore 排除 node_modules 和 .env 这类文件，用 git add . 把要提交的文件加入暂存区，最后 git commit -m 'init' 完成第一次提交，用 git log 确认提交记录存在。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "给出具体命令顺序和验证手段，是可以直接照做的实操步骤。"
+  },
+  {
+    "id": "ssh-key-auth-pass",
+    "node_type": "task",
+    "skill_title": "配置 SSH 密钥登录远程服务器",
+    "skill_description": "用密钥对代替密码登录，提升远程连接安全性",
+    "student_turns": [
+      "我会用 ssh-keygen 生成一对密钥，把公钥内容追加到服务器的 ~/.ssh/authorized_keys 文件里，确认这个文件权限是 600、.ssh 目录权限是 700，然后在本地用 ssh -i 私钥路径 user@host 试着连一次，能免密码登录就说明配好了。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "包含权限设置这个容易被忽略的关键细节，并有明确的验证步骤。"
+  },
+  {
+    "id": "dockerfile-flask-pass",
+    "node_type": "task",
+    "skill_title": "为一个 Flask 应用写 Dockerfile",
+    "skill_description": "把 Flask 项目打包成可以一致运行的容器镜像",
+    "student_turns": [
+      "我会选一个精简的 python 基础镜像，把 requirements.txt 先拷进去用 pip install 装依赖，这样能利用缓存层，再拷贝项目代码进去，暴露 5000 端口，用 CMD 指定用 gunicorn 启动应用，最后用 docker build 和 docker run 跑起来，用 curl 打一下接口确认能返回正常响应。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "有具体的镜像构建顺序、层缓存考虑和端到端验证方式。"
+  },
+  {
+    "id": "github-actions-ci-pass",
+    "node_type": "task",
+    "skill_title": "给项目接入 GitHub Actions 自动跑测试",
+    "skill_description": "每次 push 代码时自动运行测试套件，及时发现问题",
+    "student_turns": [
+      "我会在仓库根目录建 .github/workflows/ci.yml，配置 on push 触发，用一个 job 里先 checkout 代码、装好 python 版本、pip install 依赖，再跑 pytest，最后推一次代码到 GitHub 看 Actions 标签页里那个 job 是不是跑绿了。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "文件路径、触发条件、执行步骤和验证方式都具体明确。"
+  },
+  {
+    "id": "pg-dump-backup-pass",
+    "node_type": "task",
+    "skill_title": "用 pg_dump 备份 PostgreSQL 数据库",
+    "skill_description": "定期把数据库导出成文件以防数据丢失",
+    "student_turns": [
+      "我会用 pg_dump -U 用户名 -F c 数据库名 > backup.dump 导出一份自定义格式的备份文件，然后用 pg_restore --list backup.dump 检查一下文件内容是不是完整的，确认没问题后再把这个文件同步到别的存储位置，不只留在同一台机器上。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "给出具体命令、验证完整性的方法以及异地保存的考虑，不是空话。"
+  },
+  {
+    "id": "pytest-fixture-pass",
+    "node_type": "task",
+    "skill_title": "用 pytest fixture 复用测试的初始化逻辑",
+    "skill_description": "避免每个测试函数重复写数据库连接等初始化代码",
+    "student_turns": [
+      "我会在 conftest.py 里写一个 fixture 函数，用 @pytest.fixture 装饰，里面创建一个测试数据库连接并在 yield 之后加清理逻辑关闭连接，测试函数只要把这个 fixture 名字当参数传进去就能拿到现成的连接，跑完测试确认清理逻辑真的执行了、没有连接泄漏。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "说清楚了 fixture 定义、yield 分割 setup/teardown 的具体写法，细节到位。"
+  },
+  {
+    "id": "nginx-reverse-proxy-fail",
+    "node_type": "task",
+    "skill_title": "配置 nginx 反向代理",
+    "skill_description": "把外部请求转发到内部跑着的应用服务",
+    "student_turns": [
+      "随便改改配置文件应该就可以了。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "典型空话套话，没有任何具体配置内容，符合 mock 定义的'随便'类空洞回答。"
+  },
+  {
+    "id": "mapo-tofu-blanch-tofu-fail",
+    "node_type": "task",
+    "skill_title": "做麻婆豆腐前给豆腐焯水",
+    "skill_description": "焯水这一步的具体操作，去豆腥味并让豆腐定型",
+    "student_turns": [
+      "大概就是把豆腐扔水里煮一下吧，具体煮多久、水里放不放盐我也不知道，应该可以。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "承认不知道具体细节，用'应该可以'搪塞，没有可执行的步骤。"
+  },
+  {
+    "id": "change-flat-tire-fail",
+    "node_type": "task",
+    "skill_title": "更换汽车爆胎",
+    "skill_description": "在路边安全地把爆掉的轮胎换成备胎",
+    "student_turns": [
+      "反正找个地方停车，把轮胎卸下来换上新的呗，具体螺丝怎么拧我不太清楚，应该可以吧。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "缺少千斤顶支撑位置、螺丝对角顺序等关键具体步骤，用'应该可以吧'敷衍。"
+  },
+  {
+    "id": "crontab-backup-job-fail",
+    "node_type": "task",
+    "skill_title": "用 crontab 设置每天自动备份任务",
+    "skill_description": "让服务器每天定时自动执行备份脚本",
+    "student_turns": [
+      "随便写个定时任务就行了吧，大概什么时候跑我也没细想。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "没有具体的 cron 表达式、脚本路径或日志检查方式，纯粹空话。"
+  },
+  {
+    "id": "pour-over-coffee-ratio-fail",
+    "node_type": "task",
+    "skill_title": "手冲咖啡的粉水比例控制",
+    "skill_description": "冲泡时咖啡粉与水的具体比例和注水节奏",
+    "student_turns": [
+      "大概放点粉，加点水冲一冲就行了，比例我没细算过，应该可以吧。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "没有给出任何具体比例数字或注水节奏，属于空泛应付。"
+  },
+  {
+    "id": "assemble-bookshelf-fail",
+    "node_type": "task",
+    "skill_title": "组装宜家书架",
+    "skill_description": "按说明书把书架的板件和五金件组装起来",
+    "student_turns": [
+      "反正照着说明书装呗，具体哪块板先装我没细看，大概能装上吧。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "承认没看清楚说明书，无法说出具体装配顺序，用'大概'糊弄过去。"
+  },
+  {
+    "id": "home-wifi-setup-fail",
+    "node_type": "task",
+    "skill_title": "配置家庭 WiFi 路由器",
+    "skill_description": "把新买的路由器接上网并设置好 WiFi 密码",
+    "student_turns": [
+      "随便插上电，设置里改改名字密码应该就行了，具体哪个选项我不太确定。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "没有说明具体的设置项和验证联网成功的方式，回答空洞。"
+  },
+  {
+    "id": "python-venv-setup-fail",
+    "node_type": "task",
+    "skill_title": "创建 python 虚拟环境并安装依赖",
+    "skill_description": "为项目隔离出一个独立的 python 依赖环境",
+    "student_turns": [
+      "大概用什么命令建一个环境吧，然后把包装上就行，具体命令我不太记得，应该可以吧。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "承认记不清具体命令，无法给出可执行步骤，是典型空话套话。"
+  }
+]
