@@ -15,6 +15,22 @@ class LLMProvider(Protocol):
         ...
 
 
+def strip_code_fence(text: str) -> str:
+    """去掉模型响应外层可能包裹的 ```json ... ``` 或 ``` ... ``` 代码块标记。
+
+    Gemini 与 DeepSeek 两个真实 provider 共用这一逻辑，避免重复实现。
+    """
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if len(lines) >= 2 and lines[-1].strip() == "```":
+        lines = lines[1:-1]
+    else:
+        lines = lines[1:]
+    return "\n".join(lines).strip()
+
+
 _JSON_RETRY_NOTICE = "上一次的回复不是合法 JSON，请只输出合法 JSON，不要有任何额外文字或代码块标记。"
 
 

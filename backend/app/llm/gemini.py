@@ -6,7 +6,7 @@ from concurrent.futures import TimeoutError as FutureTimeoutError
 from google import genai
 
 from app.config import settings
-from app.llm.base import Message
+from app.llm.base import Message, strip_code_fence
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class GeminiProvider:
             raise GeminiEmptyResponseError("Gemini 返回了空响应，可能被安全过滤器拦截")
 
         logger.info("gemini complete() success elapsed_ms=%.0f", elapsed_ms)
-        return self._strip_code_fence(text)
+        return strip_code_fence(text)
 
     def _generate_with_timeout(self, contents: list[dict], system: str):
         executor = ThreadPoolExecutor(max_workers=1)
@@ -89,15 +89,3 @@ class GeminiProvider:
             # wait=False：超时后不阻塞等待后台线程结束，让它自然收尾（SDK 本身
             # 不提供取消正在进行的 HTTP 请求的方式）。
             executor.shutdown(wait=False)
-
-    @staticmethod
-    def _strip_code_fence(text: str) -> str:
-        stripped = text.strip()
-        if not stripped.startswith("```"):
-            return stripped
-        lines = stripped.splitlines()
-        if len(lines) >= 2 and lines[-1].strip() == "```":
-            lines = lines[1:-1]
-        else:
-            lines = lines[1:]
-        return "\n".join(lines).strip()
