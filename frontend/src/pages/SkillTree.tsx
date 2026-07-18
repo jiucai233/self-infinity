@@ -19,6 +19,11 @@ const NODE_TYPE_LABEL: Record<SkillNode['node_type'], string> = {
   task: '任务 · 做到就行',
 }
 
+const NODE_TYPE_TAG_STYLE: Record<SkillNode['node_type'], { bg: string; color: string }> = {
+  concept: { bg: 'var(--accent-tag-bg)', color: 'var(--accent-strong)' },
+  task: { bg: 'var(--info-tag-bg)', color: 'var(--info-strong)' },
+}
+
 function buildLevels(skills: SkillNode[]): SkillNode[][] {
   const byParent = new Map<number | null, SkillNode[]>()
   for (const s of skills) {
@@ -145,15 +150,17 @@ export default function SkillTree({
                   }}
                 />
                 <h3 style={{ fontSize: 15 }}>{skill.title}</h3>
-                <p
+                <span
+                  className="tag"
                   style={{
-                    fontSize: 11,
                     marginBottom: 6,
-                    color: skill.node_type === 'task' ? '#38bdf8' : '#c084fc',
+                    background: NODE_TYPE_TAG_STYLE[skill.node_type].bg,
+                    color: NODE_TYPE_TAG_STYLE[skill.node_type].color,
                   }}
                 >
                   {NODE_TYPE_LABEL[skill.node_type]}
-                </p>
+                </span>
+                <div style={{ marginBottom: 2 }} />
                 <p className="dim" style={{ fontSize: 12, marginBottom: 8 }}>
                   {skill.description}
                 </p>

@@ -12,9 +12,14 @@
   --hover-wash: rgba(255, 255, 255, 0.055);
   --text: #e9e9e7;
   --dim: #9b9b96;
-  --accent: #5eead4;
-  --accent-fill: #37352f;
+  --accent: #c4b5fd;
+  --accent-strong: #a78bfa;
+  --accent-fill: #7c3aed;
   --accent-fill-text: #ffffff;
+  --accent-tag-bg: rgba(196, 181, 253, 0.16);
+  --info: #67e8f9;
+  --info-strong: #67e8f9;
+  --info-tag-bg: rgba(103, 232, 249, 0.14);
   --danger: #ff6b6b;
   --gap: 20px;
   --shadow-popover: 0 0 0 1px rgba(15, 15, 15, 0.05), 0 3px 6px rgba(15, 15, 15, 0.1),
@@ -35,11 +40,27 @@
   --hover-wash: rgba(55, 53, 47, 0.08);
   --text: #37352f;
   --dim: #787774;
-  --accent: #0f8f7d;
-  --accent-fill: #37352f;
+  --accent: #7c3aed;
+  --accent-strong: #6d28d9;
+  --accent-fill: #6d28d9;
   --accent-fill-text: #ffffff;
+  --accent-tag-bg: #f3effc;
+  --info: #0e7490;
+  --info-strong: #0e7490;
+  --info-tag-bg: #eafafd;
   --danger: #c9362c;
   color-scheme: light;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-tag-bg);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 * {
