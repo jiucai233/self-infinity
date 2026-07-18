@@ -19,6 +19,14 @@ export default function ThemeToggle() {
         bottom: 16,
         right: 16,
         zIndex: 100,
+        width: 44,
+        height: 44,
+        padding: 0,
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 18,
       }}
     >
       {theme === 'light' ? '☀' : '☾'}

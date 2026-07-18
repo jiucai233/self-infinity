@@ -1,23 +1,49 @@
 :root {
-  --bg: #0d0d12;
-  --panel: #16161d;
-  --border: #f4f4f0;
-  --text: #f4f4f0;
-  --dim: #8a8a96;
+  /* Liquid Glass — dark theme.
+     --panel / --panel-translucent are pre-composited rgba() values (not raw
+     components) so every consumer can just drop them straight into
+     `background:` without rebuilding rgba() by hand. --panel is the "near
+     solid" layer used wherever body text sits directly on the surface
+     (panels, inputs) — kept at ~84% opacity so contrast never depends on
+     what happens to be behind it. --panel-translucent is the airier variant
+     for chrome that mostly carries short, high-contrast labels (buttons,
+     nav). */
+  --bg: #0a0c12;
+  --panel: rgba(30, 32, 44, 0.84);
+  --panel-translucent: rgba(30, 32, 44, 0.52);
+  --panel-sheen: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 45%);
+  --border: rgba(244, 244, 240, 0.16);
+  --highlight: rgba(255, 255, 255, 0.12);
+  --text: #f2f2f5;
+  --dim: #a3a3b3;
   --accent: #5eead4;
-  --danger: #f4635a;
-  --gap: 16px;
+  --danger: #ff6b6b;
+  --gap: 20px;
+  --glass-blur: 20px;
+  --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.38);
+  --shadow-soft-sm: 0 6px 18px rgba(0, 0, 0, 0.28);
+  --radius-panel: 18px;
+  --radius-control: 12px;
+  --radius-pill: 999px;
   color-scheme: dark;
 }
 
 :root[data-theme='light'] {
-  --bg: #f4f4f0;
-  --panel: #ffffff;
-  --border: #14141a;
+  /* Liquid Glass — light theme. Frosted-white surfaces over a soft
+     blue-gray backdrop; same opacity budget as dark so legibility rules
+     stay consistent between themes. */
+  --bg: #eef0f4;
+  --panel: rgba(255, 255, 255, 0.8);
+  --panel-translucent: rgba(255, 255, 255, 0.55);
+  --panel-sheen: linear-gradient(160deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0) 45%);
+  --border: rgba(20, 20, 26, 0.12);
+  --highlight: rgba(255, 255, 255, 0.75);
   --text: #14141a;
   --dim: #5a5a66;
   --accent: #0f8f7d;
   --danger: #c9362c;
+  --shadow-soft: 0 16px 40px rgba(20, 20, 30, 0.14);
+  --shadow-soft-sm: 0 6px 18px rgba(20, 20, 30, 0.1);
   color-scheme: light;
 }
 
@@ -33,9 +59,16 @@ body,
 
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--text);
-  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  /* Ambient backdrop the glass panels sit on top of and catch light from —
+     kept faint (6-12% accent tint) so it reads as depth, not decoration. */
+  background:
+    radial-gradient(circle at 15% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%),
+    radial-gradient(circle at 100% 10%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 45%),
+    var(--bg);
+  background-attachment: fixed;
 }
 
 #root {
@@ -48,6 +81,7 @@ h2,
 h3 {
   font-weight: 600;
   margin: 0 0 8px;
+  letter-spacing: -0.01em;
 }
 
 p {
@@ -57,23 +91,26 @@ p {
 button {
   font-family: inherit;
   cursor: pointer;
-  background: var(--panel);
+  background: var(--panel-sheen), var(--panel-translucent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
   color: var(--text);
-  border: 2px solid var(--border);
-  box-shadow: 3px 3px 0 var(--border);
-  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-soft-sm), inset 0 1px 0 var(--highlight);
+  padding: 9px 16px;
   font-size: 14px;
-  transition: transform 0.05s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 button:hover:not(:disabled) {
-  transform: translate(1px, 1px);
-  box-shadow: 2px 2px 0 var(--border);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 var(--highlight);
 }
 
 button:active:not(:disabled) {
-  transform: translate(3px, 3px);
-  box-shadow: 0 0 0 var(--border);
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), inset 0 1px 0 var(--highlight);
 }
 
 button:disabled {
@@ -82,27 +119,36 @@ button:disabled {
 }
 
 button.accent {
-  background: var(--accent);
+  background: var(--panel-sheen), var(--accent);
   color: #04211d;
-  border-color: var(--accent);
-  box-shadow: 3px 3px 0 #04211d;
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 textarea,
 input {
   font-family: inherit;
-  background: var(--bg);
+  /* Inputs carry longer, user-authored reading text, so they get the more
+     opaque "near solid" surface rather than the airier button treatment. */
+  background: var(--panel);
+  backdrop-filter: blur(calc(var(--glass-blur) / 2)) saturate(160%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) / 2)) saturate(160%);
   color: var(--text);
-  border: 2px solid var(--border);
-  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
   font-size: 14px;
   width: 100%;
 }
 
 .panel {
-  background: var(--panel);
-  border: 2px solid var(--border);
-  box-shadow: 4px 4px 0 var(--border);
+  background: var(--panel-sheen), var(--panel);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 var(--highlight);
   padding: var(--gap);
 }
 
@@ -110,67 +156,83 @@ input {
   color: var(--dim);
 }
 
-/* V2 力场 — 环绕角色的像素圆环，密度/噪点绑定专注度评分。
-   专注时凝实流动（实线 + 发光脉冲），分心时出现坏点（虚线 + 抖动 + 低透明度）。 */
+/* V2 力场 — 环绕角色的玻璃光环，密度/辉光绑定专注度评分。
+   专注时凝实发光（实线 + 柔和脉冲），分心时出现坏点（虚线 + 抖动 + 低透明度）。 */
 .force-field {
   position: absolute;
-  inset: 0;
-  border-radius: 0;
+  inset: -4px;
+  border-radius: var(--radius-pill);
   pointer-events: none;
   box-sizing: border-box;
 }
 
 .force-field--idle {
-  border: 2px dashed var(--border);
-  opacity: 0.25;
+  border: 1px dashed var(--border);
+  opacity: 0.3;
 }
 
 .force-field--low {
-  border: 2px dashed var(--danger);
-  opacity: 0.5;
+  border: 1px dashed var(--danger);
+  opacity: 0.55;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--danger) 45%, transparent);
   animation: force-field-glitch 0.6s steps(4) infinite;
 }
 
 .force-field--mid {
-  border: 2px solid var(--dim);
+  border: 1px solid var(--dim);
   opacity: 0.7;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--dim) 35%, transparent);
 }
 
 .force-field--high {
-  border: 2px solid var(--accent);
-  box-shadow: 0 0 0 2px var(--accent), 0 0 12px var(--accent);
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent),
+    0 0 24px color-mix(in srgb, var(--accent) 55%, transparent);
   animation: force-field-pulse 1.4s ease-in-out infinite;
 }
 
 @keyframes force-field-glitch {
   0% {
     transform: translate(0, 0);
-    opacity: 0.5;
+    opacity: 0.55;
   }
   25% {
     transform: translate(1px, -1px);
-    opacity: 0.2;
+    opacity: 0.25;
   }
   50% {
     transform: translate(-1px, 1px);
-    opacity: 0.5;
+    opacity: 0.55;
   }
   75% {
     transform: translate(1px, 1px);
-    opacity: 0.15;
+    opacity: 0.2;
   }
   100% {
     transform: translate(0, 0);
-    opacity: 0.5;
+    opacity: 0.55;
   }
 }
 
 @keyframes force-field-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 2px var(--accent), 0 0 8px var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent),
+      0 0 16px color-mix(in srgb, var(--accent) 45%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 2px var(--accent), 0 0 18px var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent),
+      0 0 30px color-mix(in srgb, var(--accent) 65%, transparent);
   }
+}
+
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--panel-sheen), var(--panel-translucent);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-soft-sm);
 }

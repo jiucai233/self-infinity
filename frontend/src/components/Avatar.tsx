@@ -43,8 +43,10 @@ function Bar({
         style={{
           width: `${trackWidthPct}%`,
           height: 8,
-          border: '2px solid var(--border)',
+          border: '1px solid var(--border)',
+          borderRadius: 999,
           background: 'var(--bg)',
+          overflow: 'hidden',
         }}
       >
         <div
@@ -53,6 +55,7 @@ function Bar({
             width: `${fillWidthPct}%`,
             height: '100%',
             background: color,
+            borderRadius: 999,
           }}
         />
       </div>

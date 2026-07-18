@@ -24,7 +24,6 @@ function App() {
           display: 'flex',
           gap: 12,
           padding: '16px 24px',
-          borderBottom: '2px solid var(--border)',
           alignItems: 'center',
         }}
       >

@@ -197,7 +197,7 @@ export default function AuditRoom({
         {(phase === 'passed' || phase === 'failed' || phase === 'reflected') && verdict && (
           <div
             style={{
-              borderTop: '2px solid var(--border)',
+              borderTop: '1px solid var(--border)',
               paddingTop: 12,
               marginTop: 4,
             }}
