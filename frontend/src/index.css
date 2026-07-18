@@ -10,6 +10,17 @@
   color-scheme: dark;
 }
 
+:root[data-theme='light'] {
+  --bg: #f4f4f0;
+  --panel: #ffffff;
+  --border: #14141a;
+  --text: #14141a;
+  --dim: #5a5a66;
+  --accent: #0f8f7d;
+  --danger: #c9362c;
+  color-scheme: light;
+}
+
 * {
   box-sizing: border-box;
 }

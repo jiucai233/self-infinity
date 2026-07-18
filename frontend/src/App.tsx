@@ -4,6 +4,7 @@ import AuditRoom from './pages/AuditRoom'
 import PrincipleShelf from './pages/PrincipleShelf'
 import AvatarPage from './pages/AvatarPage'
 import Avatar from './components/Avatar'
+import ThemeToggle from './components/ThemeToggle'
 import type { AuditMode, NodeType } from './types'
 
 type View =
@@ -17,6 +18,7 @@ function App() {
 
   return (
     <div>
+      <ThemeToggle />
       <nav
         style={{
           display: 'flex',
