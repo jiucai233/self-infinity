@@ -24,6 +24,10 @@ def build_provider(name: str):
         from app.llm.gemini import GeminiProvider
 
         return GeminiProvider()
+    if name == "deepseek":
+        from app.llm.deepseek import DeepSeekProvider
+
+        return DeepSeekProvider()
     raise ValueError(f"unknown provider: {name}")
 
 
@@ -52,7 +56,7 @@ def run_scenario(auditor: Auditor, scenario: dict) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--provider", choices=["mock", "gemini"], default="mock")
+    parser.add_argument("--provider", choices=["mock", "gemini", "deepseek"], default="mock")
     args = parser.parse_args()
 
     scenarios = json.loads(CALIBRATION_SET_PATH.read_text())
