@@ -318,6 +318,200 @@ input:focus {
   border-color: var(--text);
 }
 
+/* App shell — persistent left sidebar + main content, ported from the
+   Stitch character_dashboard_pixel_mono_white / skill_tree_hub layouts
+   (left rail with brand + nav, remaining width for content) replacing the
+   old single top nav bar + centered 880px column. */
+.app-shell {
+  display: flex;
+  min-height: 100svh;
+  align-items: stretch;
+}
+
+.app-sidebar {
+  flex: 0 0 220px;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 16px;
+  background: var(--panel-translucent);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.app-sidebar-avatar-slot {
+  display: flex;
+}
+
+.app-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Override the generic `nav` selector below (sticky/border-bottom/z-index
+     were written for the old top nav bar) — this nav now lives inside the
+     sidebar's own flex column, not as a page-level sticky header. */
+  position: static;
+  border-bottom: none;
+  background: transparent;
+}
+
+/* Full-width stacked row nav items (not the old inline button row) — active
+   item gets a solid highlighted block + left accent bar, per the "Skills"
+   highlighted row in character_dashboard_pixel_mono_white/screen.png. */
+.app-sidebar-nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  box-shadow: none;
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid transparent;
+  font-size: 13px;
+}
+
+.app-sidebar-nav-item:hover:not(:disabled) {
+  background: var(--hover-wash);
+}
+
+.app-sidebar-nav-item--active {
+  background: var(--hover-wash);
+  border-left: 3px solid var(--text);
+  font-weight: 600;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  padding: 32px;
+}
+
+/* The audit room is its own immersive dark canvas that bleeds to the edge
+   of <main> regardless of theme — cancel <main>'s padding only while it's
+   showing so AuditRoom's .audit-immersive background reaches the sidebar
+   border and viewport edges. */
+.app-main--bleed {
+  padding: 0;
+}
+
+/* Character dashboard 2-column grid (AvatarPage.tsx) — portrait panel +
+   VITALS STATUS panel side by side, per
+   character_dashboard_pixel_mono_white/screen.png. Stacks to one column
+   below 720px so it doesn't get crushed inside the ~220px-narrower main
+   column left by the sidebar. */
+.avatar-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 2fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+@media (max-width: 720px) {
+  .avatar-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.avatar-stat-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+/* Small bordered "STRENGTH/DEXTERITY/…"-style stat box, repurposed to show
+   only real vitality/focus numbers this app actually has. */
+.stat-card {
+  flex: 1;
+  min-width: 96px;
+  padding: 10px 12px;
+}
+
+.stat-card-label {
+  font-size: 9px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.stat-card-value {
+  font-size: 15px;
+}
+
+/* Small stat pill readout pinned to the top-right of the skill tree canvas,
+   per the "SKILL POINTS"/"ESSENCE" boxes in
+   skill_tree_hub_pixel_mono_white/screen.png — repurposed here to show only
+   the real mastered/total node count, no invented currency. */
+.skilltree-stat-pills {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stat-pill {
+  padding: 6px 10px;
+  background: var(--panel-translucent);
+}
+
+.stat-pill-label {
+  font-size: 9px;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.stat-pill-value {
+  font-size: 12px;
+}
+
+/* Immersive dark focus-mode canvas (AuditRoom.tsx), per
+   focus_mode_pixel_mono/screen.png — deliberately NOT tied to the --bg
+   theme token: this stays near-black even in light theme, same as Stitch's
+   dedicated focus-mode screen being its own always-dark canvas rather than
+   a themed page. */
+.audit-immersive {
+  background: #0a0a0a;
+  color: #e9e9e7;
+  min-height: 100%;
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+.audit-immersive .dim {
+  color: #9b9b96;
+}
+
+.audit-immersive-layout {
+  display: grid;
+  grid-template-columns: 1fr minmax(220px, 280px);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .audit-immersive-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ACTIVE_QUEST-style side card, per focus_mode_pixel_mono/screen.png —
+   repurposed to show real audit session facts (role, node type, turn
+   count) instead of fabricated quest/EXP/timer data this app doesn't have. */
+.audit-quest-card {
+  background: #141414;
+  box-shadow:
+    0 calc(-1 * var(--pixel-offset)) 0 0 rgba(255, 255, 255, 0.16),
+    0 var(--pixel-offset) 0 0 rgba(255, 255, 255, 0.16),
+    calc(-1 * var(--pixel-offset)) 0 0 0 rgba(255, 255, 255, 0.16),
+    var(--pixel-offset) 0 0 0 rgba(255, 255, 255, 0.16);
+  padding: var(--gap);
+  margin: 3px;
+}
+
 nav {
   position: sticky;
   top: 0;

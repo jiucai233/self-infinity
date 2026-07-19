@@ -16,42 +16,61 @@ function App() {
   const [view, setView] = useState<View>({ name: 'tree' })
   const [panel, setPanel] = useState<Panel>('none')
 
-  return (
-    <div>
-      <ThemeToggle />
-      <nav
-        style={{
-          display: 'flex',
-          gap: 12,
-          padding: '16px 24px',
-          alignItems: 'center',
-        }}
-      >
-        <h1 className="pixel-font" style={{ fontSize: 14, margin: 0 }}>
-          SELF·INFINITY
-        </h1>
-        <span className="dim" style={{ fontSize: 12 }}>
-          费曼审计闭环 · V1
-        </span>
-        <div style={{ flex: 1 }} />
-        <Avatar compact />
-        <button
-          onClick={() => {
-            setPanel('none')
-            setView({ name: 'tree' })
-          }}
-        >
-          技能树
-        </button>
-        <button onClick={() => setPanel((p) => (p === 'avatar' ? 'none' : 'avatar'))}>
-          {panel === 'avatar' ? '关闭分身' : '分身'}
-        </button>
-        <button onClick={() => setPanel((p) => (p === 'principles' ? 'none' : 'principles'))}>
-          {panel === 'principles' ? '关闭原则卷轴' : '原则卷轴'}
-        </button>
-      </nav>
+  const onTree = panel === 'none' && view.name === 'tree'
+  const onAvatar = panel === 'avatar'
+  const onPrinciples = panel === 'principles'
+  // The audit room renders its own immersive dark canvas (see AuditRoom.tsx's
+  // .audit-immersive) — drop <main>'s default padding only while it's shown
+  // so the dark background can bleed edge-to-edge instead of leaving a
+  // padded frame of the normal theme visible around it.
+  const isAuditView = panel === 'none' && view.name === 'audit'
 
-      <main style={{ padding: 24, maxWidth: 880, margin: '0 auto' }}>
+  return (
+    <div className="app-shell">
+      <aside className="app-sidebar">
+        <div>
+          <h1 className="pixel-font" style={{ fontSize: 13, margin: 0 }}>
+            SELF·INFINITY
+          </h1>
+          <span className="dim" style={{ fontSize: 11 }}>
+            费曼审计闭环 · V1
+          </span>
+        </div>
+
+        <div className="app-sidebar-avatar-slot">
+          <Avatar compact />
+        </div>
+
+        <nav className="app-sidebar-nav">
+          <button
+            className={`app-sidebar-nav-item${onTree ? ' app-sidebar-nav-item--active' : ''}`}
+            onClick={() => {
+              setPanel('none')
+              setView({ name: 'tree' })
+            }}
+          >
+            技能树
+          </button>
+          <button
+            className={`app-sidebar-nav-item${onAvatar ? ' app-sidebar-nav-item--active' : ''}`}
+            onClick={() => setPanel((p) => (p === 'avatar' ? 'none' : 'avatar'))}
+          >
+            分身
+          </button>
+          <button
+            className={`app-sidebar-nav-item${onPrinciples ? ' app-sidebar-nav-item--active' : ''}`}
+            onClick={() => setPanel((p) => (p === 'principles' ? 'none' : 'principles'))}
+          >
+            原则卷轴
+          </button>
+        </nav>
+
+        <div style={{ flex: 1 }} />
+      </aside>
+
+      <ThemeToggle />
+
+      <main className={`app-main${isAuditView ? ' app-main--bleed' : ''}`}>
         {panel === 'principles' ? (
           <PrincipleShelf />
         ) : panel === 'avatar' ? (

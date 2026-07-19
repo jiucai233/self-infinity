@@ -156,10 +156,76 @@ L x2 y2` 写法），从父节点底部中点直下，到两节点纵向中点�
 技能树画布容器额外叠加了 `.pixel-grid`（点状网格背景，`repeating-linear-
 gradient` 20px 间距），让整个滚动区域读起来像"棋盘/游戏画面"而不是空白页。
 
-### 4.8 Nav
-`sticky` 顶部导航，`--panel-translucent` 背景，底部 1px `--border` 分隔线
-（保持现有顶部横向导航结构，未改成侧边栏——这次改版只换视觉语言，不动页面
-骨架）。品牌字样 `SELF·INFINITY` 用 `.pixel-font`。
+### 4.8 Nav（已废弃，见 §4.9）
+旧版是 `sticky` 顶部导航，`--panel-translucent` 背景，底部 1px `--border`
+分隔线。2026-07-19（第二次改版）已替换为左侧栏，见下。
+
+### 4.9 App Shell — 左侧栏布局（2026-07-19 第二次改版）
+在"只换视觉语言，不动页面骨架"之后，用户明确要求把 Stitch 参考稿的**页面
+布局**也搬过来，不只是 token。`App.tsx` 从"顶部横向 nav + `max-width: 880px`
+居中单栏"改成持久左侧栏 + 主内容区占满剩余宽度，对应
+`character_dashboard_pixel_mono_white/screen.png` 的整体骨架。
+
+- `.app-shell`：`display: flex`，侧栏 + `<main>` 左右布局，`min-height: 100svh`。
+- `.app-sidebar`：固定 220px 宽，`position: sticky; top: 0`，内容从上到下是
+  品牌字样、紧凑 `<Avatar compact />`、`.app-sidebar-nav` 竖排导航列表。
+  背景复用 `--panel-translucent`，右边 1px `--border` 分隔线（沿用旧 nav 的
+  分隔线数值，只是方向从水平变竖直）。
+- `.app-sidebar-nav-item` / `.app-sidebar-nav-item--active`：导航项从旧版的
+  横排按钮组改成竖排整行点击区，激活项用 `--hover-wash` 底色 + 左侧 3px
+  `--text` 实心竖条，对应参考稿里 "Skills" 高亮行的画法（整行色块，不是
+  加粗文字）。
+- `.app-main`：`flex: 1`，`padding: 32px`，不再有 `max-width` 居中限制——
+  内容用满侧栏之外的全部宽度，同参考稿"主内容区顶格铺满"的观感。
+- `ThemeToggle` 保持原来 `position: fixed` 悬浮右下角的实现，没有并入侧栏
+  （悬浮位置在有侧栏之后依然合理，未强行改造）。
+
+### 4.10 分身页仪表盘网格（`AvatarPage.tsx`，2026-07-19）
+对应 `character_dashboard_pixel_mono_white/screen.png` 的双栏布局。
+`Avatar.tsx` 拆出两个可独立摆放的命名导出（默认导出 `Avatar` 的紧凑/完整
+渲染保持不变，用于侧栏和历史测试）：
+- `useVitalityFocus(refreshKey?)`：抽出的数据获取 hook，`AvatarPage` 用它
+  一次性拿到 `vitality`/`focus`，分别传给下面两块，不再各自发请求。
+- `AvatarPortrait`：只渲染力场环 + 像素小人 + 专注度文字（原非紧凑渲染的
+  下半部分）。
+- `VitalsPanel`：只渲染 Health/Sanity 分段条（原非紧凑渲染的上半部分）。
+
+`AvatarPage.tsx` 用 `.avatar-dashboard-grid`（`grid-template-columns:
+minmax(220px,1fr) minmax(260px,2fr)`，720px 以下退化为单列）把
+`AvatarPortrait` 放左侧面板（标题"分身"），`VitalsPanel` 放右侧面板
+（标题"VITALS STATUS"），网格下方是 `.avatar-stat-row`——一排
+`.stat-card`（小号像素描边方块，上方 dim 小标签+下方粗体像素数字），对应
+参考稿 STRENGTH/DEXTERITY/INTELLECT/LUCK 四格的**视觉样式**，但内容换成
+本项目真实有的数字：HEALTH、SANITY（含 cap）、FOCUS（仅当存在最新专注度
+会话时才渲染这一格，不伪造 0 值）。签到表单面板保持原位置和逻辑不变，挪到
+网格下方。
+
+### 4.11 技能树画布统计徽章（`SkillTree.tsx`，2026-07-19）
+对应 `skill_tree_hub_pixel_mono_white/screen.png` 画布右上角的
+"SKILL POINTS"/"ESSENCE" 小方块——**只搬视觉样式，不搬虚构资源**。新增
+`.skilltree-stat-pills`（`position: absolute; top/right: 12px`，挂在
+`.pixel-grid` 容器内，容器加 `position: relative`），内容是一个
+`.stat-pill`：「已掌握 X / Y」，X/Y 是从已加载的 `skills` 数组客户端算出的
+真实节点数（`status === 'mastered'` 计数 / 总数），没有引入 SKILL
+POINTS/ESSENCE 这类不存在的货币概念。
+
+### 4.12 审计室沉浸式暗色画布（`AuditRoom.tsx`，2026-07-19）
+对应 `focus_mode_pixel_mono/screen.png`——参考稿里这个页面是**始终纯黑**的
+独立画布，不跟随浅色/深色主题切换（"专注模式"本身就是自己的沉浸式场景）。
+新增 `.audit-immersive`：`background: #0a0a0a`（硬编码，不用 `--bg` token），
+浅色文字，替代 `App.tsx` 给这个视图套的 `<main>` padding（`isAuditView` 为真
+时 `<main>` 用 `.app-main--bleed` 去掉 32px padding，让 `.audit-immersive`
+自己的 32px padding 顶到侧栏边界和视口边缘，不留一圈平时主题色的窄边）。
+
+布局用 `.audit-immersive-layout`（grid，`1fr minmax(220px,280px)`，800px
+以下退化单列）：左侧是原有对话记录 + 输入框（功能完全不变），右侧
+`.audit-quest-card` 是仿 Stitch ACTIVE_QUEST 卡片的信息面板，显示：
+`roleLabel`（费曼审计官/任务核验官）、当前节点类型（概念/任务）、真实的
+"已提交轮次"计数（`turns.filter(t => t.role === 'user').length`，本来就在
+组件 state 里，不需要后端改动）。**没有搬** Stitch 卡片里的 EXP 百分比和
+剩余时间倒计时——这两个需要 `max_turns`/计时数据，当前没有传进这个组件，
+本次改版选择省略而不是编造假数字，代码注释里留了这个决定的记录。返回
+技能树按钮、verdict/reflection/principle 流程逻辑完全不变。
 
 ---
 
@@ -170,12 +236,11 @@ gradient` 20px 间距），让整个滚动区域读起来像"棋盘/游戏画面
 - 不做玻璃/模糊效果——Liquid Glass 版本已经试过并被否决（用户原话
   "简直是屎"），详见白皮书 §7；这次改版延续"零装饰"纪律，只是把描边语言从
   Notion 的 1px 细线换成像素台阶。
-- 不照搬 Stitch 参考稿里的 Guild/Quests/Inventory/装备栏等虚构 RPG 功能——
-  这些是 Stitch 生成的通用"Chronos/Vanguard"模板里的功能，本项目没有对应
-  实际功能，移植的是视觉语言（token、像素描边、连线画法、分段条），不是
-  页面结构。
-- 不把顶部导航改成侧边栏——Stitch 参考稿默认是左侧栏布局，但这不在这次
-  "换皮"任务范围内，`App.tsx` 的顶部横向导航结构原样保留。
+- 不照搬 Stitch 参考稿里的 Guild/Quests/Inventory/装备栏/ESSENCE 货币等
+  虚构 RPG 功能——这些是 Stitch 生成的通用"Chronos/Vanguard"模板里的功能，
+  本项目没有对应实际功能，移植的是视觉语言和**页面骨架**（侧栏、网格、
+  统计徽章、沉浸式暗色画布），骨架里填的永远是本项目真实数据，不编造数值。
+- 审计室 ACTIVE_QUEST 卡片不做 EXP% / 倒计时——数据源不存在，见 §4.12。
 
 ---
 

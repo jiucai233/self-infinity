@@ -135,15 +135,28 @@ export default function AuditRoom({
     }
   }
 
-  if (phase === 'loading') return <p className="dim">{roleLabel}正在入场…</p>
+  if (phase === 'loading')
+    return (
+      <div className="audit-immersive">
+        <p className="dim">{roleLabel}正在入场…</p>
+      </div>
+    )
+
+  // Real turn counter — number of user turns submitted so far in this
+  // session. Deliberately NOT an EXP percentage or a time-remaining
+  // countdown like the Stitch ACTIVE_QUEST card: those need max_turns /
+  // timing data that isn't passed into this component, so they're omitted
+  // rather than fabricated.
+  const userTurnCount = turns.filter((t) => t.role === 'user').length
 
   return (
-    <div>
+    <div className="audit-immersive">
       <button onClick={onDone} style={{ marginBottom: 16 }}>
         ← 返回技能树
       </button>
 
-      <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="audit-immersive-layout">
+        <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {turns.map((t, i) => (
           <div key={i}>
             <span className="dim" style={{ fontSize: 11 }}>
@@ -278,6 +291,28 @@ export default function AuditRoom({
             返回技能树
           </button>
         )}
+        </div>
+
+        {/* ACTIVE_QUEST-style side card, per focus_mode_pixel_mono/screen.png
+            — shows real session facts only (role, node type, turn count),
+            no fabricated EXP % or countdown timer. */}
+        <div className="audit-quest-card">
+          <p className="dim pixel-font" style={{ fontSize: 9, marginBottom: 8 }}>
+            ACTIVE_AUDIT
+          </p>
+          <p className="pixel-font" style={{ fontSize: 12, marginBottom: 8 }}>
+            {roleLabel}
+          </p>
+          <p className="dim" style={{ fontSize: 12, marginBottom: 12 }}>
+            节点类型：{isTask ? '任务 · 做到就行' : '概念 · 讲清楚为什么'}
+          </p>
+          <p className="dim" style={{ fontSize: 11, marginBottom: 4 }}>
+            已提交轮次
+          </p>
+          <p className="pixel-font" style={{ fontSize: 16 }}>
+            {userTurnCount}
+          </p>
+        </div>
       </div>
 
       {error && (

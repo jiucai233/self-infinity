@@ -78,6 +78,36 @@ function Bar({
   )
 }
 
+// Shared data-fetching hook — extracted so AvatarPage's dashboard grid can
+// fetch vitality/focus once and hand the same data down to the split
+// portrait/vitals panels below, instead of each panel re-fetching
+// independently. `refreshKey` lets a caller force a refetch (e.g. after a
+// check-in submission) without needing to remount the whole tree.
+export function useVitalityFocus(refreshKey: number = 0) {
+  const [vitality, setVitality] = useState<VitalityState | null>(null)
+  const [focus, setFocus] = useState<FocusSession | null>(null)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoaded(false)
+    Promise.all([api.getVitality(), api.getLatestFocus()])
+      .then(([v, f]) => {
+        if (cancelled) return
+        setVitality(v)
+        setFocus(f)
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [refreshKey])
+
+  return { vitality, focus, loaded }
+}
+
 function ForceField({ band }: { band: FocusBand }) {
   return (
     <div
@@ -112,27 +142,66 @@ function PixelFigure({ size = 48 }: { size?: number }) {
   )
 }
 
+// Just the portrait half of the non-compact Avatar render (ForceField +
+// PixelFigure + focus caption) — split out so AvatarPage.tsx can place it in
+// its own grid cell, per character_dashboard_pixel_mono_white/screen.png's
+// top-left character panel. Takes vitality/focus/loaded as props (from
+// useVitalityFocus) instead of fetching its own copy.
+export function AvatarPortrait({
+  focus,
+  loaded,
+}: {
+  focus: FocusSession | null
+  loaded: boolean
+}) {
+  const band = focusBand(focus?.focus_score ?? null)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div
+        style={{
+          position: 'relative',
+          width: 80,
+          height: 80,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ForceField band={band} />
+        <PixelFigure />
+      </div>
+      <p className="dim" style={{ fontSize: 11, textAlign: 'center' }}>
+        {loaded
+          ? focus
+            ? `专注度 ${Math.round(focus.focus_score ?? 0)}`
+            : '尚无专注度数据'
+          : '加载中…'}
+      </p>
+    </div>
+  )
+}
+
+// Just the bars half of the non-compact Avatar render — split out so
+// AvatarPage.tsx can place it in its own "VITALS STATUS" grid cell, per
+// character_dashboard_pixel_mono_white/screen.png's top-right vitals panel.
+export function VitalsPanel({ vitality }: { vitality: VitalityState | null }) {
+  if (!vitality) return null
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <Bar label="Health" value={vitality.health} max={100} trackMax={100} color="var(--accent)" />
+      <Bar
+        label="Sanity"
+        value={vitality.sanity}
+        max={vitality.sanity_cap}
+        trackMax={SANITY_REFERENCE_MAX}
+        color="#facc15"
+      />
+    </div>
+  )
+}
+
 export default function Avatar({ compact = false }: { compact?: boolean }) {
-  const [vitality, setVitality] = useState<VitalityState | null>(null)
-  const [focus, setFocus] = useState<FocusSession | null>(null)
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    Promise.all([api.getVitality(), api.getLatestFocus()])
-      .then(([v, f]) => {
-        if (cancelled) return
-        setVitality(v)
-        setFocus(f)
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
+  const { vitality, focus, loaded } = useVitalityFocus()
   const band = focusBand(focus?.focus_score ?? null)
 
   if (compact) {

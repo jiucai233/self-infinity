@@ -271,6 +271,7 @@ export default function SkillTree({
   if (loading) return <p className="dim">加载技能树…</p>
 
   const { positions, width, height } = computeSkillTreeLayout(skills)
+  const masteredCount = skills.filter((s) => s.status === 'mastered').length
 
   return (
     <div>
@@ -402,7 +403,18 @@ export default function SkillTree({
 
       {error && <p style={{ color: 'var(--danger)', marginBottom: 16 }}>{error}</p>}
 
-      <div className="pixel-grid" style={{ overflowX: 'auto' }}>
+      {skills.length > 0 && (
+        <div className="skilltree-stat-pills">
+          <div className="stat-pill pixel-border">
+            <span className="dim stat-pill-label">已掌握</span>
+            <span className="pixel-font stat-pill-value">
+              {masteredCount} / {skills.length}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className="pixel-grid" style={{ overflowX: 'auto', position: 'relative' }}>
         <div
           ref={treeContentRef}
           style={{ position: 'relative', width, height, minWidth: '100%' }}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import Avatar from '../components/Avatar'
+import { AvatarPortrait, VitalsPanel, useVitalityFocus } from '../components/Avatar'
 import { api } from '../api'
 import type { CheckInRequest, VitalityState } from '../types'
 
@@ -47,6 +47,15 @@ function RatingField({
   )
 }
 
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="panel stat-card">
+      <span className="dim pixel-font stat-card-label">{label}</span>
+      <span className="pixel-font stat-card-value">{value}</span>
+    </div>
+  )
+}
+
 export default function AvatarPage() {
   const [spending, setSpending] = useState<1 | 2 | 3>(2)
   const [activity, setActivity] = useState<1 | 2 | 3>(2)
@@ -55,6 +64,8 @@ export default function AvatarPage() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<VitalityState | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+
+  const { vitality, focus, loaded } = useVitalityFocus(refreshKey)
 
   async function submit() {
     setSubmitting(true)
@@ -76,10 +87,44 @@ export default function AvatarPage() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-      <Avatar key={refreshKey} />
+    <div>
+      {/* 2-column dashboard grid — portrait + VITALS STATUS panels side by
+          side, per character_dashboard_pixel_mono_white/screen.png. */}
+      <div className="avatar-dashboard-grid">
+        <div className="panel">
+          <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
+            分身
+          </h2>
+          <AvatarPortrait focus={focus} loaded={loaded} />
+        </div>
 
-      <div className="panel" style={{ flex: 1, minWidth: 260 }}>
+        <div className="panel">
+          <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
+            VITALS STATUS
+          </h2>
+          <VitalsPanel vitality={vitality} />
+        </div>
+      </div>
+
+      {/* Real stat readout row — only numbers this app actually has
+          (Health/Sanity from vitality, Focus from the latest focus session
+          if one exists). No fabricated STRENGTH/DEXTERITY/LUCK stats. */}
+      <div className="avatar-stat-row">
+        <StatCard label="HEALTH" value={vitality ? `${Math.round(vitality.health)}` : '—'} />
+        <StatCard
+          label="SANITY"
+          value={
+            vitality
+              ? `${Math.round(vitality.sanity)}/${Math.round(vitality.sanity_cap)}`
+              : '—'
+          }
+        />
+        {focus && focus.focus_score != null && (
+          <StatCard label="FOCUS" value={`${Math.round(focus.focus_score)}`} />
+        )}
+      </div>
+
+      <div className="panel">
         <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
           每日签到
         </h2>
