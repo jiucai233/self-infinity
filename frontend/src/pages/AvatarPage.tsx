@@ -113,36 +113,47 @@ export default function AvatarPage({ onInitiateMission }: { onInitiateMission?: 
 
   return (
     <div style={{ position: 'relative', paddingBottom: 48 }}>
-      {/* 2-column dashboard grid — portrait + VITALS STATUS panels side by
-          side, per character_dashboard_pixel_mono_white/screen.png. */}
-      <div className="avatar-dashboard-grid">
+      {/* 2-column dashboard grid — portrait card (with an ID-tag caption,
+          matching the template's UNIT_042/CHRONOS VANGUARD DIVISION block)
+          on the left; VITALS STATUS + the attribute row stacked in the
+          right column beneath it, per
+          character_dashboard_pixel_mono_white/screen.png. The attribute row
+          previously spanned the full width under BOTH columns, which the
+          reference doesn't do — it belongs nested under Vitals only. */}
+      <div className="avatar-dashboard-grid" style={{ marginBottom: 16 }}>
         <div className="panel">
-          <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
-            Character
-          </h2>
           <AvatarPortrait focus={focus} loaded={loaded} />
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <p className="pixel-font" style={{ fontSize: 11, marginBottom: 4 }}>
+              AGENT_001
+            </p>
+            <p className="dim" style={{ fontSize: 11 }}>
+              Self-Infinity Auditee
+            </p>
+          </div>
         </div>
 
-        <div className="panel">
-          <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
-            VITALS STATUS
-          </h2>
-          <VitalsPanel vitality={vitality} />
-        </div>
-      </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="panel">
+            <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
+              VITALS STATUS
+            </h2>
+            <VitalsPanel vitality={vitality} />
+          </div>
 
-      {/* Single stat-card row: real Focus reading (Health/Sanity already
-          shown above in VITALS STATUS, no need to repeat them here) plus the
-          decorative Strength/Dexterity/Intellect/Luck attributes from the
-          template's attribute grid. Intellect derives from real principle
-          count; Strength/Dexterity/Luck are static flavor values. */}
-      <div className="avatar-stat-row">
-        {focus && focus.focus_score != null && (
-          <StatCard label="FOCUS" value={`${Math.round(focus.focus_score)}`} />
-        )}
-        {attributes.map((a) => (
-          <StatCard key={a.label} label={a.label.toUpperCase()} value={`${a.value}`} />
-        ))}
+          {/* real Focus reading plus the decorative Strength/Dexterity/
+              Intellect/Luck attributes from the template's attribute grid.
+              Intellect derives from real principle count; Strength/
+              Dexterity/Luck are static flavor values. */}
+          <div className="avatar-stat-row" style={{ margin: 0 }}>
+            {focus && focus.focus_score != null && (
+              <StatCard label="FOCUS" value={`${Math.round(focus.focus_score)}`} />
+            )}
+            {attributes.map((a) => (
+              <StatCard key={a.label} label={a.label.toUpperCase()} value={`${a.value}`} />
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="avatar-dashboard-grid" style={{ marginBottom: 16 }}>
