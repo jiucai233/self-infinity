@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
+import KnowledgeGraph from './KnowledgeGraph'
 import type { AuditMode, GraphResponse, SkillNode } from '../types'
 
 const ONBOARDING_DISMISSED_KEY = 'self-infinity-onboarding-dismissed'
@@ -449,6 +450,10 @@ export default function SkillTree({
           })}
         </div>
       )}
+
+      <div style={{ marginTop: 32 }}>
+        <KnowledgeGraph onOpenSkill={(skillId) => onOpenDetail?.(skillId)} />
+      </div>
     </div>
   )
 }

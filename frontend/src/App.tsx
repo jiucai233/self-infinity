@@ -6,7 +6,6 @@ import PrincipleShelf from './pages/PrincipleShelf'
 import AvatarPage from './pages/AvatarPage'
 import Quests from './pages/Quests'
 import Guild from './pages/Guild'
-import KnowledgeGraph from './pages/KnowledgeGraph'
 import Support from './pages/Support'
 import Avatar from './components/Avatar'
 import ThemeToggle from './components/ThemeToggle'
@@ -17,7 +16,7 @@ type View =
   | { name: 'tree' }
   | { name: 'nodeDetail'; skillId: number }
   | { name: 'audit'; skillId: number; nodeType: NodeType; mode: AuditMode }
-type Panel = 'none' | 'principles' | 'avatar' | 'quests' | 'guild' | 'map' | 'support'
+type Panel = 'none' | 'principles' | 'avatar' | 'quests' | 'guild' | 'support'
 
 function App() {
   const [view, setView] = useState<View>({ name: 'tree' })
@@ -41,7 +40,6 @@ function App() {
   const onPrinciples = panel === 'principles'
   const onQuests = panel === 'quests'
   const onGuild = panel === 'guild'
-  const onMap = panel === 'map'
   const onSupport = panel === 'support'
 
   function goToSkills() {
@@ -115,12 +113,6 @@ function App() {
             Guild
           </button>
           <button
-            className={`app-sidebar-nav-item${onMap ? ' app-sidebar-nav-item--active' : ''}`}
-            onClick={() => setPanel((p) => (p === 'map' ? 'none' : 'map'))}
-          >
-            Graph
-          </button>
-          <button
             className={`app-sidebar-nav-item${onSupport ? ' app-sidebar-nav-item--active' : ''}`}
             onClick={() => setPanel((p) => (p === 'support' ? 'none' : 'support'))}
           >
@@ -151,13 +143,6 @@ function App() {
           <Quests />
         ) : panel === 'guild' ? (
           <Guild />
-        ) : panel === 'map' ? (
-          <KnowledgeGraph
-            onOpenSkill={(skillId) => {
-              setPanel('none')
-              setView({ name: 'nodeDetail', skillId })
-            }}
-          />
         ) : panel === 'support' ? (
           <Support />
         ) : view.name === 'tree' ? (

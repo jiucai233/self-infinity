@@ -14,6 +14,15 @@ vi.mock('../api', () => ({
   },
 }))
 
+// force-graph renders to a real <canvas> 2D context, which jsdom doesn't
+// implement — mounting the genuine KnowledgeGraph here would throw
+// (node_modules/force-graph reads ctx.scale on a null context). Stub it out
+// so SkillTree's own tests stay focused on the recommendation list; the
+// graph itself is only exercised via real-browser verification.
+vi.mock('./KnowledgeGraph', () => ({
+  default: () => <div data-testid="knowledge-graph-stub" />,
+}))
+
 const emptyGraph: GraphResponse = { nodes: [], edges: [] }
 
 // Recommendation list only shows real "available" nodes — locked nodes
