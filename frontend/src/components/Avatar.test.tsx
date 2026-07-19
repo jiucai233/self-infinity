@@ -96,6 +96,6 @@ describe('Avatar', () => {
     await waitFor(() =>
       expect(screen.getByTestId('force-field')).toHaveAttribute('data-band', 'idle'),
     )
-    expect(await screen.findByText('尚无专注度数据')).toBeInTheDocument()
+    expect(await screen.findByText('No focus data yet')).toBeInTheDocument()
   })
 })

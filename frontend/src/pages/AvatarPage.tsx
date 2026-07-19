@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AvatarPortrait, VitalsPanel, useVitalityFocus } from '../components/Avatar'
 import { api } from '../api'
-import type { CheckInRequest, VitalityState } from '../types'
+import type { CheckInRequest, Principle, VitalityState } from '../types'
 
 const RATING_OPTIONS: { value: 1 | 2 | 3; label: string }[] = [
-  { value: 1, label: '差' },
-  { value: 2, label: '一般' },
-  { value: 3, label: '好' },
+  { value: 1, label: 'Poor' },
+  { value: 2, label: 'Okay' },
+  { value: 3, label: 'Good' },
 ]
 
 function RatingField({
@@ -56,7 +56,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
   )
 }
 
-export default function AvatarPage() {
+export default function AvatarPage({ onInitiateMission }: { onInitiateMission?: () => void }) {
   const [spending, setSpending] = useState<1 | 2 | 3>(2)
   const [activity, setActivity] = useState<1 | 2 | 3>(2)
   const [eating, setEating] = useState<1 | 2 | 3>(2)
@@ -64,8 +64,20 @@ export default function AvatarPage() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<VitalityState | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [principles, setPrinciples] = useState<Principle[]>([])
 
   const { vitality, focus, loaded } = useVitalityFocus(refreshKey)
+
+  useEffect(() => {
+    // Real data for "Equipped Gear" / "Recent Records" below — reuses the
+    // existing principles endpoint instead of inventing fake gear/log
+    // entries. Best-effort: if it fails, both panels just fall back to
+    // decorative flavor content.
+    api
+      .listPrinciples()
+      .then(setPrinciples)
+      .catch(() => {})
+  }, [refreshKey])
 
   async function submit() {
     setSubmitting(true)
@@ -86,14 +98,27 @@ export default function AvatarPage() {
     }
   }
 
+  // decorative: Intellect derives from real recent-principle count (a cheap
+  // proxy for "how much reflection has this person banked"); Strength/
+  // Dexterity/Luck have no real backing stat in this app and are static
+  // flavor values, per the template's four-attribute row.
+  const attributes = [
+    { label: 'Strength', value: 12 },
+    { label: 'Dexterity', value: 14 },
+    { label: 'Intellect', value: 10 + principles.length },
+    { label: 'Luck', value: 7 },
+  ]
+
+  const recentPrinciples = principles.slice(0, 2)
+
   return (
-    <div>
+    <div style={{ position: 'relative', paddingBottom: 48 }}>
       {/* 2-column dashboard grid — portrait + VITALS STATUS panels side by
           side, per character_dashboard_pixel_mono_white/screen.png. */}
       <div className="avatar-dashboard-grid">
         <div className="panel">
           <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
-            分身
+            Character
           </h2>
           <AvatarPortrait focus={focus} loaded={loaded} />
         </div>
@@ -106,32 +131,85 @@ export default function AvatarPage() {
         </div>
       </div>
 
-      {/* Real stat readout row — only numbers this app actually has
-          (Health/Sanity from vitality, Focus from the latest focus session
-          if one exists). No fabricated STRENGTH/DEXTERITY/LUCK stats. */}
+      {/* Single stat-card row: real Focus reading (Health/Sanity already
+          shown above in VITALS STATUS, no need to repeat them here) plus the
+          decorative Strength/Dexterity/Intellect/Luck attributes from the
+          template's attribute grid. Intellect derives from real principle
+          count; Strength/Dexterity/Luck are static flavor values. */}
       <div className="avatar-stat-row">
-        <StatCard label="HEALTH" value={vitality ? `${Math.round(vitality.health)}` : '—'} />
-        <StatCard
-          label="SANITY"
-          value={
-            vitality
-              ? `${Math.round(vitality.sanity)}/${Math.round(vitality.sanity_cap)}`
-              : '—'
-          }
-        />
         {focus && focus.focus_score != null && (
           <StatCard label="FOCUS" value={`${Math.round(focus.focus_score)}`} />
         )}
+        {attributes.map((a) => (
+          <StatCard key={a.label} label={a.label.toUpperCase()} value={`${a.value}`} />
+        ))}
+      </div>
+
+      <div className="avatar-dashboard-grid" style={{ marginBottom: 16 }}>
+        <div className="panel">
+          <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
+            Equipped Gear
+          </h2>
+          {recentPrinciples.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {recentPrinciples.map((p) => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13 }}>{p.title}</span>
+                  <span className="tag tag--outline" style={{ fontSize: 11 }}>
+                    +Audit Passed
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="dim" style={{ fontSize: 13 }}>
+              No gear yet — pass an audit to earn your first Archive entry.
+            </p>
+          )}
+        </div>
+
+        <div className="panel">
+          <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
+            Recent Records
+          </h2>
+          {recentPrinciples.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {recentPrinciples.map((p) => (
+                <div key={p.id}>
+                  <p style={{ fontSize: 13 }}>{p.title}</p>
+                  <p className="dim" style={{ fontSize: 11 }}>
+                    {p.body.slice(0, 60)}
+                    {p.body.length > 60 ? '…' : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="dim" style={{ fontSize: 13 }}>
+              Nothing logged yet.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="panel">
         <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
-          每日签到
+          Daily Check-in
         </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <RatingField label="消费" name="spending" value={spending} onChange={setSpending} />
-          <RatingField label="运动" name="activity" value={activity} onChange={setActivity} />
-          <RatingField label="饮食" name="eating" value={eating} onChange={setEating} />
+          <RatingField
+            label="Spending"
+            name="spending"
+            value={spending}
+            onChange={setSpending}
+          />
+          <RatingField
+            label="Activity"
+            name="activity"
+            value={activity}
+            onChange={setActivity}
+          />
+          <RatingField label="Diet" name="eating" value={eating} onChange={setEating} />
         </div>
         <button
           className="accent"
@@ -139,7 +217,7 @@ export default function AvatarPage() {
           onClick={submit}
           disabled={submitting}
         >
-          {submitting ? '提交中…' : '提交签到'}
+          {submitting ? 'Submitting…' : 'Submit Check-in'}
         </button>
 
         {error && (
@@ -148,11 +226,21 @@ export default function AvatarPage() {
 
         {result && !error && (
           <p className="dim" style={{ marginTop: 12, fontSize: 13 }}>
-            签到成功 · Health {Math.round(result.health)} · Sanity {Math.round(result.sanity)}/
-            {Math.round(result.sanity_cap)}
+            Check-in complete · Health {Math.round(result.health)} · Sanity{' '}
+            {Math.round(result.sanity)}/{Math.round(result.sanity_cap)}
           </p>
         )}
       </div>
+
+      {onInitiateMission && (
+        <button
+          className="accent"
+          style={{ position: 'fixed', bottom: 16, right: 76 }}
+          onClick={onInitiateMission}
+        >
+          Initiate Mission
+        </button>
+      )}
     </div>
   )
 }

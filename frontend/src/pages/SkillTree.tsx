@@ -4,12 +4,12 @@ import type { AuditMode, SkillNode } from '../types'
 
 const ONBOARDING_DISMISSED_KEY = 'self-infinity-onboarding-dismissed'
 
-const EXAMPLE_TOPICS = ['B 树', '把这个项目部署上线', '强化学习']
+const EXAMPLE_TOPICS = ['B-trees', 'Deploy this project', 'Reinforcement learning']
 
 const STATUS_LABEL: Record<SkillNode['status'], string> = {
-  locked: '未解锁',
-  available: '可审计',
-  mastered: '已掌握',
+  locked: 'Locked',
+  available: 'Available',
+  mastered: 'Mastered',
 }
 
 const STATUS_COLOR: Record<SkillNode['status'], string> = {
@@ -19,13 +19,13 @@ const STATUS_COLOR: Record<SkillNode['status'], string> = {
 }
 
 const NODE_TYPE_LABEL: Record<SkillNode['node_type'], string> = {
-  concept: '概念 · 讲清楚为什么',
-  task: '任务 · 做到就行',
+  concept: 'Concept · Explain the why',
+  task: 'Task · Just get it done',
 }
 
 // No hue to lean on in the mono system, so concept/task stay distinct via
-// tag treatment instead of color: concept ("讲清楚为什么") is the lighter
-// outlined chip, task ("做到就行") is the heavier filled/inverted chip.
+// tag treatment instead of color: concept ("explain the why") is the lighter
+// outlined chip, task ("just get it done") is the heavier filled/inverted chip.
 const NODE_TYPE_TAG_CLASS: Record<SkillNode['node_type'], string> = {
   concept: 'tag tag--outline',
   task: 'tag tag--filled',
@@ -128,8 +128,10 @@ export function computeSkillTreeLayout(
 
 export default function SkillTree({
   onAudit,
+  onOpenDetail,
 }: {
   onAudit: (skillId: number, nodeType: SkillNode['node_type'], mode: AuditMode) => void
+  onOpenDetail?: (skillId: number) => void
 }) {
   const [skills, setSkills] = useState<SkillNode[]>([])
   const [loading, setLoading] = useState(true)
@@ -257,9 +259,9 @@ export default function SkillTree({
   function submitClarifyAnswers() {
     if (clarifyTopicText === null) return
     const lines = clarifyQuestions
-      .map((q, i) => `- ${q}：${clarifyAnswers[i]?.trim() ?? ''}`)
+      .map((q, i) => `- ${q}: ${clarifyAnswers[i]?.trim() ?? ''}`)
       .join('\n')
-    const combined = `${clarifyTopicText}\n\n补充说明：\n${lines}`
+    const combined = `${clarifyTopicText}\n\nAdditional details:\n${lines}`
     void runGenerate(combined)
   }
 
@@ -268,35 +270,41 @@ export default function SkillTree({
     void runGenerate(clarifyTopicText)
   }
 
-  if (loading) return <p className="dim">加载技能树…</p>
+  if (loading) return <p className="dim">Loading skills…</p>
 
   const { positions, width, height } = computeSkillTreeLayout(skills)
   const masteredCount = skills.filter((s) => s.status === 'mastered').length
+  // decorative: no real currency system exists — Essence is a flavor stat
+  // derived from the real mastered-node count, per the template's
+  // "ESSENCE" stat pill next to the real "Mastered X / Y" pill.
+  const essence = masteredCount * 25
 
   return (
     <div>
       <h2 className="pixel-font" style={{ fontSize: 18 }}>
-        技能树
+        Skills
       </h2>
       <p className="dim" style={{ marginBottom: 16 }}>
-        点亮一个「原理方块」，必须先通过费曼审计官的压力测试。学习内容不设限——
-        给一个主题或一个想完成的大任务，规划官会拆成小节点接到树上。
+        Light up a Principle Block by passing the Feynman Auditor's stress test first. Learning
+        isn't scoped — give a topic or a big goal you want to finish, and the Planner will break
+        it into small nodes on the tree.
       </p>
 
       {!onboardingDismissed && (
         <div className="panel" style={{ marginBottom: 16, borderColor: 'var(--accent)' }}>
-          <p style={{ marginBottom: 6, fontWeight: 600 }}>怎么玩？</p>
+          <p style={{ marginBottom: 6, fontWeight: 600 }}>How to Play</p>
           <p className="dim" style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 10 }}>
-            ① 输入一个主题或想完成的任务，AI 会拆成一棵技能树
+            ① Enter a topic or a task you want to finish — AI breaks it into a skill tree
             <br />
-            ② 每个节点必须先通过审计官的追问才能点亮
+            ② Every node must survive the Auditor's follow-up questions before it lights up
             <br />
-            ③ 概念型追问到第一性原理，任务型只看是否做到
+            ③ Concept nodes get grilled down to first principles; task nodes just need proof you
+            did it
             <br />
-            ④ 审计失败会强制你反思，蒸馏成可复用的原则
+            ④ Failing an audit forces a reflection, distilled into a reusable principle
           </p>
           <button className="accent" onClick={dismissOnboarding}>
-            知道了
+            Got it
           </button>
         </div>
       )}
@@ -305,21 +313,21 @@ export default function SkillTree({
         className="panel"
         style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}
       >
-        <span style={{ fontSize: 12 }}>审计模式：</span>
+        <span style={{ fontSize: 12 }}>Audit Mode:</span>
         <button
           className={auditMode === 'day' ? 'accent' : undefined}
           onClick={() => setAuditMode('day')}
         >
-          白天（标准）
+          Day (Standard)
         </button>
         <button
           className={auditMode === 'night' ? 'accent' : undefined}
           onClick={() => setAuditMode('night')}
         >
-          夜晚（深度）
+          Night (Deep)
         </button>
         <span className="dim" style={{ fontSize: 11 }}>
-          夜晚模式追问轮数翻倍，适合难啃的硬骨头话题
+          Night mode doubles the follow-up rounds — good for the hard stuff.
         </span>
       </div>
 
@@ -327,7 +335,7 @@ export default function SkillTree({
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             value={topic}
-            placeholder="例如：B 树 / 把这个项目上线所需要的知识"
+            placeholder="e.g. B-trees / everything needed to ship this project"
             onChange={(e) => setTopic(e.target.value)}
             disabled={generating || clarifyQuestions.length > 0}
             onKeyDown={(e) => e.key === 'Enter' && generate()}
@@ -337,13 +345,13 @@ export default function SkillTree({
             onClick={generate}
             disabled={generating || !topic.trim() || clarifyQuestions.length > 0}
           >
-            {generating ? '规划官拆解中…' : '生成技能树'}
+            {generating ? 'Planner is breaking it down…' : 'New Mission'}
           </button>
         </div>
 
         <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
           <span className="dim" style={{ fontSize: 11 }}>
-            没想法？试试：
+            No ideas? Try:
           </span>
           {EXAMPLE_TOPICS.map((example) => (
             <span
@@ -362,7 +370,7 @@ export default function SkillTree({
         {clarifyQuestions.length > 0 && (
           <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
             <p style={{ fontSize: 13, marginBottom: 10 }}>
-              这个主题有点大，先回答一两个问题帮你缩小范围（也可以跳过）：
+              This topic is pretty broad — answer a question or two to narrow it down (optional):
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
               {clarifyQuestions.map((q, i) => (
@@ -391,10 +399,10 @@ export default function SkillTree({
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="accent" onClick={submitClarifyAnswers} disabled={generating}>
-                {generating ? '规划官拆解中…' : '生成'}
+                {generating ? 'Planner is breaking it down…' : 'Generate'}
               </button>
               <button onClick={skipClarifyAnswers} disabled={generating}>
-                跳过，直接生成
+                Skip, generate anyway
               </button>
             </div>
           </div>
@@ -406,10 +414,14 @@ export default function SkillTree({
       {skills.length > 0 && (
         <div className="skilltree-stat-pills">
           <div className="stat-pill pixel-border">
-            <span className="dim stat-pill-label">已掌握</span>
+            <span className="dim stat-pill-label">Mastered</span>
             <span className="pixel-font stat-pill-value">
               {masteredCount} / {skills.length}
             </span>
+          </div>
+          <div className="stat-pill pixel-border">
+            <span className="dim stat-pill-label">Essence</span>
+            <span className="pixel-font stat-pill-value">{essence}</span>
           </div>
         </div>
       )}
@@ -489,15 +501,20 @@ export default function SkillTree({
                 </p>
                 <p style={{ fontSize: 12, color: STATUS_COLOR[skill.status], marginBottom: 8 }}>
                   {STATUS_LABEL[skill.status]}
-                  {skill.mastery_score != null ? ` · ${skill.mastery_score}分` : ''}
+                  {skill.mastery_score != null ? ` · ${skill.mastery_score} pts` : ''}
                 </p>
-                <button
-                  className={skill.status === 'available' ? 'accent' : undefined}
-                  disabled={skill.status !== 'available'}
-                  onClick={() => onAudit(skill.id, skill.node_type, auditMode)}
-                >
-                  {skill.status === 'mastered' ? '已通过审计' : '发起审计'}
-                </button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    className={skill.status === 'available' ? 'accent' : undefined}
+                    disabled={skill.status !== 'available'}
+                    onClick={() => onAudit(skill.id, skill.node_type, auditMode)}
+                  >
+                    {skill.status === 'mastered' ? 'Audit Passed' : 'Start Audit'}
+                  </button>
+                  {onOpenDetail && (
+                    <button onClick={() => onOpenDetail(skill.id)}>Details</button>
+                  )}
+                </div>
               </div>
             )
           })}

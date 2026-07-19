@@ -13,7 +13,7 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      aria-label={theme === 'light' ? '切换为深色主题' : '切换为浅色主题'}
+      aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
       style={{
         position: 'fixed',
         bottom: 16,

@@ -251,3 +251,89 @@ POINTS/ESSENCE 这类不存在的货币概念。
 - 技能树连线依赖 `getBoundingClientRect()` 做实际测量定位，在 jsdom 测试
   环境下无法获得真实布局（永远返回 0），测试只验证连线元素存在/状态样式
   正确（class 名），不验证 `d` 属性里的具体像素坐标。
+
+---
+
+## 7. 全英文 1:1 复刻（2026-07-19，第三次改版）
+
+用户明确要求"一比一，完全复制，用英语"——不再只搬视觉语言和页面骨架，连
+§5 里明确说"不照搬"的 Guild/Quests/Inventory/装备栏/ESSENCE 也要按模板加上
+（作为装饰性占位，不接后端逻辑），并把现有 UI 文案全部从中文改成英文。
+本节记录这次改版做了什么、哪些数字是真的哪些是装饰性的——§5 那条"不照搬
+虚构 RPG 功能"的取舍到这次改版为止已被用户显式推翻，但原文保留不改，改动
+记录在这里。
+
+### 7.1 全量英文化
+`App.tsx`／`SkillTree.tsx`／`AuditRoom.tsx`／`AvatarPage.tsx`／
+`PrincipleShelf.tsx`／`Avatar.tsx`／`ThemeToggle.tsx` 里所有面向用户的中文
+字符串（标题、按钮、占位符、状态文案、错误提示、aria-label）改成英文，
+配套测试（`SkillTree.test.tsx`／`AuditRoom.test.tsx`／`Avatar.test.tsx`）
+里对应的 `getByText`/`getByRole(name:)` 查询同步改成英文断言，没有削弱
+覆盖率。`原则卷轴`/PrincipleShelf 按模板的 "Archive" nav 槽位改名为
+"Archive"（组件文件名本身没改，只改了渲染文案，避免无意义的大范围
+重命名）。语音识别用的 `recognition.lang = 'zh-CN'`
+没有改——语音输入的目标用户仍然讲中文，这是功能配置不是 UI 文案。
+
+### 7.2 侧栏导航扩展 + 新增装饰页面（`App.tsx`）
+侧栏 nav 从三项（技能树/分身/原则卷轴）扩到模板的全量七项：
+`Character`／`Skills`／`Archive`／`Quests`／`Guild`／`Map`／`Support`／
+`Log Out`（disabled 按钮，无 onClick——本项目没有真实登录系统，不为了
+凑一个导航项去搭一套假登录）。新增 `pages/Quests.tsx`／`Guild.tsx`／
+`Map.tsx`／`Support.tsx`：纯静态装饰页，`.panel` 包一段 flavor
+文案，主题贴本项目"学习审计"而不是模板原版的科幻叙事，不接任何后端
+状态。侧栏新增装饰性 "Level N / Auditor Class" 卡片——Level 从真实的
+已掌握节点数派生（`1 + Math.floor(masteredCount / 3)`），Class 是写死的
+flavor 字符串；侧栏底部新增 "New Mission" 按钮，真实功能是跳转回 Skills
+视图（`goToSkills`）。
+
+### 7.3 技能节点详情页（新增 `pages/SkillNodeDetail.tsx`）
+`SkillTree.tsx` 每张卡片新增一个 "Details" 按钮（保留原有 "Start
+Audit"/"Audit Passed" 按钮行为不变），点击后 `App.tsx` 切到
+`{ name: 'nodeDetail'; skillId }` 视图。页面内容：
+- Breadcrumb "Skills > NODE DETAIL"，点 "Skills" 回到技能树。
+- 标题/描述用真实 `skill.title`/`description`，子标题是真实
+  `node_type`（"Concept Node"/"Task Node"），不是模板假的
+  "ACTIVE ABILITY / LEVEL 3"。
+- Progression 条：真实——`mastered` 时用 `mastery_score`，否则 0%。
+- Requirements 框：真实——有 `parent_id` 就显示 "Requires: <父节点标题>"，
+  否则 "No prerequisites"。
+- Benefits 框：装饰性 flavor 文案（"+Understanding" / "+Progress toward
+  mastery"），代码注释标了 decorative——没有数值 buff 系统支撑这两行。
+- 操作按钮 "Allocate Skill Point"：真实，复用 `onAudit` 回调，日/夜模式
+  这里没有选择器，固定传 `'day'`（代码注释里写了这个简化）。
+- 底部统计行：`UNLOCKED NODES` 真实（同技能树画布的 mastered/total 徽章）；
+  `GLOBAL RANK`／`TIME PLAYED` 是装饰性静态值（`#128`／`12H 40M`），本项目
+  没有排名/时长统计，注释标了 decorative，纯粹为了不让这一行看起来像
+  没做完。
+
+### 7.4 技能树画布第二个统计徽章（`SkillTree.tsx`）
+"Mastered X / Y" 真实徽章旁边新增装饰性 "Essence" 徽章
+（`masteredCount * 25`，代码注释标 decorative），凑成模板里
+SKILL POINTS/ESSENCE 那种成对徽章的视觉。"生成技能树" 按钮改名
+"New Mission"（真实生成行为不变）。
+
+### 7.5 分身页仪表盘补全（`AvatarPage.tsx`／`Avatar.tsx`）
+- `VitalsPanel` 的 Health/Sanity 条显示文案改成 "Health Score"/"Mental
+  Score"（`Bar` 组件新增 `displayLabel` 参数，与原有 `label` 参数分离——
+  `label` 仍然是 "Health"/"Sanity"，因为它同时驱动
+  `data-testid="bar-track-Health"` 等既有测试钩子，改文案不需要连带改
+  测试选择器）。
+- 新增 Strength/Dexterity/Intellect/Luck 四格属性行：Intellect 从真实的
+  已获得原则数派生（`10 + principles.length`），其余三个是装饰性静态值，
+  代码注释标了 decorative。
+- 新增 "Equipped Gear" 面板：真实数据——复用 `api.listPrinciples()` 取最近
+  2 条原则，标题 + "+Audit Passed" 徽章；没有原则时显示提示文案，不编造
+  假装备。
+- 新增 "Recent Records" 面板：同样复用最近 2 条原则（标题 + 正文截断），
+  不是独立的假日志时间戳。
+- 新增右下角 "Initiate Mission" 悬浮按钮（`onInitiateMission` prop，
+  `App.tsx` 传入 `goToSkills`），效果同侧栏 "New Mission"。
+
+### 7.6 审计室 quest 卡片补一条进度条（`AuditRoom.tsx`）
+新增 `estimateMaxTurns(nodeType, mode)`——镜像
+`backend/app/routers/audits.py` 的 `_resolve_max_turns`（concept 基数 4／
+task 基数 2，night 模式翻倍），仅用于渲染 quest 卡片里的一条
+`已提交轮次 / 估算上限` 进度条，纯展示用途，不是新的后端调用；如果后端
+`app/config.py` 的默认值以后改了，这条进度条的百分比会跟着漂移，代码注释
+里写明了这一点。真实的"什么时候强制裁决"仍然完全由后端 `_resolve_max_
+turns` 决定，前端这条只是估算展示。

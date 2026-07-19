@@ -4,17 +4,28 @@ import type { AuditMode, AuditTurn, NodeType, TurnResultResponse } from '../type
 
 type Phase = 'loading' | 'active' | 'passed' | 'failed' | 'reflected'
 
-// Decision note (M3 "语音讲解"): the whitepaper's end-state (§4.2) is sending
-// raw audio to a multimodal model, but the backend has no audio pipeline and
-// the offline MockProvider can't consume audio at all. Instead we use the
-// browser-native Web Speech API to transcribe speech to text client-side and
-// feed the result into the existing text `input` state / submitTurn flow
-// unchanged. This ships the actual user-facing feature ("speak instead of
-// type") without backend changes, and works the same regardless of which
-// LLM provider is configured.
+// Decision note (M3 "spoken explanations"): the whitepaper's end-state
+// (§4.2) is sending raw audio to a multimodal model, but the backend has no
+// audio pipeline and the offline MockProvider can't consume audio at all.
+// Instead we use the browser-native Web Speech API to transcribe speech to
+// text client-side and feed the result into the existing text `input` state
+// / submitTurn flow unchanged. This ships the actual user-facing feature
+// ("speak instead of type") without backend changes, and works the same
+// regardless of which LLM provider is configured.
 function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   if (typeof window === 'undefined') return null
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null
+}
+
+// Display-only mirror of backend/app/routers/audits.py's _resolve_max_turns:
+// base is 4 turns for concept nodes / 2 for task nodes (app/config.py
+// defaults), doubled in night mode. Only used to render an estimated
+// progress bar on the quest card below — the backend is still the source of
+// truth for when a verdict actually gets forced, this is a display estimate
+// that will drift if the backend config values are ever changed.
+function estimateMaxTurns(nodeType: NodeType, mode: AuditMode): number {
+  const base = nodeType === 'concept' ? 4 : 2
+  return mode === 'night' ? base * 2 : base
 }
 
 export default function AuditRoom({
@@ -29,7 +40,7 @@ export default function AuditRoom({
   onDone: () => void
 }) {
   const isTask = nodeType === 'task'
-  const roleLabel = isTask ? '任务核验官' : '费曼审计官'
+  const roleLabel = isTask ? 'Task Verifier' : 'Feynman Auditor'
   const [phase, setPhase] = useState<Phase>('loading')
   const [auditId, setAuditId] = useState<number | null>(null)
   const [turns, setTurns] = useState<AuditTurn[]>([])
@@ -73,8 +84,8 @@ export default function AuditRoom({
     recognition.onerror = (event) => {
       setError(
         event.error === 'not-allowed' || event.error === 'permission-denied'
-          ? '麦克风权限被拒绝，无法使用语音输入'
-          : `语音识别出错：${event.error}`,
+          ? 'Microphone permission denied — voice input unavailable'
+          : `Speech recognition error: ${event.error}`,
       )
       setListening(false)
     }
@@ -138,21 +149,20 @@ export default function AuditRoom({
   if (phase === 'loading')
     return (
       <div className="audit-immersive">
-        <p className="dim">{roleLabel}正在入场…</p>
+        <p className="dim">{roleLabel} is entering…</p>
       </div>
     )
 
   // Real turn counter — number of user turns submitted so far in this
-  // session. Deliberately NOT an EXP percentage or a time-remaining
-  // countdown like the Stitch ACTIVE_QUEST card: those need max_turns /
-  // timing data that isn't passed into this component, so they're omitted
-  // rather than fabricated.
+  // session.
   const userTurnCount = turns.filter((t) => t.role === 'user').length
+  const estimatedMaxTurns = estimateMaxTurns(nodeType, mode)
+  const progressPct = Math.min(100, Math.round((userTurnCount / estimatedMaxTurns) * 100))
 
   return (
     <div className="audit-immersive">
       <button onClick={onDone} style={{ marginBottom: 16 }}>
-        ← 返回技能树
+        ← Back to Skills
       </button>
 
       <div className="audit-immersive-layout">
@@ -160,7 +170,7 @@ export default function AuditRoom({
         {turns.map((t, i) => (
           <div key={i}>
             <span className="dim" style={{ fontSize: 11 }}>
-              {t.role === 'auditor' ? roleLabel : '你'}
+              {t.role === 'auditor' ? roleLabel : 'You'}
             </span>
             <p style={{ marginTop: 2 }}>{t.content}</p>
           </div>
@@ -171,7 +181,11 @@ export default function AuditRoom({
             <textarea
               rows={4}
               value={input}
-              placeholder={isTask ? '说清楚具体打算怎么做…' : '讲给一个完全没听说过的人听…'}
+              placeholder={
+                isTask
+                  ? 'Explain exactly what you plan to do…'
+                  : "Explain it to someone who's never heard of this…"
+              }
               onChange={(e) => setInput(e.target.value)}
               disabled={submitting}
             />
@@ -181,7 +195,11 @@ export default function AuditRoom({
                 onClick={submitTurn}
                 disabled={submitting || !input.trim()}
               >
-                {submitting ? `${roleLabel}思考中…` : isTask ? '提交说明' : '提交解释'}
+                {submitting
+                  ? `${roleLabel} is thinking…`
+                  : isTask
+                    ? 'Submit Plan'
+                    : 'Submit Explanation'}
               </button>
               {speechSupported && (
                 <button
@@ -193,14 +211,14 @@ export default function AuditRoom({
                       ? { borderColor: 'var(--danger)', color: 'var(--danger)' }
                       : undefined
                   }
-                  title="语音输入"
+                  title="Voice Input"
                 >
-                  {listening ? '● 录音中…' : '语音输入'}
+                  {listening ? '● Recording…' : 'Voice Input'}
                 </button>
               )}
               {!speechSupported && (
-                <button type="button" disabled title="此浏览器不支持语音输入">
-                  语音输入
+                <button type="button" disabled title="Voice input not supported in this browser">
+                  Voice Input
                 </button>
               )}
             </div>
@@ -225,17 +243,17 @@ export default function AuditRoom({
             >
               {verdict.passed
                 ? isTask
-                  ? '✓ 任务完成'
-                  : '✓ 审计通过'
+                  ? '✓ Task Complete'
+                  : '✓ Audit Passed'
                 : isTask
-                  ? '✗ 还没做到'
-                  : '✗ 审计未通过'}{' '}
-              · {verdict.score} 分
+                  ? '✗ Not There Yet'
+                  : '✗ Audit Failed'}{' '}
+              · {verdict.score} pts
             </p>
             {verdict.passed && verdict.reward_amount != null && (
               <p style={{ fontSize: 13, marginTop: 2, color: 'var(--accent)' }}>
-                +{verdict.reward_amount} 奖励
-                {verdict.reward_multiplier != null && ` （×${verdict.reward_multiplier}）`}
+                +{verdict.reward_amount} reward
+                {verdict.reward_multiplier != null && ` (×${verdict.reward_multiplier})`}
               </p>
             )}
             <p className="dim" style={{ fontSize: 13, marginTop: 4 }}>
@@ -250,7 +268,8 @@ export default function AuditRoom({
             )}
             {verdict.passed && verdict.unlocked_skill_ids.length > 0 && (
               <p style={{ fontSize: 13, marginTop: 8 }}>
-                解锁了 {verdict.unlocked_skill_ids.length} 个新节点
+                Unlocked {verdict.unlocked_skill_ids.length} new node
+                {verdict.unlocked_skill_ids.length === 1 ? '' : 's'}
               </p>
             )}
           </div>
@@ -259,7 +278,7 @@ export default function AuditRoom({
         {phase === 'failed' && (
           <div style={{ marginTop: 8 }}>
             <p className="dim" style={{ fontSize: 12, marginBottom: 6 }}>
-              强制反思：这次为什么没讲清楚？下次会怎么做？
+              Mandatory reflection: why didn't this land? What will you do differently next time?
             </p>
             <textarea
               rows={3}
@@ -272,7 +291,7 @@ export default function AuditRoom({
               onClick={submitReflection}
               disabled={submitting || !reflection.trim()}
             >
-              {submitting ? '蒸馏中…' : '提交反思，生成原则卷轴'}
+              {submitting ? 'Distilling…' : 'Submit Reflection, Generate Archive Entry'}
             </button>
           </div>
         )}
@@ -280,7 +299,7 @@ export default function AuditRoom({
         {phase === 'reflected' && principleTitle && (
           <div className="panel" style={{ marginTop: 8, background: 'var(--bg)' }}>
             <p style={{ fontSize: 12 }} className="dim">
-              新原则卷轴
+              New Archive Entry
             </p>
             <p>{principleTitle}</p>
           </div>
@@ -288,14 +307,15 @@ export default function AuditRoom({
 
         {phase === 'passed' && (
           <button className="accent" style={{ marginTop: 8 }} onClick={onDone}>
-            返回技能树
+            Back to Skills
           </button>
         )}
         </div>
 
         {/* ACTIVE_QUEST-style side card, per focus_mode_pixel_mono/screen.png
-            — shows real session facts only (role, node type, turn count),
-            no fabricated EXP % or countdown timer. */}
+            — shows real session facts (role, node type, turn count) plus a
+            progress bar estimated from the backend's max-turns config (see
+            estimateMaxTurns above) — display-only, not a fabricated EXP %. */}
         <div className="audit-quest-card">
           <p className="dim pixel-font" style={{ fontSize: 9, marginBottom: 8 }}>
             ACTIVE_AUDIT
@@ -304,10 +324,25 @@ export default function AuditRoom({
             {roleLabel}
           </p>
           <p className="dim" style={{ fontSize: 12, marginBottom: 12 }}>
-            节点类型：{isTask ? '任务 · 做到就行' : '概念 · 讲清楚为什么'}
+            Node type: {isTask ? 'Task · Just get it done' : 'Concept · Explain the why'}
+          </p>
+          <div
+            style={{
+              width: '100%',
+              height: 8,
+              border: '1px solid var(--border-strong)',
+              marginBottom: 4,
+            }}
+          >
+            <div
+              style={{ width: `${progressPct}%`, height: '100%', background: 'var(--text)' }}
+            />
+          </div>
+          <p className="dim" style={{ fontSize: 11, marginBottom: 12 }}>
+            {progressPct}%
           </p>
           <p className="dim" style={{ fontSize: 11, marginBottom: 4 }}>
-            已提交轮次
+            Turns Submitted
           </p>
           <p className="pixel-font" style={{ fontSize: 16 }}>
             {userTurnCount}

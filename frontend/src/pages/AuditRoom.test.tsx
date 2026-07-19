@@ -23,7 +23,7 @@ function startAuditResponse(skillId: number): StartAuditResponse {
       comment: null,
       turns: [],
     },
-    opening_question: '开场问题',
+    opening_question: 'Opening question',
   }
 }
 
@@ -40,11 +40,11 @@ describe('AuditRoom', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByPlaceholderText('说清楚具体打算怎么做…'),
+        screen.getByPlaceholderText('Explain exactly what you plan to do…'),
       ).toBeInTheDocument(),
     )
-    expect(screen.getByRole('button', { name: '提交说明' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '提交解释' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Submit Plan' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Submit Explanation' })).not.toBeInTheDocument()
   })
 
   it('shows concept-specific copy when nodeType is "concept"', async () => {
@@ -52,11 +52,11 @@ describe('AuditRoom', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByPlaceholderText('讲给一个完全没听说过的人听…'),
+        screen.getByPlaceholderText("Explain it to someone who's never heard of this…"),
       ).toBeInTheDocument(),
     )
-    expect(screen.getByRole('button', { name: '提交解释' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '提交说明' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Submit Explanation' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Submit Plan' })).not.toBeInTheDocument()
   })
 
   it('shows task-specific verdict copy on pass/fail', async () => {
@@ -64,8 +64,8 @@ describe('AuditRoom', () => {
       type: 'verdict',
       passed: false,
       score: 40,
-      gaps: ['缺少边界情况'],
-      comment: '还差一点',
+      gaps: ['Missing edge cases'],
+      comment: 'Almost there',
       unlocked_skill_ids: [],
       reward_amount: null,
       reward_multiplier: null,
@@ -74,11 +74,11 @@ describe('AuditRoom', () => {
     const user = (await import('@testing-library/user-event')).default.setup()
     render(<AuditRoom skillId={1} nodeType="task" onDone={vi.fn()} />)
 
-    const textarea = await screen.findByPlaceholderText('说清楚具体打算怎么做…')
-    await user.type(textarea, '我打算这样做')
-    await user.click(screen.getByRole('button', { name: '提交说明' }))
+    const textarea = await screen.findByPlaceholderText('Explain exactly what you plan to do…')
+    await user.type(textarea, "Here's my plan")
+    await user.click(screen.getByRole('button', { name: 'Submit Plan' }))
 
-    await waitFor(() => expect(screen.getByText(/✗ 还没做到/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/✗ Not There Yet/)).toBeInTheDocument())
   })
 
   it('shows reward feedback when the verdict includes a reward', async () => {
@@ -87,7 +87,7 @@ describe('AuditRoom', () => {
       passed: true,
       score: 90,
       gaps: [],
-      comment: '讲得很清楚',
+      comment: 'Very clearly explained',
       unlocked_skill_ids: [],
       reward_amount: 50,
       reward_multiplier: 1.5,
@@ -96,11 +96,13 @@ describe('AuditRoom', () => {
     const user = (await import('@testing-library/user-event')).default.setup()
     render(<AuditRoom skillId={1} nodeType="concept" onDone={vi.fn()} />)
 
-    const textarea = await screen.findByPlaceholderText('讲给一个完全没听说过的人听…')
-    await user.type(textarea, '这是我的解释')
-    await user.click(screen.getByRole('button', { name: '提交解释' }))
+    const textarea = await screen.findByPlaceholderText(
+      "Explain it to someone who's never heard of this…",
+    )
+    await user.type(textarea, 'Here is my explanation')
+    await user.click(screen.getByRole('button', { name: 'Submit Explanation' }))
 
-    await waitFor(() => expect(screen.getByText(/\+50 奖励/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/\+50 reward/)).toBeInTheDocument())
     expect(screen.getByText(/×1\.5/)).toBeInTheDocument()
   })
 
@@ -134,27 +136,27 @@ describe('AuditRoom', () => {
       const user = (await import('@testing-library/user-event')).default.setup()
       render(<AuditRoom skillId={1} nodeType="concept" onDone={vi.fn()} />)
 
-      const micButton = await screen.findByRole('button', { name: '语音输入' })
+      const micButton = await screen.findByRole('button', { name: 'Voice Input' })
       expect(micButton).toBeEnabled()
       await user.click(micButton)
 
       const textarea = screen.getByPlaceholderText(
-        '讲给一个完全没听说过的人听…',
+        "Explain it to someone who's never heard of this…",
       ) as HTMLTextAreaElement
 
       await waitFor(() =>
-        expect(screen.getByRole('button', { name: /录音中/ })).toBeInTheDocument(),
+        expect(screen.getByRole('button', { name: /Recording/ })).toBeInTheDocument(),
       )
 
       expect(lastInstance).not.toBeNull()
       act(() => {
         lastInstance!.onresult?.({
           resultIndex: 0,
-          results: [{ isFinal: true, 0: { transcript: '这是语音转文字的结果' } }],
+          results: [{ isFinal: true, 0: { transcript: 'this is the transcribed result' } }],
         })
       })
 
-      expect(textarea.value).toBe('这是语音转文字的结果')
+      expect(textarea.value).toBe('this is the transcribed result')
       // does not auto-submit; user must still click the submit button
       expect(api.submitTurn).not.toHaveBeenCalled()
     })
@@ -162,9 +164,9 @@ describe('AuditRoom', () => {
     it('hides/disables the mic button when SpeechRecognition is unsupported', async () => {
       render(<AuditRoom skillId={1} nodeType="concept" onDone={vi.fn()} />)
 
-      await screen.findByPlaceholderText('讲给一个完全没听说过的人听…')
+      await screen.findByPlaceholderText("Explain it to someone who's never heard of this…")
 
-      const micButton = screen.getByRole('button', { name: '语音输入' })
+      const micButton = screen.getByRole('button', { name: 'Voice Input' })
       expect(micButton).toBeDisabled()
     })
   })

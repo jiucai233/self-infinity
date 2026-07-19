@@ -15,20 +15,20 @@ export default function PrincipleShelf() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <p className="dim">加载原则卷轴…</p>
+  if (loading) return <p className="dim">Loading archive…</p>
   if (error) return <p style={{ color: 'var(--danger)' }}>{error}</p>
 
   return (
     <div>
       <h2 className="pixel-font" style={{ fontSize: 18 }}>
-        原则卷轴
+        Archive
       </h2>
       <p className="dim" style={{ marginBottom: 24 }}>
-        每一条都是一次审计失败换来的可执行规则。
+        Each entry is an actionable rule earned from a failed audit.
       </p>
 
       {principles.length === 0 ? (
-        <p className="dim">还没有卷轴——先去技能树挂一次审计。</p>
+        <p className="dim">No entries yet — go fail an audit on the Skills tree first.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {principles.map((p) => (

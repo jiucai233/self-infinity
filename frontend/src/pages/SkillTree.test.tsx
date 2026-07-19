@@ -17,8 +17,8 @@ const skills: SkillNode[] = [
   {
     id: 1,
     slug: 'locked-concept',
-    title: '锁定的概念',
-    description: '还没解锁',
+    title: 'Locked Concept',
+    description: 'Not unlocked yet',
     parent_id: null,
     status: 'locked',
     node_type: 'concept',
@@ -27,8 +27,8 @@ const skills: SkillNode[] = [
   {
     id: 2,
     slug: 'available-task',
-    title: '可审计的任务',
-    description: '可以发起审计',
+    title: 'Available Task',
+    description: 'Ready to audit',
     parent_id: null,
     status: 'available',
     node_type: 'task',
@@ -37,8 +37,8 @@ const skills: SkillNode[] = [
   {
     id: 3,
     slug: 'mastered-concept',
-    title: '已掌握的概念',
-    description: '已经通过审计',
+    title: 'Mastered Concept',
+    description: 'Already passed audit',
     parent_id: null,
     status: 'mastered',
     node_type: 'concept',
@@ -57,10 +57,10 @@ describe('SkillTree', () => {
   it('renders concept/task badge labels for each node', async () => {
     render(<SkillTree onAudit={vi.fn()} />)
 
-    await waitFor(() => expect(screen.getByText('锁定的概念')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Locked Concept')).toBeInTheDocument())
 
-    expect(screen.getAllByText('概念 · 讲清楚为什么')).toHaveLength(2)
-    expect(screen.getByText('任务 · 做到就行')).toBeInTheDocument()
+    expect(screen.getAllByText('Concept · Explain the why')).toHaveLength(2)
+    expect(screen.getByText('Task · Just get it done')).toBeInTheDocument()
   })
 
   it('calls onAudit with skillId and node_type when clicking an available node', async () => {
@@ -68,10 +68,10 @@ describe('SkillTree', () => {
     const user = userEvent.setup()
     render(<SkillTree onAudit={onAudit} />)
 
-    await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
 
-    const card = screen.getByText('可审计的任务').closest('.panel') as HTMLElement
-    const button = within(card).getByRole('button', { name: '发起审计' })
+    const card = screen.getByText('Available Task').closest('.panel') as HTMLElement
+    const button = within(card).getByRole('button', { name: 'Start Audit' })
     await user.click(button)
 
     expect(onAudit).toHaveBeenCalledWith(2, 'task', 'day')
@@ -81,10 +81,10 @@ describe('SkillTree', () => {
     const onAudit = vi.fn()
     render(<SkillTree onAudit={onAudit} />)
 
-    await waitFor(() => expect(screen.getByText('锁定的概念')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Locked Concept')).toBeInTheDocument())
 
-    const card = screen.getByText('锁定的概念').closest('.panel') as HTMLElement
-    const button = within(card).getByRole('button', { name: '发起审计' })
+    const card = screen.getByText('Locked Concept').closest('.panel') as HTMLElement
+    const button = within(card).getByRole('button', { name: 'Start Audit' })
     expect(button).toBeDisabled()
   })
 
@@ -93,10 +93,10 @@ describe('SkillTree', () => {
     const user = userEvent.setup()
     render(<SkillTree onAudit={onAudit} />)
 
-    await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
 
-    const card = screen.getByText('可审计的任务').closest('.panel') as HTMLElement
-    await user.click(within(card).getByRole('button', { name: '发起审计' }))
+    const card = screen.getByText('Available Task').closest('.panel') as HTMLElement
+    await user.click(within(card).getByRole('button', { name: 'Start Audit' }))
 
     expect(onAudit).toHaveBeenCalledWith(2, 'task', 'day')
   })
@@ -106,12 +106,12 @@ describe('SkillTree', () => {
     const user = userEvent.setup()
     render(<SkillTree onAudit={onAudit} />)
 
-    await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
 
-    await user.click(screen.getByRole('button', { name: '夜晚（深度）' }))
+    await user.click(screen.getByRole('button', { name: 'Night (Deep)' }))
 
-    const card = screen.getByText('可审计的任务').closest('.panel') as HTMLElement
-    await user.click(within(card).getByRole('button', { name: '发起审计' }))
+    const card = screen.getByText('Available Task').closest('.panel') as HTMLElement
+    await user.click(within(card).getByRole('button', { name: 'Start Audit' }))
 
     expect(onAudit).toHaveBeenCalledWith(2, 'task', 'night')
   })
@@ -123,76 +123,87 @@ describe('SkillTree', () => {
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
-      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
 
-      await user.type(screen.getByPlaceholderText(/B 树/), '强化学习')
-      await user.click(screen.getByRole('button', { name: '生成技能树' }))
+      await user.type(screen.getByPlaceholderText(/B-trees/), 'Reinforcement learning')
+      await user.click(screen.getByRole('button', { name: 'New Mission' }))
 
-      await waitFor(() => expect(api.generateTree).toHaveBeenCalledWith('强化学习'))
-      expect(screen.queryByText('跳过，直接生成')).not.toBeInTheDocument()
+      await waitFor(() =>
+        expect(api.generateTree).toHaveBeenCalledWith('Reinforcement learning'),
+      )
+      expect(screen.queryByText('Skip, generate anyway')).not.toBeInTheDocument()
     })
 
     it('when clarify says needs_clarification: true, renders question inputs and does not call generateTree yet', async () => {
       vi.mocked(api.clarifyTopic).mockResolvedValue({
         needs_clarification: true,
-        questions: ['想学哪个方向？', '目标是什么？'],
+        questions: ['Which direction do you want to focus on?', 'What is the goal?'],
       })
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
-      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
 
-      await user.type(screen.getByPlaceholderText(/B 树/), '做饭')
-      await user.click(screen.getByRole('button', { name: '生成技能树' }))
+      await user.type(screen.getByPlaceholderText(/B-trees/), 'Cooking')
+      await user.click(screen.getByRole('button', { name: 'New Mission' }))
 
-      await waitFor(() => expect(screen.getByText('想学哪个方向？')).toBeInTheDocument())
-      expect(screen.getByText('目标是什么？')).toBeInTheDocument()
+      await waitFor(() =>
+        expect(screen.getByText('Which direction do you want to focus on?')).toBeInTheDocument(),
+      )
+      expect(screen.getByText('What is the goal?')).toBeInTheDocument()
       expect(api.generateTree).not.toHaveBeenCalled()
     })
 
     it('answering the clarify questions and submitting calls generateTree with a combined string', async () => {
       vi.mocked(api.clarifyTopic).mockResolvedValue({
         needs_clarification: true,
-        questions: ['想学哪个方向？'],
+        questions: ['Which direction do you want to focus on?'],
       })
       vi.mocked(api.generateTree).mockResolvedValue([])
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
-      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
 
-      await user.type(screen.getByPlaceholderText(/B 树/), '做饭')
-      await user.click(screen.getByRole('button', { name: '生成技能树' }))
+      await user.type(screen.getByPlaceholderText(/B-trees/), 'Cooking')
+      await user.click(screen.getByRole('button', { name: 'New Mission' }))
 
-      await waitFor(() => expect(screen.getByText('想学哪个方向？')).toBeInTheDocument())
-      await user.type(screen.getByLabelText('想学哪个方向？'), '家常菜')
-      await user.click(screen.getByRole('button', { name: '生成' }))
+      await waitFor(() =>
+        expect(screen.getByText('Which direction do you want to focus on?')).toBeInTheDocument(),
+      )
+      await user.type(
+        screen.getByLabelText('Which direction do you want to focus on?'),
+        'Home cooking',
+      )
+      await user.click(screen.getByRole('button', { name: 'Generate' }))
 
       await waitFor(() => expect(api.generateTree).toHaveBeenCalled())
       const combined = vi.mocked(api.generateTree).mock.calls[0][0]
-      expect(combined).toContain('做饭')
-      expect(combined).toContain('想学哪个方向？')
-      expect(combined).toContain('家常菜')
+      expect(combined).toContain('Cooking')
+      expect(combined).toContain('Which direction do you want to focus on?')
+      expect(combined).toContain('Home cooking')
     })
 
-    it('clicking "跳过，直接生成" calls generateTree with just the original topic', async () => {
+    it('clicking "Skip, generate anyway" calls generateTree with just the original topic', async () => {
       vi.mocked(api.clarifyTopic).mockResolvedValue({
         needs_clarification: true,
-        questions: ['想学哪个方向？'],
+        questions: ['Which direction do you want to focus on?'],
       })
       vi.mocked(api.generateTree).mockResolvedValue([])
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
-      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
 
-      await user.type(screen.getByPlaceholderText(/B 树/), '做饭')
-      await user.click(screen.getByRole('button', { name: '生成技能树' }))
+      await user.type(screen.getByPlaceholderText(/B-trees/), 'Cooking')
+      await user.click(screen.getByRole('button', { name: 'New Mission' }))
 
-      await waitFor(() => expect(screen.getByText('想学哪个方向？')).toBeInTheDocument())
-      await user.click(screen.getByRole('button', { name: '跳过，直接生成' }))
+      await waitFor(() =>
+        expect(screen.getByText('Which direction do you want to focus on?')).toBeInTheDocument(),
+      )
+      await user.click(screen.getByRole('button', { name: 'Skip, generate anyway' }))
 
-      await waitFor(() => expect(api.generateTree).toHaveBeenCalledWith('做饭'))
+      await waitFor(() => expect(api.generateTree).toHaveBeenCalledWith('Cooking'))
     })
 
     it('falls back to generating directly when the clarify endpoint itself fails', async () => {
@@ -201,12 +212,14 @@ describe('SkillTree', () => {
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
-      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
 
-      await user.type(screen.getByPlaceholderText(/B 树/), '强化学习')
-      await user.click(screen.getByRole('button', { name: '生成技能树' }))
+      await user.type(screen.getByPlaceholderText(/B-trees/), 'Reinforcement learning')
+      await user.click(screen.getByRole('button', { name: 'New Mission' }))
 
-      await waitFor(() => expect(api.generateTree).toHaveBeenCalledWith('强化学习'))
+      await waitFor(() =>
+        expect(api.generateTree).toHaveBeenCalledWith('Reinforcement learning'),
+      )
     })
   })
 
@@ -215,8 +228,8 @@ describe('SkillTree', () => {
       {
         id: 10,
         slug: 'root-mastered',
-        title: '已掌握的根节点',
-        description: '根节点',
+        title: 'Mastered Root Node',
+        description: 'Root node',
         parent_id: null,
         status: 'mastered',
         node_type: 'concept',
@@ -225,8 +238,8 @@ describe('SkillTree', () => {
       {
         id: 11,
         slug: 'available-child',
-        title: '可审计的子节点',
-        description: '已解锁的子节点',
+        title: 'Available Child Node',
+        description: 'An unlocked child node',
         parent_id: 10,
         status: 'available',
         node_type: 'task',
@@ -235,8 +248,8 @@ describe('SkillTree', () => {
       {
         id: 12,
         slug: 'locked-child',
-        title: '锁定的子节点',
-        description: '还没解锁的子节点',
+        title: 'Locked Child Node',
+        description: 'A still-locked child node',
         parent_id: 10,
         status: 'locked',
         node_type: 'concept',
@@ -248,7 +261,7 @@ describe('SkillTree', () => {
       vi.mocked(api.listSkills).mockReset().mockResolvedValue(treeWithEdges)
       render(<SkillTree onAudit={vi.fn()} />)
 
-      await waitFor(() => expect(screen.getByText('已掌握的根节点')).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText('Mastered Root Node')).toBeInTheDocument())
 
       const activeEdge = document.querySelector('[data-testid="skill-edge-10-11"]')
       const lockedEdge = document.querySelector('[data-testid="skill-edge-10-12"]')
@@ -270,11 +283,11 @@ describe('SkillTree', () => {
 
   describe('computeSkillTreeLayout (subtree-aware x positions)', () => {
     // Fixture mirrors the real bug report: two independent forests coexist
-    // — a "Big-O 记号" tree and a "分布式系统概览" tree whose three children
-    // each have exactly one grandchild. The regression was that grandchild
-    // x-positions were assigned by flat-row slot index (ignoring which
-    // parent they actually belong to), so a grandchild could render nowhere
-    // near its real parent's column.
+    // — a "Big-O notation" tree and a "distributed systems overview" tree
+    // whose three children each have exactly one grandchild. The regression
+    // was that grandchild x-positions were assigned by flat-row slot index
+    // (ignoring which parent they actually belong to), so a grandchild could
+    // render nowhere near its real parent's column.
     function node(id: number, parent_id: number | null, title: string): SkillNode {
       return {
         id,
@@ -289,20 +302,20 @@ describe('SkillTree', () => {
     }
 
     const bigO = [
-      node(1, null, 'Big-O 记号'),
-      node(2, 1, '递归'),
-      node(4, 1, '图的 BFS'),
-      node(3, 2, '递归的子问题'),
+      node(1, null, 'Big-O notation'),
+      node(2, 1, 'Recursion'),
+      node(4, 1, 'Graph BFS'),
+      node(3, 2, 'Recursive subproblems'),
     ]
 
     const distributedSystems = [
-      node(12, null, '分布式系统概览'),
-      node(13, 12, '数据复制与一致性'),
-      node(14, 12, '分区与分片'),
-      node(15, 12, '共识协议'),
-      node(16, 13, '分布式存储实践'),
-      node(17, 14, '分片实践'),
-      node(18, 15, '共识实践'),
+      node(12, null, 'Distributed systems overview'),
+      node(13, 12, 'Replication & consistency'),
+      node(14, 12, 'Partitioning & sharding'),
+      node(15, 12, 'Consensus protocols'),
+      node(16, 13, 'Distributed storage practice'),
+      node(17, 14, 'Sharding practice'),
+      node(18, 15, 'Consensus practice'),
     ]
 
     const skills = [...bigO, ...distributedSystems]
@@ -353,20 +366,20 @@ describe('SkillTree', () => {
   })
 
   describe('onboarding callout', () => {
-    it('renders on first visit and stays dismissed after clicking "知道了" and a remount', async () => {
+    it('renders on first visit and stays dismissed after clicking "Got it" and a remount', async () => {
       const user = userEvent.setup()
       const { unmount } = render(<SkillTree onAudit={vi.fn()} />)
 
-      await waitFor(() => expect(screen.getByText('怎么玩？')).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText('How to Play')).toBeInTheDocument())
 
-      await user.click(screen.getByRole('button', { name: '知道了' }))
-      expect(screen.queryByText('怎么玩？')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Got it' }))
+      expect(screen.queryByText('How to Play')).not.toBeInTheDocument()
 
       unmount()
 
       render(<SkillTree onAudit={vi.fn()} />)
-      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
-      expect(screen.queryByText('怎么玩？')).not.toBeInTheDocument()
+      await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
+      expect(screen.queryByText('How to Play')).not.toBeInTheDocument()
     })
   })
 })

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import type { FocusSession, VitalityState } from '../types'
 
-// Reference max used to scale the Sanity track — whitepaper §7: "Sanity 条的
-// 实际上限随 Health 变化可视化伸缩". sanity_cap is 40-100, so the track's
+// Reference max used to scale the Sanity track — whitepaper §7: "the Sanity
+// bar's actual cap visibly scales with Health". sanity_cap is 40-100, so the track's
 // rendered width is a fraction of this reference, and the fill is a fraction
 // of the track (sanity / sanity_cap). A low-health user therefore sees a
 // visibly shorter overall Sanity bar, not just a differently-filled one.
@@ -26,6 +26,7 @@ function focusBand(score: number | null): FocusBand {
 // fewer filled ones among a fixed set.
 function Bar({
   label,
+  displayLabel,
   value,
   max,
   trackMax,
@@ -33,6 +34,12 @@ function Bar({
   compact = false,
 }: {
   label: string
+  // Text shown to the user (e.g. "Health Score" / "Mental Score", per the
+  // template's exact bar labels). Kept separate from `label` because
+  // `label` also drives the data-testid ("bar-track-Health"/"bar-track-
+  // Sanity") that existing tests key off of — renaming the displayed text
+  // shouldn't require renaming those test hooks.
+  displayLabel?: string
   value: number
   max: number
   trackMax: number
@@ -43,11 +50,12 @@ function Bar({
   const fillWidthPct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0
   const segmentCount = compact ? 8 : 20
   const filledSegments = Math.round((fillWidthPct / 100) * segmentCount)
+  const shownLabel = displayLabel ?? label
 
   const track = (
     <div
       data-testid={`bar-track-${label}`}
-      title={compact ? `${label} ${Math.round(value)}/${Math.round(max)}` : undefined}
+      title={compact ? `${shownLabel} ${Math.round(value)}/${Math.round(max)}` : undefined}
       style={{
         width: `${trackWidthPct}%`,
         height: compact ? 6 : 12,
@@ -71,7 +79,7 @@ function Bar({
   return (
     <div style={{ fontSize: 11 }}>
       <div className="dim pixel-font" style={{ marginBottom: 4, fontSize: 9 }}>
-        {label} {Math.round(value)}/{Math.round(max)}
+        {shownLabel} {Math.round(value)}/{Math.round(max)}
       </div>
       {track}
     </div>
@@ -130,7 +138,7 @@ function PixelFigure({ size = 48 }: { size?: number }) {
       shapeRendering="crispEdges"
       style={{ position: 'relative', zIndex: 1 }}
       role="img"
-      aria-label="赛博分身"
+      aria-label="Cyber avatar"
     >
       <rect x="4" y="0" width="4" height="4" fill="var(--accent)" />
       <rect x="3" y="4" width="6" height="6" fill="var(--text)" />
@@ -173,9 +181,9 @@ export function AvatarPortrait({
       <p className="dim" style={{ fontSize: 11, textAlign: 'center' }}>
         {loaded
           ? focus
-            ? `专注度 ${Math.round(focus.focus_score ?? 0)}`
-            : '尚无专注度数据'
-          : '加载中…'}
+            ? `Focus ${Math.round(focus.focus_score ?? 0)}`
+            : 'No focus data yet'
+          : 'Loading…'}
       </p>
     </div>
   )
@@ -188,9 +196,17 @@ export function VitalsPanel({ vitality }: { vitality: VitalityState | null }) {
   if (!vitality) return null
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <Bar label="Health" value={vitality.health} max={100} trackMax={100} color="var(--accent)" />
+      <Bar
+        label="Health"
+        displayLabel="Health Score"
+        value={vitality.health}
+        max={100}
+        trackMax={100}
+        color="var(--accent)"
+      />
       <Bar
         label="Sanity"
+        displayLabel="Mental Score"
         value={vitality.sanity}
         max={vitality.sanity_cap}
         trackMax={SANITY_REFERENCE_MAX}
@@ -205,7 +221,7 @@ export default function Avatar({ compact = false }: { compact?: boolean }) {
   const band = focusBand(focus?.focus_score ?? null)
 
   if (compact) {
-    // Lives inline in App's nav row, next to 技能树/分身/原则卷轴 — styled as
+    // Lives inline in App's sidebar, above the nav row — styled as
     // one more glass pill at the same height/alignment as those buttons
     // (not a separate floating widget), with Health/Sanity as small inline
     // bars stacked next to a mini icon instead of stacked text labels
@@ -309,9 +325,9 @@ export default function Avatar({ compact = false }: { compact?: boolean }) {
       <p className="dim" style={{ fontSize: 11, textAlign: 'center' }}>
         {loaded
           ? focus
-            ? `专注度 ${Math.round(focus.focus_score ?? 0)}`
-            : '尚无专注度数据'
-          : '加载中…'}
+            ? `Focus ${Math.round(focus.focus_score ?? 0)}`
+            : 'No focus data yet'
+          : 'Loading…'}
       </p>
     </div>
   )
