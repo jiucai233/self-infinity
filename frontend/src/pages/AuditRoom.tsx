@@ -28,6 +28,67 @@ function estimateMaxTurns(nodeType: NodeType, mode: AuditMode): number {
   return mode === 'night' ? base * 2 : base
 }
 
+// A pixel-bust NPC portrait for the Auditor, distinct from the player's
+// PixelFigure (components/Avatar.tsx) — a wider "head" with a single visor
+// bar instead of a face, no legs (bust only), reads as a separate character
+// rather than a re-skinned player avatar. Per the visual-novel dialogue-box
+// convention (portrait + name label next to the text box) rather than this
+// app's previous faceless log.
+function AuditorPortrait({ size = 40 }: { size?: number }) {
+  const height = (size / 12) * 12
+  return (
+    <svg
+      width={size}
+      height={height}
+      viewBox="0 0 12 12"
+      shapeRendering="crispEdges"
+      role="img"
+      aria-label="Auditor"
+      style={{ flexShrink: 0 }}
+    >
+      <rect x="1" y="1" width="10" height="9" fill="var(--text)" />
+      <rect x="2" y="4" width="8" height="2" fill="var(--bg)" />
+      <rect x="4" y="10" width="1" height="2" fill="var(--text)" />
+      <rect x="7" y="10" width="1" height="2" fill="var(--text)" />
+    </svg>
+  )
+}
+
+function PlayerBadge({ size = 40 }: { size?: number }) {
+  return (
+    <div
+      className="pixel-border"
+      style={{
+        width: size,
+        height: size,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}
+    >
+      <span className="pixel-font" style={{ fontSize: 10 }}>
+        YOU
+      </span>
+    </div>
+  )
+}
+
+function ChatMessage({ role, content, roleLabel }: AuditTurn & { roleLabel: string }) {
+  const isAuditor = role === 'auditor'
+  return (
+    <div style={{ display: 'flex', gap: 12, padding: '12px 0' }}>
+      {isAuditor ? <AuditorPortrait /> : <PlayerBadge />}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p className="pixel-font" style={{ fontSize: 10, marginBottom: 4 }}>
+          {isAuditor ? roleLabel : 'You'}
+        </p>
+        <p style={{ fontSize: 14, lineHeight: 1.6 }}>{content}</p>
+      </div>
+    </div>
+  )
+}
+
 export default function AuditRoom({
   skillId,
   nodeType,
@@ -146,12 +207,7 @@ export default function AuditRoom({
     }
   }
 
-  if (phase === 'loading')
-    return (
-      <div className="audit-immersive">
-        <p className="dim">{roleLabel} is entering…</p>
-      </div>
-    )
+  if (phase === 'loading') return <p className="dim">{roleLabel} is entering…</p>
 
   // Real turn counter — number of user turns submitted so far in this
   // session.
@@ -160,163 +216,183 @@ export default function AuditRoom({
   const progressPct = Math.min(100, Math.round((userTurnCount / estimatedMaxTurns) * 100))
 
   return (
-    <div className="audit-immersive">
+    <div>
       <button onClick={onDone} style={{ marginBottom: 16 }}>
         ← Back to Skills
       </button>
 
-      <div className="audit-immersive-layout">
-        <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {turns.map((t, i) => (
-          <div key={i}>
-            <span className="dim" style={{ fontSize: 11 }}>
-              {t.role === 'auditor' ? roleLabel : 'You'}
-            </span>
-            <p style={{ marginTop: 2 }}>{t.content}</p>
-          </div>
-        ))}
-
-        {phase === 'active' && (
-          <div style={{ marginTop: 8 }}>
-            <textarea
-              rows={4}
-              value={input}
-              placeholder={
-                isTask
-                  ? 'Explain exactly what you plan to do…'
-                  : "Explain it to someone who's never heard of this…"
-              }
-              onChange={(e) => setInput(e.target.value)}
-              disabled={submitting}
-            />
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button
-                className="accent"
-                onClick={submitTurn}
-                disabled={submitting || !input.trim()}
-              >
-                {submitting
-                  ? `${roleLabel} is thinking…`
-                  : isTask
-                    ? 'Submit Plan'
-                    : 'Submit Explanation'}
-              </button>
-              {speechSupported && (
-                <button
-                  type="button"
-                  onClick={toggleListening}
-                  disabled={submitting}
-                  style={
-                    listening
-                      ? { borderColor: 'var(--danger)', color: 'var(--danger)' }
-                      : undefined
-                  }
-                  title="Voice Input"
-                >
-                  {listening ? '● Recording…' : 'Voice Input'}
-                </button>
-              )}
-              {!speechSupported && (
-                <button type="button" disabled title="Voice input not supported in this browser">
-                  Voice Input
-                </button>
-              )}
+      <div className="audit-room-layout">
+        <div>
+          {/* NPC intro card — a persistent character header (portrait + name
+              + what they're grilling you on), visual-novel style, instead of
+              a faceless scrolling log. */}
+          <div className="panel" style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <AuditorPortrait size={56} />
+            <div>
+              <h2 className="pixel-font" style={{ fontSize: 15, marginBottom: 4 }}>
+                {roleLabel}
+              </h2>
+              <p className="dim" style={{ fontSize: 12 }}>
+                {isTask
+                  ? "Show me you did it. I'm not interested in theory."
+                  : "Explain it like I've never heard of this. I will keep pushing."}
+              </p>
             </div>
           </div>
-        )}
 
-        {(phase === 'passed' || phase === 'failed' || phase === 'reflected') && verdict && (
-          <div
-            style={{
-              borderTop: '1px solid var(--border)',
-              paddingTop: 12,
-              marginTop: 4,
-            }}
-          >
-            <p
-              className="pixel-font"
-              style={{
-                color: phase === 'failed' ? 'var(--danger)' : '#facc15',
-                fontSize: 12,
-                lineHeight: 1.8,
-              }}
-            >
-              {verdict.passed
-                ? isTask
-                  ? '✓ Task Complete'
-                  : '✓ Audit Passed'
-                : isTask
-                  ? '✗ Not There Yet'
-                  : '✗ Audit Failed'}{' '}
-              · {verdict.score} pts
-            </p>
-            {verdict.passed && verdict.reward_amount != null && (
-              <p style={{ fontSize: 13, marginTop: 2, color: 'var(--accent)' }}>
-                +{verdict.reward_amount} reward
-                {verdict.reward_multiplier != null && ` (×${verdict.reward_multiplier})`}
-              </p>
+          <div className="panel" style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {turns.map((t, i) => (
+                <ChatMessage key={i} role={t.role} content={t.content} roleLabel={roleLabel} />
+              ))}
+            </div>
+
+            {phase === 'active' && (
+              <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                <textarea
+                  rows={4}
+                  value={input}
+                  placeholder={
+                    isTask
+                      ? 'Explain exactly what you plan to do…'
+                      : "Explain it to someone who's never heard of this…"
+                  }
+                  onChange={(e) => setInput(e.target.value)}
+                  disabled={submitting}
+                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button
+                    className="accent"
+                    onClick={submitTurn}
+                    disabled={submitting || !input.trim()}
+                  >
+                    {submitting
+                      ? `${roleLabel} is thinking…`
+                      : isTask
+                        ? 'Submit Plan'
+                        : 'Submit Explanation'}
+                  </button>
+                  {speechSupported && (
+                    <button
+                      type="button"
+                      onClick={toggleListening}
+                      disabled={submitting}
+                      style={
+                        listening
+                          ? { borderColor: 'var(--danger)', color: 'var(--danger)' }
+                          : undefined
+                      }
+                      title="Voice Input"
+                    >
+                      {listening ? '● Recording…' : 'Voice Input'}
+                    </button>
+                  )}
+                  {!speechSupported && (
+                    <button
+                      type="button"
+                      disabled
+                      title="Voice input not supported in this browser"
+                    >
+                      Voice Input
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
-            <p className="dim" style={{ fontSize: 13, marginTop: 4 }}>
-              {verdict.comment}
-            </p>
-            {verdict.gaps && verdict.gaps.length > 0 && (
-              <ul style={{ fontSize: 13, marginTop: 8, paddingLeft: 18 }}>
-                {verdict.gaps.map((g, i) => (
-                  <li key={i}>{g}</li>
-                ))}
-              </ul>
+
+            {(phase === 'passed' || phase === 'failed' || phase === 'reflected') && verdict && (
+              <div
+                style={{
+                  borderTop: '1px solid var(--border)',
+                  paddingTop: 12,
+                  marginTop: 4,
+                }}
+              >
+                <p
+                  className="pixel-font"
+                  style={{
+                    color: phase === 'failed' ? 'var(--danger)' : '#facc15',
+                    fontSize: 12,
+                    lineHeight: 1.8,
+                  }}
+                >
+                  {verdict.passed
+                    ? isTask
+                      ? '✓ Task Complete'
+                      : '✓ Audit Passed'
+                    : isTask
+                      ? '✗ Not There Yet'
+                      : '✗ Audit Failed'}{' '}
+                  · {verdict.score} pts
+                </p>
+                {verdict.passed && verdict.reward_amount != null && (
+                  <p style={{ fontSize: 13, marginTop: 2, color: 'var(--accent)' }}>
+                    +{verdict.reward_amount} reward
+                    {verdict.reward_multiplier != null && ` (×${verdict.reward_multiplier})`}
+                  </p>
+                )}
+                <p className="dim" style={{ fontSize: 13, marginTop: 4 }}>
+                  {verdict.comment}
+                </p>
+                {verdict.gaps && verdict.gaps.length > 0 && (
+                  <ul style={{ fontSize: 13, marginTop: 8, paddingLeft: 18 }}>
+                    {verdict.gaps.map((g, i) => (
+                      <li key={i}>{g}</li>
+                    ))}
+                  </ul>
+                )}
+                {verdict.passed && verdict.unlocked_skill_ids.length > 0 && (
+                  <p style={{ fontSize: 13, marginTop: 8 }}>
+                    Unlocked {verdict.unlocked_skill_ids.length} new node
+                    {verdict.unlocked_skill_ids.length === 1 ? '' : 's'}
+                  </p>
+                )}
+              </div>
             )}
-            {verdict.passed && verdict.unlocked_skill_ids.length > 0 && (
-              <p style={{ fontSize: 13, marginTop: 8 }}>
-                Unlocked {verdict.unlocked_skill_ids.length} new node
-                {verdict.unlocked_skill_ids.length === 1 ? '' : 's'}
-              </p>
+
+            {phase === 'failed' && (
+              <div style={{ marginTop: 8 }}>
+                <p className="dim" style={{ fontSize: 12, marginBottom: 6 }}>
+                  Mandatory reflection: why didn't this land? What will you do differently next
+                  time?
+                </p>
+                <textarea
+                  rows={3}
+                  value={reflection}
+                  onChange={(e) => setReflection(e.target.value)}
+                  disabled={submitting}
+                />
+                <button
+                  style={{ marginTop: 8 }}
+                  onClick={submitReflection}
+                  disabled={submitting || !reflection.trim()}
+                >
+                  {submitting ? 'Distilling…' : 'Submit Reflection, Generate Archive Entry'}
+                </button>
+              </div>
+            )}
+
+            {phase === 'reflected' && principleTitle && (
+              <div className="panel" style={{ marginTop: 8 }}>
+                <p style={{ fontSize: 12 }} className="dim">
+                  New Archive Entry
+                </p>
+                <p>{principleTitle}</p>
+              </div>
+            )}
+
+            {phase === 'passed' && (
+              <button className="accent" style={{ marginTop: 8 }} onClick={onDone}>
+                Back to Skills
+              </button>
             )}
           </div>
-        )}
-
-        {phase === 'failed' && (
-          <div style={{ marginTop: 8 }}>
-            <p className="dim" style={{ fontSize: 12, marginBottom: 6 }}>
-              Mandatory reflection: why didn't this land? What will you do differently next time?
-            </p>
-            <textarea
-              rows={3}
-              value={reflection}
-              onChange={(e) => setReflection(e.target.value)}
-              disabled={submitting}
-            />
-            <button
-              style={{ marginTop: 8 }}
-              onClick={submitReflection}
-              disabled={submitting || !reflection.trim()}
-            >
-              {submitting ? 'Distilling…' : 'Submit Reflection, Generate Archive Entry'}
-            </button>
-          </div>
-        )}
-
-        {phase === 'reflected' && principleTitle && (
-          <div className="panel" style={{ marginTop: 8, background: 'var(--bg)' }}>
-            <p style={{ fontSize: 12 }} className="dim">
-              New Archive Entry
-            </p>
-            <p>{principleTitle}</p>
-          </div>
-        )}
-
-        {phase === 'passed' && (
-          <button className="accent" style={{ marginTop: 8 }} onClick={onDone}>
-            Back to Skills
-          </button>
-        )}
         </div>
 
-        {/* ACTIVE_QUEST-style side card, per focus_mode_pixel_mono/screen.png
-            — shows real session facts (role, node type, turn count) plus a
-            progress bar estimated from the backend's max-turns config (see
+        {/* Real session facts (role, node type, turn count) plus a progress
+            bar estimated from the backend's max-turns config (see
             estimateMaxTurns above) — display-only, not a fabricated EXP %. */}
-        <div className="audit-quest-card">
+        <div className="panel">
           <p className="dim pixel-font" style={{ fontSize: 9, marginBottom: 8 }}>
             ACTIVE_AUDIT
           </p>
@@ -350,9 +426,7 @@ export default function AuditRoom({
         </div>
       </div>
 
-      {error && (
-        <p style={{ color: 'var(--danger)', marginTop: 12 }}>{error}</p>
-      )}
+      {error && <p style={{ color: 'var(--danger)', marginTop: 12 }}>{error}</p>}
     </div>
   )
 }

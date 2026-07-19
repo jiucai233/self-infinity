@@ -43,11 +43,6 @@ function App() {
   const onGuild = panel === 'guild'
   const onMap = panel === 'map'
   const onSupport = panel === 'support'
-  // The audit room renders its own immersive dark canvas (see AuditRoom.tsx's
-  // .audit-immersive) — drop <main>'s default padding only while it's shown
-  // so the dark background can bleed edge-to-edge instead of leaving a
-  // padded frame of the normal theme visible around it.
-  const isAuditView = panel === 'none' && view.name === 'audit'
 
   function goToSkills() {
     setPanel('none')
@@ -147,7 +142,7 @@ function App() {
 
       <ThemeToggle />
 
-      <main className={`app-main${isAuditView ? ' app-main--bleed' : ''}`}>
+      <main className="app-main">
         {panel === 'principles' ? (
           <PrincipleShelf />
         ) : panel === 'avatar' ? (
