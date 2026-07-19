@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Character Dashboard (Pixel Mono Dark)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;family=Press+Start+2P&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        :root {
+            --pixel-border: 4px;
+        }
+        
+        body {
+            background-color: #141317;
+            font-family: 'Inter', sans-serif;
+            color: #e6e1e7;
+            background-image: 
+                linear-gradient(to right, #1c1b1f 1px, transparent 1px),
+                linear-gradient(to bottom, #1c1b1f 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+            text-transform: uppercase;
+        }
+
+        .pixel-border {
+            border: var(--pixel-border) solid #e6e1e7;
+            image-rendering: pixelated;
+        }
+
+        .pixel-separator {
+            height: var(--pixel-border);
+            background-color: #e6e1e7;
+            width: 100%;
+        }
+
+        .segmented-bar-segment {
+            width: 12px;
+            height: 24px;
+            background-color: #e6e1e7;
+            margin-right: 4px;
+        }
+
+        .segmented-bar-segment.empty {
+            background-color: transparent;
+            border: 2px solid #48454f;
+        }
+
+        /* Custom scrollbar for pixel aesthetic */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #141317;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e6e1e7;
+        }
+
+        .pixel-avatar-container {
+            width: 200px;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #0f0e12;
+            border: 4px solid #e6e1e7;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "background": "#141317",
+                        "primary": "#dfd5ff",
+                        "surface": "#141317",
+                        "surface-container": "#201f23",
+                        "surface-container-high": "#2b292e",
+                        "outline-variant": "#48454f",
+                        "on-surface": "#e6e1e7",
+                        "on-surface-variant": "#cac4d1",
+                        "accent-fill": "#7c3aed"
+                    },
+                    "spacing": {
+                        "gap-panel": "20px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Inter"],
+                        "body-base": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background min-h-screen text-on-surface">
+<!-- TopNavBar Cluster -->
+<nav class="sticky top-0 z-50 flex items-center justify-between px-5 w-full bg-surface h-16 border-b border-outline-variant">
+<div class="flex items-center gap-8">
+<span class="pixel-font font-headline-lg text-headline-lg font-bold text-on-surface">Self-Infinity</span>
+<div class="hidden md:flex gap-6 items-center">
+<a class="font-headline-sm text-headline-sm text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer active:opacity-80" href="#">Skill Tree</a>
+<a class="font-headline-sm text-headline-sm text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer active:opacity-80" href="#">Focus Area</a>
+<a class="font-headline-sm text-headline-sm text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer active:opacity-80" href="#">Inventory</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-variant p-2 rounded transition-colors">notifications</span>
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-variant p-2 rounded transition-colors">settings</span>
+</div>
+</nav>
+<div class="flex min-h-[calc(100vh-64px)]">
+<!-- SideNavBar Cluster -->
+<aside class="hidden lg:flex flex-col w-64 p-4 gap-panel border-r border-outline-variant bg-surface sticky top-16 h-[calc(100vh-64px)]">
+<div class="flex flex-col gap-2 p-2 mb-4 border-2 border-outline-variant">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 border-2 border-on-surface bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface">person</span>
+</div>
+<div>
+<p class="pixel-font text-[10px]">Lvl 24</p>
+<p class="font-body-base text-body-base font-bold">Wanderer</p>
+</div>
+</div>
+<div class="mt-2 space-y-1">
+<div class="h-1 bg-outline-variant w-full"><div class="h-full bg-on-surface w-[85%]"></div></div>
+<p class="text-[10px] text-on-surface-variant">Stamina: 85%</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2">
+<div class="flex items-center gap-3 p-3 text-on-surface font-bold bg-surface-variant rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">person</span>
+<span class="font-body-base text-body-base">Character</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-body-base text-body-base">Skills</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-body-base text-body-base">Quests</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined">auto_fix_high</span>
+<span class="font-body-base text-body-base">Forge</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-body-base text-body-base">Vault</span>
+</div>
+</nav>
+<button class="mt-4 pixel-font text-[10px] bg-on-surface text-background p-3 text-center cursor-pointer hover:opacity-90">
+                Enter Focus Mode
+            </button>
+<div class="mt-auto pt-4 border-t border-outline-variant">
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined">manage_accounts</span>
+<span class="font-body-base text-body-base">Profile</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-base text-body-base">Logout</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 p-8 overflow-y-auto">
+<header class="mb-12">
+<h1 class="pixel-font text-headline-lg text-headline-lg tracking-wider mb-2">Character Dashboard</h1>
+<div class="pixel-separator"></div>
+<p class="mt-2 text-on-surface-variant font-body-base">System: Mono-Dark // Protocol: Active</p>
+</header>
+<!-- Dashboard Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Avatar & Status Column -->
+<div class="lg:col-span-4 flex flex-col gap-8">
+<div class="pixel-border p-4 bg-background inline-block mx-auto lg:mx-0">
+<div class="pixel-avatar-container relative overflow-hidden">
+<!-- Background WebGL Shader for Atmospheric Effect -->
+
+<img class="w-48 h-48 image-rendering-pixelated relative z-10" data-alt="A minimalist white pixel art figure of a mysterious cloaked character standing in a neutral pose against a pure black background. The style is strictly 1-bit monochrome, reminiscent of high-contrast early computing graphics, with sharp jagged edges and no gradients or shading. The character has small glowing white eyes." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDovT6YYYc_oSHT7tDzSKKqlv6OXuDU7v9O2m-VvelKe1qiJA5ZfuAOgYYU2xK8X1w9SOroTLqcTcTz0Ft-Vsg29Lt3gHIPjcK7W2dsG4vRxPPPcBzzfAk4zC6NF3G8aSDmgYn-lxikL3_6XDW-WogPXoFHR3d16jN-P-X2ApoRIdkcfeg3iEvQCls7QD9ZCOcC1DZubLTnYPw9Ivcow0JGOPHF60cwRJlW9NrN2BdhSzJEharZLO6v9LC-IJfbbkutGy1DHLqfdV9G"/>
+</div>
+<div class="mt-4 text-center">
+<p class="pixel-font text-headline-sm">Lvl 24 Wanderer</p>
+</div>
+</div>
+<div class="pixel-border p-6 space-y-6">
+<div>
+<div class="flex justify-between items-end mb-4">
+<span class="pixel-font text-[12px]">Health</span>
+<span class="pixel-font text-[10px]">8/10</span>
+</div>
+<div class="flex">
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment empty"></div>
+<div class="segmented-bar-segment empty"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-end mb-4">
+<span class="pixel-font text-[12px]">Sanity</span>
+<span class="pixel-font text-[10px]">9/10</span>
+</div>
+<div class="flex">
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment"></div>
+<div class="segmented-bar-segment empty"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Stats & Inventory Column -->
+<div class="lg:col-span-8 flex flex-col gap-8">
+<!-- Attributes Bento -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="pixel-border p-4 bg-surface-container flex flex-col items-center justify-center">
+<span class="pixel-font text-[10px] text-on-surface-variant mb-2">Strength</span>
+<span class="pixel-font text-headline-md">18</span>
+</div>
+<div class="pixel-border p-4 bg-surface-container flex flex-col items-center justify-center border-accent-fill">
+<span class="pixel-font text-[10px] text-on-surface-variant mb-2">Agility</span>
+<span class="pixel-font text-headline-md">24</span>
+</div>
+<div class="pixel-border p-4 bg-surface-container flex flex-col items-center justify-center">
+<span class="pixel-font text-[10px] text-on-surface-variant mb-2">Intellect</span>
+<span class="pixel-font text-headline-md">12</span>
+</div>
+</div>
+<!-- Quests & Active Focus -->
+<div class="pixel-border p-6">
+<h2 class="pixel-font text-headline-sm mb-6 flex items-center gap-3">
+<span class="material-symbols-outlined">auto_fix_high</span>
+                            Active Focus
+                        </h2>
+<div class="space-y-4">
+<div class="p-4 border-2 border-on-surface flex justify-between items-center bg-surface-container-high group hover:bg-on-surface hover:text-background transition-colors cursor-pointer">
+<div>
+<p class="pixel-font text-[12px]">Neural Mapping Mastery</p>
+<p class="font-body-base text-[12px] opacity-70">Focus Time: 4h 20m</p>
+</div>
+<span class="pixel-font text-[10px]">45%</span>
+</div>
+<div class="p-4 border-2 border-outline-variant flex justify-between items-center group hover:border-on-surface transition-colors cursor-pointer">
+<div>
+<p class="pixel-font text-[12px]">Logic Gate Optimization</p>
+<p class="font-body-base text-[12px] opacity-70">Focus Time: 1h 05m</p>
+</div>
+<span class="pixel-font text-[10px]">12%</span>
+</div>
+<div class="p-4 border-2 border-outline-variant flex justify-between items-center group hover:border-on-surface transition-colors cursor-pointer opacity-50">
+<div>
+<p class="pixel-font text-[12px]">Void Navigation (Locked)</p>
+<p class="font-body-base text-[12px] opacity-70">Requires Level 30</p>
+</div>
+<span class="material-symbols-outlined">lock</span>
+</div>
+</div>
+</div>
+<!-- Equipment Grid -->
+<div class="pixel-border p-6 bg-surface-container-lowest">
+<h2 class="pixel-font text-headline-sm mb-6">Inventory Items</h2>
+<div class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+<!-- Slot 1 -->
+<div class="aspect-square border-2 border-on-surface bg-background flex items-center justify-center group cursor-pointer hover:bg-surface-variant">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">shield</span>
+</div>
+<!-- Slot 2 -->
+<div class="aspect-square border-2 border-on-surface bg-background flex items-center justify-center group cursor-pointer hover:bg-surface-variant">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">swords</span>
+</div>
+<!-- Slot 3 -->
+<div class="aspect-square border-2 border-outline-variant bg-background flex items-center justify-center opacity-30">
+<span class="pixel-font text-[8px] text-on-surface-variant">Empty</span>
+</div>
+<!-- Slot 4 -->
+<div class="aspect-square border-2 border-on-surface bg-background flex items-center justify-center group cursor-pointer hover:bg-surface-variant">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">magic_button</span>
+</div>
+<!-- More slots -->
+<div class="aspect-square border-2 border-outline-variant bg-background flex items-center justify-center opacity-30"></div>
+<div class="aspect-square border-2 border-outline-variant bg-background flex items-center justify-center opacity-30"></div>
+<div class="aspect-square border-2 border-outline-variant bg-background flex items-center justify-center opacity-30"></div>
+<div class="aspect-square border-2 border-outline-variant bg-background flex items-center justify-center opacity-30"></div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Mobile Bottom NavBar -->
+<div class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface flex items-center justify-around px-4 z-50 border-t border-outline-variant">
+<div class="flex flex-col items-center gap-1 text-on-surface">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-label-dim text-[10px] pixel-font">Self</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-label-dim text-[10px] pixel-font">Trees</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-label-dim text-[10px] pixel-font">Quest</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-dim text-[10px] pixel-font">Set</span>
+</div>
+</div>
+<script>
+        // Simple micro-interaction for the health segments
+        document.querySelectorAll('.segmented-bar-segment').forEach(segment => {
+            segment.addEventListener('mouseover', () => {
+                if (!segment.classList.contains('empty')) {
+                    segment.style.opacity = '0.7';
+                }
+            });
+            segment.addEventListener('mouseout', () => {
+                segment.style.opacity = '1';
+            });
+        });
+
+        // Atmospheric flicker effect on the pixel border elements
+        function subtleFlicker() {
+            const borders = document.querySelectorAll('.pixel-border');
+            borders.forEach(b => {
+                if (Math.random() > 0.99) {
+                    b.style.borderColor = '#48454f';
+                    setTimeout(() => b.style.borderColor = '#e6e1e7', 50);
+                }
+            });
+            requestAnimationFrame(subtleFlicker);
+        }
+        subtleFlicker();
+    </script>
+</body></html>

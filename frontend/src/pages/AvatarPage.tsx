@@ -80,7 +80,9 @@ export default function AvatarPage() {
       <Avatar key={refreshKey} />
 
       <div className="panel" style={{ flex: 1, minWidth: 260 }}>
-        <h2 style={{ fontSize: 15, marginBottom: 12 }}>每日签到</h2>
+        <h2 className="pixel-font" style={{ fontSize: 13, marginBottom: 12 }}>
+          每日签到
+        </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <RatingField label="消费" name="spending" value={spending} onChange={setSpending} />
           <RatingField label="运动" name="activity" value={activity} onChange={setActivity} />

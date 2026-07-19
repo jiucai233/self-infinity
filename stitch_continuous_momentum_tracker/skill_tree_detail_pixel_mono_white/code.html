@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chronos - Skill Node Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Press+Start+2P&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-on-surface": "#f4f0ee",
+                    "tertiary-container": "#363438",
+                    "surface": "#ffffff",
+                    "secondary-fixed-dim": "#c8c6c3",
+                    "on-secondary-container": "#636360",
+                    "surface-container-low": "#f7f3f1",
+                    "primary": "#21201a",
+                    "on-surface": "#1c1b1b",
+                    "surface-bright": "#fdf8f7",
+                    "secondary-fixed": "#e5e2de",
+                    "surface-container-high": "#ebe7e6",
+                    "on-primary": "#ffffff",
+                    "outline-strong": "rgba(55, 53, 47, 0.16)",
+                    "tertiary-fixed-dim": "#cac5ca",
+                    "dark-dim": "#9b9b96",
+                    "secondary": "#5f5e5c",
+                    "on-primary-fixed": "#1d1c16",
+                    "hover-state": "rgba(55, 53, 47, 0.08)",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-container": "#a09ca1",
+                    "inverse-surface": "#31302f",
+                    "primary-container": "#37352f",
+                    "on-secondary-fixed-variant": "#474744",
+                    "on-surface-variant": "#49473f",
+                    "on-error-container": "#93000a",
+                    "surface-container-highest": "#e6e2e0",
+                    "surface-dim": "#ddd9d8",
+                    "surface-tint": "#615e57",
+                    "outline": "rgba(55, 53, 47, 0.09)",
+                    "primary-fixed-dim": "#cbc6bd",
+                    "on-tertiary-fixed": "#1c1b1f",
+                    "on-secondary-fixed": "#1b1c1a",
+                    "dark-text": "#e9e9e7",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#48464a",
+                    "surface-variant": "#e6e2e0",
+                    "error": "#ba1a1a",
+                    "dark-hover": "rgba(255, 255, 255, 0.055)",
+                    "primary-fixed": "#e7e2d9",
+                    "dark-outline-strong": "rgba(255, 255, 255, 0.13)",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed": "#e6e1e6",
+                    "inverse-primary": "#cbc6bd",
+                    "tertiary": "#211f23",
+                    "on-background": "#1c1b1b",
+                    "background": "#fdf8f7",
+                    "outline-variant": "#cbc6bc",
+                    "on-error": "#ffffff",
+                    "surface-container": "#f1edeb",
+                    "on-primary-container": "#a19d95",
+                    "on-secondary": "#ffffff",
+                    "dark-bg": "#191919",
+                    "dark-outline": "rgba(255, 255, 255, 0.09)",
+                    "on-primary-fixed-variant": "#494740",
+                    "secondary-container": "#e2dfdb"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xs": "4px",
+                    "sm": "8px",
+                    "md": "16px",
+                    "lg": "24px",
+                    "margin-mobile": "16px",
+                    "xl": "32px",
+                    "margin-desktop": "40px",
+                    "gutter": "16px",
+                    "unit": "4px"
+            },
+            "fontFamily": {
+                    "pixel": ["'Press Start 2P'", "cursive"],
+                    "headline-md": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "label-lg": ["Inter"],
+                    "body-md": ["Inter"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body {
+            background-color: #fdf8f7;
+            background-image: radial-gradient(#37352f 0.5px, transparent 0.5px);
+            background-size: 24px 24px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .pixel-border {
+            box-shadow: 
+                0 -4px 0 0 #21201a,
+                0 4px 0 0 #21201a,
+                -4px 0 0 0 #21201a,
+                4px 0 0 0 #21201a;
+            margin: 4px;
+        }
+
+        .pixel-btn {
+            position: relative;
+            display: inline-block;
+            padding: 12px 24px;
+            background: #21201a;
+            color: #ffffff;
+            box-shadow: 
+                inset -4px -4px 0 0 #5f5e5c,
+                0 -4px 0 0 #21201a,
+                0 4px 0 0 #21201a,
+                -4px 0 0 0 #21201a,
+                4px 0 0 0 #21201a;
+            transition: transform 0.1s;
+        }
+
+        .pixel-btn:active {
+            transform: translateY(2px);
+            box-shadow: 
+                inset 4px 4px 0 0 #000,
+                0 -4px 0 0 #21201a,
+                0 4px 0 0 #21201a,
+                -4px 0 0 0 #21201a,
+                4px 0 0 0 #21201a;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .pixel-text {
+            font-family: 'Press Start 2P', cursive;
+            line-height: 1.5;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .cursor-blink {
+            animation: blink 1s step-end infinite;
+        }
+    </style>
+</head>
+<body class="text-primary selection:bg-primary selection:text-white">
+<!-- TopNavBar -->
+<header class="w-full top-0 border-b border-outline bg-surface sticky z-50">
+<nav class="flex justify-between items-center h-14 px-margin-desktop w-full">
+<div class="flex items-center gap-8">
+<span class="font-headline-sm text-headline-sm font-bold text-primary">Chronos</span>
+<div class="hidden md:flex gap-6">
+<a class="text-secondary hover:bg-hover-state transition-colors duration-200 font-body-md text-body-md" href="#">Dashboard</a>
+<a class="text-secondary hover:bg-hover-state transition-colors duration-200 font-body-md text-body-md" href="#">Inventory</a>
+<a class="text-secondary hover:bg-hover-state transition-colors duration-200 font-body-md text-body-md" href="#">Archive</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<input class="bg-surface-container border border-outline px-4 py-1 text-sm focus:outline-none focus:border-primary" placeholder="Search..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-primary hover:bg-hover-state p-2 rounded-full transition-colors duration-200">settings</button>
+</div>
+</nav>
+</header>
+<div class="flex min-h-[calc(100vh-56px)]">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col h-auto py-md border-r border-outline bg-surface w-64 shrink-0">
+<div class="px-md mb-xl">
+<div class="flex items-center gap-3 p-3 pixel-border bg-surface-container-low mb-4">
+<div class="w-10 h-10 bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">person</span>
+</div>
+<div>
+<p class="font-label-lg text-label-lg font-bold">Level 42</p>
+<p class="text-[10px] text-secondary uppercase tracking-wider">Vanguard Class</p>
+</div>
+</div>
+<button class="w-full pixel-btn text-[10px] mb-8">NEW MISSION</button>
+</div>
+<nav class="flex-1 space-y-1 px-sm">
+<a class="flex items-center gap-3 px-md py-3 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined">person</span> Character
+                </a>
+<a class="flex items-center gap-3 px-md py-3 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined">assignment</span> Quests
+                </a>
+<a class="flex items-center gap-3 px-md py-3 bg-secondary-container text-on-secondary-fixed font-bold border-r-2 border-primary transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">bolt</span> Skills
+                </a>
+<a class="flex items-center gap-3 px-md py-3 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined">group</span> Guild
+                </a>
+<a class="flex items-center gap-3 px-md py-3 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined">map</span> Map
+                </a>
+</nav>
+<div class="mt-auto px-sm border-t border-outline pt-md">
+<a class="flex items-center gap-3 px-md py-2 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined text-sm">help</span> Support
+                </a>
+<a class="flex items-center gap-3 px-md py-2 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined text-sm">logout</span> Log Out
+                </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 p-margin-mobile md:p-margin-desktop overflow-x-hidden">
+<div class="max-w-6xl mx-auto">
+<!-- Breadcrumbs & Header -->
+<div class="mb-xl flex justify-between items-end">
+<div>
+<p class="text-[10px] text-secondary font-pixel mb-2">PATH: SKILLS / COGNITION /</p>
+<h1 class="font-pixel text-headline-md tracking-tighter uppercase">Neural Linkage</h1>
+</div>
+<div class="hidden sm:block">
+<div class="pixel-border bg-surface px-4 py-2 flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">stars</span>
+<span class="font-pixel text-[12px]">Points: 03</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-xl items-start">
+<!-- Left Column: Pixel Guide -->
+<div class="lg:col-span-4 flex flex-col items-center">
+<div class="pixel-border bg-white p-6 w-full aspect-square flex flex-col items-center justify-center relative group">
+<!-- Dino-style guide placeholder -->
+<div class="w-48 h-48 bg-primary/5 flex items-center justify-center relative">
+<img class="w-40 h-40 object-contain" data-alt="A minimalist pixel art dinosaur character in the style of the Chrome dino game, colored in solid dark charcoal grey. The character is standing in a neutral, attentive pose within a white digital environment. The pixel edges are crisp and chunky, conveying a retro 8-bit aesthetic that is both playful and disciplined." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsPHCQ4uKOZ8ubKziDY_9pc7wQkk65_pv5AOmYgzbE0apr4S2FviWPmLAmNW7p1s5gHAglIxyl4kKkcHIp0V7AyIrq4pVafqXIW1gapbxp4qq8wDnKdvfGJucLQ9nHEWQXEZYz9qeT96qLIw82DZU-frpFNNwct82946jCASy1u0WtDru7ujy1xFCJXV-lz7t5v5ouEEoqJekI6D3covWKZSFFT5enK0jeendBzR4_9FRgxH-4G5ZkH1oJTclk7q2NeI5DaMRmw0bs"/>
+<!-- Floating notification pixel box -->
+<div class="absolute -top-4 -right-4 pixel-border bg-white p-2 px-3 animate-bounce">
+<span class="font-pixel text-[8px]">!</span>
+</div>
+</div>
+<div class="mt-8 pixel-border bg-surface-container-low p-4 w-full">
+<p class="font-pixel text-[10px] leading-loose">
+                                    "MASTER, THIS NODE WILL DRASTICALLY INCREASE YOUR SYNAPTIC THROUGHPUT. RECOMMEND UPGRADE."
+                                    <span class="cursor-blink">_</span>
+</p>
+</div>
+</div>
+</div>
+<!-- Right Column: Node Details -->
+<div class="lg:col-span-8 space-y-lg">
+<!-- Main Stats Panel -->
+<div class="pixel-border bg-white p-xl space-y-xl">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-xl">
+<div class="space-y-md">
+<h3 class="font-pixel text-[12px] border-b-2 border-primary pb-2 uppercase">Core Function</h3>
+<p class="font-body-md text-secondary leading-relaxed">
+                                        Neural Linkage establishes a permanent high-fidelity bridge between user consciousness and external data arrays. Reduces latency on all mental queries by 15%.
+                                    </p>
+</div>
+<div class="space-y-md">
+<h3 class="font-pixel text-[12px] border-b-2 border-primary pb-2 uppercase">Active Benefits</h3>
+<ul class="space-y-2">
+<li class="flex items-center gap-2 text-body-sm">
+<span class="w-2 h-2 bg-primary"></span>
+                                            +10% Data Extraction Speed
+                                        </li>
+<li class="flex items-center gap-2 text-body-sm">
+<span class="w-2 h-2 bg-primary"></span>
+                                            -5ms System Intercept
+                                        </li>
+<li class="flex items-center gap-2 text-body-sm">
+<span class="w-2 h-2 bg-outline-strong"></span>
+<span class="text-dim">Locked: Remote Syncing</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Progression Track -->
+<div class="space-y-md pt-xl">
+<div class="flex justify-between items-end">
+<h3 class="font-pixel text-[12px] uppercase">Progression Status</h3>
+<span class="font-pixel text-[10px]">Rank 2 / 5</span>
+</div>
+<div class="h-8 pixel-border bg-surface-container-low p-1 flex">
+<div class="h-full bg-primary w-2/5"></div>
+<div class="h-full bg-outline-strong w-1/5 animate-pulse"></div>
+<div class="h-full flex-1"></div>
+</div>
+<div class="flex justify-between text-[10px] font-pixel text-secondary uppercase">
+<span>Novice</span>
+<span>Adept</span>
+<span>Master</span>
+</div>
+</div>
+</div>
+<!-- Requirements & Action -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-lg">
+<div class="pixel-border bg-surface-container p-lg">
+<h3 class="font-pixel text-[10px] mb-4 uppercase">Requirements</h3>
+<div class="space-y-3">
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-secondary">Player Level</span>
+<span class="font-bold">40/40</span>
+</div>
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-secondary">Core Essence</span>
+<span class="font-bold text-error">450/800</span>
+</div>
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-secondary">Skill Points</span>
+<span class="font-bold">1/1</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<button class="pixel-btn w-full h-full flex flex-col items-center justify-center gap-2 group">
+<span class="font-pixel text-[12px]">UPGRADE NODE</span>
+<span class="text-[9px] text-secondary group-hover:text-white transition-colors uppercase">Cost: 1 Skill Point</span>
+</button>
+<button class="pixel-border border-outline-strong bg-white hover:bg-hover-state transition-colors px-6 py-4 font-pixel text-[10px] uppercase">
+                                    View Path Tree
+                                </button>
+</div>
+</div>
+<!-- Skill Synergy Grid -->
+<div class="grid grid-cols-3 gap-md">
+<div class="pixel-border bg-white p-4 flex flex-col items-center gap-2 grayscale hover:grayscale-0 transition-all cursor-pointer group">
+<span class="material-symbols-outlined text-headline-sm">memory</span>
+<span class="font-pixel text-[8px] text-center opacity-0 group-hover:opacity-100">RAM BOOST</span>
+</div>
+<div class="pixel-border bg-white p-4 flex flex-col items-center gap-2 grayscale hover:grayscale-0 transition-all cursor-pointer group">
+<span class="material-symbols-outlined text-headline-sm">visibility</span>
+<span class="font-pixel text-[8px] text-center opacity-0 group-hover:opacity-100">OVERWATCH</span>
+</div>
+<div class="pixel-border bg-white p-4 flex flex-col items-center gap-2 grayscale hover:grayscale-0 transition-all cursor-pointer group">
+<span class="material-symbols-outlined text-headline-sm">security</span>
+<span class="font-pixel text-[8px] text-center opacity-0 group-hover:opacity-100">FIREWALL</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Mobile Navigation Shell -->
+<footer class="md:hidden fixed bottom-0 left-0 w-full bg-surface border-t border-outline z-50">
+<div class="flex justify-around items-center h-16">
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-pixel">Hero</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="text-[10px] font-pixel">Skill</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined">map</span>
+<span class="text-[10px] font-pixel">Map</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-pixel">Cfg</span>
+</button>
+</div>
+</footer>
+<script>
+        // Simple micro-interaction for the pixel dino guide
+        document.addEventListener('DOMContentLoaded', () => {
+            const buttons = document.querySelectorAll('button');
+            const guideText = document.querySelector('.pixel-text');
+            
+            const messages = [
+                "CURIOUS CHOICE, MASTER.",
+                "THIS WILL HURT DATA PIRATES.",
+                "CALCULATING EFFICIENCY...",
+                "READY TO EXECUTE UPGRADE.",
+                "NODE STATUS: STABLE."
+            ];
+
+            buttons.forEach(btn => {
+                btn.addEventListener('mouseenter', () => {
+                    const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+                    const bubble = document.querySelector('.pixel-border p');
+                    if(bubble) bubble.firstChild.textContent = `"${randomMsg}" `;
+                });
+            });
+        });
+    </script>
+</body></html>

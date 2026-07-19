@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chronos | Mastery Hub</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #191919;
+            color: #e9e9e7;
+            image-rendering: pixelated;
+        }
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+            line-height: 1.5;
+        }
+        .pixel-border-2 {
+            box-shadow: 
+                0 -2px 0 0 #ffffff,
+                0 2px 0 0 #ffffff,
+                -2px 0 0 0 #ffffff,
+                2px 0 0 0 #ffffff;
+        }
+        .pixel-border-4 {
+            box-shadow: 
+                0 -4px 0 0 #ffffff,
+                0 4px 0 0 #ffffff,
+                -4px 0 0 0 #ffffff,
+                4px 0 0 0 #ffffff;
+        }
+        .pixel-border-dark-4 {
+            box-shadow: 
+                0 -4px 0 0 rgba(255, 255, 255, 0.13),
+                0 4px 0 0 rgba(255, 255, 255, 0.13),
+                -4px 0 0 0 rgba(255, 255, 255, 0.13),
+                4px 0 0 0 rgba(255, 255, 255, 0.13);
+        }
+        .skill-node {
+            transition: transform 0.1s steps(4);
+            cursor: pointer;
+        }
+        .skill-node:hover {
+            transform: scale(1.05);
+        }
+        .path-line {
+            stroke: #ffffff;
+            stroke-width: 4px;
+            fill: none;
+            shape-rendering: crispEdges;
+        }
+        .path-line-locked {
+            stroke: rgba(255, 255, 255, 0.13);
+            stroke-width: 2px;
+            stroke-dasharray: 4;
+            fill: none;
+            shape-rendering: crispEdges;
+        }
+        .dither-pattern {
+            background-image: radial-gradient(#ffffff 1px, transparent 1px);
+            background-size: 4px 4px;
+            opacity: 0.1;
+        }
+        .canvas-container {
+            cursor: grab;
+            background-color: #191919;
+        }
+        .canvas-container:active {
+            cursor: grabbing;
+        }
+        /* Custom scrollbar for pixel look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #191919;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ffffff;
+            box-shadow: inset 0 0 0 2px #191919;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "on-secondary-container": "#636360",
+                "on-primary-fixed-variant": "#494740",
+                "surface-tint": "#615e57",
+                "surface-container-highest": "#e6e2e0",
+                "on-background": "#1c1b1b",
+                "inverse-primary": "#cbc6bd",
+                "on-secondary-fixed-variant": "#474744",
+                "on-tertiary-fixed-variant": "#48464a",
+                "dark-text": "#e9e9e7",
+                "surface": "#ffffff",
+                "surface-bright": "#fdf8f7",
+                "primary-fixed": "#e7e2d9",
+                "inverse-surface": "#31302f",
+                "secondary-fixed": "#e5e2de",
+                "on-surface": "#37352f",
+                "on-primary": "#ffffff",
+                "tertiary-container": "#363438",
+                "surface-container-high": "#ebe7e6",
+                "outline": "rgba(55, 53, 47, 0.09)",
+                "error": "#ba1a1a",
+                "surface-container": "#f1edeb",
+                "background": "#fdf8f7",
+                "outline-strong": "rgba(55, 53, 47, 0.16)",
+                "tertiary-fixed": "#e6e1e6",
+                "on-surface-variant": "#49473f",
+                "primary": "#21201a",
+                "dark-outline": "rgba(255, 255, 255, 0.09)",
+                "dark-bg": "#191919",
+                "dark-outline-strong": "rgba(255, 255, 255, 0.13)",
+                "surface-variant": "#e6e2e0",
+                "secondary-container": "#e2dfdb",
+                "on-secondary-fixed": "#1b1c1a",
+                "on-primary-fixed": "#1d1c16",
+                "outline-variant": "#cbc6bc",
+                "secondary": "#5f5e5c",
+                "hover-state": "rgba(55, 53, 47, 0.08)",
+                "on-tertiary-container": "#a09ca1",
+                "dark-hover": "rgba(255, 255, 255, 0.055)",
+                "on-error": "#ffffff",
+                "on-error-container": "#93000a",
+                "on-primary-container": "#a19d95",
+                "on-tertiary-fixed": "#1c1b1f",
+                "inverse-on-surface": "#f4f0ee",
+                "secondary-fixed-dim": "#c8c6c3",
+                "primary-fixed-dim": "#cbc6bd",
+                "on-secondary": "#ffffff",
+                "primary-container": "#37352f",
+                "tertiary": "#211f23",
+                "error-container": "#ffdad6",
+                "on-tertiary": "#ffffff",
+                "surface-container-lowest": "#ffffff",
+                "dark-dim": "#9b9b96",
+                "tertiary-fixed-dim": "#cac5ca",
+                "surface-dim": "#ddd9d8",
+                "surface-container-low": "#f7f3f1"
+            },
+            "borderRadius": {
+                "DEFAULT": "0px",
+                "lg": "0px",
+                "xl": "0px",
+                "full": "0px"
+            },
+            "spacing": {
+                "xs": "4px",
+                "xl": "32px",
+                "gutter": "16px",
+                "lg": "24px",
+                "md": "16px",
+                "unit": "4px",
+                "sm": "8px",
+                "margin-mobile": "16px",
+                "margin-desktop": "40px"
+            }
+          }
+        }
+      }
+    </script>
+</head>
+<body class="bg-dark-bg overflow-hidden text-dark-text selection:bg-white selection:text-black">
+<div class="flex h-screen w-full">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col h-full py-md border-r-4 border-white bg-dark-bg w-72 shrink-0">
+<div class="px-md pb-lg">
+<h1 class="pixel-font text-[18px] text-white mb-lg">CHRONOS_OS</h1>
+<div class="mt-lg flex items-center gap-sm p-sm bg-white text-black pixel-border-4 mb-4">
+<div class="w-10 h-10 bg-black flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[24px]">skull</span>
+</div>
+<div class="ml-2">
+<div class="pixel-font text-[10px]">LVL 42</div>
+<div class="pixel-font text-[8px] mt-1 opacity-70 italic">VANGUARD</div>
+</div>
+</div>
+</div>
+<nav class="flex-1 px-sm space-y-4">
+<a class="flex items-center gap-md px-md py-sm text-dark-dim hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="pixel-font text-[10px]">CHARACTER</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-dark-dim hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="pixel-font text-[10px]">QUESTS</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm bg-white text-black pixel-border-4" href="#">
+<span class="material-symbols-outlined">bolt</span>
+<span class="pixel-font text-[10px]">SKILLS</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-dark-dim hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined">public</span>
+<span class="pixel-font text-[10px]">GUILD</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-dark-dim hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined">navigation</span>
+<span class="pixel-font text-[10px]">MAP</span>
+</a>
+</nav>
+<div class="px-md py-lg border-t-4 border-white">
+<button class="w-full py-4 bg-white text-black pixel-font text-[10px] hover:bg-dark-dim transition-colors mb-4">
+                    NEW_MISSION
+                </button>
+<div class="space-y-4">
+<a class="flex items-center gap-md px-md text-dark-dim hover:text-white" href="#">
+<span class="pixel-font text-[8px]">HELP.LOG</span>
+</a>
+<a class="flex items-center gap-md px-md text-dark-dim hover:text-white" href="#">
+<span class="pixel-font text-[8px]">EXIT_SESSION</span>
+</a>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col relative overflow-hidden">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center h-16 px-margin-desktop w-full border-b-4 border-white bg-dark-bg z-20">
+<div class="flex items-center gap-lg">
+<div class="flex items-center gap-8">
+<a class="text-white pixel-font text-[8px] hover:underline" href="#">DASHBOARD</a>
+<a class="text-dark-dim pixel-font text-[8px] hover:text-white" href="#">INVENTORY</a>
+<a class="text-dark-dim pixel-font text-[8px] hover:text-white" href="#">ARCHIVE</a>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2 text-dark-dim text-sm">search</span>
+<input class="bg-dark-bg border-2 border-white px-md pl-8 py-2 pixel-font text-[8px] text-white w-64 focus:outline-none focus:bg-white focus:text-black placeholder:text-dark-dim" placeholder="SEARCH_DATABASE..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-white p-2 border-2 border-white">settings</button>
+</div>
+</header>
+<!-- Skill Tree Canvas -->
+<div class="flex-1 bg-dark-bg relative overflow-hidden canvas-container select-none" id="canvas-container">
+<div class="absolute inset-0 dither-pattern pointer-events-none"></div>
+<!-- SVG Connections Layer (Manhattan / Stepped Style) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none z-0" id="skill-paths">
+<!-- Active Path: Initiation to Neural Linkage -->
+<path class="path-line" d="M 400 120 L 400 180 L 520 180 L 520 240"></path>
+<!-- Active Path: Neural Linkage to Kinetic Impact -->
+<path class="path-line" d="M 520 320 L 520 400 L 300 400 L 300 480"></path>
+<!-- Active Path: Neural Linkage to Aegis Protocol -->
+<path class="path-line" d="M 520 320 L 520 400 L 700 400 L 700 480"></path>
+<!-- Active Path: Kinetic Impact to Void Strike -->
+<path class="path-line" d="M 300 560 L 300 640 L 450 640 L 450 720"></path>
+<!-- Locked Path: Aegis to Nanite -->
+<path class="path-line-locked" d="M 700 560 L 700 640 L 850 640 L 850 720"></path>
+<!-- Locked Path: Sprawl Branch -->
+<path class="path-line-locked" d="M 700 560 L 700 640 L 1000 640 L 1000 480"></path>
+</svg>
+<!-- Skill Nodes Layer -->
+<div class="absolute inset-0 p-xl" id="nodes-layer">
+<!-- Core Hub (Winding layout) -->
+<div class="absolute" style="top: 80px; left: 400px; transform: translateX(-50%);">
+<div class="skill-node bg-white text-black p-4 min-w-[160px] text-center pixel-border-4">
+<div class="pixel-font text-[8px] opacity-70 mb-2">/ROOT/</div>
+<div class="pixel-font text-[12px] font-bold">INITIATION</div>
+</div>
+</div>
+<!-- Tier 1 - Neural Linkage (Offset to right) -->
+<div class="absolute" style="top: 240px; left: 520px; transform: translateX(-50%);">
+<div class="skill-node bg-black text-white p-4 min-w-[200px] text-center pixel-border-4 border-2 border-white">
+<div class="pixel-font text-[8px] text-dark-dim mb-2">MASTERY_I</div>
+<div class="pixel-font text-[10px] font-bold">NEURAL_LINKAGE</div>
+<div class="mt-2 pixel-font text-[8px] text-dark-dim">EFF_BONUS_+15%</div>
+</div>
+</div>
+<!-- Tier 2 - Kinetic Impact (Offset to left) -->
+<div class="absolute" style="top: 480px; left: 300px; transform: translateX(-50%);">
+<div class="skill-node bg-black text-white p-4 min-w-[200px] text-center pixel-border-4 border-2 border-white">
+<div class="pixel-font text-[8px] text-dark-dim mb-2">OFFENSIVE_II</div>
+<div class="pixel-font text-[10px] font-bold">KINETIC_IMPACT</div>
+<div class="mt-2 pixel-font text-[8px] text-dark-dim">FORCE_AMP_ACTIVE</div>
+</div>
+</div>
+<!-- Tier 2 - Aegis Protocol (Right side) -->
+<div class="absolute" style="top: 480px; left: 700px; transform: translateX(-50%);">
+<div class="skill-node bg-black text-white p-4 min-w-[200px] text-center pixel-border-4 border-2 border-white">
+<div class="pixel-font text-[8px] text-dark-dim mb-2">DEFENSIVE_II</div>
+<div class="pixel-font text-[10px] font-bold">AEGIS_PROTOCOL</div>
+<div class="mt-2 pixel-font text-[8px] text-dark-dim">DAMP_RATIO_0.12</div>
+</div>
+</div>
+<!-- Tier 3 - Void Strike (Center-ish bottom) -->
+<div class="absolute" style="top: 720px; left: 450px; transform: translateX(-50%);">
+<div class="skill-node bg-black text-white p-4 min-w-[200px] text-center pixel-border-4 border-2 border-white">
+<div class="pixel-font text-[8px] text-dark-dim mb-2">OFFENSIVE_III</div>
+<div class="pixel-font text-[10px] font-bold">VOID_STRIKE</div>
+<div class="mt-2 pixel-font text-[8px] text-dark-dim">CRIT_MULT_X2.4</div>
+</div>
+</div>
+<!-- Tier 3 - Nanite Repair (Locked - Far right) -->
+<div class="absolute" style="top: 720px; left: 850px; transform: translateX(-50%);">
+<div class="skill-node bg-dark-bg p-4 min-w-[200px] text-center pixel-border-dark-4 opacity-50">
+<div class="pixel-font text-[8px] text-dark-dim mb-2">DEFENSIVE_III</div>
+<div class="pixel-font text-[10px] text-dark-dim">NANITE_REPAIR</div>
+<div class="mt-2 pixel-font text-[8px] italic text-dark-dim">_LOCKED_</div>
+</div>
+</div>
+<!-- Extra branch - Ghost Step (Sprawled up) -->
+<div class="absolute" style="top: 400px; left: 1000px; transform: translateX(-50%);">
+<div class="skill-node bg-dark-bg p-4 min-w-[200px] text-center pixel-border-dark-4 opacity-50">
+<div class="pixel-font text-[8px] text-dark-dim mb-2">UTILITY_III</div>
+<div class="pixel-font text-[10px] text-dark-dim">GHOST_STEP</div>
+<div class="mt-2 pixel-font text-[8px] italic text-dark-dim">_LOCKED_</div>
+</div>
+</div>
+<!-- Decorative Elements -->
+<div class="absolute" style="top: 150px; left: 200px;"><span class="material-symbols-outlined text-white text-[32px] opacity-20">star</span></div>
+<div class="absolute" style="top: 600px; left: 100px;"><span class="material-symbols-outlined text-white text-[24px] opacity-20">swords</span></div>
+<div class="absolute" style="top: 300px; left: 850px;"><span class="material-symbols-outlined text-white text-[24px] opacity-20">arrow_forward</span></div>
+<div class="absolute" style="top: 800px; left: 700px;"><span class="material-symbols-outlined text-white text-[24px] opacity-20">security</span></div>
+</div>
+<!-- Floating Controls -->
+<div class="absolute bottom-lg right-lg flex flex-col gap-4">
+<div class="bg-black pixel-border-4 p-1 flex flex-col">
+<button class="p-2 hover:bg-white hover:text-black transition-colors" id="zoom-in"><span class="material-symbols-outlined text-[20px]">add</span></button>
+<div class="h-1 bg-white mx-1"></div>
+<button class="p-2 hover:bg-white hover:text-black transition-colors" id="zoom-out"><span class="material-symbols-outlined text-[20px]">remove</span></button>
+</div>
+<button class="bg-white text-black p-3 pixel-border-4 hover:bg-dark-dim transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">center_focus_strong</span>
+<span class="pixel-font text-[8px] font-bold">RECENTER</span>
+</button>
+</div>
+<!-- Skill Detail Overlay (Pixel Bento) -->
+<div class="absolute top-lg right-lg w-80 bg-black border-4 border-white p-6 z-10 pointer-events-auto">
+<div class="flex justify-between items-start mb-6">
+<div>
+<div class="pixel-font text-[8px] text-dark-dim mb-2">&gt;_INSIGHT_DATA</div>
+<h3 class="pixel-font text-[12px] font-bold text-white uppercase tracking-tighter">NEURAL_LINKAGE</h3>
+</div>
+<button class="material-symbols-outlined text-white hover:bg-white hover:text-black p-1">close</button>
+</div>
+<div class="space-y-6">
+<div class="p-4 border-2 border-white bg-dark-bg">
+<div class="pixel-font text-[8px] font-bold mb-3 text-white">ACTIVE_MODS:</div>
+<ul class="space-y-3">
+<li class="flex items-start gap-2">
+<span class="w-2 h-2 bg-white mt-1 shrink-0"></span>
+<span class="pixel-font text-[8px] text-white">+15% PROC_SPEED</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="w-2 h-2 bg-white mt-1 shrink-0"></span>
+<span class="pixel-font text-[8px] text-white">-10% CD_VARIANCE</span>
+</li>
+</ul>
+</div>
+<div>
+<div class="flex justify-between pixel-font text-[8px] text-dark-dim mb-2">
+<span>XP_PROGRESS</span>
+<span>75%</span>
+</div>
+<div class="h-4 bg-dark-bg border-2 border-white p-[2px]">
+<div class="h-full bg-white" style="width: 75%;"></div>
+</div>
+</div>
+<button class="w-full py-4 bg-white text-black pixel-font text-[10px] font-bold hover:bg-dark-dim transition-colors uppercase">
+                            ALLOCATE_PT
+                        </button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Micro-interactions Script -->
+<script>
+        const container = document.getElementById('canvas-container');
+        const nodesLayer = document.getElementById('nodes-layer');
+        const svgLayer = document.getElementById('skill-paths');
+        
+        let isDragging = false;
+        let startX, startY, scrollLeft, scrollTop;
+        let scale = 1;
+
+        // Panning Logic
+        container.addEventListener('mousedown', (e) => {
+            if (e.target !== container && e.target !== nodesLayer && e.target !== svgLayer) return;
+            isDragging = true;
+            startX = e.pageX - container.offsetLeft;
+            startY = e.pageY - container.offsetTop;
+            scrollLeft = container.scrollLeft;
+            scrollTop = container.scrollTop;
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const x = e.pageX - container.offsetLeft;
+            const y = e.pageY - container.offsetTop;
+            const walkX = (x - startX);
+            const walkY = (y - startY);
+            
+            nodesLayer.style.transform = `translate(${walkX}px, ${walkY}px) scale(${scale})`;
+            svgLayer.style.transform = `translate(${walkX}px, ${walkY}px) scale(${scale})`;
+        });
+
+        // Simple Zoom
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            scale = Math.min(scale + 0.1, 2);
+            updateTransform();
+        });
+
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            scale = Math.max(scale - 0.1, 0.5);
+            updateTransform();
+        });
+
+        function updateTransform() {
+            nodesLayer.style.transform = `scale(${scale})`;
+            svgLayer.style.transform = `scale(${scale})`;
+        }
+    </script>
+</body></html>

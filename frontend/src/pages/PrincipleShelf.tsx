@@ -20,7 +20,9 @@ export default function PrincipleShelf() {
 
   return (
     <div>
-      <h2>原则卷轴</h2>
+      <h2 className="pixel-font" style={{ fontSize: 18 }}>
+        原则卷轴
+      </h2>
       <p className="dim" style={{ marginBottom: 24 }}>
         每一条都是一次审计失败换来的可执行规则。
       </p>
@@ -31,7 +33,9 @@ export default function PrincipleShelf() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {principles.map((p) => (
             <div key={p.id} className="panel">
-              <h3 style={{ fontSize: 14, color: '#facc15' }}>{p.title}</h3>
+              <h3 className="pixel-font" style={{ fontSize: 12, color: '#facc15' }}>
+                {p.title}
+              </h3>
               <p style={{ fontSize: 13, marginTop: 4 }}>{p.body}</p>
             </div>
           ))}

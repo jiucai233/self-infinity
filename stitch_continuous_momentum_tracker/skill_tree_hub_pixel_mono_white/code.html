@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chronos - Skill Tree Hub (Pixel Mono White)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Press+Start+2P&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Use Tailwind Config from Brand Anchors -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "surface-tint": "#615e57",
+                "outline": "rgba(55, 53, 47, 0.09)",
+                "on-secondary-fixed": "#1b1c1a",
+                "on-primary": "#ffffff",
+                "on-error-container": "#93000a",
+                "on-secondary-container": "#636360",
+                "surface-container": "#f1edeb",
+                "on-tertiary": "#ffffff",
+                "surface-variant": "#e6e2e0",
+                "on-surface-variant": "#49473f",
+                "primary-fixed": "#e7e2d9",
+                "dark-text": "#e9e9e7",
+                "primary": "#21201a",
+                "dark-outline-strong": "rgba(255, 255, 255, 0.13)",
+                "dark-dim": "#9b9b96",
+                "secondary-fixed": "#e5e2de",
+                "on-secondary-fixed-variant": "#474744",
+                "on-primary-container": "#a19d95",
+                "surface-container-low": "#f7f3f1",
+                "on-surface": "#37352f",
+                "on-primary-fixed": "#1d1c16",
+                "on-secondary": "#ffffff",
+                "secondary-container": "#e2dfdb",
+                "on-tertiary-fixed": "#1c1b1f",
+                "on-background": "#1c1b1b",
+                "dark-bg": "#191919",
+                "surface-container-lowest": "#ffffff",
+                "secondary-fixed-dim": "#c8c6c3",
+                "hover-state": "rgba(55, 53, 47, 0.08)",
+                "on-tertiary-container": "#a09ca1",
+                "surface-container-highest": "#e6e2e0",
+                "primary-container": "#37352f",
+                "inverse-surface": "#31302f",
+                "surface-bright": "#fdf8f7",
+                "tertiary-fixed-dim": "#cac5ca",
+                "on-primary-fixed-variant": "#494740",
+                "on-error": "#ffffff",
+                "background": "#fdf8f7",
+                "primary-fixed-dim": "#cbc6bd",
+                "error": "#ba1a1a",
+                "surface-container-high": "#ebe7e6",
+                "surface": "#ffffff",
+                "dark-hover": "rgba(255, 255, 255, 0.055)",
+                "inverse-primary": "#cbc6bd",
+                "inverse-on-surface": "#f4f0ee",
+                "surface-dim": "#ddd9d8",
+                "tertiary-container": "#363438",
+                "tertiary": "#211f23",
+                "outline-variant": "#cbc6bc",
+                "tertiary-fixed": "#e6e1e6",
+                "dark-outline": "rgba(255, 255, 255, 0.09)",
+                "on-tertiary-fixed-variant": "#48464a",
+                "secondary": "#5f5e5c",
+                "outline-strong": "rgba(55, 53, 47, 0.16)",
+                "error-container": "#ffdad6"
+            },
+            "borderRadius": {
+                "DEFAULT": "0px", /* Overridden for Pixel Art Style */
+                "lg": "0px",
+                "xl": "0px",
+                "full": "0px"
+            },
+            "spacing": {
+                "gutter": "16px",
+                "unit": "4px",
+                "margin-mobile": "16px",
+                "xl": "32px",
+                "xs": "4px",
+                "lg": "24px",
+                "sm": "8px",
+                "margin-desktop": "40px",
+                "md": "16px"
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff;
+            cursor: crosshair;
+        }
+
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        /* Non-linear Grid Background */
+        .pixel-grid {
+            background-image: 
+                linear-gradient(to right, rgba(55, 53, 47, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(55, 53, 47, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Pixel Borders - Multiple shadows to create "stepped" look */
+        .pixel-border {
+            box-shadow: 
+                0 -4px 0 0 #37352f,
+                0 4px 0 0 #37352f,
+                -4px 0 0 0 #37352f,
+                4px 0 0 0 #37352f;
+            background: #ffffff;
+        }
+
+        .pixel-border-active {
+            box-shadow: 
+                0 -4px 0 0 #21201a,
+                0 4px 0 0 #21201a,
+                -4px 0 0 0 #21201a,
+                4px 0 0 0 #21201a;
+            background: #21201a;
+            color: #ffffff;
+        }
+
+        /* SVG Connectors - Manhattan/Stepped Path */
+        .connector-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Custom Scrollbar for the Canvas */
+        .custom-scroll::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #fdf8f7;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #37352f;
+        }
+
+        .material-symbols-outlined {
+            font-size: 24px;
+            display: inline-block;
+        }
+
+        /* Hover interaction for nodes */
+        .node-interact:hover {
+            transform: scale(1.05);
+            transition: transform 0.1s steps(2);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex">
+<!-- Predicted SideNavBar (The Anchor) -->
+<aside class="hidden md:flex flex-col h-screen w-64 left-0 top-0 border-r border-outline dark:border-dark-outline bg-surface dark:bg-dark-bg py-md z-50">
+<div class="px-md mb-xl">
+<h1 class="font-headline-sm text-headline-sm font-bold text-primary dark:text-dark-text tracking-tighter">Chronos</h1>
+</div>
+<div class="px-sm flex items-center space-x-md mb-lg">
+<div class="w-10 h-10 pixel-border flex items-center justify-center overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover grayscale" data-alt="A retro pixel-art portrait of a fantasy vanguard character, high-contrast black and white, minimal shading, clean square lines, professional game asset style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBYkwilRCUWmLUmGLZkIfyI1H2Z1WqNBbk-qCiN7uD_zhVPqvRy5ssyjX_6_V3TaihOS700Hh8GIKyfMYUBcNtuIotcZDTo_R9mFx2-FSLvNaVGEByyXZru_kQNCrAqLzHHp-3QW9C-jt11uy9nup6ofdxrEHkuDIh-BF8EDXqJio-VxgdtlUOHp8zmsWx3lfgZmsMkFeDG5TH7EZ3FfRtEYCrwRRbyF6sEafNj67HhRjMThGTW7moNG5IFPEq7DN8voWOT0h7bkDj"/>
+</div>
+<div>
+<p class="font-label-lg text-label-lg font-bold">Level 42</p>
+<p class="text-secondary text-[10px] font-label-sm uppercase tracking-widest">Vanguard Class</p>
+</div>
+</div>
+<nav class="flex-1 space-y-xs px-sm">
+<!-- Skills is active as this is the Skill Tree Hub -->
+<a class="flex items-center space-x-md px-md py-sm text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span>Character</span>
+</a>
+<a class="flex items-center space-x-md px-md py-sm text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span>Quests</span>
+</a>
+<a class="flex items-center space-x-md px-md py-sm bg-secondary-container text-on-secondary-fixed font-bold border-r-2 border-primary transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" data-icon="bolt">bolt</span>
+<span>Skills</span>
+</a>
+<a class="flex items-center space-x-md px-md py-sm text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span>Guild</span>
+</a>
+<a class="flex items-center space-x-md px-md py-sm text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span>Map</span>
+</a>
+</nav>
+<div class="px-sm mb-lg">
+<button class="w-full py-sm px-md pixel-border-active flex items-center justify-center space-x-sm text-label-md font-bold hover:opacity-90 transition-opacity">
+<span>New Mission</span>
+</button>
+</div>
+<div class="mt-auto px-sm border-t border-outline pt-md">
+<a class="flex items-center space-x-md px-md py-xs text-secondary hover:bg-hover-state transition-all duration-150 font-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span>Support</span>
+</a>
+<a class="flex items-center space-x-md px-md py-xs text-secondary hover:bg-hover-state transition-all duration-150 font-label-md" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>Log Out</span>
+</a>
+</div>
+</aside>
+<!-- Main Workspace -->
+<main class="flex-1 flex flex-col h-screen relative">
+<!-- Predicted TopNavBar (Horizontal Desktop Navigation Only) -->
+<header class="hidden md:flex justify-between items-center h-14 px-margin-desktop w-full border-b border-outline bg-surface z-40">
+<div class="flex items-center space-x-xl">
+<span class="font-body-md text-body-md font-bold text-primary">Skill Tree Hub (Pixel Mono White)</span>
+<div class="flex space-x-lg h-full items-center">
+<a class="text-secondary font-label-lg" href="#">Dashboard</a>
+<a class="text-secondary font-label-lg" href="#">Inventory</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-label-lg" href="#">Skills</a>
+</div>
+</div>
+<div class="flex items-center space-x-md">
+<div class="relative group">
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:text-primary transition-colors duration-200" data-icon="settings">settings</span>
+</div>
+</div>
+</header>
+<!-- Canvas Area -->
+<div class="flex-1 overflow-auto pixel-grid custom-scroll relative p-12 bg-[#ffffff]">
+<!-- Skill Tree Connector Layer -->
+<svg class="connector-container" height="2000" width="2000" xmlns="http://www.w3.org/2000/svg">
+<!-- Stepped (Manhattan) Path Construction -->
+<!-- Path 1 (Start to Combat) -->
+<path d="M 100 100 L 100 240 L 300 240" fill="none" stroke="#21201a" stroke-width="4"></path>
+<!-- Path 2 (Start to Utility) -->
+<path d="M 100 100 L 100 440 L 300 440" fill="none" stroke="#21201a" stroke-dasharray="8 8" stroke-width="4"></path>
+<!-- Path 3 (Combat to Heavy Strike) -->
+<path d="M 360 240 L 440 240 L 440 140 L 520 140" fill="none" stroke="#21201a" stroke-width="4"></path>
+<!-- Path 4 (Combat to Quick Parry) -->
+<path d="M 360 240 L 440 240 L 440 340 L 520 340" fill="none" stroke="#21201a" stroke-width="4"></path>
+<!-- Path 5 (Quick Parry to Counter) -->
+<path d="M 580 340 L 680 340" fill="none" stroke="#21201a" stroke-dasharray="8 8" stroke-width="4"></path>
+</svg>
+<!-- Skill Tree Nodes -->
+<div class="relative z-10 w-full h-[1500px]">
+<!-- Start Node -->
+<div class="absolute top-[80px] left-[80px] node-interact" id="node-start">
+<div class="w-10 h-10 pixel-border-active flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+</div>
+<span class="absolute top-12 left-0 whitespace-nowrap pixel-font text-[10px] tracking-tight">ORIGIN</span>
+</div>
+<!-- Tier 1: Combat (Unlocked) -->
+<div class="absolute top-[220px] left-[280px] node-interact" id="node-combat">
+<div class="w-20 h-20 pixel-border flex flex-col items-center justify-center space-y-1">
+<span class="material-symbols-outlined" data-icon="swords">swords</span>
+<span class="pixel-font text-[8px] text-center px-1">COMBAT</span>
+</div>
+</div>
+<!-- Tier 1: Utility (Locked) -->
+<div class="absolute top-[420px] left-[280px] opacity-40 node-interact" id="node-utility">
+<div class="w-20 h-20 border-2 border-dashed border-primary flex flex-col items-center justify-center space-y-1">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="pixel-font text-[8px] text-center px-1">UTILITY</span>
+</div>
+</div>
+<!-- Tier 2: Heavy Strike (Unlocked) -->
+<div class="absolute top-[100px] left-[520px] node-interact" id="node-heavy">
+<div class="w-16 h-16 pixel-border-active flex flex-col items-center justify-center space-y-1">
+<span class="material-symbols-outlined" data-icon="mace" style="font-variation-settings: 'FILL' 1;">face</span>
+<span class="pixel-font text-[6px] text-center px-1">HEAVY</span>
+</div>
+<div class="mt-2 text-center">
+<p class="font-label-sm text-[8px] font-bold">LVL 4/5</p>
+</div>
+</div>
+<!-- Tier 2: Quick Parry (Unlocked) -->
+<div class="absolute top-[300px] left-[520px] node-interact" id="node-parry">
+<div class="w-16 h-16 pixel-border flex flex-col items-center justify-center space-y-1">
+<span class="material-symbols-outlined" data-icon="shield">shield</span>
+<span class="pixel-font text-[6px] text-center px-1">PARRY</span>
+</div>
+<div class="mt-2 text-center">
+<p class="font-label-sm text-[8px] font-bold text-secondary">LVL 0/1</p>
+</div>
+</div>
+<!-- Tier 3: Counter Strike (Locked) -->
+<div class="absolute top-[300px] left-[680px] opacity-40 node-interact" id="node-counter">
+<div class="w-16 h-16 border-2 border-dashed border-primary flex flex-col items-center justify-center space-y-1">
+<span class="material-symbols-outlined" data-icon="bolt">bolt</span>
+<span class="pixel-font text-[6px] text-center px-1">COUNTER</span>
+</div>
+</div>
+<!-- Detail Panel (Fixed Overlay) -->
+<div class="fixed bottom-lg right-lg w-80 bg-surface pixel-border p-md z-50">
+<div class="flex justify-between items-start mb-md">
+<div>
+<h3 class="pixel-font text-[12px] leading-tight mb-1">HEAVY STRIKE</h3>
+<p class="text-[10px] text-secondary font-medium">Rank 4 Mastery</p>
+</div>
+<span class="material-symbols-outlined text-primary" data-icon="info">info</span>
+</div>
+<div class="space-y-md">
+<p class="font-body-sm text-body-sm text-on-surface">Deliver a devastating blow that deals <span class="font-bold">+140% Physical Damage</span>. 15% chance to stun enemies for 2s.</p>
+<div class="space-y-sm">
+<div class="flex justify-between text-[10px] pixel-font">
+<span>PROGRESS</span>
+<span>80%</span>
+</div>
+<div class="h-2 w-full bg-surface-container overflow-hidden pixel-border" style="box-shadow: none; border: 1px solid #37352f;">
+<div class="h-full bg-primary" style="width: 80%"></div>
+</div>
+</div>
+<button class="w-full py-sm pixel-border-active pixel-font text-[10px] hover:bg-opacity-90 active:scale-95 transition-all">
+                            UPGRADE (2 SP)
+                        </button>
+</div>
+</div>
+<!-- Global Stats floating top-right -->
+<div class="fixed top-20 right-margin-desktop flex space-x-md z-40">
+<div class="bg-surface pixel-border px-md py-sm flex items-center space-x-sm">
+<span class="material-symbols-outlined text-primary" data-icon="star">star</span>
+<div class="flex flex-col">
+<span class="text-[9px] text-secondary pixel-font">SKILL POINTS</span>
+<span class="pixel-font text-[12px]">08</span>
+</div>
+</div>
+<div class="bg-surface pixel-border px-md py-sm flex items-center space-x-sm">
+<span class="material-symbols-outlined text-primary" data-icon="diamond">diamond</span>
+<div class="flex flex-col">
+<span class="text-[9px] text-secondary pixel-font">ESSENCE</span>
+<span class="pixel-font text-[12px]">2,450</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Mobile Bottom NavBar (Suppressed if on desktop, shown on mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface border-t border-outline flex justify-around items-center z-50">
+<a class="flex flex-col items-center text-secondary" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-[9px] font-label-sm">Hero</span>
+</a>
+<a class="flex flex-col items-center text-primary font-bold" href="#">
+<span class="material-symbols-outlined" data-icon="bolt">bolt</span>
+<span class="text-[9px] font-label-sm">Skills</span>
+</a>
+<a class="flex flex-col items-center text-secondary" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="text-[9px] font-label-sm">Map</span>
+</a>
+<a class="flex flex-col items-center text-secondary" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-[9px] font-label-sm">Config</span>
+</a>
+</nav>
+<script>
+        // Simple micro-interaction for the nodes
+        document.querySelectorAll('.node-interact').forEach(node => {
+            node.addEventListener('mousedown', () => {
+                node.style.transform = 'translateY(2px)';
+            });
+            node.addEventListener('mouseup', () => {
+                node.style.transform = 'translateY(0px)';
+            });
+        });
+
+        // Dynamic viewport centering for the start node
+        window.addEventListener('DOMContentLoaded', () => {
+            const container = document.querySelector('main .overflow-auto');
+            const startNode = document.getElementById('node-start');
+            if(container && startNode) {
+                container.scrollLeft = 0;
+                container.scrollTop = 0;
+            }
+        });
+    </script>
+</body></html>

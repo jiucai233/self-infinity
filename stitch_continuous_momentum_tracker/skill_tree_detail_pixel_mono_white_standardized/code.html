@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chronos - Deep Focus Protocol</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Press+Start+2P&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "background": "#fdf8f7",
+                    "surface-variant": "#e6e2e0",
+                    "surface": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed-variant": "#494740",
+                    "primary-fixed-dim": "#cbc6bd",
+                    "on-secondary-container": "#636360",
+                    "tertiary-container": "#363438",
+                    "secondary": "#5f5e5c",
+                    "outline-variant": "#cbc6bc",
+                    "secondary-container": "#e2dfdb",
+                    "on-surface-variant": "#49473f",
+                    "tertiary-fixed-dim": "#cac5ca",
+                    "on-surface": "#1c1b1b",
+                    "primary": "#21201a",
+                    "on-primary-fixed": "#1d1c16",
+                    "inverse-on-surface": "#f4f0ee",
+                    "on-primary": "#ffffff",
+                    "secondary-fixed": "#e5e2de",
+                    "on-secondary-fixed": "#1b1c1a",
+                    "secondary-fixed-dim": "#c8c6c3",
+                    "error-container": "#ffdad6",
+                    "inverse-surface": "#31302f",
+                    "surface-container-high": "#ebe7e6",
+                    "tertiary": "#211f23",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container": "#f1edeb",
+                    "on-background": "#1c1b1b",
+                    "surface-container-low": "#f7f3f1",
+                    "primary-container": "#37352f",
+                    "hover-state": "rgba(55, 53, 47, 0.08)",
+                    "on-secondary-fixed-variant": "#474744",
+                    "error": "#ba1a1a",
+                    "dark-text": "#e9e9e7",
+                    "outline": "rgba(55, 53, 47, 0.09)",
+                    "dark-hover": "rgba(255, 255, 255, 0.055)",
+                    "inverse-primary": "#cbc6bd",
+                    "dark-outline-strong": "rgba(255, 255, 255, 0.13)",
+                    "surface-container-highest": "#e6e2e0",
+                    "on-error-container": "#93000a",
+                    "surface-bright": "#fdf8f7",
+                    "outline-strong": "rgba(55, 53, 47, 0.16)",
+                    "on-primary-container": "#a19d95",
+                    "surface-tint": "#615e57",
+                    "on-tertiary-fixed-variant": "#48464a",
+                    "surface-dim": "#ddd9d8",
+                    "primary-fixed": "#e7e2d9",
+                    "dark-outline": "rgba(255, 255, 255, 0.09)",
+                    "tertiary-fixed": "#e6e1e6",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed": "#1c1b1f",
+                    "dark-dim": "#9b9b96",
+                    "on-error": "#ffffff",
+                    "on-tertiary-container": "#a09ca1",
+                    "dark-bg": "#191919",
+                    "mastery-gold": "#d4a017"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "sm": "8px",
+                    "xs": "4px",
+                    "margin-mobile": "16px",
+                    "margin-desktop": "40px",
+                    "lg": "24px",
+                    "md": "16px",
+                    "gutter": "16px",
+                    "xl": "32px"
+            },
+            "fontFamily": {
+                    "pixel": ["'Press Start 2P'", "cursive"],
+                    "body-sm": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "label-lg": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-sm": ["Inter"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body {
+            background-color: #fdf8f7;
+            background-image: radial-gradient(#37352f 0.5px, transparent 0.5px);
+            background-size: 24px 24px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .pixel-border {
+            box-shadow: 
+                0 -4px 0 0 #21201a,
+                0 4px 0 0 #21201a,
+                -4px 0 0 0 #21201a,
+                4px 0 0 0 #21201a;
+            margin: 4px;
+        }
+
+        .pixel-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 24px;
+            background: #21201a;
+            color: #ffffff;
+            box-shadow: 
+                inset -4px -4px 0 0 #5f5e5c,
+                0 -4px 0 0 #21201a,
+                0 4px 0 0 #21201a,
+                -4px 0 0 0 #21201a,
+                4px 0 0 0 #21201a;
+            transition: transform 0.1s;
+        }
+
+        .pixel-btn:active {
+            transform: translateY(2px);
+            box-shadow: 
+                inset 4px 4px 0 0 #000,
+                0 -4px 0 0 #21201a,
+                0 4px 0 0 #21201a,
+                -4px 0 0 0 #21201a,
+                4px 0 0 0 #21201a;
+        }
+
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        .segmented-bar-unit {
+            height: 12px;
+            width: 100%;
+            background: #e6e2e0;
+            border: 1px solid #cbc6bc;
+        }
+
+        .segmented-bar-unit.filled {
+            background: #d4a017;
+            border-color: #d4a017;
+        }
+
+        .force-field-container {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .force-field-ring {
+            position: absolute;
+            border: 2px solid #21201a;
+            border-radius: 9999px;
+            opacity: 0.15;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .cursor-blink {
+            animation: blink 1s step-end infinite;
+        }
+    </style>
+</head>
+<body class="text-primary selection:bg-primary selection:text-white">
+<!-- TopNavBar -->
+<header class="w-full top-0 border-b border-outline bg-surface sticky z-50">
+<nav class="flex justify-between items-center h-14 px-margin-desktop w-full">
+<div class="flex items-center gap-8">
+<span class="font-headline-sm text-headline-sm font-bold text-primary">Chronos</span>
+<div class="hidden md:flex gap-6">
+<a class="text-secondary hover:bg-hover-state transition-colors duration-200 font-body-md text-body-md" href="#">Dashboard</a>
+<a class="text-secondary hover:bg-hover-state transition-colors duration-200 font-body-md text-body-md" href="#">Inventory</a>
+<a class="text-secondary hover:bg-hover-state transition-colors duration-200 font-body-md text-body-md" href="#">Archive</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<input class="bg-surface-container border border-outline px-4 py-1 text-sm focus:outline-none focus:border-primary" placeholder="Search..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-primary hover:bg-hover-state p-2 rounded-full transition-colors duration-200">settings</button>
+</div>
+</nav>
+</header>
+<div class="flex min-h-[calc(100vh-56px)]">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col h-auto py-md border-r border-outline bg-surface w-64 shrink-0">
+<div class="px-md mb-xl">
+<div class="flex items-center gap-3 p-3 pixel-border bg-surface-container-low mb-4">
+<div class="w-10 h-10 bg-primary flex items-center justify-center">
+<img alt="Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqVehOEoXuuVUM1IX4t4xD4ip3L1ETSm0Oou2rar2sbc0IoxY5oPRR3yajYHWiJE-acCMBP8i01wpLAGIXo_p0l02eIHSuAMBoA0WqOMXYw-yW-6ImQm9DnRpPUs1kzuqd_CVKDSKHUU5aofSvIvJXh7YyxqxCWhy9BXYh8do3cNd6A9vebVFc0aKDP6WmFYjWQORbbdXCBjb0zGbKLGb7ZeiJd51XyVOkHmeudIeRPJcpY-IqEUZdcaBwNT0PCTNPiBla57Sgy1vV"/>
+</div>
+<div>
+<p class="font-label-lg text-label-lg font-bold">Lvl 24 Wanderer</p>
+<p class="text-[10px] text-secondary uppercase tracking-wider">Wanderer Class</p>
+</div>
+</div>
+<p class="text-[10px] text-secondary mb-4 px-1">Stamina: 85% | Sanity: 92%</p>
+</div>
+<nav class="flex-1 space-y-1 px-sm">
+<a class="flex items-center gap-3 px-md py-3 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined">person</span> Character
+                </a>
+<a class="flex items-center gap-3 px-md py-3 bg-secondary-container text-on-secondary-fixed font-bold border-r-2 border-primary transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_tree</span> Skills
+                </a>
+<a class="flex items-center gap-3 px-md py-3 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined">assignment</span> Quests
+                </a>
+<a class="flex items-center gap-3 px-md py-3 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined">auto_fix_high</span> Forge
+                </a>
+<a class="flex items-center gap-3 px-md py-3 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span> Vault
+                </a>
+</nav>
+<div class="mt-auto px-sm border-t border-outline pt-md">
+<button class="w-full pixel-btn text-[10px] py-3 mb-4">ENTER FOCUS MODE</button>
+<a class="flex items-center gap-3 px-md py-2 text-secondary hover:bg-hover-state transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined text-sm">help</span> Support
+                </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 p-margin-mobile md:p-margin-desktop overflow-x-hidden bg-surface-container-low">
+<div class="max-w-6xl mx-auto">
+<!-- Breadcrumbs -->
+<div class="mb-8 flex items-center gap-2 text-on-surface-variant font-body-md">
+<span class="cursor-pointer hover:text-primary">Mastery Tree</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="cursor-pointer hover:text-primary">Cognitive Branch</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-primary font-bold">Deep Focus Protocol</span>
+</div>
+<!-- Bento-style Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-xl">
+<!-- Left Column: Skill Detail Card -->
+<section class="col-span-12 lg:col-span-8 pixel-border bg-surface p-6 flex flex-col gap-6">
+<div class="flex justify-between items-start">
+<div class="flex gap-4">
+<div class="w-20 h-20 pixel-border border-4 border-primary flex items-center justify-center bg-surface-container-low">
+<span class="material-symbols-outlined text-[48px] text-primary">psychology</span>
+</div>
+<div>
+<h1 class="pixel-font text-xl text-primary mb-2 uppercase leading-tight">Deep Focus Protocol</h1>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-primary text-white text-[8px] pixel-font">ACTIVE</span>
+<span class="px-2 py-1 bg-surface-container-highest text-secondary text-[8px] pixel-font">RANK 3/5</span>
+</div>
+</div>
+</div>
+<div class="text-right">
+<p class="pixel-font text-[8px] text-secondary mb-1">NODE INTEGRITY</p>
+<p class="pixel-font text-xl text-mastery-gold">94.2%</p>
+</div>
+</div>
+<p class="font-body-md text-secondary leading-relaxed max-w-2xl">
+                            A foundational technique of the Cognitive Branch. When activated, it generates a temporal force field that suppresses external notification noise and internal cognitive jitter, increasing productive yield by 15%.
+                        </p>
+<!-- Segmented Progress Bars -->
+<div class="space-y-4 bg-surface-container-low p-4 pixel-border">
+<div>
+<div class="flex justify-between items-center mb-2">
+<span class="pixel-font text-[8px] text-primary">XP PROGRESSION</span>
+<span class="pixel-font text-[8px] text-mastery-gold">1250 / 2000</span>
+</div>
+<div class="grid grid-cols-20 gap-1">
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+<div class="p-3 bg-surface border-l-4 border-primary">
+<p class="pixel-font text-[8px] text-secondary mb-1">CURRENT BONUS</p>
+<p class="font-headline-sm text-headline-sm text-primary">+15m Focus Shield</p>
+</div>
+<div class="p-3 bg-surface border-l-4 border-mastery-gold">
+<p class="pixel-font text-[8px] text-secondary mb-1">NEXT RANK</p>
+<p class="font-headline-sm text-headline-sm text-mastery-gold">+25m Focus Shield</p>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4 mt-4">
+<button class="pixel-btn flex-grow py-5 text-[12px] pixel-font gap-3">
+<span class="material-symbols-outlined">add_circle</span>
+                                ALLOCATE SKILL POINT
+                            </button>
+<button class="pixel-border border-outline bg-surface p-5 hover:bg-hover-state transition-colors">
+<span class="material-symbols-outlined">share</span>
+</button>
+</div>
+</section>
+<!-- Right Column: Advisor & Geometry -->
+<aside class="col-span-12 lg:col-span-4 flex flex-col gap-xl">
+<!-- Pixel Guide / Neural Advisor -->
+<div class="pixel-border bg-surface-container p-4 flex flex-col items-center">
+<div class="w-48 h-48 mb-4">
+<img alt="Advisor Drone" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAw3GCDAdybFCqEh9GwuaCxMB8gpQzhcra5-CAQCy07TlIe8_f3Oc69f3O2jEsES4pwU8Hx3irV0IAl85fNAq5ofYlQMfw5NmNe7BwtusSb4l2vauo1w1gXyUPYAkmQecraSkaDaDPel4k3SK7hxHNkW0JD3LvPM3JtF2ePC4s9mLic7qAjJ5FrJPyOftxYIqw_M19OMxgH8f0xoIErwAE9SFjYnxDdYfU3B5VCf8MVYxLnt8AT98LQjITAE2gYzyw80cLAJhiYqNH7"/>
+</div>
+<div class="bg-surface p-4 pixel-border w-full text-center">
+<p class="pixel-font text-[8px] text-secondary mb-2">NEURAL ADVISOR</p>
+<p class="font-body-md italic text-primary leading-snug">
+                                    "Concentrating your points here will stabilize your Flow State during high-entropy tasks."
+                                </p>
+</div>
+</div>
+<!-- Force Field Visualization -->
+<div class="pixel-border bg-surface p-6 flex flex-col items-center">
+<h4 class="pixel-font text-[8px] text-secondary self-start mb-6 uppercase">Focus Geometry</h4>
+<div class="force-field-container">
+<div class="force-field-ring" style="width: 100%; height: 100%;"></div>
+<div class="force-field-ring" style="width: 80%; height: 80%; border-color: #d4a017;"></div>
+<div class="force-field-ring" style="width: 60%; height: 60%; opacity: 0.3;"></div>
+<div class="force-field-ring" style="width: 40%; height: 40%; border-style: dashed;"></div>
+<span class="material-symbols-outlined text-[48px] text-mastery-gold" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+<div class="mt-8 w-full space-y-3">
+<div class="flex justify-between items-center text-[10px] pixel-font">
+<span class="text-secondary">RADIUS</span>
+<span class="text-primary">4.2M</span>
+</div>
+<div class="flex justify-between items-center text-[10px] pixel-font">
+<span class="text-secondary">INTENSITY</span>
+<span class="text-mastery-gold">HIGH</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Dependencies Row -->
+<section class="col-span-12 pixel-border bg-surface p-6">
+<h3 class="pixel-font text-[10px] text-primary mb-6">PREREQUISITE MAPPING</h3>
+<div class="flex flex-wrap gap-8 items-center justify-center md:justify-start">
+<div class="flex flex-col items-center gap-2 opacity-40">
+<div class="w-12 h-12 pixel-border border-outline border-dashed flex items-center justify-center bg-surface-container-low">
+<span class="material-symbols-outlined text-secondary">lock</span>
+</div>
+<span class="pixel-font text-[7px] text-secondary">CALM BREATH</span>
+</div>
+<div class="h-[2px] w-12 border-t-2 border-dashed border-outline"></div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-16 h-16 pixel-border border-primary flex items-center justify-center bg-surface-container-low">
+<span class="material-symbols-outlined text-primary">bolt</span>
+</div>
+<span class="pixel-font text-[7px] text-primary">INITIAL FOCUS</span>
+</div>
+<div class="h-[2px] w-12 bg-primary"></div>
+<div class="flex flex-col items-center gap-2 scale-110">
+<div class="w-20 h-20 pixel-border border-mastery-gold flex items-center justify-center bg-surface-container-low">
+<span class="material-symbols-outlined text-mastery-gold">psychology</span>
+</div>
+<span class="pixel-font text-[7px] text-mastery-gold">DEEP PROTOCOL</span>
+</div>
+<div class="h-[2px] w-12 border-t-2 border-dashed border-outline"></div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-16 h-16 pixel-border border-outline flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">auto_awesome</span>
+</div>
+<span class="pixel-font text-[7px] text-secondary">FLOW TRANCE</span>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+</div>
+<!-- Mobile Navigation -->
+<footer class="md:hidden fixed bottom-0 left-0 w-full bg-surface border-t border-outline z-50">
+<div class="flex justify-around items-center h-16">
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[8px] pixel-font">HERO</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_tree</span>
+<span class="text-[8px] pixel-font">SKILL</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-[8px] pixel-font">QUEST</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[8px] pixel-font">CFG</span>
+</button>
+</div>
+</footer>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const rings = document.querySelectorAll('.force-field-ring');
+            let angle = 0;
+            function animateRings() {
+                angle += 0.05;
+                rings.forEach((ring, i) => {
+                    const s = 1 + Math.sin(angle + i) * 0.02;
+                    ring.style.transform = `scale(${s})`;
+                });
+                requestAnimationFrame(animateRings);
+            }
+            animateRings();
+
+            // Hover effect for guide interaction
+            const advisorText = document.querySelector('.italic');
+            const messages = [
+                "CURIOUS CHOICE, MASTER.",
+                "STABILIZING FLOW STATE...",
+                "CALCULATING EFFICIENCY...",
+                "READY TO ALLOCATE POINT.",
+                "NODE STATUS: OPTIMAL."
+            ];
+
+            document.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('mouseenter', () => {
+                    if(advisorText) {
+                        const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+                        advisorText.textContent = `"${randomMsg}"`;
+                    }
+                });
+            });
+        });
+    </script>
+</body></html>

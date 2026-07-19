@@ -18,6 +18,12 @@ function focusBand(score: number | null): FocusBand {
   return 'low'
 }
 
+// Segmented pixel-style bar (row of discrete filled/unfilled squares,
+// per stitch_continuous_momentum_tracker/character_dashboard_pixel_mono_white
+// "HEALTH SCORE"/"MENTAL SCORE" bars) instead of one continuous rounded fill.
+// The track container itself is still scaled to trackWidthPct so a lower
+// sanity_cap keeps rendering visibly *fewer available segments*, not just
+// fewer filled ones among a fixed set.
 function Bar({
   label,
   value,
@@ -35,28 +41,28 @@ function Bar({
 }) {
   const trackWidthPct = Math.max(0, Math.min(100, (max / trackMax) * 100))
   const fillWidthPct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0
+  const segmentCount = compact ? 8 : 20
+  const filledSegments = Math.round((fillWidthPct / 100) * segmentCount)
+
   const track = (
     <div
       data-testid={`bar-track-${label}`}
       title={compact ? `${label} ${Math.round(value)}/${Math.round(max)}` : undefined}
       style={{
         width: `${trackWidthPct}%`,
-        height: compact ? 4 : 8,
-        border: '1px solid var(--border-strong)',
-        borderRadius: 999,
-        background: 'var(--hover-wash)',
-        overflow: 'hidden',
+        height: compact ? 6 : 12,
+        display: 'flex',
+        gap: compact ? 1 : 2,
       }}
     >
-      <div
-        data-testid={`bar-fill-${label}`}
-        style={{
-          width: `${fillWidthPct}%`,
-          height: '100%',
-          background: color,
-          borderRadius: 999,
-        }}
-      />
+      {Array.from({ length: segmentCount }).map((_, i) => (
+        <div
+          key={i}
+          data-testid={`bar-segment-${label}`}
+          className={i < filledSegments ? 'pixel-bar-segment active' : 'pixel-bar-segment'}
+          style={i < filledSegments ? { background: color } : undefined}
+        />
+      ))}
     </div>
   )
 
@@ -64,7 +70,7 @@ function Bar({
 
   return (
     <div style={{ fontSize: 11 }}>
-      <div className="dim" style={{ marginBottom: 2 }}>
+      <div className="dim pixel-font" style={{ marginBottom: 4, fontSize: 9 }}>
         {label} {Math.round(value)}/{Math.round(max)}
       </div>
       {track}
@@ -142,7 +148,7 @@ export default function Avatar({ compact = false }: { compact?: boolean }) {
           alignItems: 'center',
           gap: 8,
           padding: '6px 10px',
-          borderRadius: 'var(--radius-pill)',
+          borderRadius: 0,
           background: 'var(--panel-translucent)',
           border: '1px solid var(--border)',
           boxShadow: 'none',

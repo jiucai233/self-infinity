@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;family=Press+Start+2P&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "background": "#141317",
+                    "primary-fixed-dim": "#ccbeff",
+                    "surface": "#141317",
+                    "error": "#ffb4ab",
+                    "surface-container-high": "#2b292e",
+                    "inverse-primary": "#625595",
+                    "inverse-on-surface": "#313034",
+                    "tertiary-container": "#d1bf60",
+                    "tertiary": "#eedb79",
+                    "outline-variant": "#48454f",
+                    "accent-light": "#7c3aed",
+                    "surface-dim": "#141317",
+                    "accent-dark": "#c4b5fd",
+                    "tertiary-fixed": "#f7e380",
+                    "secondary": "#54d8e8",
+                    "on-tertiary-fixed-variant": "#514700",
+                    "mastery-gold": "#facc15",
+                    "error-container": "#93000a",
+                    "info-dark": "#67e8f9",
+                    "secondary-fixed-dim": "#54d8e8",
+                    "surface-container-lowest": "#0f0e12",
+                    "on-tertiary-container": "#594d00",
+                    "surface-bright": "#3a383d",
+                    "accent-fill": "#7c3aed",
+                    "surface-container-highest": "#363439",
+                    "primary-container": "#c4b5fd",
+                    "inverse-surface": "#e6e1e7",
+                    "tertiary-fixed-dim": "#d9c767",
+                    "on-error": "#690005",
+                    "on-primary-fixed-variant": "#4a3d7c",
+                    "primary": "#dfd5ff",
+                    "secondary-fixed": "#91f1ff",
+                    "on-secondary-fixed-variant": "#004f57",
+                    "on-primary-container": "#514483",
+                    "surface-container-low": "#1c1b1f",
+                    "on-surface": "#e6e1e7",
+                    "on-primary-fixed": "#1e0e4e",
+                    "secondary-container": "#02aebe",
+                    "on-tertiary-fixed": "#211b00",
+                    "on-background": "#e6e1e7",
+                    "on-secondary": "#00363c",
+                    "danger-light": "#c9362c",
+                    "on-secondary-fixed": "#001f23",
+                    "surface-tint": "#ccbeff",
+                    "outline": "#938f9a",
+                    "accent-strong-light": "#6d28d9",
+                    "on-secondary-container": "#003b42",
+                    "on-primary": "#332664",
+                    "on-error-container": "#ffdad6",
+                    "on-tertiary": "#383000",
+                    "surface-container": "#201f23",
+                    "accent-strong-dark": "#a78bfa",
+                    "surface-variant": "#363439",
+                    "info-light": "#0e7490",
+                    "on-surface-variant": "#cac4d1",
+                    "danger-dark": "#ff6b6b",
+                    "primary-fixed": "#e7deff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gap-panel": "20px",
+                    "edge-thickness-locked": "1.5px",
+                    "edge-thickness-active": "2.5px"
+            },
+            "fontFamily": {
+                    "headline-sm": ["Inter"],
+                    "body-base": ["Inter"],
+                    "label-dim": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "pixel": ["'Press Start 2P'", "cursive"]
+            },
+            "fontSize": {
+                    "headline-sm": ["16px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-base": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "label-dim": ["12px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                    "headline-md": ["20px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-lg": ["24px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            image-rendering: pixelated;
+        }
+
+        .pixel-border {
+            box-shadow: 
+                0 -4px 0 0 #ffffff,
+                0 4px 0 0 #ffffff,
+                -4px 0 0 0 #ffffff,
+                4px 0 0 0 #ffffff;
+        }
+
+        .pixel-border-locked {
+            box-shadow: 
+                0 -2px 0 0 #48454f,
+                0 2px 0 0 #48454f,
+                -2px 0 0 0 #48454f,
+                4px 0 0 0 #48454f;
+        }
+
+        .pixel-line-active {
+            background: #ffffff;
+            width: 4px;
+            height: 4px;
+        }
+
+        /* Winding Path Connectors */
+        .connector-h { height: 4px; background: white; }
+        .connector-v { width: 4px; background: white; }
+        .connector-locked { background-image: linear-gradient(to right, #48454f 50%, transparent 50%); background-size: 10px 100%; }
+        .connector-v-locked { background-image: linear-gradient(to bottom, #48454f 50%, transparent 50%); background-size: 100% 10px; }
+
+        .pixel-node {
+            width: 64px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000000;
+            transition: all 0.1s steps(2);
+            position: relative;
+            z-index: 10;
+        }
+
+        .pixel-node:hover {
+            background: #ffffff;
+            color: #000000;
+            transform: scale(1.1);
+        }
+
+        .node-label {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+            text-transform: uppercase;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #fff;
+        }
+    </style>
+</head>
+<body class="overflow-hidden">
+<!-- TopNavBar Mapping -->
+<header class="sticky top-0 z-50 flex items-center justify-between px-5 w-full bg-surface border-b border-outline-variant h-16">
+<div class="flex items-center gap-4">
+<span class="font-pixel text-[12px] text-primary tracking-tighter">SELF-INFINITY</span>
+</div>
+<nav class="hidden md:flex gap-8 items-center">
+<a class="font-headline-sm text-headline-sm text-primary border-b-2 border-primary pb-1 hover:bg-surface-variant transition-colors cursor-pointer active:opacity-80" href="#">Skill Tree</a>
+<a class="font-headline-sm text-headline-sm text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer active:opacity-80" href="#">Focus Area</a>
+<a class="font-headline-sm text-headline-sm text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer active:opacity-80" href="#">Inventory</a>
+</nav>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer">settings</span>
+</div>
+</header>
+<div class="flex h-[calc(100vh-64px)] overflow-hidden">
+<!-- SideNavBar Mapping -->
+<aside class="flex flex-col h-full p-4 gap-panel bg-surface border-r border-outline-variant w-64 shrink-0">
+<div class="mb-6 space-y-2">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-white pixel-border flex items-center justify-center">
+<img class="w-8 h-8" data-alt="A high-contrast black and white pixel art character portrait of a wandering adventurer wearing a hood and carrying a staff. The style is 8-bit, nostalgic, and minimalist with sharp edges and no gradients. The background is pure black to match the UI theme." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeTYh7tzeJprsi1OM1KilOhxij_-wWRhqsiW75RA3Ns1j556budSdlikk9_7TBQsMg9AZMMY1JK373hsK2bwd497hvZjsmQVPwItmu3P2rNiGunP8IrfZl_zsDp7lbn7A_trsRohMv7Q27BU1sRWQdiw3PWn8-aKNMM3z12KKG4WFrllFkRHqVhr5AmM_LPYOgU5RFNMHxMndAhD86yDYslWTm41CBnryrFNEOQe4BkqTITQGF3OXVYP6lqgKPHO_v9_lBGnlGpe1d"/>
+</div>
+<div>
+<div class="font-pixel text-[8px]">LEVEL 24</div>
+<div class="font-headline-md text-headline-md text-primary">Wanderer</div>
+</div>
+</div>
+<p class="font-label-dim text-label-dim text-on-surface-variant">Stamina: 85% | Sanity: 92%</p>
+<!-- Progress Bars -->
+<div class="space-y-1 pt-2">
+<div class="h-2 w-full bg-surface-container-high border border-outline-variant">
+<div class="h-full bg-mastery-gold" style="width: 85%"></div>
+</div>
+<div class="h-2 w-full bg-surface-container-high border border-outline-variant">
+<div class="h-full bg-secondary" style="width: 92%"></div>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-2">
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined">person</span>
+<span class="font-body-base text-body-base">Character</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-primary font-bold bg-surface-variant rounded-lg cursor-pointer">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-body-base text-body-base">Skills</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-body-base text-body-base">Quests</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined">auto_fix_high</span>
+<span class="font-body-base text-body-base">Forge</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-body-base text-body-base">Vault</span>
+</div>
+</nav>
+<button class="w-full py-4 font-pixel text-[10px] border-4 border-white hover:bg-white hover:text-black transition-all mb-4">
+                ENTER FOCUS MODE
+            </button>
+<div class="border-t border-outline-variant pt-4 space-y-2">
+<div class="flex items-center gap-3 p-2 text-on-surface-variant hover:bg-surface-container-high cursor-pointer">
+<span class="material-symbols-outlined">manage_accounts</span>
+<span class="font-body-base text-body-base">Profile</span>
+</div>
+<div class="flex items-center gap-3 p-2 text-on-surface-variant hover:bg-surface-container-high cursor-pointer">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-base text-body-base">Logout</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas (Skill Tree Hub) -->
+<main class="flex-1 overflow-auto relative bg-black flex flex-col p-8">
+<div class="flex justify-between items-center mb-12">
+<div>
+<h1 class="font-pixel text-xl mb-2">SKILL TREE HUB</h1>
+<p class="font-body-base text-on-surface-variant text-sm">Path: Mono-Dark Core // Nodes: 08/24 Unlocked</p>
+</div>
+<div class="flex gap-4">
+<div class="px-4 py-2 border-2 border-white flex items-center gap-2">
+<span class="font-pixel text-[10px]">SP: 4</span>
+</div>
+</div>
+</div>
+<!-- The Skill Tree (Winding Path) -->
+<div class="relative flex-1 min-h-[800px] w-full flex justify-center">
+<!-- Row 1 -->
+<div class="absolute top-0 flex flex-col items-center">
+<div class="pixel-node pixel-border group cursor-pointer">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<div class="absolute -bottom-8 node-label whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Root Identity</div>
+</div>
+<!-- Vertical Connector -->
+<div class="connector-v h-24"></div>
+<!-- Row 2 -->
+<div class="flex items-center">
+<div class="pixel-node pixel-border group cursor-pointer">
+<span class="material-symbols-outlined">psychology</span>
+<div class="absolute -bottom-8 node-label whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Mind Bridge</div>
+</div>
+<!-- Horizontal Connector Right -->
+<div class="connector-h w-48"></div>
+<div class="pixel-node pixel-border group cursor-pointer">
+<span class="material-symbols-outlined">bolt</span>
+<div class="absolute -bottom-8 node-label whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Fast Flow</div>
+</div>
+<!-- Locked Path -->
+<div class="connector-h w-48 connector-locked"></div>
+<div class="pixel-node pixel-border-locked group opacity-50">
+<span class="material-symbols-outlined text-outline">lock</span>
+<div class="absolute -bottom-8 node-label whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Overclock</div>
+</div>
+</div>
+<!-- Step Down Path -->
+<div class="flex w-full justify-start pl-[64px]">
+<div class="connector-v h-24"></div>
+</div>
+<!-- Row 3 -->
+<div class="flex items-center flex-row-reverse w-full max-w-4xl justify-end">
+<div class="pixel-node pixel-border group cursor-pointer">
+<span class="material-symbols-outlined">visibility</span>
+<div class="absolute -bottom-8 node-label whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Visual Audit</div>
+</div>
+<div class="connector-h w-32"></div>
+<div class="pixel-node pixel-border group cursor-pointer">
+<span class="material-symbols-outlined">inventory_2</span>
+<div class="absolute -bottom-8 node-label whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Logic Box</div>
+</div>
+<div class="connector-h w-32 connector-locked"></div>
+<div class="pixel-node pixel-border-locked group opacity-50">
+<span class="material-symbols-outlined text-outline">lock</span>
+<div class="absolute -bottom-8 node-label whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Deep Frame</div>
+</div>
+</div>
+<!-- Another Step Down -->
+<div class="flex w-full justify-end pr-[64px] mr-48">
+<div class="connector-v h-32 connector-v-locked"></div>
+</div>
+<!-- Row 4 -->
+<div class="flex items-center ml-auto mr-48">
+<div class="pixel-node pixel-border-locked group opacity-50">
+<span class="material-symbols-outlined text-outline">auto_awesome</span>
+<div class="absolute -bottom-8 node-label whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Zen State</div>
+</div>
+</div>
+</div>
+<!-- Atmospheric Background Grid Elements -->
+<div class="absolute inset-0 pointer-events-none opacity-5">
+<div class="w-full h-full" style="background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 20px 20px;"></div>
+</div>
+</div>
+<!-- Tooltip / Info Panel (Bottom Fixed Right) -->
+<div class="fixed bottom-8 right-8 w-80 bg-black pixel-border p-6 z-50">
+<div class="flex justify-between items-start mb-4">
+<h3 class="font-pixel text-[10px]">NODE INFO</h3>
+<button class="material-symbols-outlined text-sm">close</button>
+</div>
+<div class="space-y-4">
+<div class="flex gap-4">
+<div class="w-12 h-12 border-2 border-white flex items-center justify-center">
+<span class="material-symbols-outlined">psychology</span>
+</div>
+<div>
+<div class="font-pixel text-[8px] text-mastery-gold mb-1">UNLOCKED</div>
+<div class="font-headline-sm text-headline-sm">Mind Bridge</div>
+</div>
+</div>
+<p class="font-body-base text-on-surface-variant text-xs">
+                        Reduces cognitive load by 15% when navigating complex information trees. Increases focus duration during deep work sessions.
+                    </p>
+<div class="pt-2 border-t border-outline-variant flex justify-between">
+<span class="font-pixel text-[8px] text-on-surface-variant">LEVEL: 2/5</span>
+<span class="font-pixel text-[8px] text-primary">UPGRADE: 2SP</span>
+</div>
+</div>
+</div>
+<!-- Status HUD Overlay -->
+<div class="fixed top-24 right-8 flex flex-col gap-4">
+<div class="bg-black/80 pixel-border p-4 w-48">
+<div class="font-pixel text-[8px] mb-2">FORCE FIELD</div>
+<div class="flex justify-center py-2">
+<!-- Simulated Force Field Rings -->
+<div class="w-16 h-16 border-2 border-secondary rounded-full flex items-center justify-center">
+<div class="w-12 h-12 border border-secondary/50 rounded-full flex items-center justify-center">
+<div class="w-8 h-8 border-4 border-secondary rounded-full"></div>
+</div>
+</div>
+</div>
+<div class="text-center font-pixel text-[8px] text-secondary mt-2">STABLE</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Micro-interaction script -->
+<script>
+        document.querySelectorAll('.pixel-node').forEach(node => {
+            node.addEventListener('mouseenter', () => {
+                // Potential for adding retro sound effects or additional UI highlights
+            });
+        });
+    </script>
+</body></html>

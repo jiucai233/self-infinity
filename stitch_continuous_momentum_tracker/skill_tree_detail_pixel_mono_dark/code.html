@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Skill Node Detail | Self-Infinity</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;family=Press+Start+2P&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        /* Custom Pixel-Style Reset and Utilities */
+        body {
+            background-color: #141317;
+            color: #e6e1e7;
+            font-family: 'Inter', sans-serif;
+            image-rendering: pixelated;
+        }
+
+        .pixel-border {
+            border: 4px solid #48454f;
+            position: relative;
+            background: #141317;
+        }
+
+        .pixel-border-accent {
+            border: 4px solid #7c3aed;
+        }
+
+        .pixel-shadow {
+            box-shadow: 6px 6px 0px 0px rgba(0, 0, 0, 0.5);
+        }
+
+        .segmented-bar-unit {
+            height: 12px;
+            width: 100%;
+            background: #201f23;
+            border: 1px solid #48454f;
+        }
+
+        .segmented-bar-unit.filled {
+            background: #facc15;
+            border-color: #facc15;
+        }
+
+        /* Material Icon Sizing */
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+
+        /* Scanline Effect for Atmosphere */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(18, 16, 16, 0) 50%,
+                rgba(0, 0, 0, 0.1) 50%
+            );
+            background-size: 100% 4px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+            text-transform: uppercase;
+        }
+
+        .force-field-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .force-field-ring {
+            position: absolute;
+            border: 2px solid #7c3aed;
+            border-radius: 9999px;
+            opacity: 0.3;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "mastery-gold": "#facc15",
+                        "surface-container-lowest": "#0f0e12",
+                        "secondary": "#54d8e8",
+                        "on-primary-fixed": "#1e0e4e",
+                        "tertiary-fixed-dim": "#d9c767",
+                        "primary-container": "#c4b5fd",
+                        "on-tertiary-container": "#594d00",
+                        "inverse-surface": "#e6e1e7",
+                        "accent-fill": "#7c3aed",
+                        "on-primary": "#332664",
+                        "surface-container-high": "#2b292e",
+                        "secondary-fixed": "#91f1ff",
+                        "surface-bright": "#3a383d",
+                        "surface": "#141317",
+                        "tertiary-container": "#d1bf60",
+                        "inverse-on-surface": "#313034",
+                        "primary": "#dfd5ff",
+                        "surface-container-low": "#1c1b1f",
+                        "danger-light": "#c9362c",
+                        "secondary-fixed-dim": "#54d8e8",
+                        "on-secondary-container": "#003b42",
+                        "accent-strong-dark": "#a78bfa",
+                        "on-secondary": "#00363c",
+                        "accent-strong-light": "#6d28d9",
+                        "secondary-container": "#02aebe",
+                        "on-primary-fixed-variant": "#4a3d7c",
+                        "tertiary": "#eedb79",
+                        "info-light": "#0e7490",
+                        "inverse-primary": "#625595",
+                        "tertiary-fixed": "#f7e380",
+                        "on-tertiary": "#383000",
+                        "danger-dark": "#ff6b6b",
+                        "on-surface": "#e6e1e7",
+                        "on-primary-container": "#514483",
+                        "surface-container": "#201f23",
+                        "outline-variant": "#48454f",
+                        "on-error": "#690005",
+                        "on-background": "#e6e1e7",
+                        "background": "#141317",
+                        "accent-light": "#7c3aed",
+                        "error-container": "#93000a",
+                        "accent-dark": "#c4b5fd",
+                        "on-tertiary-fixed": "#211b00",
+                        "on-secondary-fixed": "#001f23",
+                        "primary-fixed": "#e7deff",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#363439",
+                        "on-tertiary-fixed-variant": "#514700",
+                        "surface-container-highest": "#363439",
+                        "on-error-container": "#ffdad6",
+                        "on-surface-variant": "#cac4d1",
+                        "on-secondary-fixed-variant": "#004f57",
+                        "primary-fixed-dim": "#ccbeff",
+                        "surface-tint": "#ccbeff",
+                        "outline": "#938f9a",
+                        "surface-dim": "#141317",
+                        "info-dark": "#67e8f9"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0rem",
+                        "lg": "0rem",
+                        "xl": "0rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "edge-thickness-active": "2.5px",
+                        "gap-panel": "20px",
+                        "edge-thickness-locked": "1.5px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "label-dim": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "body-base": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["24px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "label-dim": ["12px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                        "headline-md": ["20px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-sm": ["16px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-base": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background overflow-hidden">
+<div class="scanlines"></div>
+<!-- Top Navigation -->
+<header class="sticky top-0 z-50 flex items-center justify-between px-5 w-full bg-surface border-b border-outline-variant h-16">
+<div class="flex items-center gap-4">
+<span class="font-headline-lg text-headline-lg font-bold text-primary">Self-Infinity</span>
+<nav class="hidden md:flex gap-6 ml-8">
+<a class="font-headline-sm text-headline-sm text-primary border-b-2 border-primary pb-1" href="#">Skill Tree</a>
+<a class="font-headline-sm text-headline-sm text-on-surface-variant hover:bg-surface-variant transition-colors px-2" href="#">Focus Area</a>
+<a class="font-headline-sm text-headline-sm text-on-surface-variant hover:bg-surface-variant transition-colors px-2" href="#">Inventory</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-variant p-2 text-on-surface-variant" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-variant p-2 text-on-surface-variant" data-icon="settings">settings</span>
+</div>
+</header>
+<div class="flex h-[calc(100vh-64px)]">
+<!-- Side Navigation -->
+<aside class="flex flex-col h-full p-4 gap-panel w-64 bg-surface border-r border-outline-variant shrink-0">
+<div class="flex flex-col gap-2 mb-6">
+<div class="w-16 h-16 pixel-border border-2 overflow-hidden mb-2">
+<img class="w-full h-full object-cover" data-alt="A detailed pixel art avatar of a futuristic wanderer wearing a high-tech visor and a dark cloak, rendered in a crisp, low-bit monochrome style with deep purple accents. The background is a solid flat black, maintaining a clean and minimalist aesthetic suitable for a high-end productivity app. The lighting is harsh and directional, emphasizing the jagged pixel edges." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqVehOEoXuuVUM1IX4t4xD4ip3L1ETSm0Oou2rar2sbc0IoxY5oPRR3yajYHWiJE-acCMBP8i01wpLAGIXo_p0l02eIHSuAMBoA0WqOMXYw-yW-6ImQm9DnRpPUs1kzuqd_CVKDSKHUU5aofSvIvJXh7YyxqxCWhy9BXYh8do3cNd6A9vebVFc0aKDP6WmFYjWQORbbdXCBjb0zGbKLGb7ZeiJd51XyVOkHmeudIeRPJcpY-IqEUZdcaBwNT0PCTNPiBla57Sgy1vV"/>
+</div>
+<h3 class="font-headline-md text-headline-md text-primary">Lvl 24 Wanderer</h3>
+<p class="font-body-base text-body-base text-on-surface-variant">Stamina: 85% | Sanity: 92%</p>
+</div>
+<nav class="flex flex-col gap-1">
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-body-base text-body-base">Character</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-primary font-bold bg-surface-variant rounded-lg cursor-pointer">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span class="font-body-base text-body-base">Skills</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span class="font-body-base text-body-base">Quests</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="auto_fix_high">auto_fix_high</span>
+<span class="font-body-base text-body-base">Forge</span>
+</div>
+<div class="flex items-center gap-3 p-3 text-on-surface-variant hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-body-base text-body-base">Vault</span>
+</div>
+</nav>
+<button class="mt-auto pixel-border border-2 p-3 pixel-font text-[10px] text-accent-fill hover:bg-accent-fill hover:text-on-primary transition-all">
+                Enter Focus Mode
+            </button>
+</aside>
+<!-- Main Content Area: Skill Node Detail View -->
+<main class="flex-grow p-8 overflow-y-auto relative bg-surface-dim">
+<!-- Breadcrumbs -->
+<div class="mb-8 flex items-center gap-2 text-on-surface-variant font-body-base">
+<span class="cursor-pointer hover:text-primary">Mastery Tree</span>
+<span class="material-symbols-outlined text-[16px]" data-icon="chevron_right">chevron_right</span>
+<span class="cursor-pointer hover:text-primary">Cognitive Branch</span>
+<span class="material-symbols-outlined text-[16px]" data-icon="chevron_right">chevron_right</span>
+<span class="text-primary font-bold">Deep Focus Protocol</span>
+</div>
+<!-- Bento-style Layout -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Skill Detail Card (Main) -->
+<section class="col-span-12 lg:col-span-8 pixel-border p-6 flex flex-col gap-6">
+<div class="flex justify-between items-start">
+<div class="flex gap-4">
+<div class="w-20 h-20 pixel-border border-4 border-accent-fill flex items-center justify-center bg-surface-container">
+<span class="material-symbols-outlined text-[48px] text-accent-fill" data-icon="psychology">psychology</span>
+</div>
+<div>
+<h1 class="pixel-font text-2xl text-primary mb-2">Deep Focus Protocol</h1>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-accent-tag-bg text-accent-strong-dark pixel-border border-1 text-[10px] pixel-font">Active</span>
+<span class="px-2 py-1 bg-surface-variant text-on-surface-variant pixel-border border-1 text-[10px] pixel-font">Rank 3/5</span>
+</div>
+</div>
+</div>
+<div class="text-right">
+<p class="pixel-font text-[10px] text-on-surface-variant mb-1">Node Integrity</p>
+<p class="pixel-font text-xl text-mastery-gold">94.2%</p>
+</div>
+</div>
+<p class="font-body-base text-body-base text-on-surface-variant leading-relaxed max-w-2xl">
+                        A foundational technique of the Cognitive Branch. When activated, it generates a temporal force field that suppresses external notification noise and internal cognitive jitter, increasing productive yield by 15%.
+                    </p>
+<!-- Segmented Progress Bars -->
+<div class="space-y-4 bg-surface-container p-4 pixel-border border-2">
+<div>
+<div class="flex justify-between items-center mb-2">
+<span class="pixel-font text-[10px] text-on-surface">XP PROGRESSION</span>
+<span class="pixel-font text-[10px] text-mastery-gold">1250 / 2000</span>
+</div>
+<div class="grid grid-cols-20 gap-1">
+<!-- Generated blocks for progress -->
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit filled"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+<div class="segmented-bar-unit"></div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4 mt-6">
+<div class="p-3 bg-surface border-l-4 border-accent-fill">
+<p class="pixel-font text-[8px] text-on-surface-variant mb-1">Current Bonus</p>
+<p class="font-headline-sm text-headline-sm text-primary">+15m Focus Shield</p>
+</div>
+<div class="p-3 bg-surface border-l-4 border-mastery-gold">
+<p class="pixel-font text-[8px] text-on-surface-variant mb-1">Next Rank</p>
+<p class="font-headline-sm text-headline-sm text-mastery-gold">+25m Focus Shield</p>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4 mt-4">
+<button class="flex-grow bg-accent-fill hover:opacity-90 active:scale-95 transition-all p-5 pixel-border border-4 border-black text-white pixel-font text-sm flex items-center justify-center gap-3">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+                            ALLOCATE SKILL POINT
+                        </button>
+<button class="pixel-border border-4 p-5 text-on-surface-variant hover:bg-surface-variant">
+<span class="material-symbols-outlined" data-icon="share">share</span>
+</button>
+</div>
+</section>
+<!-- Character Guide & Stats (Side Column) -->
+<aside class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+<!-- Pixel Guide -->
+<div class="pixel-border border-4 p-4 flex flex-col items-center bg-surface-container relative overflow-hidden">
+<div class="absolute inset-0 opacity-10 pointer-events-none">
+
+</div>
+<div class="w-48 h-48 mb-4 relative z-10">
+<img class="w-full h-full object-contain" data-alt="A full-body pixel art character guide, a small robotic drone with a circular glowing eye and hovering limbs, rendered in high-contrast black and white with gold accents. It is pointing toward the screen as if explaining skill statistics. The style is strictly flat and pixelated, adhering to a 64x64 bit aesthetic within a 1920x1080 productivity frame." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAw3GCDAdybFCqEh9GwuaCxMB8gpQzhcra5-CAQCy07TlIe8_f3Oc69f3O2jEsES4pwU8Hx3irV0IAl85fNAq5ofYlQMfw5NmNe7BwtusSb4l2vauo1w1gXyUPYAkmQecraSkaDaDPel4k3SK7hxHNkW0JD3LvPM3JtF2ePC4s9mLic7qAjJ5FrJPyOftxYIqw_M19OMxgH8f0xoIErwAE9SFjYnxDdYfU3B5VCf8MVYxLnt8AT98LQjITAE2gYzyw80cLAJhiYqNH7"/>
+</div>
+<div class="bg-surface p-3 pixel-border border-2 w-full text-center">
+<p class="pixel-font text-[10px] text-on-surface-variant mb-2">NEURAL ADVISOR</p>
+<p class="font-body-base text-body-base italic">"Concentrating your points here will stabilize your Flow State during high-entropy tasks."</p>
+</div>
+</div>
+<!-- Force Field Visualization -->
+<div class="pixel-border border-4 p-6 flex flex-col items-center justify-center bg-surface">
+<h4 class="pixel-font text-[10px] text-on-surface-variant self-start mb-6">FOCUS GEOMETRY</h4>
+<div class="force-field-container">
+<!-- Visualizing concentric rings for force field -->
+<div class="force-field-ring" style="width: 100%; height: 100%;"></div>
+<div class="force-field-ring" style="width: 80%; height: 80%; border-color: #facc15;"></div>
+<div class="force-field-ring" style="width: 60%; height: 60%; opacity: 0.6;"></div>
+<div class="force-field-ring" style="width: 40%; height: 40%; border-style: dashed;"></div>
+<span class="material-symbols-outlined text-[48px] text-mastery-gold" data-icon="security" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+<div class="mt-8 w-full space-y-3">
+<div class="flex justify-between items-center text-[10px] pixel-font">
+<span class="text-on-surface-variant">Radius</span>
+<span class="text-primary">4.2m</span>
+</div>
+<div class="flex justify-between items-center text-[10px] pixel-font">
+<span class="text-on-surface-variant">Intensity</span>
+<span class="text-mastery-gold">High</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Skill Dependencies (Bottom Row) -->
+<section class="col-span-12 pixel-border p-6">
+<h3 class="pixel-font text-sm text-primary mb-6">Prerequisite Mapping</h3>
+<div class="flex flex-wrap gap-8 items-center justify-center md:justify-start">
+<!-- Locked Dependency -->
+<div class="flex flex-col items-center gap-2 opacity-50">
+<div class="w-12 h-12 pixel-border border-2 border-dashed flex items-center justify-center">
+<span class="material-symbols-outlined text-outline" data-icon="lock">lock</span>
+</div>
+<span class="pixel-font text-[8px]">Calm Breath</span>
+</div>
+<!-- Connector -->
+<div class="h-[2px] w-12 border-t-2 border-dashed border-outline-variant"></div>
+<!-- Active Dependency -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-16 h-16 pixel-border border-2 border-accent-fill flex items-center justify-center bg-surface-container">
+<span class="material-symbols-outlined text-accent-fill" data-icon="bolt">bolt</span>
+</div>
+<span class="pixel-font text-[8px] text-primary">Initial Focus</span>
+</div>
+<!-- Connector Active -->
+<div class="h-[2px] w-12 bg-accent-fill"></div>
+<!-- Current Node -->
+<div class="flex flex-col items-center gap-2 scale-110">
+<div class="w-20 h-20 pixel-border border-4 border-mastery-gold flex items-center justify-center bg-surface-container">
+<span class="material-symbols-outlined text-mastery-gold" data-icon="psychology">psychology</span>
+</div>
+<span class="pixel-font text-[8px] text-mastery-gold">Deep Protocol</span>
+</div>
+<!-- Connector Upcoming -->
+<div class="h-[2px] w-12 border-t-2 border-dashed border-outline-variant"></div>
+<!-- Upcoming Unlocked -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-16 h-16 pixel-border border-2 flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<span class="pixel-font text-[8px] text-on-surface-variant">Flow Trance</span>
+</div>
+</div>
+</section>
+</div>
+</main>
+</div>
+<!-- Micro-interactions Script -->
+<script>
+        document.querySelectorAll('.pixel-border').forEach(panel => {
+            panel.addEventListener('mouseenter', () => {
+                panel.style.transform = 'translate(-2px, -2px)';
+                panel.style.boxShadow = '6px 6px 0px 0px #7c3aed';
+            });
+            panel.addEventListener('mouseleave', () => {
+                panel.style.transform = 'translate(0px, 0px)';
+                panel.style.boxShadow = 'none';
+            });
+        });
+
+        // Simple animation for the force field rings
+        const rings = document.querySelectorAll('.force-field-ring');
+        let angle = 0;
+        function animateRings() {
+            angle += 0.05;
+            rings.forEach((ring, i) => {
+                const s = 1 + Math.sin(angle + i) * 0.02;
+                ring.style.transform = `scale(${s})`;
+            });
+            requestAnimationFrame(animateRings);
+        }
+        animateRings();
+    </script>
+</body></html>

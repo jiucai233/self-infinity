@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chronos | Focus Mode</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Press+Start+2P&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000000;
+            color: #ffffff;
+        }
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+        /* Pixel-art border effect */
+        .pixel-border {
+            box-shadow: 
+                0 -4px 0 0 #000,
+                0 4px 0 0 #000,
+                -4px 0 0 0 #000,
+                4px 0 0 0 #000,
+                0 -8px 0 0 #fff,
+                0 8px 0 0 #fff,
+                -8px 0 0 0 #fff,
+                4px 0 0 0 #fff,
+                inset -4px -4px 0 0 #ccc;
+        }
+        .pixel-button {
+            position: relative;
+            background: #fff;
+            color: #000;
+            border: 4px solid #000;
+            box-shadow: 4px 4px 0 0 #555;
+            transition: all 0.1s;
+        }
+        .pixel-button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 0 #555;
+        }
+        .pixel-bg {
+            background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 8px 8px;
+        }
+        .dithered-floor {
+            height: 4px;
+            background-image: radial-gradient(#fff 1px, transparent 0);
+            background-size: 4px 4px;
+            opacity: 0.2;
+        }
+        .octagon-ring {
+            clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+        }
+        /* Monochrome scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #fff;
+            border: 2px solid #000;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#ffffff",
+                        "on-primary": "#000000",
+                        "secondary": "#888888",
+                        "background": "#000000",
+                        "surface": "#000000",
+                        "surface-container": "#111111",
+                        "surface-container-low": "#0a0a0a",
+                        "outline": "rgba(255, 255, 255, 0.2)",
+                        "outline-strong": "rgba(255, 255, 255, 0.4)",
+                        "hover-state": "rgba(255, 255, 255, 0.1)",
+                        "secondary-container": "rgba(255, 255, 255, 0.15)",
+                        "on-secondary-container": "#ffffff",
+                        "dark-text": "#ffffff",
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "0px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "xl": "32px",
+                        "gutter": "16px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "unit": "4px",
+                        "sm": "8px",
+                        "margin-mobile": "16px",
+                        "margin-desktop": "40px"
+                    },
+                    "fontSize": {
+                        "label-sm": ["10px", {"lineHeight": "14px", "fontWeight": "400"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "headline-lg": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                        "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "700"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "headline-md": ["22px", {"lineHeight": "28px", "fontWeight": "700"}],
+                        "label-lg": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="flex h-screen bg-background selection:bg-white selection:text-black text-dark-text">
+<!-- Sidebar Navigation Shell -->
+<aside class="hidden md:flex flex-col h-full w-64 bg-surface border-r-4 border-white py-md">
+<div class="px-md pb-lg">
+<div class="flex items-center gap-sm mb-lg">
+<div class="w-8 h-8 bg-primary flex items-center justify-center border-2 border-black ring-2 ring-white">
+<span class="material-symbols-outlined text-on-primary text-body-md" data-icon="timer">timer</span>
+</div>
+<h1 class="pixel-font text-[14px] text-primary">CHRONOS</h1>
+</div>
+<div class="space-y-xs">
+<a class="flex items-center gap-md px-sm py-xs bg-white text-black transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-label-lg" data-icon="person">person</span>
+<span class="pixel-font text-[10px]">CHARACTER</span>
+</a>
+<a class="flex items-center gap-md px-sm py-xs text-secondary hover:text-white hover:bg-hover-state transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-label-lg" data-icon="assignment">assignment</span>
+<span class="pixel-font text-[10px]">QUESTS</span>
+</a>
+<a class="flex items-center gap-md px-sm py-xs text-secondary hover:text-white hover:bg-hover-state transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-label-lg" data-icon="bolt">bolt</span>
+<span class="pixel-font text-[10px]">SKILLS</span>
+</a>
+<a class="flex items-center gap-md px-sm py-xs text-secondary hover:text-white hover:bg-hover-state transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-label-lg" data-icon="group">group</span>
+<span class="pixel-font text-[10px]">GUILD</span>
+</a>
+<a class="flex items-center gap-md px-sm py-xs text-secondary hover:text-white hover:bg-hover-state transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-label-lg" data-icon="map">map</span>
+<span class="pixel-font text-[10px]">MAP</span>
+</a>
+</div>
+</div>
+<div class="mt-auto px-md space-y-md pt-lg border-t-4 border-white">
+<button class="pixel-button w-full flex items-center justify-center gap-sm py-sm font-bold">
+<span class="material-symbols-outlined text-label-lg" data-icon="add">add</span>
+<span class="pixel-font text-[10px]">NEW MISSION</span>
+</button>
+<div class="space-y-xs">
+<a class="flex items-center gap-md px-sm py-xs text-secondary hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined text-label-lg" data-icon="help">help</span>
+<span class="pixel-font text-[10px]">SUPPORT</span>
+</a>
+<a class="flex items-center gap-md px-sm py-xs text-secondary hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined text-label-lg" data-icon="logout">logout</span>
+<span class="pixel-font text-[10px]">LOG OUT</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
+<!-- TopNavBar -->
+<header class="w-full flex justify-between items-center h-16 px-margin-desktop bg-surface border-b-4 border-white z-10">
+<div class="flex items-center gap-lg">
+<span class="pixel-font text-[14px] text-primary">FOCUS_MODE</span>
+<nav class="hidden lg:flex items-center gap-md">
+<span class="pixel-font text-[10px] text-primary border-b-2 border-primary pb-1 cursor-pointer">SESSION</span>
+<span class="pixel-font text-[10px] text-secondary hover:text-primary px-sm py-1 transition-colors cursor-pointer">STATS</span>
+<span class="pixel-font text-[10px] text-secondary hover:text-primary px-sm py-1 transition-colors cursor-pointer">CONFIG</span>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<div class="hidden sm:flex border-2 border-white px-sm py-1 items-center gap-xs">
+<span class="material-symbols-outlined text-label-md text-white" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 pixel-font text-[10px] w-32 text-primary placeholder-secondary" placeholder="SEARCH..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-primary p-sm border-2 border-transparent hover:border-white transition-colors" data-icon="settings">settings</button>
+</div>
+</header>
+<div class="flex-1 flex overflow-hidden pixel-bg">
+<!-- Central Timer Area -->
+<div class="flex-1 flex flex-col items-center justify-center p-xl relative">
+<!-- Dithered Horizon Line -->
+<div class="absolute bottom-1/4 left-0 right-0 dithered-floor"></div>
+<div class="absolute bottom-1/4 left-1/4 w-32 h-16 border-t-2 border-l-2 border-white opacity-20"></div>
+<!-- Timer Ring Area -->
+<div class="relative w-[420px] h-[420px] flex items-center justify-center">
+<!-- Octagonal Pixel Ring -->
+<div class="absolute inset-0 border-4 border-white/10 octagon-ring"></div>
+<div class="absolute inset-[4px] border-2 border-white octagon-ring" id="timer-ring"></div>
+<div class="text-center z-10">
+<p class="pixel-font text-[10px] tracking-widest text-secondary mb-xl uppercase">LEVEL 01: FOCUSING</p>
+<h2 class="pixel-font text-[64px] leading-none tracking-tight text-primary" id="timer-display">24:59</h2>
+<div class="flex gap-md mt-xl justify-center">
+<button class="pixel-button w-16 h-16 flex items-center justify-center" id="play-btn" onclick="toggleTimer()">
+<span class="material-symbols-outlined text-3xl" data-icon="play_arrow">play_arrow</span>
+</button>
+<button class="pixel-button w-16 h-16 flex items-center justify-center bg-black text-white border-white">
+<span class="material-symbols-outlined text-3xl" data-icon="refresh">refresh</span>
+</button>
+</div>
+</div>
+</div>
+<div class="mt-xl text-center z-10">
+<div class="inline-block border-2 border-white p-sm bg-black">
+<p class="pixel-font text-[10px] text-secondary">OBJECTIVE: <span class="text-primary">REFACTOR_UI_SYSTEM</span></p>
+</div>
+</div>
+</div>
+<!-- Right Panel -->
+<aside class="w-80 border-l-4 border-white bg-surface flex flex-col hidden xl:flex">
+<section class="p-lg border-b-2 border-white">
+<h3 class="pixel-font text-[10px] uppercase tracking-wider text-secondary mb-md">ACTIVE_QUEST</h3>
+<div class="p-md border-2 border-white bg-white/5">
+<div class="flex items-start gap-sm">
+<span class="material-symbols-outlined text-primary mt-xs" data-icon="check_box_outline_blank">check_box_outline_blank</span>
+<div>
+<p class="pixel-font text-[10px] text-primary leading-relaxed">REFACTOR UI COMPONENT SYSTEM</p>
+<p class="pixel-font text-[8px] text-secondary mt-xs leading-normal">MODULARIZE CONFIGS AND SCHEMAS.</p>
+</div>
+</div>
+<div class="mt-md w-full border-2 border-white h-4 bg-black overflow-hidden p-[2px]">
+<div class="bg-white h-full" style="width: 65%"></div>
+</div>
+<div class="mt-sm flex justify-between">
+<span class="pixel-font text-[8px] text-secondary">EXP: 65%</span>
+<span class="pixel-font text-[8px] text-secondary">45M REMAIN</span>
+</div>
+</div>
+</section>
+<!-- Session Log -->
+<section class="flex-1 flex flex-col overflow-hidden">
+<div class="p-lg flex justify-between items-center border-b-2 border-white">
+<h3 class="pixel-font text-[10px] uppercase tracking-wider text-secondary">LOG_DATA</h3>
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:text-white transition-colors" data-icon="more_horiz">more_horiz</span>
+</div>
+<div class="flex-1 overflow-y-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="border-b-2 border-white">
+<th class="px-lg py-sm pixel-font text-[8px] text-secondary uppercase">Activity</th>
+<th class="px-lg py-sm pixel-font text-[8px] text-secondary uppercase text-right">Time</th>
+</tr>
+</thead>
+<tbody class="divide-y-2 divide-white/20">
+<tr class="hover:bg-white/10 transition-colors">
+<td class="px-lg py-md">
+<p class="pixel-font text-[10px] text-primary">LOGIC MAPPING</p>
+<p class="pixel-font text-[8px] text-secondary mt-1">FOCUS_SESSION</p>
+</td>
+<td class="px-lg py-md text-right pixel-font text-[10px] text-secondary">25:00</td>
+</tr>
+<tr class="hover:bg-white/10 transition-colors">
+<td class="px-lg py-md">
+<p class="pixel-font text-[10px] text-primary">BREAK</p>
+<p class="pixel-font text-[8px] text-secondary mt-1">IDLE_STATE</p>
+</td>
+<td class="px-lg py-md text-right pixel-font text-[10px] text-secondary">05:00</td>
+</tr>
+<tr class="bg-white/10">
+<td class="px-lg py-md">
+<div class="flex items-center gap-xs">
+<div class="w-2 h-2 bg-white animate-pulse"></div>
+<p class="pixel-font text-[10px] text-primary">REFACTORING</p>
+</div>
+<p class="pixel-font text-[8px] text-secondary italic mt-1">ACTIVE...</p>
+</td>
+<td class="px-lg py-md text-right pixel-font text-[10px] text-primary">14:02</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Statistics Chart -->
+<div class="p-lg border-t-4 border-white bg-white/5">
+<div class="flex justify-between items-center mb-md">
+<span class="pixel-font text-[8px] text-secondary">TOTAL FOCUS</span>
+<span class="pixel-font text-[10px] text-primary">4H 12M</span>
+</div>
+<div class="h-12 flex items-end gap-[4px]">
+<div class="bg-white/20 h-[30%] flex-1"></div>
+<div class="bg-white h-[80%] flex-1"></div>
+<div class="bg-white/20 h-[40%] flex-1"></div>
+<div class="bg-white h-[100%] flex-1"></div>
+<div class="bg-white/20 h-[20%] flex-1"></div>
+<div class="bg-white h-[60%] flex-1"></div>
+<div class="bg-white h-[90%] flex-1"></div>
+<div class="bg-white/20 h-[10%] flex-1"></div>
+<div class="bg-white/20 h-[50%] flex-1"></div>
+<div class="bg-white h-[15%] flex-1"></div>
+</div>
+</div>
+</section>
+</aside>
+</div>
+<!-- Floating FAB -->
+<button class="fixed bottom-lg right-lg pixel-button w-16 h-16 flex items-center justify-center shadow-none md:right-[340px] xl:right-margin-desktop">
+<span class="material-symbols-outlined text-[32px]" data-icon="add">add</span>
+</button>
+</main>
+<!-- Mobile Navigation -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-surface border-t-4 border-white flex justify-around items-center px-md z-50">
+<button class="flex flex-col items-center gap-xs text-primary">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="pixel-font text-[8px] uppercase">CHAR</span>
+</button>
+<button class="flex flex-col items-center gap-xs text-secondary">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span class="pixel-font text-[8px] uppercase">QUEST</span>
+</button>
+<button class="flex flex-col items-center gap-xs text-secondary">
+<span class="material-symbols-outlined" data-icon="bolt">bolt</span>
+<span class="pixel-font text-[8px] uppercase">SKILL</span>
+</button>
+<button class="flex flex-col items-center gap-xs text-secondary">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="pixel-font text-[8px] uppercase">MAP</span>
+</button>
+</nav>
+<script>
+        let isRunning = false;
+        let timeLeft = 24 * 60 + 59;
+        const display = document.getElementById('timer-display');
+        const timerRing = document.getElementById('timer-ring');
+        const playBtn = document.getElementById('play-btn');
+
+        function updateTimer() {
+            if (isRunning && timeLeft > 0) {
+                timeLeft--;
+                const mins = Math.floor(timeLeft / 60);
+                const secs = timeLeft % 60;
+                display.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                
+                // Opacity pulsing instead of smooth rotation for "pixel" feel
+                const progress = timeLeft / (25 * 60);
+                timerRing.style.opacity = 0.3 + (progress * 0.7);
+            }
+        }
+
+        function toggleTimer() {
+            isRunning = !isRunning;
+            const icon = playBtn.querySelector('.material-symbols-outlined');
+            icon.textContent = isRunning ? 'pause' : 'play_arrow';
+            icon.setAttribute('data-icon', isRunning ? 'pause' : 'play_arrow');
+        }
+
+        setInterval(updateTimer, 1000);
+    </script>
+</body></html>

@@ -202,7 +202,14 @@ export default function AuditRoom({
               marginTop: 4,
             }}
           >
-            <p style={{ color: phase === 'failed' ? 'var(--danger)' : '#facc15' }}>
+            <p
+              className="pixel-font"
+              style={{
+                color: phase === 'failed' ? 'var(--danger)' : '#facc15',
+                fontSize: 12,
+                lineHeight: 1.8,
+              }}
+            >
               {verdict.passed
                 ? isTask
                   ? '✓ 任务完成'

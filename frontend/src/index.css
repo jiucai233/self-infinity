@@ -1,9 +1,15 @@
 :root {
-  /* Notion — dark theme. Flat, opaque surfaces only: no blur, no
-     translucency, no gradients, no glow. --panel and --panel-translucent
-     are both solid (alpha 1) colors; the "translucent" name is kept only
-     because some chrome (nav) wants a very slightly different flat tone
-     than page-level panels, not because it is see-through. */
+  /* Pixel Mono — dark theme. Pure monochrome per
+     stitch_continuous_momentum_tracker/self_infinity_mono_system/DESIGN.md
+     ("## 2. Color Tokens" table — the authoritative token block; the YAML
+     frontmatter above it in that file is a generic Material-color dump with
+     warm/tan-tinted surfaces like #fdf8f7 that aren't actually pure grey, so
+     it was NOT used here). No purple, no blue, no accent hue — "accent" is
+     just the primary text/ink color used for borders and solid fills.
+     --danger (failed state) and the gold #facc15 "mastered" status color
+     (hardcoded where used, see Avatar.tsx / SkillTree.tsx / PrincipleShelf.tsx)
+     are the only non-grayscale exceptions — functional status indicators,
+     not brand accents. */
   --bg: #191919;
   --panel: #191919;
   --panel-translucent: #202020;
@@ -12,26 +18,23 @@
   --hover-wash: rgba(255, 255, 255, 0.055);
   --text: #e9e9e7;
   --dim: #9b9b96;
-  --accent: #c4b5fd;
-  --accent-strong: #a78bfa;
-  --accent-fill: #7c3aed;
-  --accent-fill-text: #ffffff;
-  --accent-tag-bg: rgba(196, 181, 253, 0.16);
-  --info: #67e8f9;
-  --info-strong: #67e8f9;
-  --info-tag-bg: rgba(103, 232, 249, 0.14);
+  /* "Accent" is now just the primary ink color — same value as --text, kept
+     as its own token because a lot of code still says var(--accent) for
+     "the one emphasis color", which is still true, it just isn't purple. */
+  --accent: #e9e9e7;
+  --accent-fill: #e9e9e7;
+  --accent-fill-text: #191919;
   --danger: #ff6b6b;
   --gap: 20px;
-  --shadow-popover: 0 0 0 1px rgba(15, 15, 15, 0.05), 0 3px 6px rgba(15, 15, 15, 0.1),
-    0 9px 24px rgba(15, 15, 15, 0.2);
-  --radius-panel: 6px;
-  --radius-control: 4px;
-  --radius-pill: 999px;
+  --pixel-offset: 4px;
+  --radius-panel: 0px;
+  --radius-control: 0px;
+  --radius-pill: 0px;
   color-scheme: dark;
 }
 
 :root[data-theme='light'] {
-  /* Notion — light theme. */
+  /* Pixel Mono — light theme. */
   --bg: #ffffff;
   --panel: #ffffff;
   --panel-translucent: #ffffff;
@@ -40,27 +43,84 @@
   --hover-wash: rgba(55, 53, 47, 0.08);
   --text: #37352f;
   --dim: #787774;
-  --accent: #7c3aed;
-  --accent-strong: #6d28d9;
-  --accent-fill: #6d28d9;
+  --accent: #37352f;
+  --accent-fill: #37352f;
   --accent-fill-text: #ffffff;
-  --accent-tag-bg: #f3effc;
-  --info: #0e7490;
-  --info-strong: #0e7490;
-  --info-tag-bg: #eafafd;
   --danger: #c9362c;
   color-scheme: light;
+}
+
+@font-face {
+  font-display: swap;
+}
+
+.pixel-font {
+  font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+  letter-spacing: 0.02em;
+}
+
+/* Pixel-border technique (ported from
+   stitch_continuous_momentum_tracker/skill_tree_hub_pixel_mono_white/code.html):
+   four offset, zero-blur box-shadows fake a chunky pixel-art border/bevel
+   instead of a normal CSS border. .pixel-border is the default/locked
+   treatment (grey outline, panel-colored fill); .pixel-border-active is the
+   solid black/white primary-action treatment. */
+.pixel-border {
+  box-shadow:
+    0 calc(-1 * var(--pixel-offset)) 0 0 var(--border-strong),
+    0 var(--pixel-offset) 0 0 var(--border-strong),
+    calc(-1 * var(--pixel-offset)) 0 0 0 var(--border-strong),
+    var(--pixel-offset) 0 0 0 var(--border-strong);
+  background: var(--panel);
+}
+
+.pixel-border-active {
+  box-shadow:
+    0 calc(-1 * var(--pixel-offset)) 0 0 var(--text),
+    0 var(--pixel-offset) 0 0 var(--text),
+    calc(-1 * var(--pixel-offset)) 0 0 0 var(--text),
+    var(--pixel-offset) 0 0 0 var(--text);
+  background: var(--text);
+  color: var(--bg);
+}
+
+/* Dot/line grid background ("game board" canvas) — used behind the skill
+   tree's scrollable content area. */
+.pixel-grid {
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 .tag {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--accent-tag-bg);
-  color: var(--accent-strong);
+  border-radius: 0;
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1.5px solid var(--text);
+  background: transparent;
+  color: var(--text);
+}
+
+/* Grayscale-only concept/task distinction (no hue available): concept nodes
+   get the outlined chip (border, transparent fill — "explain it" is the
+   lighter-weight ask), task nodes get the filled/solid chip (inverted
+   fill — "do it" reads as a harder commitment). Both stay legible at a
+   glance without relying on color. */
+.tag--outline {
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--text);
+}
+
+.tag--filled {
+  background: var(--text);
+  color: var(--bg);
+  border: 1.5px solid var(--text);
 }
 
 * {
@@ -103,13 +163,18 @@ p {
 button {
   font-family: inherit;
   cursor: pointer;
-  background: transparent;
+  background: var(--panel);
   color: var(--text);
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  box-shadow: none;
+  border: none;
+  border-radius: 0;
+  box-shadow:
+    0 -2px 0 0 var(--border-strong),
+    0 2px 0 0 var(--border-strong),
+    -2px 0 0 0 var(--border-strong),
+    2px 0 0 0 var(--border-strong);
   padding: 9px 16px;
   font-size: 14px;
+  margin: 2px;
   transition: background 0.1s ease;
 }
 
@@ -119,6 +184,7 @@ button:hover:not(:disabled) {
 
 button:active:not(:disabled) {
   background: var(--hover-wash);
+  transform: translate(1px, 1px);
 }
 
 button:disabled {
@@ -127,10 +193,15 @@ button:disabled {
 }
 
 button.accent {
-  /* Notion-style solid "primary" fill — flat, no gradient, no glow. */
+  /* Solid "primary" fill — pixel-border-active treatment inlined for buttons
+     specifically so hover/disabled states can still apply on top of it. */
   background: var(--accent-fill);
   color: var(--accent-fill-text);
-  border-color: transparent;
+  box-shadow:
+    0 -2px 0 0 var(--text),
+    0 2px 0 0 var(--text),
+    -2px 0 0 0 var(--text),
+    2px 0 0 0 var(--text);
 }
 
 button.accent:hover:not(:disabled) {
@@ -149,41 +220,52 @@ input:not([type='radio']):not([type='checkbox']) {
   font-family: inherit;
   background: var(--panel);
   color: var(--text);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-control);
+  border: none;
+  border-radius: 0;
+  box-shadow:
+    0 -2px 0 0 var(--border-strong),
+    0 2px 0 0 var(--border-strong),
+    -2px 0 0 0 var(--border-strong),
+    2px 0 0 0 var(--border-strong);
   padding: 10px 12px;
   font-size: 14px;
   width: 100%;
-  box-shadow: none;
   outline: none;
 }
 
 textarea:focus,
 input:focus {
-  border-color: var(--accent);
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  box-shadow:
+    0 -2px 0 0 var(--text),
+    0 2px 0 0 var(--text),
+    -2px 0 0 0 var(--text),
+    2px 0 0 0 var(--text);
 }
 
 .panel {
   background: var(--panel);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-panel);
-  box-shadow: none;
+  border: none;
+  border-radius: 0;
+  box-shadow:
+    0 -3px 0 0 var(--border-strong),
+    0 3px 0 0 var(--border-strong),
+    -3px 0 0 0 var(--border-strong),
+    3px 0 0 0 var(--border-strong);
   padding: var(--gap);
+  margin: 3px;
 }
 
 .dim {
   color: var(--dim);
 }
 
-/* 力场 — 专注度指示环。V2 的发光/脉冲玻璃效果与 Notion 的纯平设计语言冲突，
-   简化为一个纯色实心圆环：颜色（而非辉光强度）表达 idle/low/mid/high 四档，
-   不使用 blur / box-shadow 光晕 / 动画。 */
+/* 力场 — 专注度指示环。四档用轮廓粗细/颜色区分：idle 细灰框，low 用 danger
+   红（唯一保留的功能性例外色），mid 用 --dim 实心描边，high 用主色（黑/白）
+   实心描边——纯灰阶，不再靠紫色表达"专注拉满"。 */
 .force-field {
   position: absolute;
   inset: -4px;
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   pointer-events: none;
   box-sizing: border-box;
   border: 2px solid transparent;
@@ -198,28 +280,42 @@ input:focus {
 }
 
 .force-field--mid {
-  border-color: #d9a441;
+  border-color: var(--dim);
+  border-style: dashed;
 }
 
 .force-field--high {
-  border-color: var(--accent);
+  border-color: var(--text);
 }
 
-/* 技能树连接线 — 父子节点之间的连线，反映解锁状态：未解锁的子节点用暗淡虚线，
-   可审计/已掌握的子节点用醒目的强调色实线，呈现"哪条路径已经点亮"的游戏感。 */
+/* 技能树连接线 — 父子节点之间的 Manhattan/直角折线（不是贝塞尔曲线），
+   反映解锁状态：未解锁虚线灰，可审计/已掌握实线主色（黑/白），呈现
+   "哪条路径已经点亮"的像素游戏感。 */
 .skill-edge {
   fill: none;
 }
 
 .skill-edge--locked {
   stroke: var(--border-strong);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 4;
+  stroke-width: 3;
+  stroke-dasharray: 8 8;
 }
 
 .skill-edge--active {
-  stroke: var(--accent);
-  stroke-width: 2.5;
+  stroke: var(--text);
+  stroke-width: 4;
+}
+
+/* Segmented pixel-style progress bar (Health/Sanity) — a row of individual
+   filled/unfilled squares instead of one continuous rounded fill. */
+.pixel-bar-segment {
+  flex: 1;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+}
+
+.pixel-bar-segment.active {
+  border-color: var(--text);
 }
 
 nav {

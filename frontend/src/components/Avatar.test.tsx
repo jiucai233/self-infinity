@@ -45,12 +45,14 @@ describe('Avatar', () => {
     render(<Avatar />)
 
     const track = await screen.findByTestId('bar-track-Sanity')
-    // sanity_cap 60 out of reference max 100 -> 60% track width
+    // sanity_cap 60 out of reference max 100 -> 60% track width (the track
+    // itself renders fewer available segments, not just fewer filled ones)
     expect(track).toHaveStyle({ width: '60%' })
 
-    const fill = screen.getByTestId('bar-fill-Sanity')
-    // sanity 30 / sanity_cap 60 -> 50% fill within the track
-    expect(fill).toHaveStyle({ width: '50%' })
+    const segments = screen.getAllByTestId('bar-segment-Sanity')
+    const activeSegments = segments.filter((el) => el.className.includes('active'))
+    // sanity 30 / sanity_cap 60 -> 50% fill -> half the segments are active
+    expect(activeSegments.length).toBe(segments.length / 2)
   })
 
   it('renders a shorter sanity track when sanity_cap is lower (low health)', async () => {

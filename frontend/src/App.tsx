@@ -27,7 +27,9 @@ function App() {
           alignItems: 'center',
         }}
       >
-        <h1 style={{ fontSize: 18, margin: 0 }}>SELF·INFINITY</h1>
+        <h1 className="pixel-font" style={{ fontSize: 14, margin: 0 }}>
+          SELF·INFINITY
+        </h1>
         <span className="dim" style={{ fontSize: 12 }}>
           费曼审计闭环 · V1
         </span>

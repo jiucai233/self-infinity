@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Skill Node Detail (Pixel Mono White)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Press+Start+2P&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-tint": "#615e57",
+                    "outline": "rgba(55, 53, 47, 0.09)",
+                    "on-secondary-fixed": "#1b1c1a",
+                    "on-primary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "on-secondary-container": "#636360",
+                    "surface-container": "#f1edeb",
+                    "on-tertiary": "#ffffff",
+                    "surface-variant": "#e6e2e0",
+                    "on-surface-variant": "#49473f",
+                    "primary-fixed": "#e7e2d9",
+                    "dark-text": "#e9e9e7",
+                    "primary": "#21201a",
+                    "dark-outline-strong": "rgba(255, 255, 255, 0.13)",
+                    "dark-dim": "#9b9b96",
+                    "secondary-fixed": "#e5e2de",
+                    "on-secondary-fixed-variant": "#474744",
+                    "on-primary-container": "#a19d95",
+                    "surface-container-low": "#f7f3f1",
+                    "on-surface": "#37352f",
+                    "on-primary-fixed": "#1d1c16",
+                    "on-secondary": "#ffffff",
+                    "secondary-container": "#e2dfdb",
+                    "on-tertiary-fixed": "#1c1b1f",
+                    "on-background": "#1c1b1b",
+                    "dark-bg": "#191919",
+                    "surface-container-lowest": "#ffffff",
+                    "secondary-fixed-dim": "#c8c6c3",
+                    "hover-state": "rgba(55, 53, 47, 0.08)",
+                    "on-tertiary-container": "#a09ca1",
+                    "surface-container-highest": "#e6e2e0",
+                    "primary-container": "#37352f",
+                    "inverse-surface": "#31302f",
+                    "surface-bright": "#fdf8f7",
+                    "tertiary-fixed-dim": "#cac5ca",
+                    "on-primary-fixed-variant": "#494740",
+                    "on-error": "#ffffff",
+                    "background": "#fdf8f7",
+                    "primary-fixed-dim": "#cbc6bd",
+                    "error": "#ba1a1a",
+                    "surface-container-high": "#ebe7e6",
+                    "surface": "#ffffff",
+                    "dark-hover": "rgba(255, 255, 255, 0.055)",
+                    "inverse-primary": "#cbc6bd",
+                    "inverse-on-surface": "#f4f0ee",
+                    "surface-dim": "#ddd9d8",
+                    "tertiary-container": "#363438",
+                    "tertiary": "#211f23",
+                    "outline-variant": "#cbc6bc",
+                    "tertiary-fixed": "#e6e1e6",
+                    "dark-outline": "rgba(255, 255, 255, 0.09)",
+                    "on-tertiary-fixed-variant": "#48464a",
+                    "secondary": "#5f5e5c",
+                    "outline-strong": "rgba(55, 53, 47, 0.16)",
+                    "error-container": "#ffdad6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "16px",
+                    "unit": "4px",
+                    "margin-mobile": "16px",
+                    "xl": "32px",
+                    "xs": "4px",
+                    "lg": "24px",
+                    "sm": "8px",
+                    "margin-desktop": "40px",
+                    "md": "16px"
+            },
+            "fontFamily": {
+                    "pixel": ["'Press Start 2P'", "cursive"],
+                    "label-lg": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-md": ["Inter"]
+            },
+            "fontSize": {
+                    "label-lg": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-sm": ["11px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #fdf8f7;
+            color: #37352f;
+        }
+        .pixel-border {
+            border: 4px solid #37352f;
+            box-shadow: 4px 4px 0px 0px rgba(55, 53, 47, 0.16);
+        }
+        .pixel-border-sm {
+            border: 2px solid #37352f;
+        }
+        .pixel-btn {
+            background: #ffffff;
+            border: 4px solid #37352f;
+            padding: 12px 24px;
+            transition: transform 0.1s;
+            cursor: pointer;
+        }
+        .pixel-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: none;
+        }
+        .pixel-btn:hover {
+            background: #f1edeb;
+        }
+        .pixel-avatar-frame {
+            width: 128px;
+            height: 128px;
+            image-rendering: pixelated;
+        }
+        .pixel-progress-track {
+            height: 24px;
+            background: #f1edeb;
+            border: 2px solid #37352f;
+            position: relative;
+        }
+        .pixel-progress-bar {
+            height: 100%;
+            background: #37352f;
+            width: 60%;
+        }
+        .pixel-grid-pattern {
+            background-size: 20px 20px;
+            background-image: radial-gradient(circle, #37352f 1px, transparent 1px);
+            opacity: 0.05;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .typewriter {
+            overflow: hidden;
+            border-right: .15em solid #37352f;
+            white-space: nowrap;
+            margin: 0 auto;
+            letter-spacing: .15em;
+            animation: typing 3.5s steps(40, end), blink-caret .75s step-end infinite;
+        }
+        @keyframes typing {
+          from { width: 0 }
+          to { width: 100% }
+        }
+        @keyframes blink-caret {
+          from, to { border-color: transparent }
+          50% { border-color: #37352f; }
+        }
+    </style>
+</head>
+<body class="font-body-md text-on-surface min-h-screen flex flex-col">
+<!-- TopNavBar Cluster -->
+<header class="w-full top-0 bg-surface border-b border-outline flex justify-between items-center h-14 px-margin-desktop z-50">
+<div class="flex items-center gap-md">
+<span class="font-pixel text-[12px] font-bold text-primary">Chronos</span>
+<nav class="hidden md:flex items-center gap-lg ml-xl">
+<a class="text-secondary font-body-md hover:text-primary transition-colors" href="#">Dashboard</a>
+<a class="text-secondary font-body-md hover:text-primary transition-colors" href="#">Inventory</a>
+<a class="text-secondary font-body-md hover:text-primary transition-colors" href="#">Archive</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<div class="pixel-border-sm px-2 py-1 flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">monetization_on</span>
+<span class="font-pixel text-[10px]">1,240</span>
+</div>
+<button class="material-symbols-outlined text-on-surface hover:bg-hover-state p-1 rounded transition-colors" data-icon="settings">settings</button>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar Anchor -->
+<aside class="hidden md:flex flex-col h-full py-md border-r border-outline bg-surface w-64 shrink-0">
+<div class="px-md mb-lg">
+<div class="flex items-center gap-sm p-sm pixel-border-sm bg-surface-container-low mb-sm">
+<img class="w-10 h-10 pixel-avatar-frame bg-primary-container" data-alt="A minimalist pixel art portrait of a fantasy character wearing a dark hood, styled in high-contrast black and white for a clean, retro aesthetic. The character has sharp, geometric features and glowing white eyes that contrast against the dark shadows of the hood. The background is a stark, solid white, maintaining a disciplined monochrome professional appearance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvlvQ2Q228UuDyhXpnbMi3mSzk371Ywb6H7MQKzxGbf--mjXqUBofs8InCzLdSDVNziczpU8A2qNa6KU8XjODXrzHC3iMLKfXl5fqvX39ssj57GZc1-lc6lKp4141Pv_ciZSqRtZphpLbMpISjWlCn9xSm0MTlWEru5msqD_JpA0mNqq5buxgNoxwaxchuxzr5wr_Ya2hCZR_Bx9cSL_FMzcrSj5xoBEBIi6etBoVNY_NIOs7Tez2MIvYhATTNiOCp4bBiZYnpqc8Z"/>
+<div>
+<p class="font-pixel text-[8px] leading-none mb-1">Level 42</p>
+<p class="font-label-sm text-secondary">Vanguard Class</p>
+</div>
+</div>
+<button class="w-full pixel-btn font-pixel text-[10px] flex items-center justify-center gap-xs">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+                    New Mission
+                </button>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Skill Tab Active -->
+<a class="flex items-center gap-md px-md py-sm text-secondary hover:bg-hover-state transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-lg">Character</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-secondary hover:bg-hover-state transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span class="font-label-lg">Quests</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm bg-secondary-container text-on-secondary-fixed font-bold border-r-2 border-primary transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="bolt" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="font-label-lg">Skills</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-secondary hover:bg-hover-state transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-label-lg">Guild</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-secondary hover:bg-hover-state transition-all duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="font-label-lg">Map</span>
+</a>
+</nav>
+<div class="mt-auto px-md space-y-1">
+<a class="flex items-center gap-md px-md py-sm text-secondary hover:bg-hover-state" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-lg">Support</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-secondary hover:bg-hover-state" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-lg">Log Out</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto bg-background relative pixel-grid-pattern">
+<div class="max-w-6xl mx-auto p-margin-desktop">
+<!-- Title & Breadcrumbs -->
+<div class="mb-xl">
+<div class="flex items-center gap-sm text-secondary font-pixel text-[8px] mb-md">
+<span>SKILL TREE</span>
+<span class="material-symbols-outlined text-[12px]">chevron_right</span>
+<span class="text-on-surface">NODE DETAIL</span>
+</div>
+<h1 class="font-pixel text-headline-lg uppercase text-on-surface">Skill Node Detail (Pixel Mono White)</h1>
+</div>
+<!-- Main Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-xl">
+<!-- Left: The Guide Character -->
+<div class="lg:col-span-5 flex flex-col items-center">
+<div class="pixel-border bg-white w-full aspect-square flex flex-col items-center justify-center p-xl relative">
+<!-- Character Sprite Representation -->
+<div class="w-64 h-64 bg-white relative">
+<img class="w-full h-full object-contain pixel-avatar-frame" data-alt="A minimalist black and white pixel-art sprite of a stoic mentor character, featuring a large circular head, simple blocky eyes, and a tall, rectangular body. The character stands in a neutral pose with arms at its sides, rendered in a clean, professional vector-like pixel style. The background is a solid, bright white, highlighting the sharp monochrome edges of the sprite." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA-eyaZoguqgT3CF6vvsLt1gMdWc4QNtKy1T-OTWAFlQzdwZ1rPdX_DmZgBEolwRDoSSZKj5KsmRMFBsoPk1OTkenx2CIfbMLxIahfmQMt7Oy9mSKEIFgSBkvweg7frMvBnh-9znxBJgai7dFcuamfrXSPchfmxWw2M_HqnKA3hPDc2FU6aT5DuI4kQmk1y_sKB6inVPfyk3lwj7mAn0rIOObpfHISiWbVTd3SBn7AD1fJJy924WEumSq_XxCx94LSEtUNEZ03gFVWW"/>
+</div>
+<!-- Dialogue Box -->
+<div class="absolute -bottom-10 left-0 right-0 px-lg">
+<div class="pixel-border bg-white p-md min-h-[80px]">
+<p class="font-pixel text-[10px] leading-relaxed text-on-surface">
+                                        "THIS NODE GRANTS IMMENSE POWER OVER THE TEMPORAL FLOW. CHOOSE WISELY, VANGUARD."
+                                    </p>
+</div>
+</div>
+</div>
+</div>
+<!-- Right: Skill Progression & Details -->
+<div class="lg:col-span-7 space-y-xl mt-12 lg:mt-0">
+<!-- Header Node Info -->
+<div class="pixel-border bg-white p-lg">
+<div class="flex items-start justify-between mb-lg">
+<div>
+<h2 class="font-pixel text-headline-sm mb-xs">TEMPORAL SHIFT</h2>
+<p class="font-label-lg text-secondary">ACTIVE ABILITY / LEVEL 3</p>
+</div>
+<div class="pixel-border-sm p-2">
+<span class="material-symbols-outlined text-[32px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+</div>
+<!-- Progression Blocks -->
+<div class="space-y-md">
+<div class="flex justify-between font-pixel text-[10px]">
+<span>PROGRESSION</span>
+<span>60%</span>
+</div>
+<div class="pixel-progress-track">
+<div class="pixel-progress-bar"></div>
+</div>
+</div>
+</div>
+<!-- Chunky Pixelated Info Blocks -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<!-- Requirements -->
+<div class="pixel-border bg-surface-container-low p-md">
+<h3 class="font-pixel text-[10px] mb-md border-b-2 border-outline-strong pb-sm flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">lock_open</span>
+                                    REQUIREMENTS
+                                </h3>
+<ul class="space-y-sm font-label-md">
+<li class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary text-[14px]">check_box</span>
+<span>Focus Level 15</span>
+</li>
+<li class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary text-[14px]">check_box</span>
+<span>Chrono-Essence x50</span>
+</li>
+<li class="flex items-center gap-sm text-secondary">
+<span class="material-symbols-outlined text-[14px]">check_box_outline_blank</span>
+<span>Skill Point (1)</span>
+</li>
+</ul>
+</div>
+<!-- Benefits -->
+<div class="pixel-border bg-white p-md">
+<h3 class="font-pixel text-[10px] mb-md border-b-2 border-outline-strong pb-sm flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+                                    BENEFITS
+                                </h3>
+<ul class="space-y-sm font-label-md">
+<li class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-[14px]">add</span>
+<span>+15% Action Speed</span>
+</li>
+<li class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-[14px]">add</span>
+<span>-2s Cooldown reduction</span>
+</li>
+<li class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-[14px]">add</span>
+<span>Unlocked Echo Strike</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Action Area -->
+<div class="pixel-border bg-white p-lg flex flex-col md:flex-row items-center justify-between gap-lg">
+<div class="text-center md:text-left">
+<p class="font-pixel text-[8px] text-secondary mb-1">AVAILABLE POINTS</p>
+<p class="font-pixel text-headline-sm">03</p>
+</div>
+<button class="pixel-btn w-full md:w-auto font-pixel text-label-lg group flex items-center justify-center gap-sm">
+                                ALLOCATE SKILL POINT
+                                <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Footer Stats Cluster -->
+<div class="mt-xl grid grid-cols-2 md:grid-cols-4 gap-md">
+<div class="pixel-border bg-white p-md text-center">
+<p class="font-label-sm text-secondary mb-1">TOTAL ATTRIBUTES</p>
+<p class="font-pixel text-[12px]">245</p>
+</div>
+<div class="pixel-border bg-white p-md text-center">
+<p class="font-label-sm text-secondary mb-1">GLOBAL RANK</p>
+<p class="font-pixel text-[12px]">#1,042</p>
+</div>
+<div class="pixel-border bg-white p-md text-center">
+<p class="font-label-sm text-secondary mb-1">UNLOCKED NODES</p>
+<p class="font-pixel text-[12px]">18 / 64</p>
+</div>
+<div class="pixel-border bg-white p-md text-center">
+<p class="font-label-sm text-secondary mb-1">TIME PLAYED</p>
+<p class="font-pixel text-[12px]">142H</p>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Mobile Bottom NavBar Anchor -->
+<nav class="md:hidden bg-surface border-t border-outline h-16 flex items-center justify-around px-md z-50">
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-[10px] font-pixel">CHR</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span class="text-[10px] font-pixel">QST</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" data-icon="bolt" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="text-[10px] font-pixel">SKL</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-secondary">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="text-[10px] font-pixel">MAP</span>
+</button>
+</nav>
+<script>
+        // Micro-interactions for the pixel buttons
+        document.querySelectorAll('.pixel-btn').forEach(btn => {
+            btn.addEventListener('mousedown', () => {
+                btn.style.boxShadow = 'none';
+                btn.style.transform = 'translate(2px, 2px)';
+            });
+            btn.addEventListener('mouseup', () => {
+                btn.style.boxShadow = '4px 4px 0px 0px rgba(55, 53, 47, 0.16)';
+                btn.style.transform = 'translate(0px, 0px)';
+            });
+            // Init box shadow
+            btn.style.boxShadow = '4px 4px 0px 0px rgba(55, 53, 47, 0.16)';
+        });
+
+        // Simple reactive dialogue trigger
+        const dialogue = document.querySelector('.pixel-border p');
+        const phrases = [
+            "THIS NODE GRANTS IMMENSE POWER OVER THE TEMPORAL FLOW. CHOOSE WISELY, VANGUARD.",
+            "I CAN FEEL THE CHRONO-ESSENCE PULSING FROM THIS CORE.",
+            "LEVELING THIS SKILL WILL REQUIRE SACRIFICE.",
+            "THE ARCHIVE RECORDS ALL YOUR CHOICES. MAKE THEM COUNT."
+        ];
+        
+        let phraseIdx = 0;
+        setInterval(() => {
+            phraseIdx = (phraseIdx + 1) % phrases.length;
+            dialogue.style.opacity = '0';
+            setTimeout(() => {
+                dialogue.textContent = `"${phrases[phraseIdx]}"`;
+                dialogue.style.opacity = '1';
+            }, 300);
+        }, 8000);
+    </script>
+</body></html>

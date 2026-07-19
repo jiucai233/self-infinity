@@ -23,9 +23,12 @@ const NODE_TYPE_LABEL: Record<SkillNode['node_type'], string> = {
   task: '任务 · 做到就行',
 }
 
-const NODE_TYPE_TAG_STYLE: Record<SkillNode['node_type'], { bg: string; color: string }> = {
-  concept: { bg: 'var(--accent-tag-bg)', color: 'var(--accent-strong)' },
-  task: { bg: 'var(--info-tag-bg)', color: 'var(--info-strong)' },
+// No hue to lean on in the mono system, so concept/task stay distinct via
+// tag treatment instead of color: concept ("讲清楚为什么") is the lighter
+// outlined chip, task ("做到就行") is the heavier filled/inverted chip.
+const NODE_TYPE_TAG_CLASS: Record<SkillNode['node_type'], string> = {
+  concept: 'tag tag--outline',
+  task: 'tag tag--filled',
 }
 
 // One connector line for a parent -> child edge, positioned in coordinates
@@ -179,12 +182,16 @@ export default function SkillTree({
         const y1 = pRect.bottom - containerRect.top
         const x2 = cRect.left + cRect.width / 2 - containerRect.left
         const y2 = cRect.top - containerRect.top
+        // Manhattan/stepped orthogonal path — straight down from the
+        // parent's bottom-center, straight across at the midpoint row,
+        // straight down into the child's top-center. Chunky right angles
+        // read as pixel-art circuitry instead of an organic curve.
         const midY = (y1 + y2) / 2
         next.push({
           parentId: parent.id,
           childId: child.id,
           status: child.status,
-          d: `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`,
+          d: `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`,
         })
       }
       setEdges(next)
@@ -267,7 +274,9 @@ export default function SkillTree({
 
   return (
     <div>
-      <h2>技能树</h2>
+      <h2 className="pixel-font" style={{ fontSize: 18 }}>
+        技能树
+      </h2>
       <p className="dim" style={{ marginBottom: 16 }}>
         点亮一个「原理方块」，必须先通过费曼审计官的压力测试。学习内容不设限——
         给一个主题或一个想完成的大任务，规划官会拆成小节点接到树上。
@@ -393,7 +402,7 @@ export default function SkillTree({
 
       {error && <p style={{ color: 'var(--danger)', marginBottom: 16 }}>{error}</p>}
 
-      <div style={{ overflowX: 'auto' }}>
+      <div className="pixel-grid" style={{ overflowX: 'auto' }}>
         <div
           ref={treeContentRef}
           style={{ position: 'relative', width, height, minWidth: '100%' }}
@@ -448,19 +457,17 @@ export default function SkillTree({
                     height: 32,
                     background:
                       skill.status === 'mastered' ? STATUS_COLOR.mastered : 'var(--bg)',
-                    border: `1px solid ${STATUS_COLOR[skill.status]}`,
-                    borderRadius: 4,
+                    border: `2px solid ${STATUS_COLOR[skill.status]}`,
+                    borderRadius: 0,
                     marginBottom: 8,
                   }}
                 />
-                <h3 style={{ fontSize: 15 }}>{skill.title}</h3>
+                <h3 className="pixel-font" style={{ fontSize: 12, lineHeight: 1.6 }}>
+                  {skill.title}
+                </h3>
                 <span
-                  className="tag"
-                  style={{
-                    marginBottom: 6,
-                    background: NODE_TYPE_TAG_STYLE[skill.node_type].bg,
-                    color: NODE_TYPE_TAG_STYLE[skill.node_type].color,
-                  }}
+                  className={NODE_TYPE_TAG_CLASS[skill.node_type]}
+                  style={{ marginBottom: 6 }}
                 >
                   {NODE_TYPE_LABEL[skill.node_type]}
                 </span>
