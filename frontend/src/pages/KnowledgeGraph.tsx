@@ -104,7 +104,17 @@ export default function KnowledgeGraph({
         (l as unknown as FGLink).kind === 'parent' ? null : [2, 2],
       )
       .minZoom(0.3)
-      .maxZoom(3)
+      .maxZoom(8)
+      // Precompute most of the layout synchronously before the first paint
+      // instead of animating from a random start, and cap the post-warmup
+      // animated loop at a fixed tick count instead of the library's default
+      // wall-clock cooldown (~15s) — on a ~35-node graph that default left
+      // nodes sitting overlapped in a fixed-zoom crop of the center for 15
+      // real seconds before the eventual re-fit. With warmup already having
+      // done the heavy lifting, cooldownTicks only needs to be enough for a
+      // last bit of settling before onEngineStop fires and re-fits below.
+      .warmupTicks(100)
+      .cooldownTicks(50)
       .onNodeClick((n) => {
         const node = n as FGNode
         setSelected(node)
@@ -112,6 +122,7 @@ export default function KnowledgeGraph({
           onOpenSkill(Number(node.id.replace('skill-', '')))
         }
       })
+      .onEngineStop(() => graphRef.current?.zoomToFit(200, 24))
 
     return () => {
       graph._destructor()
