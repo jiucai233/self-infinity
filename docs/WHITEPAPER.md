@@ -158,7 +158,9 @@ Architect 不需要比 Auditor 更强的能力：拆解是结构性任务，验�
 ```
 
 - Scribe 输入 =（审计暴露的 gaps + 用户自由反思），输出一条 Dalio 式行为规则：title ≤ 20 字，body 为"当…时，我将…"形式，≤ 80 字，禁止空话。
-- V2 将原则库向量化：审计开始时检索该 skill 相关的历史原则注入 Auditor 上下文（"该用户历史上在 X 类问题上栽过"），原则从被动档案变成主动 buff。这构成一个完整的 memory-augmented agent 闭环。
+- 审计开始时检索该 skill 相关的历史原则注入 Auditor 上下文（"该用户历史上在 X 类问题上栽过"）——已实现（`app/agents/retrieval.py` 的 `find_relevant_principles`），但用的是字符 2-gram/词重叠启发式，不是向量语义检索，见该文件顶部注释里对这个取舍的说明。
+
+**已实现（2026-07-20）：Librarian 语义关联 + 矛盾检测**——参考 Andrej Karpathy 2026-04 提出的 "LLM wiki" 思路（不是"检索完就忘"的 RAG，而是让 LLM 把新内容和已有知识库的关系在写入时就判断清楚，产生真正的交叉引用）落地的一版：新原则蒸馏出来后，`app/agents/librarian.py`（新增的 Librarian agent，一次 LLM 调用）判断它和已有原则/技能节点里哪些是真正语义相关的（`related`）、哪些和已有原则在做法上直接冲突（`contradicts`），结果持久化为 `PrincipleLink` 表（`app/services/linking.py`），不再是 `/api/graph` 每次请求时现算的字符重叠打分。`POST /api/graph/relink` 是手动触发的"linting pass"：对全库原则重新跑一遍判断，既是新功能上线前的历史数据回填，也是唯一会把"矛盾"暴露出来的地方（对称去重后展示）。前端 Knowledge Graph 页新增红色 `contradicts` 边和"Rebuild Links"按钮 + 矛盾列表面板。范围声明：`find_relevant_principles`（审计时注入上下文那条路径）没有改，仍是关键词重叠——只有 `/api/graph` 的 `related` 边这一条路径换成了 LLM 判断。
 
 ### 4.4 激励引擎（V1.5 → V2.1）
 

@@ -1,10 +1,18 @@
 import json
 import logging
+import re
 import time
 
 from app.llm.base import Message
 
 logger = logging.getLogger(__name__)
+
+# Deterministic stand-in for "the LLM decided these two principles conflict"
+# — a real provider judges this from meaning, but a scripted mock has no
+# meaning to judge, so tests that want a contradiction fixture just put this
+# literal marker in a principle's body.
+_CONTRADICTS_MARKER = "刻意矛盾"
+_CANDIDATE_LINE_RE = re.compile(r"^\[(\d+)\] \((\w+)\) (.+?) —— (.*)$")
 
 _FIRST_PROBE = "为什么这个方法能生效？如果去掉关键的那一步，会发生什么？"
 _ERROR_INJECTION_PROBE = (
@@ -36,6 +44,8 @@ class MockProvider:
         system = next((m["content"] for m in messages if m["role"] == "system"), "")
         if "原则蒸馏官" in system:
             result = self._distill(messages)
+        elif "关联图书管理员" in system:
+            result = self._link(messages)
         elif "澄清官" in system:
             result = self._clarify(messages)
         elif "技能树规划官" in system:
@@ -100,6 +110,34 @@ class MockProvider:
             },
         ]
         return json.dumps(nodes)
+
+    @staticmethod
+    def _link(messages: list[Message]) -> str:
+        # Deterministic stand-in for the Librarian: reuses the same
+        # word/bigram overlap heuristic app/agents/retrieval.py uses
+        # elsewhere, purely so offline tests have *something* non-trivial to
+        # assert on — a real provider judges this from meaning, not overlap.
+        from app.agents.retrieval import relevance_score
+
+        system = next((m["content"] for m in messages if m["role"] == "system"), "")
+        title_match = re.search(r"标题：(.*)", system)
+        body_match = re.search(r"内容：(.*)", system)
+        new_text = f"{title_match.group(1) if title_match else ''} {body_match.group(1) if body_match else ''}"
+
+        related = []
+        contradicts = []
+        for line in system.splitlines():
+            m = _CANDIDATE_LINE_RE.match(line.strip())
+            if not m:
+                continue
+            ref, kind, ctitle, ctext = int(m.group(1)), m.group(2), m.group(3), m.group(4)
+            if kind == "principle" and _CONTRADICTS_MARKER in ctext:
+                contradicts.append({"ref": ref, "reason": "mock: 检测到刻意矛盾标记"})
+                continue
+            if relevance_score(new_text, f"{ctitle} {ctext}") > 0:
+                related.append({"ref": ref, "reason": "mock: 关键词重叠"})
+
+        return json.dumps({"related": related[:4], "contradicts": contradicts})
 
     @staticmethod
     def _distill(messages: list[Message]) -> str:

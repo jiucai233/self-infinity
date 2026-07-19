@@ -1,36 +1,36 @@
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
-from app.agents.retrieval import relevance_score
 from app.db import get_session
-from app.models import AuditSession, Principle, SkillNode
-from app.schemas import GraphEdgeOut, GraphNodeOut, GraphResponse
+from app.llm import get_provider
+from app.models import AuditSession, LinkKind, Principle, PrincipleLink, SkillNode
+from app.schemas import ContradictionOut, GraphEdgeOut, GraphNodeOut, GraphResponse, RelinkResponse
+from app.services.linking import link_principle
 
 router = APIRouter(prefix="/api", tags=["graph"])
-
-# Cap on extra "related" edges per principle beyond its real origin edge —
-# without a cap a handful of generic-sounding principles would fan out to
-# every skill node and turn the graph into an unreadable hairball.
-MAX_RELATED_EDGES_PER_PRINCIPLE = 2
 
 
 @router.get("/graph", response_model=GraphResponse)
 def get_graph(session: Session = Depends(get_session)):
     """Unified skill-tree + principle-archive graph.
 
-    Three edge kinds, all derived from data that already exists — nothing
+    Four edge kinds, all derived from data that already exists — nothing
     fabricated:
     - "parent": the real skill-tree structure (SkillNode.parent_id).
     - "origin": a principle's real source (Principle.source_session_id ->
       AuditSession.skill_id) — the node whose failed audit produced it.
-    - "related": a principle to any OTHER skill node scored above zero by
-      the same character-bigram/word-overlap heuristic
-      app/agents/retrieval.py already uses for in-audit principle
-      retrieval, capped at MAX_RELATED_EDGES_PER_PRINCIPLE per principle.
+    - "related" / "contradicts": persisted PrincipleLink rows, judged by the
+      Librarian agent (an LLM call) rather than computed live here — see
+      app/services/linking.py. A principle gets linked automatically when
+      it's created; re-running the judgment for every principle (e.g. after
+      changing the prompt, or to catch principles that predate this feature)
+      is a manual action via POST /api/graph/relink, not something this
+      read endpoint triggers itself.
     """
     skills = session.exec(select(SkillNode)).all()
     principles = session.exec(select(Principle)).all()
     sessions_by_id = {s.id: s for s in session.exec(select(AuditSession)).all()}
+    links = session.exec(select(PrincipleLink)).all()
 
     nodes: list[GraphNodeOut] = [
         GraphNodeOut(
@@ -64,17 +64,75 @@ def get_graph(session: Session = Depends(get_session)):
                 )
             )
 
-        principle_text = f"{p.title} {p.body}"
-        scored = [
-            (s, relevance_score(principle_text, f"{s.title} {s.description}"))
-            for s in skills
-            if s.id != origin_skill_id
-        ]
-        scored = [(s, score) for s, score in scored if score > 0]
-        scored.sort(key=lambda item: item[1], reverse=True)
-        for s, _score in scored[:MAX_RELATED_EDGES_PER_PRINCIPLE]:
-            edges.append(
-                GraphEdgeOut(source=f"principle-{p.id}", target=f"skill-{s.id}", kind="related")
+    for link in links:
+        edges.append(
+            GraphEdgeOut(
+                source=f"principle-{link.principle_id}",
+                target=f"{link.target_kind.value}-{link.target_id}",
+                kind=link.kind.value,
+                reason=link.reason,
             )
+        )
 
     return GraphResponse(nodes=nodes, edges=edges)
+
+
+@router.post("/graph/relink", response_model=RelinkResponse)
+def relink_graph(session: Session = Depends(get_session)):
+    """Re-runs the Librarian for every principle against the full current
+    library and skill tree, replacing all persisted PrincipleLink rows.
+
+    This is the "linting pass": besides refreshing "related" edges (so
+    principles created before this feature existed, or before the prompt
+    changed, get judged too), it's the only place contradictions between
+    principles get surfaced — a POST because it's a real (LLM-call-heavy,
+    O(n) in principle count) recompute, not something to trigger implicitly
+    on every graph read.
+    """
+    provider = get_provider()
+    principles = session.exec(select(Principle)).all()
+    sessions_by_id = {s.id: s for s in session.exec(select(AuditSession)).all()}
+
+    for link in session.exec(select(PrincipleLink)).all():
+        session.delete(link)
+    session.commit()
+
+    related_count = 0
+    contradictions: list[ContradictionOut] = []
+    seen_pairs: set[frozenset[int]] = set()
+    principles_by_id = {p.id: p for p in principles}
+    for p in principles:
+        origin_audit = sessions_by_id.get(p.source_session_id)
+        origin_skill_id = origin_audit.skill_id if origin_audit is not None else None
+        link_principle(session, provider, p, exclude_skill_id=origin_skill_id)
+
+    for link in session.exec(select(PrincipleLink)).all():
+        if link.kind == LinkKind.related:
+            related_count += 1
+        elif link.kind == LinkKind.contradicts and link.target_kind.value == "principle":
+            other = principles_by_id.get(link.target_id)
+            source = principles_by_id.get(link.principle_id)
+            if other is None or source is None or other.id is None or source.id is None:
+                continue
+            # The Librarian runs once per principle against the whole pool,
+            # so a mutual contradiction between A and B can surface twice
+            # (once from each side) — collapse to a single reported pair.
+            pair = frozenset({source.id, other.id})
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            contradictions.append(
+                ContradictionOut(
+                    principle_a_id=source.id,
+                    principle_a_title=source.title,
+                    principle_b_id=other.id,
+                    principle_b_title=other.title,
+                    reason=link.reason,
+                )
+            )
+
+    return RelinkResponse(
+        principles_processed=len(principles),
+        related_links_created=related_count,
+        contradictions=contradictions,
+    )

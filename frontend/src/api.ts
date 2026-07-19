@@ -5,6 +5,7 @@ import type {
   FocusSession,
   GraphResponse,
   Principle,
+  RelinkResponse,
   SkillNode,
   StartAuditResponse,
   TurnResultResponse,
@@ -59,6 +60,8 @@ export const api = {
   listPrinciples: () => request<Principle[]>('/principles'),
 
   getGraph: () => request<GraphResponse>('/graph'),
+
+  relinkGraph: () => request<RelinkResponse>('/graph/relink', { method: 'POST' }),
 
   getVitality: () => request<VitalityState>('/vitality'),
 

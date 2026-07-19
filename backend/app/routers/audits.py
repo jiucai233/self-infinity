@@ -22,6 +22,7 @@ from app.models import (
     TurnRole,
     utcnow,
 )
+from app.services.linking import link_principle
 from app.config import settings
 from app.schemas import (
     AuditSessionOut,
@@ -206,5 +207,7 @@ def submit_reflection(audit_id: int, body: ReflectionRequest, session: Session =
     session.add(principle)
     session.commit()
     session.refresh(principle)
+
+    link_principle(session, get_provider(), principle, exclude_skill_id=audit.skill_id)
 
     return principle

@@ -107,12 +107,27 @@ class GraphNodeOut(BaseModel):
 class GraphEdgeOut(BaseModel):
     source: str
     target: str
-    kind: str  # "parent" | "origin" | "related"
+    kind: str  # "parent" | "origin" | "related" | "contradicts"
+    reason: str | None = None
 
 
 class GraphResponse(BaseModel):
     nodes: list[GraphNodeOut]
     edges: list[GraphEdgeOut]
+
+
+class ContradictionOut(BaseModel):
+    principle_a_id: int
+    principle_a_title: str
+    principle_b_id: int
+    principle_b_title: str
+    reason: str
+
+
+class RelinkResponse(BaseModel):
+    principles_processed: int
+    related_links_created: int
+    contradictions: list[ContradictionOut]
 
 
 class PrincipleOut(BaseModel):

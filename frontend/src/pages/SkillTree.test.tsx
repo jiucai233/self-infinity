@@ -151,8 +151,8 @@ describe('SkillTree', () => {
         { id: 'principle-1', kind: 'principle', title: 'Check the base case first', status: null, node_type: null },
       ],
       edges: [
-        { source: 'skill-3', target: 'skill-2', kind: 'parent' },
-        { source: 'principle-1', target: 'skill-2', kind: 'origin' },
+        { source: 'skill-3', target: 'skill-2', kind: 'parent', reason: null },
+        { source: 'principle-1', target: 'skill-2', kind: 'origin', reason: null },
       ],
     }
 

@@ -71,6 +71,33 @@ class Principle(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
 
 
+class LinkKind(StrEnum):
+    related = "related"
+    contradicts = "contradicts"
+
+
+class LinkTargetKind(StrEnum):
+    skill = "skill"
+    principle = "principle"
+
+
+class PrincipleLink(SQLModel, table=True):
+    # LLM-judged relationship from a Principle to another node (a skill it
+    # applies to, or another principle it agrees or conflicts with) —
+    # replaces the old keyword-overlap heuristic that used to be computed
+    # live on every /api/graph request. Persisted once (at principle
+    # creation, or in bulk via the /api/graph/relink lint pass) so the
+    # judgment doesn't need re-running per request. Undirected in practice:
+    # one row is enough to render the edge either way in the graph UI.
+    id: int | None = Field(default=None, primary_key=True)
+    principle_id: int = Field(foreign_key="principle.id")
+    target_kind: LinkTargetKind
+    target_id: int
+    kind: LinkKind
+    reason: str
+    created_at: datetime = Field(default_factory=utcnow)
+
+
 class RewardEvent(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     session_id: int = Field(foreign_key="auditsession.id")

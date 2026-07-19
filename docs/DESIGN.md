@@ -468,3 +468,31 @@ SVG + 自写力学（延续 §8 的 `graphLayout.ts`），用户建议用 three.
 Canvas API 基本是空实现，深度交互测试在这个环境下没有意义（和 §7 记录的
 SVG 连线在 jsdom 下测不了像素坐标是同一个限制），验证方式是本节改动都过了
 `tsc -b`/`npm test`/`npm run lint` 加真实浏览器截图（亮/暗主题各一张）。
+
+## 10. Knowledge Graph：Librarian 语义关联 + 矛盾检测（2026-07-20，第六次改版）
+
+`related` 边的判断从关键词重叠启发式换成了 LLM（Librarian agent）——细节
+和取舍见 `docs/WHITEPAPER.md` §4.3。这里只记视觉/组件层面的改动：
+
+- **新增 `contradicts` 边**：唯一一处不用黑白灰的边——复用系统里本来就有
+  的 `--danger` 红（错误提示用的同一个变量），不是新引入一个"分类色"，
+  逻辑上和"金色只留给已掌握"是同一条规则：颜色只用来传递语义信号
+  （警示/成就），不用来做类目区分。渲染为实线（`linkLineDash: null`，
+  和 `parent` 边一样），比虚线的 `related` 边更显眼——矛盾比"这两个东西
+  有点关系"更值得被注意到。
+- **"Rebuild Links" 按钮**：在图谱工具条最右侧，触发 `POST
+  /api/graph/relink`（后端对全库原则重新跑一次 Librarian 判断，见
+  WHITEPAPER §4.3），成功后用返回的最新数据重新拉一次 `/api/graph`。
+  没有原则数据时按钮禁用（`disabled`），避免对着空库点一个必然无事发生
+  的按钮。
+- **"LIBRARIAN LINT" 面板**：`Rebuild Links` 点过一次之后才出现（初始
+  不显示，不是"没矛盾"和"还没检查过"两种状态糊在一起），红色描边
+  （`borderColor: 'var(--danger)'`）+ 逐条列出矛盾的原则标题对和 LLM
+  给的一句话原因；没有矛盾时显示"No contradictions found across the
+  archive."而不是把面板隐藏掉——用户点了"检查一下"这个动作理应有反馈，
+  不能因为结果是"没问题"就假装什么都没发生。
+- 后端没有新增 UI 相关内容，但新增了 `backend/app/agents/librarian.py`
+  （新 agent）、`backend/app/services/linking.py`（复用于原则创建时自动
+  关联 + relink 端点的批量重跑）、`backend/app/models.py` 的
+  `PrincipleLink` 表（新表，`SQLModel.metadata.create_all` 自动建表，
+  不需要手动迁移）。测试见 `backend/tests/test_linking.py`。

@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import ForceGraph, { type NodeObject } from 'force-graph'
 import { api } from '../api'
-import type { GraphEdge, GraphNode, GraphResponse } from '../types'
+import type { Contradiction, GraphEdge, GraphNode, GraphResponse } from '../types'
 
 // Repurposes the template's "Map" nav slot — a knowledge graph is, in a
 // real sense, a map of everything you've learned. Renders the real skill
 // tree (parent edges) plus the Archive's principles wired to the real node
 // each one came from ("origin" edges, via Principle.source_session_id ->
-// AuditSession.skill_id on the backend) and to any other node the same
-// keyword-overlap heuristic app/agents/retrieval.py already uses for
-// in-audit retrieval finds related ("related" edges) — no fabricated
-// connections.
+// AuditSession.skill_id on the backend) and to whatever the Librarian agent
+// (backend/app/agents/librarian.py, an LLM judgment persisted as
+// PrincipleLink rows — see backend/app/services/linking.py) reads as
+// related or contradicting ("related"/"contradicts" edges) — no fabricated
+// connections, and no keyword-overlap heuristic standing in for meaning.
 //
 // 2026-07-20: rendered with the `force-graph` library (2D canvas, d3-force
 // physics) instead of the hand-rolled SVG + custom force simulation from
@@ -37,6 +38,7 @@ function nodeColor(node: FGNode): string {
 }
 
 function linkColor(link: FGLink): string {
+  if (link.kind === 'contradicts') return cssVar('--danger')
   if (link.kind === 'origin') return '#facc15'
   if (link.kind === 'parent') return cssVar('--text')
   return cssVar('--border-strong')
@@ -81,6 +83,9 @@ export default function KnowledgeGraph({
   const [data, setData] = useState<GraphResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<GraphNode | null>(null)
+  const [relinking, setRelinking] = useState(false)
+  const [relinkError, setRelinkError] = useState<string | null>(null)
+  const [contradictions, setContradictions] = useState<Contradiction[] | null>(null)
   // Mirrors `selected` for the nodeCanvasObject closure below, which is set
   // up once per graph instance (not re-run on every selection change — that
   // would tear down and re-warm the whole force simulation just to update a
@@ -94,6 +99,25 @@ export default function KnowledgeGraph({
       .then(setData)
       .catch((e) => setError(String(e)))
   }, [])
+
+  // "related"/"contradicts" edges are Librarian (LLM) judgments persisted
+  // at principle-creation time, not recomputed on every graph read — this
+  // is the manual re-run: refreshes stale/missing links (e.g. principles
+  // created before this feature existed) and is the only place
+  // contradictions between principles get surfaced.
+  function relink() {
+    setRelinking(true)
+    setRelinkError(null)
+    api
+      .relinkGraph()
+      .then((result) => {
+        setContradictions(result.contradictions)
+        return api.getGraph()
+      })
+      .then(setData)
+      .catch((e) => setRelinkError(String(e)))
+      .finally(() => setRelinking(false))
+  }
 
   useEffect(() => {
     if (!data || !containerRef.current) return
@@ -136,9 +160,9 @@ export default function KnowledgeGraph({
         ctx.fillText(label, node.x ?? 0, (node.y ?? 0) + nodeRadius(node) + 2)
       })
       .linkColor((l) => linkColor(l as unknown as FGLink))
-      .linkWidth((l) => ((l as unknown as FGLink).kind === 'parent' ? 2 : 1))
+      .linkWidth((l) => (['parent', 'contradicts'].includes((l as unknown as FGLink).kind) ? 2 : 1))
       .linkLineDash((l) =>
-        (l as unknown as FGLink).kind === 'parent' ? null : [2, 2],
+        ['parent', 'contradicts'].includes((l as unknown as FGLink).kind) ? null : [2, 2],
       )
       .minZoom(0.3)
       .maxZoom(8)
@@ -179,8 +203,9 @@ export default function KnowledgeGraph({
       {!compact && (
         <p className="dim" style={{ fontSize: 13, marginBottom: 16 }}>
           Every skill node and every Archive principle, wired together by what's actually real:
-          parent nodes, the node a principle came from, and nodes the same principle's wording
-          relates to. Drag a node to reposition it, scroll or pinch to zoom.
+          parent nodes, the node a principle came from, and what the Librarian (an LLM judgment,
+          not keyword matching) reads as related or contradicting. Drag a node to reposition it,
+          scroll or pinch to zoom.
         </p>
       )}
 
@@ -190,6 +215,7 @@ export default function KnowledgeGraph({
           gap: compact ? 6 : 8,
           marginBottom: compact ? 8 : 16,
           flexWrap: 'wrap',
+          alignItems: 'center',
         }}
       >
         <span className="dim" style={{ fontSize: 11 }}>
@@ -201,12 +227,46 @@ export default function KnowledgeGraph({
         <span className="dim" style={{ fontSize: 11 }}>
           <span style={{ color: 'var(--border-strong)' }}>▬</span> related
         </span>
+        <span className="dim" style={{ fontSize: 11 }}>
+          <span style={{ color: 'var(--danger)' }}>▬</span> contradicts
+        </span>
         {!compact && (
           <span className="dim" style={{ fontSize: 11 }}>
             ● skill (larger, gold when mastered) &nbsp; ● principle (smaller, dim)
           </span>
         )}
+        <button
+          onClick={relink}
+          disabled={relinking || (data?.nodes.filter((n) => n.kind === 'principle').length ?? 0) === 0}
+          style={{ fontSize: 11, marginLeft: 'auto' }}
+        >
+          {relinking ? 'Relinking…' : 'Rebuild Links'}
+        </button>
       </div>
+
+      {relinkError && (
+        <p style={{ color: 'var(--danger)', fontSize: 12, marginBottom: 12 }}>{relinkError}</p>
+      )}
+
+      {contradictions && (
+        <div className="panel" style={{ marginBottom: 16, borderColor: 'var(--danger)' }}>
+          <p className="dim pixel-font" style={{ fontSize: 9, marginBottom: 6 }}>
+            LIBRARIAN LINT
+          </p>
+          {contradictions.length === 0 ? (
+            <p style={{ fontSize: 12 }}>No contradictions found across the archive.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {contradictions.map((c) => (
+                <p key={`${c.principle_a_id}-${c.principle_b_id}`} style={{ fontSize: 12 }}>
+                  <strong>{c.principle_a_title}</strong> vs <strong>{c.principle_b_title}</strong>
+                  <span className="dim"> — {c.reason}</span>
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {data.nodes.length === 0 ? (
         <p className="dim">No nodes yet — generate a skill tree first.</p>

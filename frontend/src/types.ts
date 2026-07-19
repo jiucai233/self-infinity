@@ -81,7 +81,7 @@ export interface ClarifyResponse {
 }
 
 export type GraphNodeKind = 'skill' | 'principle'
-export type GraphEdgeKind = 'parent' | 'origin' | 'related'
+export type GraphEdgeKind = 'parent' | 'origin' | 'related' | 'contradicts'
 
 export interface GraphNode {
   id: string
@@ -95,9 +95,24 @@ export interface GraphEdge {
   source: string
   target: string
   kind: GraphEdgeKind
+  reason: string | null
 }
 
 export interface GraphResponse {
   nodes: GraphNode[]
   edges: GraphEdge[]
+}
+
+export interface Contradiction {
+  principle_a_id: number
+  principle_a_title: string
+  principle_b_id: number
+  principle_b_title: string
+  reason: string
+}
+
+export interface RelinkResponse {
+  principles_processed: number
+  related_links_created: number
+  contradictions: Contradiction[]
 }
