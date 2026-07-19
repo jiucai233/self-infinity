@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import ForceGraph, { type NodeObject } from 'force-graph'
 import { api } from '../api'
-import { computeForceLayout } from '../graphLayout'
 import type { GraphEdge, GraphNode, GraphResponse } from '../types'
 
 // Repurposes the template's "Map" nav slot — a knowledge graph is, in a
@@ -11,17 +11,35 @@ import type { GraphEdge, GraphNode, GraphResponse } from '../types'
 // keyword-overlap heuristic app/agents/retrieval.py already uses for
 // in-audit retrieval finds related ("related" edges) — no fabricated
 // connections.
+//
+// 2026-07-20: rendered with the `force-graph` library (2D canvas, d3-force
+// physics) instead of the hand-rolled SVG + custom force simulation from
+// the previous version — chosen over a full 3D (three.js/3d-force-graph)
+// approach specifically because dense text labels stay readable without 3D
+// perspective distortion, matching how Obsidian's own graph view is 2D by
+// default. Drag-to-reposition and wheel/pinch-to-zoom are the library's
+// built-in behavior, not custom pointer-event code.
 const WIDTH = 900
 const HEIGHT = 620
 
-const EDGE_STYLE: Record<GraphEdge['kind'], { stroke: string; dash?: string; width: number }> = {
-  parent: { stroke: 'var(--text)', width: 2 },
-  origin: { stroke: '#facc15', dash: '2 4', width: 1.5 },
-  related: { stroke: 'var(--border-strong)', dash: '1 3', width: 1 },
+type FGNode = GraphNode & NodeObject
+type FGLink = { source: string; target: string; kind: GraphEdge['kind'] }
+
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'
 }
 
-function nodeRadius(node: GraphNode): number {
-  return node.kind === 'principle' ? 7 : 10
+// Read fresh on every call (not cached) so colors track the live/light-dark
+// theme toggle without needing to re-instantiate the graph on theme change.
+function nodeColor(node: FGNode): string {
+  if (node.kind === 'skill' && node.status === 'mastered') return '#facc15'
+  return node.kind === 'skill' ? cssVar('--text') : cssVar('--dim')
+}
+
+function linkColor(link: FGLink): string {
+  if (link.kind === 'origin') return '#facc15'
+  if (link.kind === 'parent') return cssVar('--text')
+  return cssVar('--border-strong')
 }
 
 export default function KnowledgeGraph({
@@ -29,6 +47,8 @@ export default function KnowledgeGraph({
 }: {
   onOpenSkill: (skillId: number) => void
 }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const graphRef = useRef<InstanceType<typeof ForceGraph> | null>(null)
   const [data, setData] = useState<GraphResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<GraphNode | null>(null)
@@ -40,26 +60,58 @@ export default function KnowledgeGraph({
       .catch((e) => setError(String(e)))
   }, [])
 
-  const positions = useMemo(() => {
-    if (!data) return new Map()
-    return computeForceLayout(
-      data.nodes.map((n) => n.id),
-      data.edges,
-      WIDTH,
-      HEIGHT,
-    )
-  }, [data])
+  useEffect(() => {
+    if (!data || !containerRef.current) return
+
+    const graph = new ForceGraph(containerRef.current)
+    graphRef.current = graph
+
+    graph
+      .width(WIDTH)
+      .height(HEIGHT)
+      .backgroundColor('rgba(0,0,0,0)')
+      .graphData({
+        nodes: data.nodes as FGNode[],
+        links: data.edges.map((e) => ({ ...e })) as unknown as FGLink[],
+      })
+      .nodeId('id')
+      .nodeVal((n) => ((n as FGNode).kind === 'principle' ? 3 : 5))
+      .nodeColor((n) => nodeColor(n as FGNode))
+      .nodeLabel((n) => (n as FGNode).title)
+      .nodeCanvasObjectMode(() => 'after')
+      .nodeCanvasObject((n, ctx, scale) => {
+        const node = n as FGNode
+        const label = node.title.length > 16 ? `${node.title.slice(0, 16)}…` : node.title
+        const fontSize = 10 / scale
+        ctx.font = `${fontSize}px sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        ctx.fillStyle = cssVar('--dim')
+        ctx.fillText(label, node.x ?? 0, (node.y ?? 0) + 8)
+      })
+      .linkColor((l) => linkColor(l as unknown as FGLink))
+      .linkWidth((l) => ((l as unknown as FGLink).kind === 'parent' ? 2 : 1))
+      .linkLineDash((l) =>
+        (l as unknown as FGLink).kind === 'parent' ? null : [2, 2],
+      )
+      .minZoom(0.3)
+      .maxZoom(3)
+      .onNodeClick((n) => {
+        const node = n as FGNode
+        setSelected(node)
+        if (node.kind === 'skill') {
+          onOpenSkill(Number(node.id.replace('skill-', '')))
+        }
+      })
+
+    return () => {
+      graph._destructor()
+      graphRef.current = null
+    }
+  }, [data, onOpenSkill])
 
   if (error) return <p style={{ color: 'var(--danger)' }}>{error}</p>
   if (!data) return <p className="dim">Loading graph…</p>
-
-  function handleNodeClick(node: GraphNode) {
-    setSelected(node)
-    if (node.kind === 'skill') {
-      const id = Number(node.id.replace('skill-', ''))
-      onOpenSkill(id)
-    }
-  }
 
   return (
     <div>
@@ -69,7 +121,7 @@ export default function KnowledgeGraph({
       <p className="dim" style={{ fontSize: 13, marginBottom: 16 }}>
         Every skill node and every Archive principle, wired together by what's actually real:
         parent nodes, the node a principle came from, and nodes the same principle's wording
-        relates to.
+        relates to. Drag a node to reposition it, scroll or pinch to zoom.
       </p>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -83,87 +135,15 @@ export default function KnowledgeGraph({
           <span style={{ color: 'var(--border-strong)' }}>▬</span> related
         </span>
         <span className="dim" style={{ fontSize: 11 }}>
-          □ skill &nbsp; ○ principle
+          ● skill (larger, gold when mastered) &nbsp; ● principle (smaller, dim)
         </span>
       </div>
 
       {data.nodes.length === 0 ? (
         <p className="dim">No nodes yet — generate a skill tree first.</p>
       ) : (
-        <div className="panel pixel-grid" style={{ overflow: 'auto' }}>
-          <svg width={WIDTH} height={HEIGHT} style={{ display: 'block' }}>
-            {data.edges.map((e, i) => {
-              const a = positions.get(e.source)
-              const b = positions.get(e.target)
-              if (!a || !b) return null
-              const style = EDGE_STYLE[e.kind]
-              return (
-                <line
-                  key={i}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  stroke={style.stroke}
-                  strokeWidth={style.width}
-                  strokeDasharray={style.dash}
-                />
-              )
-            })}
-
-            {data.nodes.map((n) => {
-              const pos = positions.get(n.id)
-              if (!pos) return null
-              const r = nodeRadius(n)
-              const isSelected = selected?.id === n.id
-              const fill =
-                n.kind === 'skill' && n.status === 'mastered'
-                  ? '#facc15'
-                  : n.kind === 'skill'
-                    ? 'var(--panel)'
-                    : 'var(--panel)'
-              return (
-                <g
-                  key={n.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleNodeClick(n)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleNodeClick(n)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  {n.kind === 'skill' ? (
-                    <rect
-                      x={pos.x - r}
-                      y={pos.y - r}
-                      width={r * 2}
-                      height={r * 2}
-                      fill={fill}
-                      stroke={isSelected ? 'var(--danger)' : 'var(--text)'}
-                      strokeWidth={isSelected ? 2.5 : 1.5}
-                    />
-                  ) : (
-                    <circle
-                      cx={pos.x}
-                      cy={pos.y}
-                      r={r}
-                      fill={fill}
-                      stroke={isSelected ? 'var(--danger)' : 'var(--text)'}
-                      strokeWidth={isSelected ? 2.5 : 1.5}
-                    />
-                  )}
-                  <text
-                    x={pos.x}
-                    y={pos.y + r + 12}
-                    textAnchor="middle"
-                    fontSize={9}
-                    fill="var(--dim)"
-                  >
-                    {n.title.length > 14 ? `${n.title.slice(0, 14)}…` : n.title}
-                  </text>
-                </g>
-              )
-            })}
-          </svg>
+        <div className="panel" style={{ overflow: 'auto', padding: 0 }}>
+          <div ref={containerRef} style={{ width: WIDTH, height: HEIGHT }} />
         </div>
       )}
 

@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
-import type { AuditMode, SkillNode } from '../types'
+import type { AuditMode, GraphResponse, SkillNode } from '../types'
 
 const ONBOARDING_DISMISSED_KEY = 'self-infinity-onboarding-dismissed'
 
@@ -31,99 +31,57 @@ const NODE_TYPE_TAG_CLASS: Record<SkillNode['node_type'], string> = {
   task: 'tag tag--filled',
 }
 
-// One connector line for a parent -> child edge, positioned in coordinates
-// relative to the tree content wrapper (the element the SVG overlay covers).
-interface SkillEdge {
-  parentId: number
-  childId: number
-  d: string
-  status: SkillNode['status']
+const NEAREST_NEIGHBOR_COUNT = 3
+
+// Undirected adjacency built from the graph's edges — a node's neighbors are
+// anyone connected via parent/origin/related, regardless of which side is
+// source/target. Used only for the "nearest N nodes" lookup below. The tree
+// canvas that used to render this data as an absolutely-positioned diagram
+// (computeSkillTreeLayout + Manhattan SVG connectors) has been retired per
+// explicit user feedback ("那个树的话也别干了") in favor of this
+// recommendation list — the underlying parent_id graph structure is
+// unchanged, only the visualization went away.
+function buildAdjacency(edges: GraphResponse['edges']): Map<string, string[]> {
+  const adjacency = new Map<string, string[]>()
+  const link = (a: string, b: string) => {
+    const list = adjacency.get(a) ?? []
+    list.push(b)
+    adjacency.set(a, list)
+  }
+  for (const e of edges) {
+    link(e.source, e.target)
+    link(e.target, e.source)
+  }
+  return adjacency
 }
 
-// Pixel geometry for the tree diagram. Cards are a fixed width; rows get a
-// generous fixed height so variable-length descriptions don't cause
-// vertically adjacent rows to visually collide.
-const CARD_WIDTH = 220
-const COL_WIDTH = 236 // CARD_WIDTH + horizontal gap between sibling columns
-const ROW_HEIGHT = 240 // vertical distance between depth levels
-const TREE_GAP_SLOTS = 1 // extra empty columns inserted between separate root trees
-
-export interface SkillLayoutPosition {
-  x: number
-  y: number
-}
-
-/**
- * Assigns each node an (x, y) position such that a node's horizontal
- * position is derived from its own subtree, not from "which slot in a flat
- * row" it happens to land in. This app can render several independently
- * generated trees (forests) side by side, so parent_id === null nodes are
- * each treated as the root of their own subtree.
- *
- * Simplified bottom-up centering (in the spirit of Reingold-Tilford, without
- * the contour-fitting complexity):
- *   - leaf nodes get the next available integer column, assigned in
- *     left-to-right (depth-first, array-order) traversal order
- *   - an internal node's column is the mean of its children's columns
- * Because leaves are handed out in strictly increasing order during a single
- * depth-first traversal, every subtree occupies a contiguous, non-overlapping
- * range of columns — so a parent always sits centered over its own children
- * and never drifts into an unrelated cousin subtree's columns.
- *
- * Separate root trees are kept from touching by leaving a gap of
- * TREE_GAP_SLOTS empty columns after each root tree finishes.
- */
-export function computeSkillTreeLayout(
-  skills: SkillNode[],
-): { positions: Map<number, SkillLayoutPosition>; width: number; height: number } {
-  const childrenOf = new Map<number, SkillNode[]>()
-  for (const s of skills) {
-    if (s.parent_id != null) {
-      const list = childrenOf.get(s.parent_id) ?? []
-      list.push(s)
-      childrenOf.set(s.parent_id, list)
+// BFS outward from `startId`, collecting the first `limit` distinct nodes
+// encountered (breadth order = closest first), skipping the start node
+// itself. Returns fewer than `limit` entries for small/isolated subtrees —
+// no padding with fake neighbors.
+function nearestNeighbors(
+  adjacency: Map<string, string[]>,
+  nodesById: Map<string, GraphResponse['nodes'][number]>,
+  startId: string,
+  limit: number,
+): GraphResponse['nodes'] {
+  const visited = new Set<string>([startId])
+  const queue: string[] = [...(adjacency.get(startId) ?? [])]
+  const result: GraphResponse['nodes'] = []
+  let i = 0
+  while (i < queue.length && result.length < limit) {
+    const id = queue[i]
+    i += 1
+    if (visited.has(id)) continue
+    visited.add(id)
+    const node = nodesById.get(id)
+    if (node) result.push(node)
+    if (result.length >= limit) break
+    for (const next of adjacency.get(id) ?? []) {
+      if (!visited.has(next)) queue.push(next)
     }
   }
-  const roots = skills.filter((s) => s.parent_id == null)
-
-  const colOf = new Map<number, number>()
-  const depthOf = new Map<number, number>()
-  let nextLeafSlot = 0
-  let maxDepth = 0
-
-  function assign(node: SkillNode, depth: number): number {
-    depthOf.set(node.id, depth)
-    maxDepth = Math.max(maxDepth, depth)
-    const kids = childrenOf.get(node.id) ?? []
-    let col: number
-    if (kids.length === 0) {
-      col = nextLeafSlot
-      nextLeafSlot += 1
-    } else {
-      const childCols = kids.map((k) => assign(k, depth + 1))
-      col = childCols.reduce((a, b) => a + b, 0) / childCols.length
-    }
-    colOf.set(node.id, col)
-    return col
-  }
-
-  for (const root of roots) {
-    assign(root, 0)
-    nextLeafSlot += TREE_GAP_SLOTS
-  }
-
-  const positions = new Map<number, SkillLayoutPosition>()
-  for (const s of skills) {
-    const col = colOf.get(s.id) ?? 0
-    const depth = depthOf.get(s.id) ?? 0
-    positions.set(s.id, { x: col * COL_WIDTH, y: depth * ROW_HEIGHT })
-  }
-
-  const maxCol = Math.max(0, ...Array.from(colOf.values()))
-  const width = skills.length > 0 ? maxCol * COL_WIDTH + CARD_WIDTH : 0
-  const height = skills.length > 0 ? (maxDepth + 1) * ROW_HEIGHT : 0
-
-  return { positions, width, height }
+  return result
 }
 
 export default function SkillTree({
@@ -134,6 +92,7 @@ export default function SkillTree({
   onOpenDetail?: (skillId: number) => void
 }) {
   const [skills, setSkills] = useState<SkillNode[]>([])
+  const [graph, setGraph] = useState<GraphResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [topic, setTopic] = useState('')
@@ -151,67 +110,17 @@ export default function SkillTree({
     () => window.localStorage.getItem(ONBOARDING_DISMISSED_KEY) === '1',
   )
 
-  // Connector-line overlay: cards register themselves in cardRefs (keyed by
-  // skill id) via callback refs, then treeContentRef's descendants are
-  // measured to compute one SVG path per parent-child edge. Recomputed after
-  // layout (useLayoutEffect) and on any resize/reflow of the tree content.
-  const treeContentRef = useRef<HTMLDivElement | null>(null)
-  const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map())
-  const [edges, setEdges] = useState<SkillEdge[]>([])
-
-  const refresh = () => api.listSkills().then(setSkills).catch((e) => setError(String(e)))
+  const refresh = () =>
+    Promise.all([api.listSkills(), api.getGraph()])
+      .then(([s, g]) => {
+        setSkills(s)
+        setGraph(g)
+      })
+      .catch((e) => setError(String(e)))
 
   useEffect(() => {
     refresh().finally(() => setLoading(false))
   }, [])
-
-  useLayoutEffect(() => {
-    const recomputeEdges = () => {
-      const container = treeContentRef.current
-      if (!container) return
-      const containerRect = container.getBoundingClientRect()
-      const byId = new Map(skills.map((s) => [s.id, s]))
-      const next: SkillEdge[] = []
-      for (const child of skills) {
-        if (child.parent_id == null) continue
-        const parent = byId.get(child.parent_id)
-        const parentEl = cardRefs.current.get(child.parent_id)
-        const childEl = cardRefs.current.get(child.id)
-        if (!parent || !parentEl || !childEl) continue
-        const pRect = parentEl.getBoundingClientRect()
-        const cRect = childEl.getBoundingClientRect()
-        const x1 = pRect.left + pRect.width / 2 - containerRect.left
-        const y1 = pRect.bottom - containerRect.top
-        const x2 = cRect.left + cRect.width / 2 - containerRect.left
-        const y2 = cRect.top - containerRect.top
-        // Manhattan/stepped orthogonal path — straight down from the
-        // parent's bottom-center, straight across at the midpoint row,
-        // straight down into the child's top-center. Chunky right angles
-        // read as pixel-art circuitry instead of an organic curve.
-        const midY = (y1 + y2) / 2
-        next.push({
-          parentId: parent.id,
-          childId: child.id,
-          status: child.status,
-          d: `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`,
-        })
-      }
-      setEdges(next)
-    }
-
-    recomputeEdges()
-
-    window.addEventListener('resize', recomputeEdges)
-    let observer: ResizeObserver | null = null
-    if (typeof ResizeObserver !== 'undefined' && treeContentRef.current) {
-      observer = new ResizeObserver(recomputeEdges)
-      observer.observe(treeContentRef.current)
-    }
-    return () => {
-      window.removeEventListener('resize', recomputeEdges)
-      observer?.disconnect()
-    }
-  }, [skills])
 
   function dismissOnboarding() {
     window.localStorage.setItem(ONBOARDING_DISMISSED_KEY, '1')
@@ -270,14 +179,33 @@ export default function SkillTree({
     void runGenerate(clarifyTopicText)
   }
 
-  if (loading) return <p className="dim">Loading skills…</p>
-
-  const { positions, width, height } = computeSkillTreeLayout(skills)
   const masteredCount = skills.filter((s) => s.status === 'mastered').length
   // decorative: no real currency system exists — Essence is a flavor stat
   // derived from the real mastered-node count, per the template's
   // "ESSENCE" stat pill next to the real "Mastered X / Y" pill.
   const essence = masteredCount * 25
+
+  // Recommended-next list: only real "available" nodes (unlocked, not yet
+  // mastered — locked nodes aren't actionable yet, mastered ones are done),
+  // ranked by how many direct children mastering them would unlock (higher
+  // leverage first), tie-broken by id for stability. No fabricated scoring.
+  const recommendations = useMemo(() => {
+    const childCount = new Map<number, number>()
+    for (const s of skills) {
+      if (s.parent_id != null) childCount.set(s.parent_id, (childCount.get(s.parent_id) ?? 0) + 1)
+    }
+    return skills
+      .filter((s) => s.status === 'available')
+      .sort((a, b) => (childCount.get(b.id) ?? 0) - (childCount.get(a.id) ?? 0) || a.id - b.id)
+  }, [skills])
+
+  const adjacency = useMemo(() => (graph ? buildAdjacency(graph.edges) : new Map()), [graph])
+  const nodesById = useMemo(
+    () => (graph ? new Map(graph.nodes.map((n) => [n.id, n])) : new Map()),
+    [graph],
+  )
+
+  if (loading) return <p className="dim">Loading skills…</p>
 
   return (
     <div>
@@ -327,7 +255,8 @@ export default function SkillTree({
           Night (Deep)
         </button>
         <span className="dim" style={{ fontSize: 11 }}>
-          Night mode doubles the follow-up rounds — good for the hard stuff.
+          Night mode doubles the safety-ceiling round count — good for the hard stuff. Either way
+          the Auditor decides when it's done, not a fixed quota.
         </span>
       </div>
 
@@ -426,100 +355,100 @@ export default function SkillTree({
         </div>
       )}
 
-      <div className="pixel-grid" style={{ overflowX: 'auto', position: 'relative' }}>
-        <div
-          ref={treeContentRef}
-          style={{ position: 'relative', width, height, minWidth: '100%' }}
-        >
-          <svg
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              pointerEvents: 'none',
-              zIndex: 0,
-              overflow: 'visible',
-            }}
-          >
-            {edges.map((edge) => (
-              <path
-                key={`${edge.parentId}-${edge.childId}`}
-                data-testid={`skill-edge-${edge.parentId}-${edge.childId}`}
-                d={edge.d}
-                className={
-                  edge.status === 'locked'
-                    ? 'skill-edge skill-edge--locked'
-                    : 'skill-edge skill-edge--active'
-                }
-              />
-            ))}
-          </svg>
+      <h3 className="pixel-font" style={{ fontSize: 13, marginBottom: 8 }}>
+        Recommended Next
+      </h3>
 
-          {skills.map((skill) => {
-            const pos = positions.get(skill.id) ?? { x: 0, y: 0 }
+      {skills.length === 0 ? (
+        <p className="dim">No skills yet — generate one above to get started.</p>
+      ) : recommendations.length === 0 ? (
+        <p className="dim">
+          Nothing available right now — everything's either locked or already mastered.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {recommendations.map((skill) => {
+            const neighbors = nearestNeighbors(
+              adjacency,
+              nodesById,
+              `skill-${skill.id}`,
+              NEAREST_NEIGHBOR_COUNT,
+            )
             return (
-              <div
-                key={skill.id}
-                ref={(el) => {
-                  if (el) cardRefs.current.set(skill.id, el)
-                  else cardRefs.current.delete(skill.id)
-                }}
-                className="panel"
-                style={{
-                  position: 'absolute',
-                  left: pos.x,
-                  top: pos.y,
-                  width: CARD_WIDTH,
-                  zIndex: 1,
-                  opacity: skill.status === 'locked' ? 0.5 : 1,
-                }}
-              >
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    background:
-                      skill.status === 'mastered' ? STATUS_COLOR.mastered : 'var(--bg)',
-                    border: `2px solid ${STATUS_COLOR[skill.status]}`,
-                    borderRadius: 0,
-                    marginBottom: 8,
-                  }}
-                />
-                <h3 className="pixel-font" style={{ fontSize: 12, lineHeight: 1.6 }}>
-                  {skill.title}
-                </h3>
-                <span
-                  className={NODE_TYPE_TAG_CLASS[skill.node_type]}
-                  style={{ marginBottom: 6 }}
-                >
-                  {NODE_TYPE_LABEL[skill.node_type]}
-                </span>
-                <div style={{ marginBottom: 2 }} />
-                <p className="dim" style={{ fontSize: 12, marginBottom: 8 }}>
-                  {skill.description}
-                </p>
-                <p style={{ fontSize: 12, color: STATUS_COLOR[skill.status], marginBottom: 8 }}>
-                  {STATUS_LABEL[skill.status]}
-                  {skill.mastery_score != null ? ` · ${skill.mastery_score} pts` : ''}
-                </p>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    className={skill.status === 'available' ? 'accent' : undefined}
-                    disabled={skill.status !== 'available'}
-                    onClick={() => onAudit(skill.id, skill.node_type, auditMode)}
+              <div key={skill.id} className="panel">
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 className="pixel-font" style={{ fontSize: 13, marginBottom: 6 }}>
+                      {skill.title}
+                    </h3>
+                    <span className={NODE_TYPE_TAG_CLASS[skill.node_type]}>
+                      {NODE_TYPE_LABEL[skill.node_type]}
+                    </span>
+                    <p className="dim" style={{ fontSize: 12, marginTop: 8 }}>
+                      {skill.description}
+                    </p>
+                    <p style={{ fontSize: 12, color: STATUS_COLOR[skill.status], marginTop: 6 }}>
+                      {STATUS_LABEL[skill.status]}
+                    </p>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      flexShrink: 0,
+                    }}
                   >
-                    {skill.status === 'mastered' ? 'Audit Passed' : 'Start Audit'}
-                  </button>
-                  {onOpenDetail && (
-                    <button onClick={() => onOpenDetail(skill.id)}>Details</button>
-                  )}
+                    <button className="accent" onClick={() => onAudit(skill.id, skill.node_type, auditMode)}>
+                      Start Audit
+                    </button>
+                    {onOpenDetail && (
+                      <button onClick={() => onOpenDetail(skill.id)}>Details</button>
+                    )}
+                  </div>
                 </div>
+
+                {neighbors.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      paddingTop: 12,
+                      borderTop: '1px solid var(--border)',
+                      display: 'flex',
+                      gap: 8,
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span className="dim" style={{ fontSize: 11 }}>
+                      Nearest in graph:
+                    </span>
+                    {neighbors.map((n) => (
+                      <span
+                        key={n.id}
+                        className={n.kind === 'skill' ? 'tag tag--outline' : 'tag'}
+                        role={n.kind === 'skill' && onOpenDetail ? 'button' : undefined}
+                        tabIndex={n.kind === 'skill' && onOpenDetail ? 0 : undefined}
+                        onClick={
+                          n.kind === 'skill' && onOpenDetail
+                            ? () => onOpenDetail(Number(n.id.replace('skill-', '')))
+                            : undefined
+                        }
+                        style={
+                          n.kind === 'skill' && onOpenDetail ? { cursor: 'pointer' } : undefined
+                        }
+                        title={n.kind === 'principle' ? 'Archive principle' : undefined}
+                      >
+                        {n.title.length > 20 ? `${n.title.slice(0, 20)}…` : n.title}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
-      </div>
+      )}
     </div>
   )
 }

@@ -400,3 +400,71 @@ test.ts` 验证了这一点，以及所有坐标都是有限数且落在画布�
 拖拽重新定位或持续动画——真正的 Obsidian 图谱视图支持拖拽/缩放/物理引擎
 持续运行，这里先做到"结构真实、位置合理、可点击探索"，拖拽交互留到下次
 如果需要再加，不在这次范围内声称做到。
+
+---
+
+## 9. 图谱换 force-graph 库 + 技能树画布退休为推荐列表（2026-07-20，第五次改版）
+
+用户反馈：知识图谱要"一个球一个球"（全部圆形节点）+ 真的能拖拽/缩放，§8
+那版静态一次性力导向布局不够；同时明确要求"那个树的话也别干了"——
+`SkillTree.tsx` 的树状画布不再维护，改成一个"接下来该做什么"的推荐列表，
+每条推荐能看到网络里最近的 3 个关联节点。技术选型上，最初打算继续手写
+SVG + 自写力学（延续 §8 的 `graphLayout.ts`），用户建议用 three.js；权衡后
+选了同作者的 2D 版本 `force-graph`（而不是 3D 的 `3d-force-graph`）——
+理由：这个图谱信息密度高、以阅读文字标签为主，3D 透视会让密集文字标签
+变形/互相遮挡，Obsidian 自己的图谱视图默认也是 2D，不是 3D。
+
+### 9.1 `KnowledgeGraph.tsx` 换用 `force-graph`
+`frontend/src/graphLayout.ts`／`graphLayout.test.ts`（§8 的手写力导向实现）
+已删除——`force-graph` 自带 d3-force 物理引擎，没必要维护两套并行的力学
+实现。新实现：
+- 所有节点渲染成圆（`nodeVal`）——技能节点更大，已掌握用金色 `#facc15`
+  填充；原则节点更小、用 `--dim` 灰色，不再用方块/圆形区分技能/原则。
+- 拖拽重新定位、滚轮/触控板缩放/平移全部是库自带行为
+  （`enableNodeDrag`/内置 zoom+pan），没有写任何手动 pointer/wheel 事件
+  处理代码。
+- 颜色通过 `getComputedStyle(document.documentElement)` 在每次渲染回调
+  里现读 CSS 变量（`--text`/`--dim`/`--border-strong`），因为 Canvas 的
+  `fillStyle`/`strokeStyle` 不能直接吃 `var(--x)` 这种 CSS 自定义属性
+  字符串——这样处理还带来一个好处：亮暗主题切换会在下一帧自动生效，不需要
+  额外监听 `data-theme` 变化重新初始化图实例。
+- 节点标签用 `nodeCanvasObjectMode('after') + nodeCanvasObject` 在库画完
+  默认圆之后叠加文字，而不是自定义整个渲染（复用库的圆形渲染 + 只接管
+  文字部分）。
+- 点击技能节点仍然真实跳转到 `SkillNodeDetail`（`onNodeClick` 回调），
+  点原则节点弹出真实标题/状态的信息卡——这部分行为和 §8 版本一致，只是
+  底层从手写 SVG 换成了库的 canvas 渲染 + 回调。
+
+### 9.2 `SkillTree.tsx`：树状画布退休，改成推荐列表
+`computeSkillTreeLayout()`、Manhattan SVG 连线、绝对定位卡片全部删除——
+不是隐藏，是真的不再维护（对应用户"别干了"的原话）。技能树底层数据结构
+（`parent_id` 关系）没有变，`SkillNodeDetail` 的前置节点面包屑、
+`KnowledgeGraph` 的 `parent` 边都还在用它，只是不再有一个专门的画布把它
+画成树。
+
+页面顶部的主题输入框/澄清追问流程/日夜审计模式切换/新手引导面板完全不变
+（这部分是真实功能，不是画布的一部分）。画布位置换成：
+- **推荐列表**：只列真实的 `status === 'available'` 节点（locked 还不能
+  操作，mastered 已经做完，两者都不属于"接下来该做什么"）。排序按该节点
+  的直接子节点数量降序（能解锁的下游节点越多，优先级越高——真实计算，
+  不是编的分数），同分按 id 升序稳定排序。
+- **最近 3 个关联节点**：`api.getGraph()` 拉一次完整图数据，把 `edges`
+  当无向图建邻接表（不管 `source`/`target` 谁是谁，parent/origin/related
+  三种边都算相邻），从推荐节点做 BFS，按发现顺序（=最近优先）取前 3 个
+  不同节点，够不到 3 个就有几个显示几个，不补假数据。技能邻居点击后
+  真的跳转到该节点详情页；原则邻居只是静态标签（还没有单独的原则详情页）。
+- 空态区分两种情况："没有任何技能节点"（`No skills yet — generate one
+  above to get started.`）vs "有节点但没有 available 的"（`Nothing
+  available right now — everything's either locked or already
+  mastered.`），不是笼统一句提示。
+
+### 9.3 测试改动
+`SkillTree.test.tsx` 里专门测 `computeSkillTreeLayout` 子树居中数学的
+`describe` 块（子树布局 bug 回归测试）和测 SVG 连线 class 的
+`describe` 块整个删除——这些测的行为已经不存在了，不是简化断言。新增
+测试覆盖：只列出 available 节点（locked/mastered 不出现）、两种空态、
+"最近关联节点" chip 渲染与点击跳转。`KnowledgeGraph.tsx` 没有新增单测——
+`force-graph` 渲染到真实 DOM 容器的 Canvas，jsdom 里容器尺寸为 0 且
+Canvas API 基本是空实现，深度交互测试在这个环境下没有意义（和 §7 记录的
+SVG 连线在 jsdom 下测不了像素坐标是同一个限制），验证方式是本节改动都过了
+`tsc -b`/`npm test`/`npm run lint` 加真实浏览器截图（亮/暗主题各一张）。

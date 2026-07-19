@@ -1,18 +1,25 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import SkillTree, { computeSkillTreeLayout } from './SkillTree'
+import SkillTree from './SkillTree'
 import { api } from '../api'
-import type { SkillNode } from '../types'
+import type { GraphResponse, SkillNode } from '../types'
 
 vi.mock('../api', () => ({
   api: {
     listSkills: vi.fn(),
+    getGraph: vi.fn(),
     generateTree: vi.fn(),
     clarifyTopic: vi.fn(),
   },
 }))
 
+const emptyGraph: GraphResponse = { nodes: [], edges: [] }
+
+// Recommendation list only shows real "available" nodes — locked nodes
+// aren't actionable yet, mastered ones are done, so neither belongs in a
+// "what should I do next" list. This fixture deliberately includes one of
+// each status to assert that filtering.
 const skills: SkillNode[] = [
   {
     id: 1,
@@ -50,17 +57,39 @@ describe('SkillTree', () => {
   beforeEach(() => {
     window.localStorage.clear()
     vi.mocked(api.listSkills).mockReset().mockResolvedValue(skills)
+    vi.mocked(api.getGraph).mockReset().mockResolvedValue(emptyGraph)
     vi.mocked(api.generateTree).mockReset()
     vi.mocked(api.clarifyTopic).mockReset()
   })
 
-  it('renders concept/task badge labels for each node', async () => {
+  it('only lists available nodes as recommendations, not locked or mastered ones', async () => {
     render(<SkillTree onAudit={vi.fn()} />)
 
-    await waitFor(() => expect(screen.getByText('Locked Concept')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
 
-    expect(screen.getAllByText('Concept · Explain the why')).toHaveLength(2)
     expect(screen.getByText('Task · Just get it done')).toBeInTheDocument()
+    expect(screen.queryByText('Locked Concept')).not.toBeInTheDocument()
+    expect(screen.queryByText('Mastered Concept')).not.toBeInTheDocument()
+  })
+
+  it('shows an empty state when nothing is available yet', async () => {
+    vi.mocked(api.listSkills).mockReset().mockResolvedValue([skills[0], skills[2]])
+    render(<SkillTree onAudit={vi.fn()} />)
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Nothing available right now/),
+      ).toBeInTheDocument(),
+    )
+  })
+
+  it('shows an empty state when no skills exist yet', async () => {
+    vi.mocked(api.listSkills).mockReset().mockResolvedValue([])
+    render(<SkillTree onAudit={vi.fn()} />)
+
+    await waitFor(() =>
+      expect(screen.getByText(/No skills yet/)).toBeInTheDocument(),
+    )
   })
 
   it('calls onAudit with skillId and node_type when clicking an available node', async () => {
@@ -77,28 +106,17 @@ describe('SkillTree', () => {
     expect(onAudit).toHaveBeenCalledWith(2, 'task', 'day')
   })
 
-  it('disables the audit button for a locked node', async () => {
-    const onAudit = vi.fn()
-    render(<SkillTree onAudit={onAudit} />)
-
-    await waitFor(() => expect(screen.getByText('Locked Concept')).toBeInTheDocument())
-
-    const card = screen.getByText('Locked Concept').closest('.panel') as HTMLElement
-    const button = within(card).getByRole('button', { name: 'Start Audit' })
-    expect(button).toBeDisabled()
-  })
-
-  it('defaults to day mode and calls onAudit with "day" when starting an audit', async () => {
-    const onAudit = vi.fn()
+  it('calls onOpenDetail when clicking "Details"', async () => {
+    const onOpenDetail = vi.fn()
     const user = userEvent.setup()
-    render(<SkillTree onAudit={onAudit} />)
+    render(<SkillTree onAudit={vi.fn()} onOpenDetail={onOpenDetail} />)
 
     await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
 
     const card = screen.getByText('Available Task').closest('.panel') as HTMLElement
-    await user.click(within(card).getByRole('button', { name: 'Start Audit' }))
+    await user.click(within(card).getByRole('button', { name: 'Details' }))
 
-    expect(onAudit).toHaveBeenCalledWith(2, 'task', 'day')
+    expect(onOpenDetail).toHaveBeenCalledWith(2)
   })
 
   it('switching to night mode calls onAudit with "night"', async () => {
@@ -114,6 +132,35 @@ describe('SkillTree', () => {
     await user.click(within(card).getByRole('button', { name: 'Start Audit' }))
 
     expect(onAudit).toHaveBeenCalledWith(2, 'task', 'night')
+  })
+
+  describe('nearest neighbors', () => {
+    const graphWithNeighbors: GraphResponse = {
+      nodes: [
+        { id: 'skill-2', kind: 'skill', title: 'Available Task', status: 'available', node_type: 'task' },
+        { id: 'skill-3', kind: 'skill', title: 'Mastered Concept', status: 'mastered', node_type: 'concept' },
+        { id: 'principle-1', kind: 'principle', title: 'Check the base case first', status: null, node_type: null },
+      ],
+      edges: [
+        { source: 'skill-3', target: 'skill-2', kind: 'parent' },
+        { source: 'principle-1', target: 'skill-2', kind: 'origin' },
+      ],
+    }
+
+    it('shows the nearest graph neighbors for a recommended node and can open a skill neighbor', async () => {
+      vi.mocked(api.getGraph).mockReset().mockResolvedValue(graphWithNeighbors)
+      const onOpenDetail = vi.fn()
+      const user = userEvent.setup()
+      render(<SkillTree onAudit={vi.fn()} onOpenDetail={onOpenDetail} />)
+
+      await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
+      expect(screen.getByText('Nearest in graph:')).toBeInTheDocument()
+      expect(screen.getByText('Mastered Concept')).toBeInTheDocument()
+      expect(screen.getByText(/Check the base case/)).toBeInTheDocument()
+
+      await user.click(screen.getByText('Mastered Concept'))
+      expect(onOpenDetail).toHaveBeenCalledWith(3)
+    })
   })
 
   describe('clarify-first generate flow', () => {
@@ -220,148 +267,6 @@ describe('SkillTree', () => {
       await waitFor(() =>
         expect(api.generateTree).toHaveBeenCalledWith('Reinforcement learning'),
       )
-    })
-  })
-
-  describe('skill tree connector lines', () => {
-    const treeWithEdges: SkillNode[] = [
-      {
-        id: 10,
-        slug: 'root-mastered',
-        title: 'Mastered Root Node',
-        description: 'Root node',
-        parent_id: null,
-        status: 'mastered',
-        node_type: 'concept',
-        mastery_score: 88,
-      },
-      {
-        id: 11,
-        slug: 'available-child',
-        title: 'Available Child Node',
-        description: 'An unlocked child node',
-        parent_id: 10,
-        status: 'available',
-        node_type: 'task',
-        mastery_score: null,
-      },
-      {
-        id: 12,
-        slug: 'locked-child',
-        title: 'Locked Child Node',
-        description: 'A still-locked child node',
-        parent_id: 10,
-        status: 'locked',
-        node_type: 'concept',
-        mastery_score: null,
-      },
-    ]
-
-    it('renders an SVG edge between a mastered parent and its available/locked children, styled differently', async () => {
-      vi.mocked(api.listSkills).mockReset().mockResolvedValue(treeWithEdges)
-      render(<SkillTree onAudit={vi.fn()} />)
-
-      await waitFor(() => expect(screen.getByText('Mastered Root Node')).toBeInTheDocument())
-
-      const activeEdge = document.querySelector('[data-testid="skill-edge-10-11"]')
-      const lockedEdge = document.querySelector('[data-testid="skill-edge-10-12"]')
-
-      expect(activeEdge).not.toBeNull()
-      expect(lockedEdge).not.toBeNull()
-
-      // jsdom does not perform real layout, so getBoundingClientRect() on the
-      // measured cards returns all-zero rects — the component must still
-      // render a (degenerate) path without throwing, and the visual
-      // treatment of locked vs. available/mastered edges must differ via
-      // class name, not measured pixel coordinates.
-      expect(activeEdge?.getAttribute('class')).toContain('skill-edge--active')
-      expect(activeEdge?.getAttribute('class')).not.toContain('skill-edge--locked')
-      expect(lockedEdge?.getAttribute('class')).toContain('skill-edge--locked')
-      expect(lockedEdge?.getAttribute('class')).not.toContain('skill-edge--active')
-    })
-  })
-
-  describe('computeSkillTreeLayout (subtree-aware x positions)', () => {
-    // Fixture mirrors the real bug report: two independent forests coexist
-    // — a "Big-O notation" tree and a "distributed systems overview" tree
-    // whose three children each have exactly one grandchild. The regression
-    // was that grandchild x-positions were assigned by flat-row slot index
-    // (ignoring which parent they actually belong to), so a grandchild could
-    // render nowhere near its real parent's column.
-    function node(id: number, parent_id: number | null, title: string): SkillNode {
-      return {
-        id,
-        slug: `n${id}`,
-        title,
-        description: '',
-        parent_id,
-        status: 'available',
-        node_type: 'concept',
-        mastery_score: null,
-      }
-    }
-
-    const bigO = [
-      node(1, null, 'Big-O notation'),
-      node(2, 1, 'Recursion'),
-      node(4, 1, 'Graph BFS'),
-      node(3, 2, 'Recursive subproblems'),
-    ]
-
-    const distributedSystems = [
-      node(12, null, 'Distributed systems overview'),
-      node(13, 12, 'Replication & consistency'),
-      node(14, 12, 'Partitioning & sharding'),
-      node(15, 12, 'Consensus protocols'),
-      node(16, 13, 'Distributed storage practice'),
-      node(17, 14, 'Sharding practice'),
-      node(18, 15, 'Consensus practice'),
-    ]
-
-    const skills = [...bigO, ...distributedSystems]
-
-    it('places a grandchild directly under its real parent, not a sibling-tree cousin', () => {
-      const { positions } = computeSkillTreeLayout(skills)
-
-      const x13 = positions.get(13)!.x
-      const x14 = positions.get(14)!.x
-      const x15 = positions.get(15)!.x
-      const x16 = positions.get(16)!.x
-      const x17 = positions.get(17)!.x
-      const x18 = positions.get(18)!.x
-
-      // Each grandchild is an only child, so a correct bottom-up centering
-      // pass puts it at exactly the same column as its real parent.
-      expect(x16).toBe(x13)
-      expect(x17).toBe(x14)
-      expect(x18).toBe(x15)
-
-      // Sibling order under the shared root is preserved left-to-right.
-      expect(x13).toBeLessThan(x14)
-      expect(x14).toBeLessThan(x15)
-
-      // 16's real parent (13) sits nowhere near its cousins' subtrees.
-      expect(x16).not.toBe(x14)
-      expect(x16).not.toBe(x15)
-    })
-
-    it('keeps separate root trees (forests) in non-overlapping column ranges', () => {
-      const { positions } = computeSkillTreeLayout(skills)
-
-      const bigOXs = bigO.map((s) => positions.get(s.id)!.x)
-      const distributedXs = distributedSystems.map((s) => positions.get(s.id)!.x)
-
-      expect(Math.max(...bigOXs)).toBeLessThan(Math.min(...distributedXs))
-    })
-
-    it('centers a parent with multiple children over the mean of their columns', () => {
-      const { positions } = computeSkillTreeLayout(skills)
-
-      const x1 = positions.get(1)!.x
-      const x2 = positions.get(2)!.x
-      const x4 = positions.get(4)!.x
-
-      expect(x1).toBeCloseTo((x2 + x4) / 2)
     })
   })
 
