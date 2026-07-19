@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { AuditMode, SkillNode } from '../types'
 
@@ -28,24 +28,99 @@ const NODE_TYPE_TAG_STYLE: Record<SkillNode['node_type'], { bg: string; color: s
   task: { bg: 'var(--info-tag-bg)', color: 'var(--info-strong)' },
 }
 
-function buildLevels(skills: SkillNode[]): SkillNode[][] {
-  const byParent = new Map<number | null, SkillNode[]>()
+// One connector line for a parent -> child edge, positioned in coordinates
+// relative to the tree content wrapper (the element the SVG overlay covers).
+interface SkillEdge {
+  parentId: number
+  childId: number
+  d: string
+  status: SkillNode['status']
+}
+
+// Pixel geometry for the tree diagram. Cards are a fixed width; rows get a
+// generous fixed height so variable-length descriptions don't cause
+// vertically adjacent rows to visually collide.
+const CARD_WIDTH = 220
+const COL_WIDTH = 236 // CARD_WIDTH + horizontal gap between sibling columns
+const ROW_HEIGHT = 240 // vertical distance between depth levels
+const TREE_GAP_SLOTS = 1 // extra empty columns inserted between separate root trees
+
+export interface SkillLayoutPosition {
+  x: number
+  y: number
+}
+
+/**
+ * Assigns each node an (x, y) position such that a node's horizontal
+ * position is derived from its own subtree, not from "which slot in a flat
+ * row" it happens to land in. This app can render several independently
+ * generated trees (forests) side by side, so parent_id === null nodes are
+ * each treated as the root of their own subtree.
+ *
+ * Simplified bottom-up centering (in the spirit of Reingold-Tilford, without
+ * the contour-fitting complexity):
+ *   - leaf nodes get the next available integer column, assigned in
+ *     left-to-right (depth-first, array-order) traversal order
+ *   - an internal node's column is the mean of its children's columns
+ * Because leaves are handed out in strictly increasing order during a single
+ * depth-first traversal, every subtree occupies a contiguous, non-overlapping
+ * range of columns — so a parent always sits centered over its own children
+ * and never drifts into an unrelated cousin subtree's columns.
+ *
+ * Separate root trees are kept from touching by leaving a gap of
+ * TREE_GAP_SLOTS empty columns after each root tree finishes.
+ */
+export function computeSkillTreeLayout(
+  skills: SkillNode[],
+): { positions: Map<number, SkillLayoutPosition>; width: number; height: number } {
+  const childrenOf = new Map<number, SkillNode[]>()
   for (const s of skills) {
-    const list = byParent.get(s.parent_id) ?? []
-    list.push(s)
-    byParent.set(s.parent_id, list)
-  }
-  const levels: SkillNode[][] = []
-  let frontier = byParent.get(null) ?? []
-  while (frontier.length > 0) {
-    levels.push(frontier)
-    const next: SkillNode[] = []
-    for (const node of frontier) {
-      next.push(...(byParent.get(node.id) ?? []))
+    if (s.parent_id != null) {
+      const list = childrenOf.get(s.parent_id) ?? []
+      list.push(s)
+      childrenOf.set(s.parent_id, list)
     }
-    frontier = next
   }
-  return levels
+  const roots = skills.filter((s) => s.parent_id == null)
+
+  const colOf = new Map<number, number>()
+  const depthOf = new Map<number, number>()
+  let nextLeafSlot = 0
+  let maxDepth = 0
+
+  function assign(node: SkillNode, depth: number): number {
+    depthOf.set(node.id, depth)
+    maxDepth = Math.max(maxDepth, depth)
+    const kids = childrenOf.get(node.id) ?? []
+    let col: number
+    if (kids.length === 0) {
+      col = nextLeafSlot
+      nextLeafSlot += 1
+    } else {
+      const childCols = kids.map((k) => assign(k, depth + 1))
+      col = childCols.reduce((a, b) => a + b, 0) / childCols.length
+    }
+    colOf.set(node.id, col)
+    return col
+  }
+
+  for (const root of roots) {
+    assign(root, 0)
+    nextLeafSlot += TREE_GAP_SLOTS
+  }
+
+  const positions = new Map<number, SkillLayoutPosition>()
+  for (const s of skills) {
+    const col = colOf.get(s.id) ?? 0
+    const depth = depthOf.get(s.id) ?? 0
+    positions.set(s.id, { x: col * COL_WIDTH, y: depth * ROW_HEIGHT })
+  }
+
+  const maxCol = Math.max(0, ...Array.from(colOf.values()))
+  const width = skills.length > 0 ? maxCol * COL_WIDTH + CARD_WIDTH : 0
+  const height = skills.length > 0 ? (maxDepth + 1) * ROW_HEIGHT : 0
+
+  return { positions, width, height }
 }
 
 export default function SkillTree({
@@ -71,11 +146,63 @@ export default function SkillTree({
     () => window.localStorage.getItem(ONBOARDING_DISMISSED_KEY) === '1',
   )
 
+  // Connector-line overlay: cards register themselves in cardRefs (keyed by
+  // skill id) via callback refs, then treeContentRef's descendants are
+  // measured to compute one SVG path per parent-child edge. Recomputed after
+  // layout (useLayoutEffect) and on any resize/reflow of the tree content.
+  const treeContentRef = useRef<HTMLDivElement | null>(null)
+  const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const [edges, setEdges] = useState<SkillEdge[]>([])
+
   const refresh = () => api.listSkills().then(setSkills).catch((e) => setError(String(e)))
 
   useEffect(() => {
     refresh().finally(() => setLoading(false))
   }, [])
+
+  useLayoutEffect(() => {
+    const recomputeEdges = () => {
+      const container = treeContentRef.current
+      if (!container) return
+      const containerRect = container.getBoundingClientRect()
+      const byId = new Map(skills.map((s) => [s.id, s]))
+      const next: SkillEdge[] = []
+      for (const child of skills) {
+        if (child.parent_id == null) continue
+        const parent = byId.get(child.parent_id)
+        const parentEl = cardRefs.current.get(child.parent_id)
+        const childEl = cardRefs.current.get(child.id)
+        if (!parent || !parentEl || !childEl) continue
+        const pRect = parentEl.getBoundingClientRect()
+        const cRect = childEl.getBoundingClientRect()
+        const x1 = pRect.left + pRect.width / 2 - containerRect.left
+        const y1 = pRect.bottom - containerRect.top
+        const x2 = cRect.left + cRect.width / 2 - containerRect.left
+        const y2 = cRect.top - containerRect.top
+        const midY = (y1 + y2) / 2
+        next.push({
+          parentId: parent.id,
+          childId: child.id,
+          status: child.status,
+          d: `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`,
+        })
+      }
+      setEdges(next)
+    }
+
+    recomputeEdges()
+
+    window.addEventListener('resize', recomputeEdges)
+    let observer: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined' && treeContentRef.current) {
+      observer = new ResizeObserver(recomputeEdges)
+      observer.observe(treeContentRef.current)
+    }
+    return () => {
+      window.removeEventListener('resize', recomputeEdges)
+      observer?.disconnect()
+    }
+  }, [skills])
 
   function dismissOnboarding() {
     window.localStorage.setItem(ONBOARDING_DISMISSED_KEY, '1')
@@ -136,7 +263,7 @@ export default function SkillTree({
 
   if (loading) return <p className="dim">加载技能树…</p>
 
-  const levels = buildLevels(skills)
+  const { positions, width, height } = computeSkillTreeLayout(skills)
 
   return (
     <div>
@@ -266,15 +393,52 @@ export default function SkillTree({
 
       {error && <p style={{ color: 'var(--danger)', marginBottom: 16 }}>{error}</p>}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-        {levels.map((level, i) => (
-          <div key={i} style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            {level.map((skill) => (
+      <div style={{ overflowX: 'auto' }}>
+        <div
+          ref={treeContentRef}
+          style={{ position: 'relative', width, height, minWidth: '100%' }}
+        >
+          <svg
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              zIndex: 0,
+              overflow: 'visible',
+            }}
+          >
+            {edges.map((edge) => (
+              <path
+                key={`${edge.parentId}-${edge.childId}`}
+                data-testid={`skill-edge-${edge.parentId}-${edge.childId}`}
+                d={edge.d}
+                className={
+                  edge.status === 'locked'
+                    ? 'skill-edge skill-edge--locked'
+                    : 'skill-edge skill-edge--active'
+                }
+              />
+            ))}
+          </svg>
+
+          {skills.map((skill) => {
+            const pos = positions.get(skill.id) ?? { x: 0, y: 0 }
+            return (
               <div
                 key={skill.id}
+                ref={(el) => {
+                  if (el) cardRefs.current.set(skill.id, el)
+                  else cardRefs.current.delete(skill.id)
+                }}
                 className="panel"
                 style={{
-                  width: 220,
+                  position: 'absolute',
+                  left: pos.x,
+                  top: pos.y,
+                  width: CARD_WIDTH,
+                  zIndex: 1,
                   opacity: skill.status === 'locked' ? 0.5 : 1,
                 }}
               >
@@ -316,9 +480,9 @@ export default function SkillTree({
                   {skill.status === 'mastered' ? '已通过审计' : '发起审计'}
                 </button>
               </div>
-            ))}
-          </div>
-        ))}
+            )
+          })}
+        </div>
       </div>
     </div>
   )

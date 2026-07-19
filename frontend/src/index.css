@@ -205,6 +205,23 @@ input:focus {
   border-color: var(--accent);
 }
 
+/* 技能树连接线 — 父子节点之间的连线，反映解锁状态：未解锁的子节点用暗淡虚线，
+   可审计/已掌握的子节点用醒目的强调色实线，呈现"哪条路径已经点亮"的游戏感。 */
+.skill-edge {
+  fill: none;
+}
+
+.skill-edge--locked {
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+.skill-edge--active {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
 nav {
   position: sticky;
   top: 0;
