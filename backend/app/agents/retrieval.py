@@ -34,14 +34,19 @@ def _words(text: str) -> set[str]:
     return {w.lower() for w in _WORD_RE.findall(text) if len(w) >= 2}
 
 
-def _relevance_score(principle_text: str, skill_text: str) -> int:
-    principle_bigrams = _char_bigrams(principle_text)
-    skill_bigrams = _char_bigrams(skill_text)
-    bigram_overlap = sum((principle_bigrams & skill_bigrams).values())
+def relevance_score(text_a: str, text_b: str) -> int:
+    """Generic pairwise overlap score — despite the parameter names used
+    below (principle/skill), this compares any two text blobs and is also
+    reused by app/routers/graph.py to score principle<->skill "related"
+    edges for the knowledge graph, not just the audit-time retrieval this
+    module was originally written for."""
+    bigrams_a = _char_bigrams(text_a)
+    bigrams_b = _char_bigrams(text_b)
+    bigram_overlap = sum((bigrams_a & bigrams_b).values())
 
-    principle_words = _words(principle_text)
-    skill_words = _words(skill_text)
-    word_overlap = len(principle_words & skill_words)
+    words_a = _words(text_a)
+    words_b = _words(text_b)
+    word_overlap = len(words_a & words_b)
 
     return bigram_overlap + word_overlap * 2
 
@@ -55,7 +60,7 @@ def find_relevant_principles(session: Session, skill: SkillNode, limit: int = 3)
     principles = session.exec(select(Principle)).all()
 
     scored = [
-        (principle, _relevance_score(f"{principle.title} {principle.body}", skill_text))
+        (principle, relevance_score(f"{principle.title} {principle.body}", skill_text))
         for principle in principles
     ]
     relevant = [(p, score) for p, score in scored if score > 0]

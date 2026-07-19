@@ -6,7 +6,7 @@ import PrincipleShelf from './pages/PrincipleShelf'
 import AvatarPage from './pages/AvatarPage'
 import Quests from './pages/Quests'
 import Guild from './pages/Guild'
-import MapPage from './pages/Map'
+import KnowledgeGraph from './pages/KnowledgeGraph'
 import Support from './pages/Support'
 import Avatar from './components/Avatar'
 import ThemeToggle from './components/ThemeToggle'
@@ -118,7 +118,7 @@ function App() {
             className={`app-sidebar-nav-item${onMap ? ' app-sidebar-nav-item--active' : ''}`}
             onClick={() => setPanel((p) => (p === 'map' ? 'none' : 'map'))}
           >
-            Map
+            Graph
           </button>
           <button
             className={`app-sidebar-nav-item${onSupport ? ' app-sidebar-nav-item--active' : ''}`}
@@ -152,7 +152,12 @@ function App() {
         ) : panel === 'guild' ? (
           <Guild />
         ) : panel === 'map' ? (
-          <MapPage />
+          <KnowledgeGraph
+            onOpenSkill={(skillId) => {
+              setPanel('none')
+              setView({ name: 'nodeDetail', skillId })
+            }}
+          />
         ) : panel === 'support' ? (
           <Support />
         ) : view.name === 'tree' ? (

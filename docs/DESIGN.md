@@ -337,3 +337,66 @@ task 基数 2，night 模式翻倍），仅用于渲染 quest 卡片里的一条
 `app/config.py` 的默认值以后改了，这条进度条的百分比会跟着漂移，代码注释
 里写明了这一点。真实的"什么时候强制裁决"仍然完全由后端 `_resolve_max_
 turns` 决定，前端这条只是估算展示。
+
+---
+
+## 8. 审计室对话重做 + 知识图谱（2026-07-19，第四次改版）
+
+用户反馈两件事：（1）审计室"太无聊了"，对话没有 NPC 感，而且浅色主题下
+背景还是黑的；（2）希望整站往"带 agent 的 Obsidian"方向走——技能树和
+原则卷轴目前是两个互不relate的孤立结构，应该有一个知识图谱把两者连起来。
+
+### 8.1 修复审计室主题 bug + NPC 对话重做（`AuditRoom.tsx`）
+`.audit-immersive` 之前故意写死 `background: #0a0a0a`，不跟随
+`--bg`/`--panel` 主题 token（§7 之前没有这个问题，这是更早一次改版引入的
+设计决策，仿照 Stitch 参考稿里 Focus Mode 是一个独立永远深色的沉浸画布）。
+用户反馈这在浅色主题下看起来像没生效的 bug，而不是有意的设计——采纳这个
+反馈，整段 `.audit-immersive`/`.audit-quest-card` 深色写死样式删掉，
+`AuditRoom.tsx` 改回用标准 `.panel`，和其余页面一样跟随主题 token。
+
+对话区改造：上网查了视觉小说/RPG 对话框的通用做法（头像+称呼贴着文本框，
+不是纯文字滚动记录），新增 `AuditorPortrait`（`AuditRoom.tsx` 内部组件）——
+一个跟玩家 `PixelFigure`（`Avatar.tsx`）区分开的像素半身像（宽头+一条
+"面罩"横线，没有腿，纯头像不是缩小版玩家造型），页面顶部新增一张常驻的
+"角色卡"（头像+身份+一句入戏台词），对话记录改成类似 Claude.ai 的消息流
+布局——每条消息一行「头像 + 发言人名字 + 正文」，不是之前那种只有文字、
+没有头像的纯文本堆叠。玩家消息用一个 "YOU" 方块头像区分。对话逻辑、
+verdict/reflection 流程、右侧 quest 卡片的真实数据（角色、节点类型、
+已提交轮次、估算进度）都没有变，只是把外层容器从 `.audit-immersive`
+换回 `.panel`，把消息渲染换成 `ChatMessage` 组件。
+
+### 8.2 知识图谱（新增 `pages/KnowledgeGraph.tsx`，后端新增 `GET /api/graph`）
+不是装饰性占位，是把技能树（`SkillNode.parent_id`）和原则卷轴
+（`Principle`）两套已有的真实数据结构第一次连起来展示成一张图，复用侧栏
+模板里原本装饰性的 "Map" 槽位（导航文案改成 "Graph"，删掉原来的
+`pages/Map.tsx` 占位页）。
+
+**后端**（`backend/app/routers/graph.py`）：`GET /api/graph` 返回
+`{nodes, edges}`，三种边全部从已有数据推导，没有新增任何编造字段：
+- `parent`：技能树原有的 `parent_id` 结构。
+- `origin`：一条原则真实来源于哪个节点——`Principle.source_session_id`
+  → `AuditSession.skill_id`，这条关系本来就存在（审计失败时生成原则），
+  只是之前没有暴露成图的边。
+- `related`：把 `app/agents/retrieval.py` 里审计开始时用来做"历史相关
+  原则检索"的字符 2-gram/词重叠打分函数（`_relevance_score` 改名导出成
+  公开的 `relevance_score`，供两处复用）用在原则文本 vs. 技能节点文本上，
+  取分数最高的最多 2 个非来源节点连边，超过 `MAX_RELATED_EDGES_PER_
+  PRINCIPLE` 的直接丢弃，避免变成一团乱麻。新增 `tests/test_graph.py`
+  验证空态（只有技能节点、只有 parent 边）和有原则时的 origin 边。
+
+**前端**：`graphLayout.ts` 实现了一个不依赖任何图表库的力导向布局
+（Fruchterman-Reingold 思路：全节点两两互斥 + 沿边吸引 + 向中心的弱回拉力 +
+线性降温），初始角度用节点 id 的确定性哈希算出（不是 `Math.random()`），
+保证同一份图数据每次渲染布局一致，不会每次刷新都跳动——`graphLayout.
+test.ts` 验证了这一点，以及所有坐标都是有限数且落在画布范围内。
+`KnowledgeGraph.tsx` 用一个 SVG 画布渲染：技能节点是方块（已掌握用金色
+`#facc15` 填充，呼应"已掌握"在别处的配色），原则节点是圆圈，三种边用不同
+线型区分（parent 实线／origin 金色虚线／related 灰色虚线，图例列在画布
+上方）。点技能节点会真的跳转到该节点的 `SkillNodeDetail` 页
+（`onOpenSkill` 回调）；点原则节点会在画布下方弹出一张真实标题的信息卡，
+不是纯装饰的点击效果。
+
+**已知取舍**：布局是"渲染时算一次、之后不再动"的静态力导向图，没有做
+拖拽重新定位或持续动画——真正的 Obsidian 图谱视图支持拖拽/缩放/物理引擎
+持续运行，这里先做到"结构真实、位置合理、可点击探索"，拖拽交互留到下次
+如果需要再加，不在这次范围内声称做到。

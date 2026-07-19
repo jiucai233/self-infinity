@@ -79,3 +79,25 @@ export interface ClarifyResponse {
   needs_clarification: boolean
   questions: string[]
 }
+
+export type GraphNodeKind = 'skill' | 'principle'
+export type GraphEdgeKind = 'parent' | 'origin' | 'related'
+
+export interface GraphNode {
+  id: string
+  kind: GraphNodeKind
+  title: string
+  status: SkillStatus | null
+  node_type: NodeType | null
+}
+
+export interface GraphEdge {
+  source: string
+  target: string
+  kind: GraphEdgeKind
+}
+
+export interface GraphResponse {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}

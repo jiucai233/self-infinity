@@ -96,6 +96,25 @@ class ReflectionRequest(BaseModel):
     _validate_reflection = field_validator("reflection")(_not_blank)
 
 
+class GraphNodeOut(BaseModel):
+    id: str
+    kind: str  # "skill" | "principle"
+    title: str
+    status: SkillStatus | None = None
+    node_type: NodeType | None = None
+
+
+class GraphEdgeOut(BaseModel):
+    source: str
+    target: str
+    kind: str  # "parent" | "origin" | "related"
+
+
+class GraphResponse(BaseModel):
+    nodes: list[GraphNodeOut]
+    edges: list[GraphEdgeOut]
+
+
 class PrincipleOut(BaseModel):
     id: int
     title: str

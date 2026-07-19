@@ -3,6 +3,7 @@ import type {
   CheckInRequest,
   ClarifyResponse,
   FocusSession,
+  GraphResponse,
   Principle,
   SkillNode,
   StartAuditResponse,
@@ -56,6 +57,8 @@ export const api = {
     }),
 
   listPrinciples: () => request<Principle[]>('/principles'),
+
+  getGraph: () => request<GraphResponse>('/graph'),
 
   getVitality: () => request<VitalityState>('/vitality'),
 
