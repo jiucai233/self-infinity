@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { AvatarPortrait, useVitalityFocus } from '../components/Avatar'
 import type { AuditMode, SkillNode } from '../types'
 
 const NODE_TYPE_LABEL: Record<SkillNode['node_type'], string> = {
@@ -34,6 +35,7 @@ export default function SkillNodeDetail({
   const [skills, setSkills] = useState<SkillNode[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { focus, loaded } = useVitalityFocus()
 
   useEffect(() => {
     api
@@ -68,82 +70,107 @@ export default function SkillNodeDetail({
         {' > NODE DETAIL'}
       </p>
 
-      <div className="panel" style={{ marginBottom: 16 }}>
-        <h2 className="pixel-font" style={{ fontSize: 16, marginBottom: 6 }}>
-          {skill.title}
-        </h2>
-        <p className="dim" style={{ fontSize: 12, marginBottom: 12 }}>
-          {NODE_TYPE_LABEL[skill.node_type]}
-        </p>
-        <p style={{ fontSize: 13 }}>{skill.description}</p>
-      </div>
-
-      <div className="panel" style={{ marginBottom: 16 }}>
-        <p className="dim pixel-font" style={{ fontSize: 10, marginBottom: 8 }}>
-          PROGRESSION
-        </p>
-        <div
-          style={{
-            width: '100%',
-            height: 12,
-            border: '1px solid var(--border-strong)',
-            marginBottom: 6,
-          }}
-        >
-          <div
-            style={{
-              width: `${progressionPct}%`,
-              height: '100%',
-              background: skill.status === 'mastered' ? '#facc15' : 'var(--accent)',
-            }}
-          />
-        </div>
-        <p className="dim" style={{ fontSize: 12 }}>
-          {Math.round(progressionPct)}%
-        </p>
-      </div>
-
+      {/* Two-column layout per skill_node_detail_pixel_mono_white/screen.png:
+          a portrait+flavor-quote card on the left, the ability details
+          (title/progression/requirements/benefits/allocate) stacked on the
+          right. Previously this page was a single flat column with no
+          portrait side at all — that was the actual gap the user flagged. */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: 'minmax(220px, 1fr) 2fr',
           gap: 16,
           marginBottom: 16,
+          alignItems: 'start',
         }}
       >
         <div className="panel">
-          <p className="dim pixel-font" style={{ fontSize: 10, marginBottom: 8 }}>
-            REQUIREMENTS
-          </p>
-          {/* real: derived from the node's actual parent_id, not fabricated
-              prerequisite text. */}
-          <p style={{ fontSize: 13 }}>
-            {parent ? `Requires: ${parent.title}` : 'No prerequisites'}
-          </p>
+          <AvatarPortrait focus={focus} loaded={loaded} />
+          <div
+            className="pixel-border"
+            style={{ padding: 12, marginTop: 16 }}
+          >
+            <p className="dim" style={{ fontSize: 12, fontStyle: 'italic' }}>
+              &ldquo;{skill.description}&rdquo;
+            </p>
+          </div>
         </div>
-        <div className="panel">
-          <p className="dim pixel-font" style={{ fontSize: 10, marginBottom: 8 }}>
-            BENEFITS
-          </p>
-          {/* decorative: no numeric buff system backs these — flavor lines
-              standing in for the template's "+15% Action Speed" chips. */}
-          <p style={{ fontSize: 13, marginBottom: 4 }}>+Understanding</p>
-          <p style={{ fontSize: 13 }}>+Progress toward mastery</p>
-        </div>
-      </div>
 
-      <div className="panel" style={{ marginBottom: 16 }}>
-        <button
-          className={skill.status === 'available' ? 'accent' : undefined}
-          disabled={skill.status !== 'available'}
-          onClick={() => onAudit(skill.id, skill.node_type, 'day')}
-        >
-          {skill.status === 'mastered'
-            ? 'Mastered'
-            : skill.status === 'locked'
-              ? 'Locked'
-              : 'Allocate Skill Point'}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="panel">
+            <h2 className="pixel-font" style={{ fontSize: 16, marginBottom: 6 }}>
+              {skill.title}
+            </h2>
+            <p className="dim" style={{ fontSize: 12, marginBottom: 16 }}>
+              {NODE_TYPE_LABEL[skill.node_type]}
+            </p>
+            <p className="dim pixel-font" style={{ fontSize: 10, marginBottom: 8 }}>
+              PROGRESSION
+            </p>
+            <div
+              style={{
+                width: '100%',
+                height: 12,
+                border: '1px solid var(--border-strong)',
+                marginBottom: 6,
+              }}
+            >
+              <div
+                style={{
+                  width: `${progressionPct}%`,
+                  height: '100%',
+                  background: skill.status === 'mastered' ? '#facc15' : 'var(--accent)',
+                }}
+              />
+            </div>
+            <p className="dim" style={{ fontSize: 12 }}>
+              {Math.round(progressionPct)}%
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 16,
+            }}
+          >
+            <div className="panel">
+              <p className="dim pixel-font" style={{ fontSize: 10, marginBottom: 8 }}>
+                REQUIREMENTS
+              </p>
+              {/* real: derived from the node's actual parent_id, not
+                  fabricated prerequisite text. */}
+              <p style={{ fontSize: 13 }}>
+                {parent ? `Requires: ${parent.title}` : 'No prerequisites'}
+              </p>
+            </div>
+            <div className="panel">
+              <p className="dim pixel-font" style={{ fontSize: 10, marginBottom: 8 }}>
+                BENEFITS
+              </p>
+              {/* decorative: no numeric buff system backs these — flavor
+                  lines standing in for the template's "+15% Action Speed"
+                  chips. */}
+              <p style={{ fontSize: 13, marginBottom: 4 }}>+Understanding</p>
+              <p style={{ fontSize: 13 }}>+Progress toward mastery</p>
+            </div>
+          </div>
+
+          <div className="panel">
+            <button
+              className={skill.status === 'available' ? 'accent' : undefined}
+              disabled={skill.status !== 'available'}
+              onClick={() => onAudit(skill.id, skill.node_type, 'day')}
+            >
+              {skill.status === 'mastered'
+                ? 'Mastered'
+                : skill.status === 'locked'
+                  ? 'Locked'
+                  : 'Allocate Skill Point'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="avatar-stat-row">
