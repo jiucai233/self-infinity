@@ -17,17 +17,6 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null
 }
 
-// Display-only mirror of backend/app/routers/audits.py's _resolve_max_turns:
-// base is 4 turns for concept nodes / 2 for task nodes (app/config.py
-// defaults), doubled in night mode. Only used to render an estimated
-// progress bar on the quest card below — the backend is still the source of
-// truth for when a verdict actually gets forced, this is a display estimate
-// that will drift if the backend config values are ever changed.
-function estimateMaxTurns(nodeType: NodeType, mode: AuditMode): number {
-  const base = nodeType === 'concept' ? 4 : 2
-  return mode === 'night' ? base * 2 : base
-}
-
 // A pixel-bust NPC portrait for the Auditor, distinct from the player's
 // PixelFigure (components/Avatar.tsx) — a wider "head" with a single visor
 // bar instead of a face, no legs (bust only), reads as a separate character
@@ -212,8 +201,6 @@ export default function AuditRoom({
   // Real turn counter — number of user turns submitted so far in this
   // session.
   const userTurnCount = turns.filter((t) => t.role === 'user').length
-  const estimatedMaxTurns = estimateMaxTurns(nodeType, mode)
-  const progressPct = Math.min(100, Math.round((userTurnCount / estimatedMaxTurns) * 100))
 
   return (
     <div>
@@ -389,9 +376,12 @@ export default function AuditRoom({
           </div>
         </div>
 
-        {/* Real session facts (role, node type, turn count) plus a progress
-            bar estimated from the backend's max-turns config (see
-            estimateMaxTurns above) — display-only, not a fabricated EXP %. */}
+        {/* Real session facts only. No progress-toward-cap bar anymore —
+            2026-07-19: the Auditor no longer stops at a fixed turn count
+            (see backend/app/agents/auditor.py), it decides when it's
+            satisfied or has found a real gap. A "% toward max" bar would
+            misrepresent that as a target length, so this now just shows
+            the honest running count. */}
         <div className="panel">
           <p className="dim pixel-font" style={{ fontSize: 9, marginBottom: 8 }}>
             ACTIVE_AUDIT
@@ -402,26 +392,15 @@ export default function AuditRoom({
           <p className="dim" style={{ fontSize: 12, marginBottom: 12 }}>
             Node type: {isTask ? 'Task · Just get it done' : 'Concept · Explain the why'}
           </p>
-          <div
-            style={{
-              width: '100%',
-              height: 8,
-              border: '1px solid var(--border-strong)',
-              marginBottom: 4,
-            }}
-          >
-            <div
-              style={{ width: `${progressPct}%`, height: '100%', background: 'var(--text)' }}
-            />
-          </div>
-          <p className="dim" style={{ fontSize: 11, marginBottom: 12 }}>
-            {progressPct}%
-          </p>
           <p className="dim" style={{ fontSize: 11, marginBottom: 4 }}>
             Turns Submitted
           </p>
           <p className="pixel-font" style={{ fontSize: 16 }}>
             {userTurnCount}
+          </p>
+          <p className="dim" style={{ fontSize: 11, marginTop: 8 }}>
+            No fixed round count — the Auditor keeps going until it's either satisfied or has
+            found a real gap.
           </p>
         </div>
       </div>

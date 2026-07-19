@@ -4,8 +4,12 @@
 from unittest.mock import patch
 
 from app.agents.auditor import Auditor
+from app.config import settings
 from app.llm.base import Message
 from app.models import NodeType
+
+DAY_CONCEPT_MAX_TURNS = settings.audit_max_turns
+NIGHT_CONCEPT_MAX_TURNS = settings.audit_max_turns * 2
 
 
 class StubbornProbeProvider:
@@ -26,18 +30,18 @@ def test_night_mode_doubles_max_turns_at_the_auditor_level():
     auditor = Auditor(StubbornProbeProvider())
     history: list[Message] = []
 
-    for turn in range(8 + 3):
+    for turn in range(NIGHT_CONCEPT_MAX_TURNS + 3):
         result = auditor.next_turn(
             skill_title="测试技能",
             skill_description="用于夜晚模式测试",
             history=history,
             node_type=NodeType.concept,
-            max_turns=8,
+            max_turns=NIGHT_CONCEPT_MAX_TURNS,
         )
         user_turn_count = sum(1 for m in history if m["role"] == "user")
         if result.is_verdict:
-            # 不应该在 day 模式的 4 轮上限处就被强制收敛
-            assert user_turn_count >= 8
+            # 不应该在 day 模式的上限处就被强制收敛
+            assert user_turn_count >= NIGHT_CONCEPT_MAX_TURNS
             return
         history.append({"role": "assistant", "content": result.question or ""})
         history.append({"role": "user", "content": "还是原来那个答案。"})
@@ -59,7 +63,7 @@ def test_start_audit_night_mode_stores_doubled_max_turns_for_concept(client):
         from app.models import AuditSession
 
         audit = db.get(AuditSession, audit_id)
-        assert audit.max_turns == 8
+        assert audit.max_turns == NIGHT_CONCEPT_MAX_TURNS
 
 
 def test_start_audit_default_mode_matches_existing_day_behavior(client):
@@ -75,7 +79,7 @@ def test_start_audit_default_mode_matches_existing_day_behavior(client):
         from app.models import AuditSession
 
         audit = db.get(AuditSession, audit_id)
-        assert audit.max_turns == 4
+        assert audit.max_turns == DAY_CONCEPT_MAX_TURNS
 
 
 def test_start_audit_invalid_mode_rejected(client):
@@ -91,7 +95,7 @@ def test_night_mode_audit_survives_more_than_four_rounds_before_forced_verdict(c
 
     with patch("app.routers.audits.get_provider", return_value=StubbornProbeProvider()):
         results = []
-        for _ in range(8 + 2):
+        for _ in range(NIGHT_CONCEPT_MAX_TURNS + 2):
             resp = client.post(f"/api/audits/{audit_id}/turns", json={"content": "还是原来那个答案。"})
             body = resp.json()
             results.append(body)
@@ -101,8 +105,8 @@ def test_night_mode_audit_survives_more_than_four_rounds_before_forced_verdict(c
     verdict_index = next(i for i, r in enumerate(results) if r["type"] == "verdict")
     # user_turn_count at forced verdict time is verdict_index + 1 (this turn's user
     # message was already recorded before the auditor ran) and must reach the
-    # night-mode ceiling (8), not the day-mode one (4).
-    assert verdict_index + 1 >= 8
+    # night-mode ceiling, not the day-mode one.
+    assert verdict_index + 1 >= NIGHT_CONCEPT_MAX_TURNS
     assert results[-1]["passed"] is False
 
 
@@ -113,7 +117,7 @@ def test_day_mode_audit_still_forces_verdict_at_four_rounds(client):
 
     with patch("app.routers.audits.get_provider", return_value=StubbornProbeProvider()):
         results = []
-        for _ in range(4 + 2):
+        for _ in range(DAY_CONCEPT_MAX_TURNS + 2):
             resp = client.post(f"/api/audits/{audit_id}/turns", json={"content": "还是原来那个答案。"})
             body = resp.json()
             results.append(body)
@@ -121,5 +125,5 @@ def test_day_mode_audit_still_forces_verdict_at_four_rounds(client):
                 break
 
     verdict_index = next(i for i, r in enumerate(results) if r["type"] == "verdict")
-    assert verdict_index + 1 == 4
+    assert verdict_index + 1 == DAY_CONCEPT_MAX_TURNS
     assert results[-1]["passed"] is False

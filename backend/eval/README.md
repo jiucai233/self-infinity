@@ -81,3 +81,16 @@ depth (tedious, and still brittle against prompt/model changes), or replacing
 canned `student_turns` with an LLM-played adaptive student — out of scope for
 this pass. Flagging as the concrete next step before M2 can be marked
 accepted rather than "code-ready."
+
+**2026-07-19 update — this run is now stale.** `app/agents/auditor.py`'s
+`CONCEPT_SYSTEM_PROMPT` was substantially rewritten after this run: the
+deliberate-error-injection rule (§4.2's "故意提出一个看似合理但含有细微
+错误的理解") was removed entirely per user feedback that it made the
+Auditor behave like a leading expert instead of a naive Feynman-style
+listener, and the fixed per-mode turn cap told to the model was removed in
+favor of the model deciding convergence itself (config's `audit_max_turns`/
+`task_max_turns` are now a generous safety ceiling only, not a quota stated
+in the prompt). Both changes directly affect the accuracy/leniency numbers
+above — they were measured against the old prompt. This calibration needs
+to be re-run against the new prompt before any M2 acceptance claim; doing
+so is not yet scheduled, pending user direction.

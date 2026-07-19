@@ -111,7 +111,7 @@ class _CapturingProvider:
         prompts = []
         for messages in self.calls:
             system = next((m["content"] for m in messages if m["role"] == "system"), "")
-            if "费曼审计官" in system or "任务核验官" in system:
+            if "正在听用户给你讲解" in system or "任务核验官" in system:
                 prompts.append(system)
         return prompts
 

@@ -11,8 +11,14 @@ class Settings(BaseSettings):
     # 部署时按当前启用的 provider 把 LLM_MODEL 设成对应的值（如 "deepseek-chat"）。
     llm_model: str = "gemini-2.5-flash"
     database_url: str = "sqlite:///./self_infinity.db"
-    audit_max_turns: int = 4
-    task_max_turns: int = 2
+    # 这两个数字不再是"审计官的额度"——2026-07-19 起 Auditor 的系统提示词里已经不
+    # 告诉模型有多少轮可用，真正"什么时候该收敛"完全由模型自己判断（听懂了/发现
+    # 讲不清楚的地方就裁决，不为了凑轮次硬问）。这两个值只是一道服务端安全阀，
+    # 防止模型异常时（比如顽固地一直 probe）无限问下去，正常对话几乎不会真的碰到
+    # 这个上限，所以数值定得比"预期轮数"宽松很多。night 模式在此基础上再翻倍
+    # （见 app/routers/audits.py 的 _resolve_max_turns）。
+    audit_max_turns: int = 8
+    task_max_turns: int = 4
     gemini_timeout_seconds: float = 30.0
     deepseek_timeout_seconds: float = 30.0
 
