@@ -42,9 +42,9 @@ function Bar({
       style={{
         width: `${trackWidthPct}%`,
         height: compact ? 4 : 8,
-        border: '1px solid var(--border)',
+        border: '1px solid var(--border-strong)',
         borderRadius: 999,
-        background: 'var(--bg)',
+        background: 'var(--hover-wash)',
         overflow: 'hidden',
       }}
     >

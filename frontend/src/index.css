@@ -138,8 +138,14 @@ button.accent:hover:not(:disabled) {
   opacity: 0.9;
 }
 
+input[type='radio'],
+input[type='checkbox'] {
+  width: auto;
+  accent-color: var(--accent);
+}
+
 textarea,
-input {
+input:not([type='radio']):not([type='checkbox']) {
   font-family: inherit;
   background: var(--panel);
   color: var(--text);
