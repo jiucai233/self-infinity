@@ -19,8 +19,8 @@ import type { GraphEdge, GraphNode, GraphResponse } from '../types'
 // perspective distortion, matching how Obsidian's own graph view is 2D by
 // default. Drag-to-reposition and wheel/pinch-to-zoom are the library's
 // built-in behavior, not custom pointer-event code.
-const WIDTH = 900
-const HEIGHT = 620
+const DEFAULT_WIDTH = 900
+const DEFAULT_HEIGHT = 620
 
 type FGNode = GraphNode & NodeObject
 type FGLink = { source: string; target: string; kind: GraphEdge['kind'] }
@@ -44,8 +44,17 @@ function linkColor(link: FGLink): string {
 
 export default function KnowledgeGraph({
   onOpenSkill,
+  width = DEFAULT_WIDTH,
+  height = DEFAULT_HEIGHT,
+  compact = false,
 }: {
   onOpenSkill: (skillId: number) => void
+  width?: number
+  height?: number
+  // Trims the heading/description/legend so the component fits in a narrow
+  // side-by-side column (used on the Skills page) instead of a full-width
+  // standalone section.
+  compact?: boolean
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const graphRef = useRef<InstanceType<typeof ForceGraph> | null>(null)
@@ -67,8 +76,8 @@ export default function KnowledgeGraph({
     graphRef.current = graph
 
     graph
-      .width(WIDTH)
-      .height(HEIGHT)
+      .width(width)
+      .height(height)
       .backgroundColor('rgba(0,0,0,0)')
       .graphData({
         nodes: data.nodes as FGNode[],
@@ -108,42 +117,53 @@ export default function KnowledgeGraph({
       graph._destructor()
       graphRef.current = null
     }
-  }, [data, onOpenSkill])
+  }, [data, onOpenSkill, width, height])
 
   if (error) return <p style={{ color: 'var(--danger)' }}>{error}</p>
   if (!data) return <p className="dim">Loading graph…</p>
 
   return (
     <div>
-      <h2 className="pixel-font" style={{ fontSize: 18, marginBottom: 8 }}>
+      <h2 className="pixel-font" style={{ fontSize: compact ? 14 : 18, marginBottom: 8 }}>
         Knowledge Graph
       </h2>
-      <p className="dim" style={{ fontSize: 13, marginBottom: 16 }}>
-        Every skill node and every Archive principle, wired together by what's actually real:
-        parent nodes, the node a principle came from, and nodes the same principle's wording
-        relates to. Drag a node to reposition it, scroll or pinch to zoom.
-      </p>
+      {!compact && (
+        <p className="dim" style={{ fontSize: 13, marginBottom: 16 }}>
+          Every skill node and every Archive principle, wired together by what's actually real:
+          parent nodes, the node a principle came from, and nodes the same principle's wording
+          relates to. Drag a node to reposition it, scroll or pinch to zoom.
+        </p>
+      )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: compact ? 6 : 8,
+          marginBottom: compact ? 8 : 16,
+          flexWrap: 'wrap',
+        }}
+      >
         <span className="dim" style={{ fontSize: 11 }}>
           <span style={{ color: 'var(--text)' }}>▬</span> parent
         </span>
         <span className="dim" style={{ fontSize: 11 }}>
-          <span style={{ color: '#facc15' }}>▬</span> principle origin
+          <span style={{ color: '#facc15' }}>▬</span> origin
         </span>
         <span className="dim" style={{ fontSize: 11 }}>
           <span style={{ color: 'var(--border-strong)' }}>▬</span> related
         </span>
-        <span className="dim" style={{ fontSize: 11 }}>
-          ● skill (larger, gold when mastered) &nbsp; ● principle (smaller, dim)
-        </span>
+        {!compact && (
+          <span className="dim" style={{ fontSize: 11 }}>
+            ● skill (larger, gold when mastered) &nbsp; ● principle (smaller, dim)
+          </span>
+        )}
       </div>
 
       {data.nodes.length === 0 ? (
         <p className="dim">No nodes yet — generate a skill tree first.</p>
       ) : (
         <div className="panel" style={{ overflow: 'auto', padding: 0 }}>
-          <div ref={containerRef} style={{ width: WIDTH, height: HEIGHT }} />
+          <div ref={containerRef} style={{ width, height }} />
         </div>
       )}
 

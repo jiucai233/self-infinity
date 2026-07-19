@@ -356,103 +356,126 @@ export default function SkillTree({
         </div>
       )}
 
-      <h3 className="pixel-font" style={{ fontSize: 13, marginBottom: 8 }}>
-        Recommended Next
-      </h3>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) 420px',
+          gap: 24,
+          alignItems: 'start',
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <h3 className="pixel-font" style={{ fontSize: 13, marginBottom: 8 }}>
+            Recommended Next
+          </h3>
 
-      {skills.length === 0 ? (
-        <p className="dim">No skills yet — generate one above to get started.</p>
-      ) : recommendations.length === 0 ? (
-        <p className="dim">
-          Nothing available right now — everything's either locked or already mastered.
-        </p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {recommendations.map((skill) => {
-            const neighbors = nearestNeighbors(
-              adjacency,
-              nodesById,
-              `skill-${skill.id}`,
-              NEAREST_NEIGHBOR_COUNT,
-            )
-            return (
-              <div key={skill.id} className="panel">
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 className="pixel-font" style={{ fontSize: 13, marginBottom: 6 }}>
-                      {skill.title}
-                    </h3>
-                    <span className={NODE_TYPE_TAG_CLASS[skill.node_type]}>
-                      {NODE_TYPE_LABEL[skill.node_type]}
-                    </span>
-                    <p className="dim" style={{ fontSize: 12, marginTop: 8 }}>
-                      {skill.description}
-                    </p>
-                    <p style={{ fontSize: 12, color: STATUS_COLOR[skill.status], marginTop: 6 }}>
-                      {STATUS_LABEL[skill.status]}
-                    </p>
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <button className="accent" onClick={() => onAudit(skill.id, skill.node_type, auditMode)}>
-                      Start Audit
-                    </button>
-                    {onOpenDetail && (
-                      <button onClick={() => onOpenDetail(skill.id)}>Details</button>
+          {skills.length === 0 ? (
+            <p className="dim">No skills yet — generate one above to get started.</p>
+          ) : recommendations.length === 0 ? (
+            <p className="dim">
+              Nothing available right now — everything's either locked or already mastered.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {recommendations.map((skill) => {
+                const neighbors = nearestNeighbors(
+                  adjacency,
+                  nodesById,
+                  `skill-${skill.id}`,
+                  NEAREST_NEIGHBOR_COUNT,
+                )
+                return (
+                  <div key={skill.id} className="panel">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3 className="pixel-font" style={{ fontSize: 13, marginBottom: 6 }}>
+                          {skill.title}
+                        </h3>
+                        <span className={NODE_TYPE_TAG_CLASS[skill.node_type]}>
+                          {NODE_TYPE_LABEL[skill.node_type]}
+                        </span>
+                        <p className="dim" style={{ fontSize: 12, marginTop: 8 }}>
+                          {skill.description}
+                        </p>
+                        <p
+                          style={{ fontSize: 12, color: STATUS_COLOR[skill.status], marginTop: 6 }}
+                        >
+                          {STATUS_LABEL[skill.status]}
+                        </p>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 6,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <button
+                          className="accent"
+                          onClick={() => onAudit(skill.id, skill.node_type, auditMode)}
+                        >
+                          Start Audit
+                        </button>
+                        {onOpenDetail && (
+                          <button onClick={() => onOpenDetail(skill.id)}>Details</button>
+                        )}
+                      </div>
+                    </div>
+
+                    {neighbors.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: 12,
+                          paddingTop: 12,
+                          borderTop: '1px solid var(--border)',
+                          display: 'flex',
+                          gap: 8,
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span className="dim" style={{ fontSize: 11 }}>
+                          Nearest in graph:
+                        </span>
+                        {neighbors.map((n) => (
+                          <span
+                            key={n.id}
+                            className={n.kind === 'skill' ? 'tag tag--outline' : 'tag'}
+                            role={n.kind === 'skill' && onOpenDetail ? 'button' : undefined}
+                            tabIndex={n.kind === 'skill' && onOpenDetail ? 0 : undefined}
+                            onClick={
+                              n.kind === 'skill' && onOpenDetail
+                                ? () => onOpenDetail(Number(n.id.replace('skill-', '')))
+                                : undefined
+                            }
+                            style={
+                              n.kind === 'skill' && onOpenDetail
+                                ? { cursor: 'pointer' }
+                                : undefined
+                            }
+                            title={n.kind === 'principle' ? 'Archive principle' : undefined}
+                          >
+                            {n.title.length > 20 ? `${n.title.slice(0, 20)}…` : n.title}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
-                </div>
-
-                {neighbors.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: 12,
-                      paddingTop: 12,
-                      borderTop: '1px solid var(--border)',
-                      display: 'flex',
-                      gap: 8,
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <span className="dim" style={{ fontSize: 11 }}>
-                      Nearest in graph:
-                    </span>
-                    {neighbors.map((n) => (
-                      <span
-                        key={n.id}
-                        className={n.kind === 'skill' ? 'tag tag--outline' : 'tag'}
-                        role={n.kind === 'skill' && onOpenDetail ? 'button' : undefined}
-                        tabIndex={n.kind === 'skill' && onOpenDetail ? 0 : undefined}
-                        onClick={
-                          n.kind === 'skill' && onOpenDetail
-                            ? () => onOpenDetail(Number(n.id.replace('skill-', '')))
-                            : undefined
-                        }
-                        style={
-                          n.kind === 'skill' && onOpenDetail ? { cursor: 'pointer' } : undefined
-                        }
-                        title={n.kind === 'principle' ? 'Archive principle' : undefined}
-                      >
-                        {n.title.length > 20 ? `${n.title.slice(0, 20)}…` : n.title}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+                )
+              })}
+            </div>
+          )}
         </div>
-      )}
 
-      <div style={{ marginTop: 32 }}>
-        <KnowledgeGraph onOpenSkill={(skillId) => onOpenDetail?.(skillId)} />
+        <div style={{ position: 'sticky', top: 16 }}>
+          <KnowledgeGraph
+            compact
+            width={420}
+            height={520}
+            onOpenSkill={(skillId) => onOpenDetail?.(skillId)}
+          />
+        </div>
       </div>
     </div>
   )
