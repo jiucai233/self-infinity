@@ -9,6 +9,7 @@ vi.mock('../api', () => ({
   api: {
     listSkills: vi.fn(),
     generateTree: vi.fn(),
+    clarifyTopic: vi.fn(),
   },
 }))
 
@@ -47,7 +48,10 @@ const skills: SkillNode[] = [
 
 describe('SkillTree', () => {
   beforeEach(() => {
-    vi.mocked(api.listSkills).mockResolvedValue(skills)
+    window.localStorage.clear()
+    vi.mocked(api.listSkills).mockReset().mockResolvedValue(skills)
+    vi.mocked(api.generateTree).mockReset()
+    vi.mocked(api.clarifyTopic).mockReset()
   })
 
   it('renders concept/task badge labels for each node', async () => {
@@ -110,5 +114,117 @@ describe('SkillTree', () => {
     await user.click(within(card).getByRole('button', { name: '发起审计' }))
 
     expect(onAudit).toHaveBeenCalledWith(2, 'task', 'night')
+  })
+
+  describe('clarify-first generate flow', () => {
+    it('when clarify says needs_clarification: false, calls generateTree directly with no intermediate step', async () => {
+      vi.mocked(api.clarifyTopic).mockResolvedValue({ needs_clarification: false, questions: [] })
+      vi.mocked(api.generateTree).mockResolvedValue([])
+      const user = userEvent.setup()
+      render(<SkillTree onAudit={vi.fn()} />)
+
+      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+
+      await user.type(screen.getByPlaceholderText(/B 树/), '强化学习')
+      await user.click(screen.getByRole('button', { name: '生成技能树' }))
+
+      await waitFor(() => expect(api.generateTree).toHaveBeenCalledWith('强化学习'))
+      expect(screen.queryByText('跳过，直接生成')).not.toBeInTheDocument()
+    })
+
+    it('when clarify says needs_clarification: true, renders question inputs and does not call generateTree yet', async () => {
+      vi.mocked(api.clarifyTopic).mockResolvedValue({
+        needs_clarification: true,
+        questions: ['想学哪个方向？', '目标是什么？'],
+      })
+      const user = userEvent.setup()
+      render(<SkillTree onAudit={vi.fn()} />)
+
+      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+
+      await user.type(screen.getByPlaceholderText(/B 树/), '做饭')
+      await user.click(screen.getByRole('button', { name: '生成技能树' }))
+
+      await waitFor(() => expect(screen.getByText('想学哪个方向？')).toBeInTheDocument())
+      expect(screen.getByText('目标是什么？')).toBeInTheDocument()
+      expect(api.generateTree).not.toHaveBeenCalled()
+    })
+
+    it('answering the clarify questions and submitting calls generateTree with a combined string', async () => {
+      vi.mocked(api.clarifyTopic).mockResolvedValue({
+        needs_clarification: true,
+        questions: ['想学哪个方向？'],
+      })
+      vi.mocked(api.generateTree).mockResolvedValue([])
+      const user = userEvent.setup()
+      render(<SkillTree onAudit={vi.fn()} />)
+
+      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+
+      await user.type(screen.getByPlaceholderText(/B 树/), '做饭')
+      await user.click(screen.getByRole('button', { name: '生成技能树' }))
+
+      await waitFor(() => expect(screen.getByText('想学哪个方向？')).toBeInTheDocument())
+      await user.type(screen.getByLabelText('想学哪个方向？'), '家常菜')
+      await user.click(screen.getByRole('button', { name: '生成' }))
+
+      await waitFor(() => expect(api.generateTree).toHaveBeenCalled())
+      const combined = vi.mocked(api.generateTree).mock.calls[0][0]
+      expect(combined).toContain('做饭')
+      expect(combined).toContain('想学哪个方向？')
+      expect(combined).toContain('家常菜')
+    })
+
+    it('clicking "跳过，直接生成" calls generateTree with just the original topic', async () => {
+      vi.mocked(api.clarifyTopic).mockResolvedValue({
+        needs_clarification: true,
+        questions: ['想学哪个方向？'],
+      })
+      vi.mocked(api.generateTree).mockResolvedValue([])
+      const user = userEvent.setup()
+      render(<SkillTree onAudit={vi.fn()} />)
+
+      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+
+      await user.type(screen.getByPlaceholderText(/B 树/), '做饭')
+      await user.click(screen.getByRole('button', { name: '生成技能树' }))
+
+      await waitFor(() => expect(screen.getByText('想学哪个方向？')).toBeInTheDocument())
+      await user.click(screen.getByRole('button', { name: '跳过，直接生成' }))
+
+      await waitFor(() => expect(api.generateTree).toHaveBeenCalledWith('做饭'))
+    })
+
+    it('falls back to generating directly when the clarify endpoint itself fails', async () => {
+      vi.mocked(api.clarifyTopic).mockRejectedValue(new Error('502 Bad Gateway'))
+      vi.mocked(api.generateTree).mockResolvedValue([])
+      const user = userEvent.setup()
+      render(<SkillTree onAudit={vi.fn()} />)
+
+      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+
+      await user.type(screen.getByPlaceholderText(/B 树/), '强化学习')
+      await user.click(screen.getByRole('button', { name: '生成技能树' }))
+
+      await waitFor(() => expect(api.generateTree).toHaveBeenCalledWith('强化学习'))
+    })
+  })
+
+  describe('onboarding callout', () => {
+    it('renders on first visit and stays dismissed after clicking "知道了" and a remount', async () => {
+      const user = userEvent.setup()
+      const { unmount } = render(<SkillTree onAudit={vi.fn()} />)
+
+      await waitFor(() => expect(screen.getByText('怎么玩？')).toBeInTheDocument())
+
+      await user.click(screen.getByRole('button', { name: '知道了' }))
+      expect(screen.queryByText('怎么玩？')).not.toBeInTheDocument()
+
+      unmount()
+
+      render(<SkillTree onAudit={vi.fn()} />)
+      await waitFor(() => expect(screen.getByText('可审计的任务')).toBeInTheDocument())
+      expect(screen.queryByText('怎么玩？')).not.toBeInTheDocument()
+    })
   })
 })

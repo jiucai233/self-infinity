@@ -17,6 +17,9 @@ _TASK_HOLLOW_PHRASES = ("随便", "应该可以", "大概", "反正", "不知道
 
 _TASK_ORIENTED_KEYWORDS = ("把", "怎么", "如何", "部署", "搭建", "实现", "写一个", "做一个", "上线", "完成")
 
+_KNOWN_VAGUE_TOPICS = ("做饭", "强化学习", "我要学编程", "编程", "学习")
+_CLARIFY_QUESTIONS = ("你想深入哪个具体方向/菜系/流派？", "你希望学到什么深度——入门认知还是能实际动手做？")
+
 
 class MockProvider:
     """确定性脚本化审计：不调用任何外部模型，用于离线演示与 CI 测试。
@@ -33,6 +36,8 @@ class MockProvider:
         system = next((m["content"] for m in messages if m["role"] == "system"), "")
         if "原则蒸馏官" in system:
             result = self._distill(messages)
+        elif "澄清官" in system:
+            result = self._clarify(messages)
         elif "技能树规划官" in system:
             result = self._generate_tree(messages)
         elif "任务核验官" in system:
@@ -42,6 +47,14 @@ class MockProvider:
         elapsed_ms = (time.perf_counter() - start) * 1000
         logger.info("mock complete() success elapsed_ms=%.0f", elapsed_ms)
         return result
+
+    @staticmethod
+    def _clarify(messages: list[Message]) -> str:
+        topic = next((m["content"] for m in messages if m["role"] == "user"), "").strip()
+        is_vague = any(kw in topic for kw in _KNOWN_VAGUE_TOPICS)
+        if is_vague:
+            return json.dumps({"needs_clarification": True, "questions": list(_CLARIFY_QUESTIONS)})
+        return json.dumps({"needs_clarification": False, "questions": []})
 
     @staticmethod
     def _generate_tree(messages: list[Message]) -> str:

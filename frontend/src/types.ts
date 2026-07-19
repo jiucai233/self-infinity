@@ -74,3 +74,8 @@ export interface CheckInRequest {
   activity_rating: 1 | 2 | 3
   eating_rating: 1 | 2 | 3
 }
+
+export interface ClarifyResponse {
+  needs_clarification: boolean
+  questions: string[]
+}

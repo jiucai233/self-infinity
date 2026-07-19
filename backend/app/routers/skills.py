@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.agents.architect import Architect, GeneratedNode
+from app.agents.clarifier import Clarifier
 from app.db import get_session
 from app.llm import get_provider
 from app.models import SkillNode, SkillStatus
-from app.schemas import GenerateTreeRequest, SkillNodeOut
+from app.schemas import ClarifyRequest, ClarifyResponse, GenerateTreeRequest, SkillNodeOut
 from app.utils import slugify
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
@@ -14,6 +15,16 @@ router = APIRouter(prefix="/api/skills", tags=["skills"])
 @router.get("", response_model=list[SkillNodeOut])
 def list_skills(session: Session = Depends(get_session)):
     return session.exec(select(SkillNode)).all()
+
+
+@router.post("/clarify", response_model=ClarifyResponse)
+def clarify_topic(body: ClarifyRequest):
+    clarifier = Clarifier(get_provider())
+    try:
+        result = clarifier.clarify(body.topic)
+    except Exception:
+        raise HTTPException(502, "澄清问题生成失败，请稍后重试")
+    return ClarifyResponse(needs_clarification=result.needs_clarification, questions=result.questions)
 
 
 @router.post("/generate", response_model=list[SkillNodeOut])

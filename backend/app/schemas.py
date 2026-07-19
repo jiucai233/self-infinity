@@ -18,6 +18,17 @@ class GenerateTreeRequest(BaseModel):
     _validate_topic = field_validator("topic")(_not_blank)
 
 
+class ClarifyRequest(BaseModel):
+    topic: str
+
+    _validate_topic = field_validator("topic")(_not_blank)
+
+
+class ClarifyResponse(BaseModel):
+    needs_clarification: bool
+    questions: list[str]
+
+
 def _validate_audit_mode(value: str) -> str:
     if value not in ("day", "night"):
         raise ValueError('mode must be "day" or "night"')

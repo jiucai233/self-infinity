@@ -1,6 +1,7 @@
 import type {
   AuditMode,
   CheckInRequest,
+  ClarifyResponse,
   FocusSession,
   Principle,
   SkillNode,
@@ -26,6 +27,12 @@ export const api = {
 
   generateTree: (topic: string) =>
     request<SkillNode[]>('/skills/generate', {
+      method: 'POST',
+      body: JSON.stringify({ topic }),
+    }),
+
+  clarifyTopic: (topic: string) =>
+    request<ClarifyResponse>('/skills/clarify', {
       method: 'POST',
       body: JSON.stringify({ topic }),
     }),
