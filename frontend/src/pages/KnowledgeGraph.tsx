@@ -42,6 +42,26 @@ function linkColor(link: FGLink): string {
   return cssVar('--border-strong')
 }
 
+// Real edge count per node — used to size hub nodes larger (more
+// connections = more central to what's been learned) and to decide which
+// nodes get an inline label, the same "cluster hubs are labeled, leaves
+// aren't" visual hierarchy a real Obsidian graph settles into once it has
+// enough notes to get dense.
+function computeDegrees(edges: GraphResponse['edges']): Map<string, number> {
+  const degrees = new Map<string, number>()
+  for (const e of edges) {
+    degrees.set(e.source, (degrees.get(e.source) ?? 0) + 1)
+    degrees.set(e.target, (degrees.get(e.target) ?? 0) + 1)
+  }
+  return degrees
+}
+
+// Small graphs have no clutter problem, so every node keeps its label —
+// the hub-only threshold only kicks in once there's enough nodes for
+// labels to start overlapping.
+const LABEL_ALL_THRESHOLD = 15
+const HUB_DEGREE_THRESHOLD = 3
+
 export default function KnowledgeGraph({
   onOpenSkill,
   width = DEFAULT_WIDTH,
@@ -61,6 +81,12 @@ export default function KnowledgeGraph({
   const [data, setData] = useState<GraphResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<GraphNode | null>(null)
+  // Mirrors `selected` for the nodeCanvasObject closure below, which is set
+  // up once per graph instance (not re-run on every selection change — that
+  // would tear down and re-warm the whole force simulation just to update a
+  // label) but still needs to know the current selection so a clicked leaf
+  // node's label stays visible even below the hub-degree threshold.
+  const selectedRef = useRef<GraphNode | null>(null)
 
   useEffect(() => {
     api
@@ -75,6 +101,14 @@ export default function KnowledgeGraph({
     const graph = new ForceGraph(containerRef.current)
     graphRef.current = graph
 
+    const degrees = computeDegrees(data.edges)
+    const labelAll = data.nodes.length <= LABEL_ALL_THRESHOLD
+    const nodeDegree = (node: FGNode) => degrees.get(node.id) ?? 0
+    const nodeRadius = (node: FGNode) => {
+      const base = node.kind === 'principle' ? 2 : 4
+      return Math.min(base + nodeDegree(node) * 1.1, 20)
+    }
+
     graph
       .width(width)
       .height(height)
@@ -84,19 +118,22 @@ export default function KnowledgeGraph({
         links: data.edges.map((e) => ({ ...e })) as unknown as FGLink[],
       })
       .nodeId('id')
-      .nodeVal((n) => ((n as FGNode).kind === 'principle' ? 3 : 5))
+      .nodeVal((n) => nodeRadius(n as FGNode))
       .nodeColor((n) => nodeColor(n as FGNode))
       .nodeLabel((n) => (n as FGNode).title)
       .nodeCanvasObjectMode(() => 'after')
       .nodeCanvasObject((n, ctx, scale) => {
         const node = n as FGNode
+        if (!labelAll && nodeDegree(node) < HUB_DEGREE_THRESHOLD && selectedRef.current?.id !== node.id) {
+          return
+        }
         const label = node.title.length > 16 ? `${node.title.slice(0, 16)}…` : node.title
         const fontSize = 10 / scale
         ctx.font = `${fontSize}px sans-serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'top'
         ctx.fillStyle = cssVar('--dim')
-        ctx.fillText(label, node.x ?? 0, (node.y ?? 0) + 8)
+        ctx.fillText(label, node.x ?? 0, (node.y ?? 0) + nodeRadius(node) + 2)
       })
       .linkColor((l) => linkColor(l as unknown as FGLink))
       .linkWidth((l) => ((l as unknown as FGLink).kind === 'parent' ? 2 : 1))
@@ -117,6 +154,7 @@ export default function KnowledgeGraph({
       .cooldownTicks(50)
       .onNodeClick((n) => {
         const node = n as FGNode
+        selectedRef.current = node
         setSelected(node)
         if (node.kind === 'skill') {
           onOpenSkill(Number(node.id.replace('skill-', '')))
