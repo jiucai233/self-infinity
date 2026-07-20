@@ -1,8 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.db import get_session, init_db
 from app.llm import get_provider
@@ -40,3 +42,15 @@ app.include_router(graph.router)
 @app.get("/api/health")
 def health():
     return {"status": "ok", "llm_provider": get_provider().name}
+
+
+# Dev workflow (run.sh) serves the frontend separately via `vite dev` on
+# :5173 with a proxy back to this app, so `frontend/dist` won't exist and
+# this mount is skipped. For personal daily use (Self-Infinity.command),
+# the frontend is built once and served by this same process — one port,
+# one thing to start, no separate dev server. Registered last: Starlette
+# matches routes in registration order, so the `/api/...` routers above
+# still take priority over this catch-all static mount.
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if _FRONTEND_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")
