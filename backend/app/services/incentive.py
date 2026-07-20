@@ -26,7 +26,7 @@ def _node_depth(session: Session, node: SkillNode) -> int:
     return depth
 
 
-def _difficulty(session: Session, skill: SkillNode) -> float:
+def node_difficulty_score(session: Session, skill: SkillNode) -> float:
     """Concept nodes survive the full Feynman protocol (harder) than task nodes,
     so they get a 2x base weight over 1x for tasks. Depth adds +0.5x per level,
     since a node reached via a longer parent chain is harder-won than a root.
@@ -55,7 +55,7 @@ def compute_reward(session: Session, skill: SkillNode) -> tuple[int, float]:
     new, higher level -- consistent with "compounding reward for the same
     task at higher levels" from the whitepaper.
     """
-    difficulty = _difficulty(session, skill)
+    difficulty = node_difficulty_score(session, skill)
     level = _global_level(session)
     multiplier = LEVEL_MULTIPLIER_BASE**level
     amount = round(BASE_REWARD * difficulty * multiplier)

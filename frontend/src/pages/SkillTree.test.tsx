@@ -9,6 +9,7 @@ vi.mock('../api', () => ({
   api: {
     listSkills: vi.fn(),
     getGraph: vi.fn(),
+    getRecommendation: vi.fn(),
     generateTree: vi.fn(),
     clarifyTopic: vi.fn(),
   },
@@ -67,6 +68,9 @@ describe('SkillTree', () => {
     window.localStorage.clear()
     vi.mocked(api.listSkills).mockReset().mockResolvedValue(skills)
     vi.mocked(api.getGraph).mockReset().mockResolvedValue(emptyGraph)
+    vi.mocked(api.getRecommendation)
+      .mockReset()
+      .mockResolvedValue({ context_bucket: 'mid', suggested_tier: 'easy', skill_tiers: {} })
     vi.mocked(api.generateTree).mockReset()
     vi.mocked(api.clarifyTopic).mockReset()
   })
@@ -169,6 +173,78 @@ describe('SkillTree', () => {
 
       await user.click(screen.getByText('Mastered Concept'))
       expect(onOpenDetail).toHaveBeenCalledWith(3)
+    })
+  })
+
+  describe('bandit recommendation', () => {
+    // Two available nodes: "Available Task" has more real unlock leverage
+    // (2 children vs 0), so it would normally rank first — but the bandit
+    // suggests "hard" and only "Available Concept" is tagged "hard", so it
+    // should be floated to the top instead, with a "Suggested" badge.
+    const twoAvailable: SkillNode[] = [
+      skills[1],
+      {
+        id: 4,
+        slug: 'available-concept',
+        title: 'Available Concept',
+        description: 'Also ready to audit',
+        parent_id: null,
+        status: 'available',
+        node_type: 'concept',
+        mastery_score: null,
+      },
+      {
+        id: 5,
+        slug: 'child-of-task',
+        title: 'Child Of Task',
+        description: 'unlocked by Available Task',
+        parent_id: 2,
+        status: 'locked',
+        node_type: 'task',
+        mastery_score: null,
+      },
+      {
+        id: 6,
+        slug: 'another-child-of-task',
+        title: 'Another Child Of Task',
+        description: 'also unlocked by Available Task',
+        parent_id: 2,
+        status: 'locked',
+        node_type: 'task',
+        mastery_score: null,
+      },
+    ]
+
+    it('floats the bandit-suggested tier to the top and badges it, without changing the underlying leverage order otherwise', async () => {
+      vi.mocked(api.listSkills).mockReset().mockResolvedValue(twoAvailable)
+      vi.mocked(api.getRecommendation).mockReset().mockResolvedValue({
+        context_bucket: 'high',
+        suggested_tier: 'hard',
+        skill_tiers: { '2': 'easy', '4': 'hard' },
+      })
+
+      render(<SkillTree onAudit={vi.fn()} />)
+
+      await waitFor(() => expect(screen.getByText('Available Concept')).toBeInTheDocument())
+
+      const cards = screen.getAllByRole('heading', { level: 3 })
+      const titles = cards.map((c) => c.textContent)
+      expect(titles.indexOf('Available Concept')).toBeLessThan(titles.indexOf('Available Task'))
+
+      const suggestedCard = screen.getByText('Available Concept').closest('.panel') as HTMLElement
+      expect(within(suggestedCard).getByText('Suggested')).toBeInTheDocument()
+
+      const otherCard = screen.getByText('Available Task').closest('.panel') as HTMLElement
+      expect(within(otherCard).queryByText('Suggested')).not.toBeInTheDocument()
+    })
+
+    it('does not crash and shows no suggestion banner when the recommendation call fails', async () => {
+      vi.mocked(api.getRecommendation).mockReset().mockRejectedValue(new Error('502'))
+      render(<SkillTree onAudit={vi.fn()} />)
+
+      await waitFor(() => expect(screen.getByText('Available Task')).toBeInTheDocument())
+      expect(screen.queryByText('Suggested')).not.toBeInTheDocument()
+      expect(screen.queryByText(/Based on your recent audits/)).not.toBeInTheDocument()
     })
   })
 

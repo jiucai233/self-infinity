@@ -98,6 +98,19 @@ class PrincipleLink(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
 
 
+class BanditArm(SQLModel, table=True):
+    # Beta-Bernoulli posterior for one (context_bucket, difficulty tier) arm
+    # of the whitepaper §4.4 V2.1 contextual bandit — see
+    # app/services/bandit.py for the discretization rationale. alpha/beta
+    # start at 1.0 (uniform prior) and shift with each observed audit
+    # outcome for that arm; there's no user-facing CRUD for this table.
+    id: int | None = Field(default=None, primary_key=True)
+    context_bucket: str
+    tier: str
+    alpha: float = 1.0
+    beta: float = 1.0
+
+
 class RewardEvent(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     session_id: int = Field(foreign_key="auditsession.id")

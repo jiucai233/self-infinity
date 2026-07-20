@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import KnowledgeGraph from './KnowledgeGraph'
-import type { AuditMode, GraphResponse, SkillNode } from '../types'
+import type { AuditMode, DifficultyTier, GraphResponse, RecommendationResponse, SkillNode } from '../types'
+
+const TIER_LABEL: Record<DifficultyTier, string> = {
+  easy: 'Easy',
+  medium: 'Medium',
+  hard: 'Hard',
+}
 
 const ONBOARDING_DISMISSED_KEY = 'self-infinity-onboarding-dismissed'
 
@@ -94,6 +100,7 @@ export default function SkillTree({
 }) {
   const [skills, setSkills] = useState<SkillNode[]>([])
   const [graph, setGraph] = useState<GraphResponse | null>(null)
+  const [recommendation, setRecommendation] = useState<RecommendationResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [topic, setTopic] = useState('')
@@ -119,8 +126,19 @@ export default function SkillTree({
       })
       .catch((e) => setError(String(e)))
 
+  // Separate, best-effort fetch: the bandit recommendation (whitepaper §4.4
+  // V2.1) is a nice-to-have steer, not core data the page depends on, so a
+  // failure here shouldn't block skills/graph from loading or surface an
+  // error banner of its own.
+  const refreshRecommendation = () =>
+    api
+      .getRecommendation()
+      .then(setRecommendation)
+      .catch(() => setRecommendation(null))
+
   useEffect(() => {
     refresh().finally(() => setLoading(false))
+    refreshRecommendation()
   }, [])
 
   function dismissOnboarding() {
@@ -138,6 +156,7 @@ export default function SkillTree({
       setClarifyQuestions([])
       setClarifyAnswers([])
       await refresh()
+      refreshRecommendation()
     } catch (e) {
       setError(String(e))
     } finally {
@@ -187,18 +206,31 @@ export default function SkillTree({
   const essence = masteredCount * 25
 
   // Recommended-next list: only real "available" nodes (unlocked, not yet
-  // mastered — locked nodes aren't actionable yet, mastered ones are done),
-  // ranked by how many direct children mastering them would unlock (higher
-  // leverage first), tie-broken by id for stability. No fabricated scoring.
+  // mastered — locked nodes aren't actionable yet, mastered ones are done).
+  // Primary ranking is real direct-child count (higher unlock leverage
+  // first); nodes matching the bandit's suggested difficulty tier (§4.4
+  // V2.1 — derived from recent pass rate/abandon rate/session length, see
+  // backend/app/services/bandit.py) are stably floated to the front of that
+  // ranking, not re-scored — this is a nudge toward "reachable difficulty",
+  // not a replacement for the leverage-based order.
   const recommendations = useMemo(() => {
     const childCount = new Map<number, number>()
     for (const s of skills) {
       if (s.parent_id != null) childCount.set(s.parent_id, (childCount.get(s.parent_id) ?? 0) + 1)
     }
+    const suggestedTier = recommendation?.suggested_tier
+    const tiers = recommendation?.skill_tiers
+    const matchesSuggestion = (id: number) =>
+      suggestedTier != null && tiers?.[String(id)] === suggestedTier
     return skills
       .filter((s) => s.status === 'available')
-      .sort((a, b) => (childCount.get(b.id) ?? 0) - (childCount.get(a.id) ?? 0) || a.id - b.id)
-  }, [skills])
+      .sort(
+        (a, b) =>
+          Number(matchesSuggestion(b.id)) - Number(matchesSuggestion(a.id)) ||
+          (childCount.get(b.id) ?? 0) - (childCount.get(a.id) ?? 0) ||
+          a.id - b.id,
+      )
+  }, [skills, recommendation])
 
   const adjacency = useMemo(() => (graph ? buildAdjacency(graph.edges) : new Map()), [graph])
   const nodesById = useMemo(
@@ -369,6 +401,17 @@ export default function SkillTree({
             Recommended Next
           </h3>
 
+          {recommendation && (
+            <p className="dim" style={{ fontSize: 11, marginBottom: 8 }}>
+              Based on your recent audits, {TIER_LABEL[recommendation.suggested_tier].toLowerCase()}{' '}
+              nodes are probably the best fit right now — those are pinned to the top, marked{' '}
+              <span className="tag tag--outline" style={{ fontSize: 10 }}>
+                Suggested
+              </span>
+              .
+            </p>
+          )}
+
           {skills.length === 0 ? (
             <p className="dim">No skills yet — generate one above to get started.</p>
           ) : recommendations.length === 0 ? (
@@ -394,6 +437,13 @@ export default function SkillTree({
                         <span className={NODE_TYPE_TAG_CLASS[skill.node_type]}>
                           {NODE_TYPE_LABEL[skill.node_type]}
                         </span>
+                        {recommendation != null &&
+                          recommendation.skill_tiers[String(skill.id)] ===
+                            recommendation.suggested_tier && (
+                            <span className="tag tag--outline" style={{ marginLeft: 6 }}>
+                              Suggested
+                            </span>
+                          )}
                         <p className="dim" style={{ fontSize: 12, marginTop: 8 }}>
                           {skill.description}
                         </p>

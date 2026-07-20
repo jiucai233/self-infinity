@@ -6,7 +6,14 @@ from app.agents.clarifier import Clarifier
 from app.db import get_session
 from app.llm import get_provider
 from app.models import SkillNode, SkillStatus
-from app.schemas import ClarifyRequest, ClarifyResponse, GenerateTreeRequest, SkillNodeOut
+from app.schemas import (
+    ClarifyRequest,
+    ClarifyResponse,
+    GenerateTreeRequest,
+    RecommendationOut,
+    SkillNodeOut,
+)
+from app.services import bandit
 from app.utils import slugify
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
@@ -15,6 +22,22 @@ router = APIRouter(prefix="/api/skills", tags=["skills"])
 @router.get("", response_model=list[SkillNodeOut])
 def list_skills(session: Session = Depends(get_session)):
     return session.exec(select(SkillNode)).all()
+
+
+@router.get("/recommendation", response_model=RecommendationOut)
+def get_recommendation(session: Session = Depends(get_session)):
+    """V2.1 contextual bandit (whitepaper §4.4): which difficulty tier the
+    user's recent audit history suggests they're ready for right now, plus
+    each available node's tier so the frontend can highlight matches. Every
+    call re-samples the bandit's posterior (Thompson Sampling), so repeated
+    calls can legitimately return different tiers — that's exploration
+    working as intended, not flicker to be "fixed" with caching."""
+    bucket = bandit.context_bucket(session)
+    tier = bandit.choose_tier(session, bucket)
+    available = session.exec(select(SkillNode).where(SkillNode.status == SkillStatus.available)).all()
+    tiers = {s.id: bandit.difficulty_tier(session, s) for s in available}
+    session.commit()
+    return RecommendationOut(context_bucket=bucket, suggested_tier=tier, skill_tiers=tiers)
 
 
 @router.post("/clarify", response_model=ClarifyResponse)

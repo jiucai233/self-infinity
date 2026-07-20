@@ -116,3 +116,11 @@ export interface RelinkResponse {
   related_links_created: number
   contradictions: Contradiction[]
 }
+
+export type DifficultyTier = 'easy' | 'medium' | 'hard'
+
+export interface RecommendationResponse {
+  context_bucket: 'low' | 'mid' | 'high'
+  suggested_tier: DifficultyTier
+  skill_tiers: Record<string, DifficultyTier>
+}

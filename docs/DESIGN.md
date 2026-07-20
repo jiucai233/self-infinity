@@ -496,3 +496,23 @@ SVG 连线在 jsdom 下测不了像素坐标是同一个限制），验证方式
   关联 + relink 端点的批量重跑）、`backend/app/models.py` 的
   `PrincipleLink` 表（新表，`SQLModel.metadata.create_all` 自动建表，
   不需要手动迁移）。测试见 `backend/tests/test_linking.py`。
+
+## 11. Skills 页：contextual bandit 难度建议（2026-07-20，第七次改版）
+
+落地白皮书 §4.4 V2.1 的 contextual bandit（细节/算法取舍见 WHITEPAPER）。
+UI 侧只做了两处克制的改动，没有新起一个"推荐"板块：
+
+- **顶部一行提示**：`Recommended Next` 标题下面一行 `dim` 小字——
+  "Based on your recent audits, {tier} nodes are probably the best fit
+  right now"，内嵌一个 `tag tag--outline` 样式的 `Suggested` 徽标示例，
+  告诉用户接下来看到的徽标是什么意思。请求失败（`getRecommendation` 是
+  独立于 `skills`/`graph` 的 best-effort 请求）时这行连同下面所有
+  `Suggested` 徽标一起消失，不显示错误提示——这条建议本身就是锦上添花，
+  不是核心数据，没必要为它单独弹错误横幅。
+- **`Suggested` 徽标 + 稳定重排**：卡片按真实子节点数（解锁杠杆）排序的
+  规则不变，只是命中 bandit 建议难度档的卡片会被稳定地挪到最前面
+  （sort 比较函数里加一层最高优先级 key，不是重新打分），同时在
+  node_type 标签右边追加一个 `Suggested` 标签。命中判断纯前端用
+  `skill_tiers[id] === suggested_tier` 比对，后端已经把"这个节点是什么
+  难度档"算好了（`node_difficulty_score` 复用自激励引擎），前端不重复
+  实现这套规则。

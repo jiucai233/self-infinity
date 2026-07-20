@@ -34,6 +34,7 @@ from app.schemas import (
     SubmitTurnRequest,
     TurnResultResponse,
 )
+from app.services import bandit
 from app.services.focus import compute_focus_score
 from app.services.incentive import compute_reward
 from app.services.vitality import apply_audit_result
@@ -135,12 +136,19 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
         session.commit()
         return TurnResultResponse(type="probe", question=result.question)
 
+    # Context is computed excluding this session (its own outcome can't
+    # leak into the state used to judge which tier was worth recommending
+    # before we knew the result) — see app/services/bandit.py.
+    bucket = bandit.context_bucket(session, exclude_id=audit.id)
+    tier = bandit.difficulty_tier(session, skill)
+
     audit.status = AuditStatus.passed if result.passed else AuditStatus.failed
     audit.score = result.score
     audit.gaps_json = json.dumps(result.gaps or [])
     audit.comment = result.comment
     session.add(audit)
     apply_audit_result(session, result.passed)
+    bandit.update_arm(session, bucket, tier, reward=result.passed)
 
     unlocked_ids: list[int] = []
     reward_amount: int | None = None

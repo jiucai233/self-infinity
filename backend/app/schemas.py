@@ -52,6 +52,12 @@ class SkillNodeOut(BaseModel):
     mastery_score: int | None
 
 
+class RecommendationOut(BaseModel):
+    context_bucket: str
+    suggested_tier: str
+    skill_tiers: dict[int, str]
+
+
 class AuditTurnOut(BaseModel):
     role: str
     content: str

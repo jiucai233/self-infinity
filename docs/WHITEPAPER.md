@@ -168,13 +168,24 @@ Architect 不需要比 Auditor 更强的能力：拆解是结构性任务，验�
 
 **关于 focus score（力场可视化的数据来源）**：§7 的力场设计假设有一个 0-100 的专注度评分驱动视觉状态，原稿设想由桌面端屏幕监控写入（`FocusSession.source`）；但 ADR-2 已明确不做屏幕监控。实现改为从审计追问的时间间隔推导 focus_score 的工程代理指标（答题节奏落在合理区间给高分，过快疑似瞎蒙、过慢疑似分心都会降分），`FocusSession.source` 字段因此保留为通用字符串（如 `"audit_engagement"`）而非绑定屏幕捕获语义。这是诚实的替代方案，不是真实专注力测量——如果未来真的接入屏幕监控，只需换一个 source 值和对应的采集逻辑，不需要改数据模型或前端可视化。
 
-**V2.1（可学习组件）**：引入 contextual bandit（LinUCB 或 Thompson Sampling）。
+**V2.1（可学习组件）· 已实现（2026-07-20）**：contextual bandit，选的是 Thompson Sampling，不是 LinUCB——原因见下。
 
-- 上下文特征：用户近期审计通过率、放弃率、平均会话时长；
-- 动作空间：推荐任务的难度档位；
-- 奖励信号：任务被完成且审计通过。
+- 上下文特征：用户近期审计通过率、放弃率（没有显式"放弃"操作可采集，用超过
+  `STALE_ACTIVE_HOURS` 还卡在 active 状态的会话数近似）、平均会话时长；
+- 动作空间：推荐任务的难度档位（`easy`/`medium`/`hard`，由 node_type + 树深度算出，
+  复用 `app/services/incentive.py` 的 `node_difficulty_score`）；
+- 奖励信号：任务被完成且审计通过（`app/routers/audits.py` 的 `submit_turn` 出裁决那一刻）。
 
-目标是把用户维持在"够得着的困难"区间。选 bandit 而非 deep RL 是刻意的：单用户、小样本、冷启动场景下，bandit 是统计上诚实的选择——这一段本身就是答辩时展示算法判断力的地方。
+实现在 `app/services/bandit.py`。工程取舍：三个原始上下文特征没有各自单独分桶做笛卡尔积
+（3×3×3=27 格），那样单用户的数据量会把每格都饿死；而是先压成一个综合"就绪度"分桶
+（low/mid/high），再和三档难度组合，一共 9 个 Beta-Bernoulli 臂，单用户数据量下勉强够用。
+这也是为什么选 Thompson Sampling 而非 LinUCB——后者对连续上下文做线性回归，需要的数据量
+比单用户能产生的多得多，白皮书原文强调的"单用户、小样本、冷启动场景下 bandit 是统计上诚实
+的选择"这条原则，具体化到算法选型上就是离散化 context + Thompson Sampling，而不是上更复杂
+的线性模型。`GET /api/skills/recommendation` 暴露 `context_bucket`/`suggested_tier`/
+`skill_tiers`，前端 Skills 页把匹配建议难度档的节点浮到"Recommended Next"列表最前面并打
+`Suggested` 标签——是稳定排序的调整，不是重新打分替换掉原本按真实子节点数（解锁杠杆）的
+排序。
 
 **关于 bandit 的定位，需要明确一个容易混淆的点**：它不是"让 agent 更懂用户"的语义升级，不改变 Auditor 对用户解释的理解能力——那是 LLM 本身和 §4.3 原则检索注入的工作。bandit 只是一个独立的难度分发策略层，输入用户状态特征，输出任务难度，靠"是否完成+审计通过"这个奖励信号自我修正，与推荐系统"该给用户推哪篇内容"是同一类问题。两者互补，不要在叙事里混为一谈。
 

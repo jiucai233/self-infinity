@@ -5,6 +5,7 @@ import type {
   FocusSession,
   GraphResponse,
   Principle,
+  RecommendationResponse,
   RelinkResponse,
   SkillNode,
   StartAuditResponse,
@@ -26,6 +27,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   listSkills: () => request<SkillNode[]>('/skills'),
+
+  getRecommendation: () => request<RecommendationResponse>('/skills/recommendation'),
 
   generateTree: (topic: string) =>
     request<SkillNode[]>('/skills/generate', {
