@@ -20,7 +20,7 @@ real API calls for every scenario.
 ## What it measures
 
 For each scenario, the script replays `student_turns` into a simulated audit
-conversation (opening question, then probes) up to a safety cap of 6 rounds,
+conversation (opening question, then probes) up to a safety cap of 10 rounds,
 and compares the final verdict's `passed` against the scenario's
 `expected_passed` ground truth. It reports:
 
@@ -126,3 +126,60 @@ step. What this re-run *does* establish: the prompt rewrite didn't
 regress task-side behavior (perfect scores there) and got strictly stricter
 on leniency, which was the one metric that already passed the M2 bar before
 and still does, more comfortably now.
+
+## Adaptive student (2026-07-20, fixes the concept under-scripting root cause)
+
+Implemented the fix flagged above: once a scenario's scripted `student_turns`
+run out, `run_calibration.py` now hands the conversation to an LLM playing
+the same student persona (`build_student_answer` / `STUDENT_SYSTEM_PROMPT`),
+grounded in the scripted turns' tone/depth and the scenario's
+`expected_passed` + `label_rationale`, instead of repeating a stale line.
+On by default for real providers (`--no-adaptive-student` to disable,
+`--adaptive-student` to force it on for `mock`). MAX_TURNS raised 6 → 10 to
+comfortably clear `audit_max_turns=8`.
+
+Two consecutive runs, `--provider deepseek`, same calibration set:
+
+```
+run 1: accuracy 24/30 = 80.0%   leniency 3/15 = 20.0%
+  [concept] accuracy 12/15 = 80.0%  leniency 0/7  =  0.0%
+  [task]    accuracy 12/15 = 80.0%  leniency 3/8  = 37.5%
+
+run 2: accuracy 25/30 = 83.3%   leniency 2/15 = 13.3%
+  [concept] accuracy 11/15 = 73.3%  leniency 1/7  = 14.3%
+  [task]    accuracy 14/15 = 93.3%  leniency 1/8  = 12.5%
+```
+
+**The concept-side fix worked**: concept accuracy jumped from a stuck 46.7%
+(both prior runs, all 8 `-pass` scenarios failing) to 73–80%, with most
+`-pass` scenarios now correctly passing once the student can actually
+answer follow-ups instead of stalling. This confirms the harness diagnosis
+was right — it really was the scripted replay, not the Auditor.
+
+**That surfaced a real leniency problem on the task side that the old
+harness was masking.** Task leniency is now 37.5% and 12.5% across the two
+runs (vs. 12.5%/0.0% under the stale, under-scripted harness) — both traced
+to `-fail` task scenarios where the adaptive student, asked a genuine
+follow-up, gave an answer that's imprecise-but-plausible enough (e.g.
+"应该是192.168点什么的，具体记不清了" for a router admin address) that the
+task protocol's intentionally-lenient rubric (§4.2: "回答具体、不是空话套话
+…就通过") accepted it. Traced one instance (`home-wifi-setup-fail`) with a
+one-off script outside the harness and got a *correct* fail on that trace —
+so this reads as genuine run-to-run variance from two compounding stochastic
+LLM calls (Auditor + student, both temperature > 0) landing right at a
+judgment boundary, not a broken harness or a systematic Auditor bug. Prior
+runs never exposed this because the old harness force-failed most concept
+scenarios and only ever exercised 1-2 scripted task turns — it had no
+opportunity to surface task-side leniency variance at all.
+
+**Net read**: accuracy now clears the ≥80% bar on average across the two
+runs (~81.7%), which the harness could never produce before this fix no
+matter how good the Auditor was. Leniency is where the real signal now
+is — averaging ~16.7%, above the ≤10% bar in both runs, concentrated in
+task `-fail` scenarios with follow-up questions. This is the first
+calibration run that can be trusted as actually representative of live
+Auditor behavior rather than an artifact of the test harness; the concrete
+next step is tightening the task protocol's leniency rule for
+follow-up-round answers (or accepting more runs / an averaged multi-run
+metric to separate genuine leniency from single-run variance) before
+claiming M2 passing — not yet done, flagging as the next actionable item.
