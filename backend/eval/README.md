@@ -82,15 +82,47 @@ canned `student_turns` with an LLM-played adaptive student — out of scope for
 this pass. Flagging as the concrete next step before M2 can be marked
 accepted rather than "code-ready."
 
-**2026-07-19 update — this run is now stale.** `app/agents/auditor.py`'s
-`CONCEPT_SYSTEM_PROMPT` was substantially rewritten after this run: the
-deliberate-error-injection rule (§4.2's "故意提出一个看似合理但含有细微
-错误的理解") was removed entirely per user feedback that it made the
-Auditor behave like a leading expert instead of a naive Feynman-style
-listener, and the fixed per-mode turn cap told to the model was removed in
-favor of the model deciding convergence itself (config's `audit_max_turns`/
-`task_max_turns` are now a generous safety ceiling only, not a quota stated
-in the prompt). Both changes directly affect the accuracy/leniency numbers
-above — they were measured against the old prompt. This calibration needs
-to be re-run against the new prompt before any M2 acceptance claim; doing
-so is not yet scheduled, pending user direction.
+**2026-07-19 update — that run is now stale**, superseded by the re-run below.
+`app/agents/auditor.py`'s `CONCEPT_SYSTEM_PROMPT` was substantially rewritten
+after the run above: the deliberate-error-injection rule (§4.2's "故意提出
+一个看似合理但含有细微错误的理解") was removed entirely per user feedback
+that it made the Auditor behave like a leading expert instead of a naive
+Feynman-style listener, and the fixed per-mode turn cap told to the model was
+removed in favor of the model deciding convergence itself (config's
+`audit_max_turns`/`task_max_turns` are now a generous safety ceiling only,
+not a quota stated in the prompt).
+
+## Re-run (2026-07-20, `--provider deepseek`, naive-beginner + dynamic-turns prompt)
+
+```
+accuracy: 22/30 = 73.3%
+leniency rate (false-pass among should-fail): 0/15 = 0.0%
+  [concept] accuracy: 7/15 = 46.7%  leniency: 0/7 = 0.0%
+  [task] accuracy: 15/15 = 100.0%  leniency: 0/8 = 0.0%
+```
+
+Leniency dropped to **0%** (from 6.7%) and task accuracy is now **100%**
+(from 93.3%) — the naive-beginner rewrite made the Auditor stricter, not more
+lenient, which is the direction that actually matters for "宁 fail 不放水".
+
+Overall accuracy (73.3%) still misses the ≥80% bar, and concept accuracy
+(46.7%) is numerically identical to the stale run — same root cause, entirely
+unaffected by the prompt rewrite: **all 8 `-pass` concept scenarios still
+fail**, for the exact reason diagnosed above (harness replays a scenario's
+fixed `student_turns` list and repeats the *last* scripted answer verbatim
+once it runs out; a real model's concept follow-ups still run longer than
+what's scripted, so the harness feeds a stale answer against a fresh
+question and the Auditor correctly hits forced-convergence-fail). The
+dynamic-turns change if anything makes this worse to fix by re-scripting,
+since there's no longer a fixed per-mode round count to script against —
+the model decides its own depth per scenario.
+
+**Still not a passing M2 result, and the blocker is unchanged from the
+stale run**: the calibration harness's canned `student_turns`, not the
+Auditor. Confirms the diagnosis rather than changing it — re-scripting more
+turns per concept scenario (tedious, brittle) or an LLM-played adaptive
+student (real fix, out of scope for this pass) remains the concrete next
+step. What this re-run *does* establish: the prompt rewrite didn't
+regress task-side behavior (perfect scores there) and got strictly stricter
+on leniency, which was the one metric that already passed the M2 bar before
+and still does, more comfortably now.
