@@ -140,7 +140,10 @@ class PrincipleOut(BaseModel):
     id: int
     title: str
     body: str
+    misconception: str | None
     source_session_id: int
+    recurring_of_id: int | None = None
+    recurring_of_title: str | None = None
 
 
 class RewardEventOut(BaseModel):

@@ -67,6 +67,11 @@ class Principle(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     title: str
     body: str
+    # The underlying wrong mental model the Scribe diagnosed behind this
+    # failure (teach-me-style misconception tracking) — distinct from `body`,
+    # which is the corrective rule. Used to detect recurring failure
+    # patterns across unrelated skills (see find_recurring_misconception).
+    misconception: str | None = None
     source_session_id: int = Field(foreign_key="auditsession.id")
     created_at: datetime = Field(default_factory=utcnow)
 

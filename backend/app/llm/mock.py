@@ -146,7 +146,13 @@ class MockProvider:
             body = f"当我再次面对同类问题时，我将记住这次的教训：{reflection[:40]}"
         else:
             body = "当我再次面对同类问题时，我将先讲清楚为什么，再给结论。"
-        return json.dumps({"title": "先讲机制，再讲结论", "body": body})
+        return json.dumps(
+            {
+                "title": "先讲机制，再讲结论",
+                "body": body,
+                "misconception": "以为记住结论就等于理解了机制",
+            }
+        )
 
     def _audit_concept(self, messages: list[Message]) -> str:
         user_turns = [m for m in messages if m["role"] == "user"]

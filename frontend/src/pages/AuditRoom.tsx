@@ -98,6 +98,7 @@ export default function AuditRoom({
   const [verdict, setVerdict] = useState<TurnResultResponse | null>(null)
   const [reflection, setReflection] = useState('')
   const [principleTitle, setPrincipleTitle] = useState<string | null>(null)
+  const [recurringOfTitle, setRecurringOfTitle] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [listening, setListening] = useState(false)
@@ -188,6 +189,7 @@ export default function AuditRoom({
     try {
       const principle = await api.submitReflection(auditId, reflection.trim())
       setPrincipleTitle(principle.title)
+      setRecurringOfTitle(principle.recurring_of_title)
       setPhase('reflected')
     } catch (e) {
       setError(String(e))
@@ -365,6 +367,18 @@ export default function AuditRoom({
                   New Archive Entry
                 </p>
                 <p>{principleTitle}</p>
+              </div>
+            )}
+
+            {phase === 'reflected' && recurringOfTitle && (
+              <div className="panel" style={{ marginTop: 8, borderColor: 'var(--danger)' }}>
+                <p style={{ fontSize: 12 }} className="dim">
+                  Recurring Pattern
+                </p>
+                <p>
+                  Same underlying misconception as an earlier entry: "{recurringOfTitle}" — this
+                  isn't the first time.
+                </p>
               </div>
             )}
 

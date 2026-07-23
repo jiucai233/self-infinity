@@ -50,7 +50,10 @@ export interface Principle {
   id: number
   title: string
   body: string
+  misconception: string | null
   source_session_id: number
+  recurring_of_id: number | null
+  recurring_of_title: string | null
 }
 
 export interface VitalityState {

@@ -51,6 +51,30 @@ def relevance_score(text_a: str, text_b: str) -> int:
     return bigram_overlap + word_overlap * 2
 
 
+# 判定"这是同一类错误的心智模型又犯了一次"的阈值。misconception 是一句话（约
+# 20-40 字），比 find_relevant_principles 比对的整段 title+body 短得多，所以门槛
+# 定得更高——两三个字符 2-gram 偶然重合很常见，但 word_overlap*2 或者大量 bigram
+# 重合基本只会发生在语义真的重复时。跟 find_relevant_principles 一样，这是没有
+# embedding 基础设施时的诚实 V1，不追求覆盖用词完全不同但语义相近的情况。
+_RECURRING_MISCONCEPTION_THRESHOLD = 6
+
+
+def find_recurring_misconception(session: Session, misconception: str) -> Principle | None:
+    """如果这次诊断出的 misconception 和历史上某条原则的 misconception 明显重合，
+    说明用户在不同技能点上反复栽在同一类错误的心智模型里——返回最早的那一条作为
+    "这不是第一次了"的证据；找不到就返回 None。
+    """
+    if not misconception:
+        return None
+    candidates = session.exec(
+        select(Principle).where(Principle.misconception.is_not(None)).order_by(Principle.created_at)
+    ).all()
+    for candidate in candidates:
+        if relevance_score(misconception, candidate.misconception) >= _RECURRING_MISCONCEPTION_THRESHOLD:
+            return candidate
+    return None
+
+
 def find_relevant_principles(session: Session, skill: SkillNode, limit: int = 3) -> list[Principle]:
     """返回和 skill 最相关的历史原则，最相关的排最前面；找不到相关的就返回空列表。
 

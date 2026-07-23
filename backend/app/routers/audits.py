@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.agents.auditor import Auditor
-from app.agents.retrieval import find_relevant_principles
+from app.agents.retrieval import find_recurring_misconception, find_relevant_principles
 from app.agents.scribe import Scribe
 from app.db import get_session
 from app.llm import get_provider
@@ -207,15 +207,27 @@ def submit_reflection(audit_id: int, body: ReflectionRequest, session: Session =
 
     scribe = Scribe(get_provider())
     try:
-        title, principle_body = scribe.distill(skill.title, gaps, body.reflection)
+        title, principle_body, misconception = scribe.distill(skill.title, gaps, body.reflection)
     except Exception:
         raise HTTPException(502, "原则蒸馏失败，请稍后重试")
 
-    principle = Principle(title=title, body=principle_body, source_session_id=audit.id)
+    recurring_of = find_recurring_misconception(session, misconception)
+
+    principle = Principle(
+        title=title, body=principle_body, misconception=misconception, source_session_id=audit.id
+    )
     session.add(principle)
     session.commit()
     session.refresh(principle)
 
     link_principle(session, get_provider(), principle, exclude_skill_id=audit.skill_id)
 
-    return principle
+    return PrincipleOut(
+        id=principle.id,
+        title=principle.title,
+        body=principle.body,
+        misconception=principle.misconception,
+        source_session_id=principle.source_session_id,
+        recurring_of_id=recurring_of.id if recurring_of else None,
+        recurring_of_title=recurring_of.title if recurring_of else None,
+    )

@@ -3,7 +3,7 @@ from unittest.mock import patch
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
-from app.agents.retrieval import find_relevant_principles
+from app.agents.retrieval import find_recurring_misconception, find_relevant_principles
 from app.llm.base import Message
 from app.llm.mock import MockProvider
 from app.models import Principle, SkillNode
@@ -90,6 +90,45 @@ def test_find_relevant_principles_respects_limit_and_ranking():
     assert results == [strong_match]
 
 
+def test_find_recurring_misconception_matches_overlapping_diagnosis():
+    session = _make_session()
+
+    earlier = Principle(
+        title="先讲机制再讲结论",
+        body="当我解释一个概念时，我将先说出它为什么成立，再说它是什么。",
+        misconception="以为记住结论就等于理解了机制",
+        source_session_id=1,
+    )
+    session.add(earlier)
+    session.commit()
+
+    match = find_recurring_misconception(session, "误以为背下结论就是理解了机制")
+
+    assert match is not None
+    assert match.id == earlier.id
+
+
+def test_find_recurring_misconception_returns_none_when_unrelated():
+    session = _make_session()
+
+    earlier = Principle(
+        title="部署前先备份",
+        body="当我上线新版本时，我将先做好数据库备份，再执行迁移脚本。",
+        misconception="以为线上环境和本地环境行为一致",
+        source_session_id=1,
+    )
+    session.add(earlier)
+    session.commit()
+
+    assert find_recurring_misconception(session, "以为记住结论就等于理解了机制") is None
+
+
+def test_find_recurring_misconception_empty_library_returns_none():
+    session = _make_session()
+
+    assert find_recurring_misconception(session, "以为记住结论就等于理解了机制") is None
+
+
 class _CapturingProvider:
     """包一层 MockProvider，记录每次调用真正收到的 messages，方便断言 system prompt 内容。
 
@@ -160,6 +199,33 @@ def test_submit_turn_injects_relevant_principle_into_system_prompt(client):
     assert audit_prompts
     assert any(principle_text_fragment in prompt for prompt in audit_prompts)
     assert any("该用户过去在类似问题上暴露过以下原则" in prompt for prompt in audit_prompts)
+
+
+def test_reflection_flags_recurring_misconception_across_unrelated_skills(client):
+    # MockProvider's _distill always diagnoses the same misconception
+    # ("以为记住结论就等于理解了机制"), so a second failed-and-reflected audit on a
+    # completely unrelated skill should still be flagged as a repeat of the first.
+    skill_a = _generate_root_skill(client, "递归专题")
+    _fail_audit_and_reflect(client, skill_a["id"], "下次做递归题先想清楚终止条件再动手写代码。")
+    first_principle_id = client.get("/api/principles").json()[0]["id"]
+
+    skill_b = _generate_root_skill(client, "网络安全基础")
+    start_b = client.post(f"/api/skills/{skill_b['id']}/audits")
+    audit_b_id = start_b.json()["session"]["id"]
+
+    weak_answer = "不知道，反正大概就是这样吧。"
+    client.post(f"/api/audits/{audit_b_id}/turns", json={"content": weak_answer})
+    client.post(f"/api/audits/{audit_b_id}/turns", json={"content": weak_answer})
+    verdict = client.post(f"/api/audits/{audit_b_id}/turns", json={"content": weak_answer}).json()
+    assert verdict["passed"] is False
+
+    reflection_resp = client.post(
+        f"/api/audits/{audit_b_id}/reflection", json={"reflection": "又是没讲清楚为什么。"}
+    )
+    body = reflection_resp.json()
+
+    assert body["recurring_of_id"] == first_principle_id
+    assert body["recurring_of_title"]
 
 
 def test_submit_turn_omits_principle_section_when_nothing_relevant(client):
