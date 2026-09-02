@@ -15,8 +15,12 @@ def _force_mock_provider(monkeypatch):
     # regardless of what's configured in a local backend/.env — otherwise
     # whichever real key happens to be present silently swaps every test
     # that relies on get_provider()'s default onto a real network call.
-    monkeypatch.setattr(settings, "gemini_api_key", "")
-    monkeypatch.setattr(settings, "deepseek_api_key", "")
+    for field in ("gemini_api_key", "deepseek_api_key", "openai_api_key", "kimi_api_key"):
+        monkeypatch.setattr(settings, field, "")
+    # 显式指定也要清掉，否则本地 .env 里的 LLM_PROVIDER 会绕过上面这几行。
+    monkeypatch.setattr(settings, "llm_provider", "")
+    # 搜索是独立的一层，同理不能让本地 key 把测试悄悄切到真实网络。
+    monkeypatch.setattr(settings, "tavily_api_key", "")
 
 
 @pytest.fixture(name="client_engine")

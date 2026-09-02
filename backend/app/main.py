@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.db import get_session, init_db
 from app.llm import get_provider
-from app.routers import audits, checkins, focus, graph, principles, skills
+from app.routers import audits, checkins, focus, graph, narrator, plan, principles, skills
 from app.seed import seed_skill_tree
 
 logging.basicConfig(level=logging.INFO)
@@ -37,6 +37,8 @@ app.include_router(principles.router)
 app.include_router(checkins.router)
 app.include_router(focus.router)
 app.include_router(graph.router)
+app.include_router(narrator.router)
+app.include_router(plan.router)
 
 
 @app.get("/api/health")

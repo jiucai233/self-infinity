@@ -19,6 +19,13 @@ _MISCONCEPTION_LINE_RE = re.compile(r"^- (.+)$")
 # 妥协。阈值比 retrieval 的复发检测更高：那边比的是两条同为一句话的 misconception，
 # 这边拿整段回答去比，偶然重合的机会大得多。
 _CHALLENGE_THRESHOLD = 8
+# Narrator 的替身从事实清单里认这两个标记：跨领域簇的前缀，以及簇行的起始符号。
+_CROSS_DOMAIN_MARKER = "【跨领域】"
+_CLUSTER_LINE_RE = re.compile(r"^·\s*(?:【跨领域】)?「(.+?)」发作 (\d+) 次，出现在这些技能点上：(.+)$")
+_PLAN_NODE_RE = re.compile(r"^- skill_id=(\d+) 「(.+?)」（(\w+)，难度 (\w+)）")
+_SUGGESTED_TIER_RE = re.compile(r"难度调度器建议的档位：(\w+)")
+_SEARCH_SKILL_RE = re.compile(r"讲解「(.+?)」")
+_CANDIDATE_INDEX_RE = re.compile(r"^\[(\d+)\] ")
 
 _FIRST_PROBE = "为什么这个方法能生效？如果去掉关键的那一步，会发生什么？"
 _ERROR_INJECTION_PROBE = (
@@ -48,7 +55,15 @@ class MockProvider:
     def complete(self, messages: list[Message]) -> str:
         start = time.perf_counter()
         system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        if "审计复核官" in system:
+        if "检索规划官" in system:
+            result = self._search_queries(messages)
+        elif "资料筛选官" in system:
+            result = self._search_select(messages)
+        elif "学习规划官" in system:
+            result = self._plan(messages)
+        elif "叙述官" in system:
+            result = self._narrate(messages)
+        elif "审计复核官" in system:
             result = self._challenge(messages)
         elif "原则蒸馏官" in system:
             result = self._distill(messages)
@@ -146,6 +161,90 @@ class MockProvider:
                 related.append({"ref": ref, "reason": "mock: 关键词重叠"})
 
         return json.dumps({"related": related[:4], "contradicts": contradicts})
+
+    @staticmethod
+    def _search_queries(messages: list[Message]) -> str:
+        system = next((m["content"] for m in messages if m["role"] == "system"), "")
+        m = _SEARCH_SKILL_RE.search(system)
+        skill = m.group(1) if m else "未知主题"
+        return json.dumps({"queries": [f"{skill} 原理", f"{skill} 常见误区"]})
+
+    @staticmethod
+    def _search_select(messages: list[Message]) -> str:
+        """挑前两条候选。真 provider 判的是"这条能不能补上缺口"，脚本只能按位置挑。"""
+        system = next((m["content"] for m in messages if m["role"] == "system"), "")
+        indices = [
+            int(m.group(1))
+            for line in system.splitlines()
+            if (m := _CANDIDATE_INDEX_RE.match(line.strip()))
+        ]
+        return json.dumps(
+            {"picks": [{"index": i, "reason": f"mock: 第 {i} 条候选与缺口相关。"} for i in indices[:2]]}
+        )
+
+    @staticmethod
+    def _plan(messages: list[Message]) -> str:
+        """确定性排序：建议档位匹配的节点优先，其余按原顺序补齐，最多 3 步。
+
+        这个"优先匹配 bandit 建议档位"的行为刻意和 SkillTree 页的推荐排序保持一致
+        （见 app/routers/skills.py 的 get_recommendation），这样离线演示里两处给出的
+        建议不会互相打架。
+        """
+        system = next((m["content"] for m in messages if m["role"] == "system"), "")
+        tier_match = _SUGGESTED_TIER_RE.search(system)
+        suggested = tier_match.group(1) if tier_match else ""
+
+        matched: list[tuple[int, str, str]] = []
+        others: list[tuple[int, str, str]] = []
+        for line in system.splitlines():
+            m = _PLAN_NODE_RE.match(line.strip())
+            if not m:
+                continue
+            entry = (int(m.group(1)), m.group(2), m.group(4))
+            (matched if m.group(4) == suggested else others).append(entry)
+
+        ordered = (matched + others)[:3]
+        steps = [
+            {
+                "skill_id": skill_id,
+                "rationale": f"mock: 难度 {tier} 与当前建议档位 {suggested or '未知'} 的匹配结果，排在第 {i + 1} 位。",
+                "focus_hint": f"mock: 讲「{title}」时先说清楚它为什么成立。",
+            }
+            for i, (skill_id, title, tier) in enumerate(ordered)
+        ]
+        return json.dumps({"steps": steps})
+
+    @staticmethod
+    def _narrate(messages: list[Message]) -> str:
+        """确定性叙述：真 provider 写的是人话，脚本只能按模板填空。
+
+        刻意保留"点名跨领域涉及哪些技能"这一条行为——那是 Narrator 存在的核心理由，
+        离线演示和测试都需要它可见，其余措辞则不必模仿。
+        """
+        system = next((m["content"] for m in messages if m["role"] == "system"), "")
+
+        cross_domain: list[tuple[str, str]] = []
+        total_clusters = 0
+        for line in system.splitlines():
+            m = _CLUSTER_LINE_RE.match(line.strip())
+            if not m:
+                continue
+            total_clusters += 1
+            if _CROSS_DOMAIN_MARKER in line:
+                cross_domain.append((m.group(1), m.group(3)))
+
+        if not total_clusters:
+            return json.dumps({"narrative": "还没有足够的失败记录可供分析。先完成一次审计。"})
+
+        if cross_domain:
+            label, skills = cross_domain[0]
+            narrative = (
+                f"你有 {total_clusters} 个反复出现的错误心智模型，"
+                f"其中「{label}」横跨了{skills}——问题不在某个知识点上。"
+            )
+        else:
+            narrative = f"你有 {total_clusters} 个反复出现的错误心智模型，目前都集中在单个技能点上。"
+        return json.dumps({"narrative": narrative})
 
     @staticmethod
     def _challenge(messages: list[Message]) -> str:

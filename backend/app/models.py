@@ -163,3 +163,45 @@ class FocusSession(SQLModel, table=True):
     # source is intentionally free-text (e.g. "audit_engagement"), not tied
     # to desktop screen-capture monitoring, which was deferred per §3 ADRs.
     source: str
+
+
+class NarratorBriefing(SQLModel, table=True):
+    """Narrator 最近一次生成的叙述。
+
+    只保留历史记录，读取时取最新一条。缓存的理由是成本与延迟：画像本身是纯 DB 计算
+    可以随便刷，但把它讲成话要调一次 LLM——首屏每次打开都调既慢又烧钱，所以叙述
+    只在用户主动点"重新生成"时更新。
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    narrative: str
+    generated_at: datetime = Field(default_factory=utcnow)
+
+
+class StudyPlan(SQLModel, table=True):
+    """Planner 生成的一份短期学习顺序。
+
+    落库而不是每次现算：一次规划要调一次 LLM，而用户会反复打开这个页面。context_json
+    存的是生成当时的状态快照（难度档位、体力等），这样计划旧了之后能看出它是基于
+    什么判断做出来的——一份没有前提的计划无法判断还该不该信。
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    steps_json: str
+    context_json: str
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class SearchPlan(SQLModel, table=True):
+    """针对某个技能点上某个具体缺口检索到的补救材料。
+
+    落库的理由一半是省钱（一次检索是两次 LLM 调用加若干次搜索 API），一半是它本身
+    就是记录：这个缺口当时是靠哪些材料补的，日后复发时能对照着看上次的补救有没有生效。
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    skill_id: int = Field(foreign_key="skillnode.id")
+    gap: str
+    queries_json: str
+    items_json: str
+    created_at: datetime = Field(default_factory=utcnow)

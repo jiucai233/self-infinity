@@ -6,6 +6,12 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = ""
     deepseek_api_key: str = ""
+    openai_api_key: str = ""
+    kimi_api_key: str = ""
+    # 显式指定用哪个 provider（"deepseek" / "openai" / "kimi" / "gemini" / "mock"）。
+    # 留空则按 key 是否配置自动选择，见 app/llm/__init__.py。配了多把 key 又想
+    # 临时切换时用它，比删 key 方便。
+    llm_provider: str = ""
     # llm_model 被 Gemini 与 DeepSeek 共用同一个字段——两者不会同时启用（见
     # get_provider() 的优先级选择），所以不需要各自独立的 model 字段，只需要
     # 部署时按当前启用的 provider 把 LLM_MODEL 设成对应的值（如 "deepseek-chat"）。
@@ -25,6 +31,12 @@ class Settings(BaseSettings):
     # 注入 Challenger 的历史 misconception 条数上限。取最近的若干条即可：
     # 全量注入会让 prompt 随使用时长无限膨胀，而越久远的错误模型越可能已经被纠正。
     challenger_misconception_limit: int = 5
+    # 搜索是独立于 LLM provider 的一层（见 app/search/base.py 的模块注释）：
+    # 换裁决模型不影响检索，换检索服务也不影响裁决。留空则用离线替身。
+    tavily_api_key: str = ""
+    search_timeout_seconds: float = 15.0
+    # OpenAI / Kimi 共用；DeepSeek 沿用自己那个字段，避免改动既有部署的 .env。
+    llm_timeout_seconds: float = 30.0
     gemini_timeout_seconds: float = 30.0
     deepseek_timeout_seconds: float = 30.0
 

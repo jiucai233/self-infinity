@@ -192,3 +192,75 @@ class CheckInRequest(BaseModel):
     _validate_spending_rating = field_validator("spending_rating")(_validate_rating)
     _validate_activity_rating = field_validator("activity_rating")(_validate_rating)
     _validate_eating_rating = field_validator("eating_rating")(_validate_rating)
+
+
+class MisconceptionClusterOut(BaseModel):
+    label: str
+    occurrences: int
+    skills: list[str]
+    cross_domain: bool
+    first_seen: datetime
+    last_seen: datetime
+    principle_ids: list[int]
+
+
+class NarratorBriefingOut(BaseModel):
+    total_skills: int
+    mastered_skills: int
+    available_skills: int
+    total_audits: int
+    passed_audits: int
+    failed_audits: int
+    pass_rate: float | None
+    clusters: list[MisconceptionClusterOut]
+    health: float | None
+    sanity: float | None
+    focus_score: int | None
+    # 叙述与画像分开返回：画像永远是新鲜的（纯 DB 现算），叙述可能是上一次生成的
+    # 快照，甚至为 None（从没生成过）。前端要能区分这两者，否则会把陈旧的叙述当成
+    # 对当前状态的描述。
+    narrative: str | None
+    narrative_generated_at: datetime | None
+
+
+class PlanStepOut(BaseModel):
+    skill_id: int
+    skill_title: str
+    node_type: NodeType
+    rationale: str
+    focus_hint: str
+
+
+class StudyPlanOut(BaseModel):
+    id: int
+    steps: list[PlanStepOut]
+    suggested_tier: str
+    context_bucket: str
+    created_at: datetime
+
+
+class SearchPlanRequest(BaseModel):
+    """检索入口强制要求上下文。
+
+    只接受"针对某个缺口/某个错误心智模型去找材料"，不接受"给我找这个主题的资料"——
+    后者会让系统退化成资料推荐器，而本系统的立论是验证而非供给（白皮书 §1）。
+    """
+
+    gap: str | None = None
+    misconception_id: int | None = None
+
+
+class SearchPlanItemOut(BaseModel):
+    title: str
+    url: str
+    snippet: str
+    reason: str
+
+
+class SearchPlanOut(BaseModel):
+    id: int
+    skill_id: int
+    gap: str
+    queries: list[str]
+    items: list[SearchPlanItemOut]
+    created_at: datetime
