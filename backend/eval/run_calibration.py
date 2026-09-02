@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.agents.auditor import Auditor
+from app.agents.challenger import Challenger
 from app.llm.base import LLMProvider, Message, complete_with_json_retry
 from app.llm.mock import MockProvider
 from app.models import NodeType
@@ -90,13 +91,31 @@ def build_student_answer(provider: LLMProvider, scenario: dict, history: list[Me
         return scenario["student_turns"][-1]
 
 
-def run_scenario(auditor: Auditor, provider: LLMProvider, scenario: dict, adaptive_student: bool) -> bool:
+def run_scenario(
+    auditor: Auditor,
+    provider: LLMProvider,
+    scenario: dict,
+    adaptive_student: bool,
+    challenger: Challenger | None = None,
+) -> bool:
+    """跑完一个场景，返回 Auditor 的最终裁决。
+
+    challenger 非 None 时，pass 裁决会先经过一次复核；复核推翻的话，挑战变成
+    多出来的一个追问，学生回答后由 Auditor 重新裁决（至多一次，和线上一致）。
+
+    注意 Challenger 在这里只拿得到来源 (a)（skill_description），misconceptions
+    一律传空：离线校准没有"该用户的历史"，而场景里唯一像历史的字段
+    （label_rationale / expected_passed）是 ground truth——喂给复核官就是标签
+    泄漏，跑出来的放水率会假性变好。
+    """
     node_type = NodeType(scenario["node_type"])
     student_turns = scenario["student_turns"]
 
     template = CONCEPT_OPENING_TEMPLATE if node_type == NodeType.concept else TASK_OPENING_TEMPLATE
     opening = template.format(title=scenario["skill_title"])
     history: list[Message] = [{"role": "assistant", "content": opening}]
+
+    challenged = False
 
     for turn in range(MAX_TURNS):
         if turn < len(student_turns):
@@ -111,6 +130,17 @@ def run_scenario(auditor: Auditor, provider: LLMProvider, scenario: dict, adapti
             scenario["skill_title"], scenario["skill_description"], history, node_type
         )
         if result.is_verdict:
+            if result.passed and challenger is not None and not challenged:
+                try:
+                    challenge = challenger.review(
+                        scenario["skill_title"], scenario["skill_description"], history, []
+                    )
+                except Exception:
+                    challenge = None
+                if challenge is not None and challenge.overturned:
+                    challenged = True
+                    history.append({"role": "assistant", "content": challenge.question})
+                    continue
             return result.passed
 
         history.append({"role": "assistant", "content": result.question})
@@ -125,6 +155,9 @@ def main() -> None:
     # asks beyond ~2 rounds, so the 3 scripted turns are always enough and
     # spending real API calls on a student for it would be pointless).
     parser.add_argument("--adaptive-student", action=argparse.BooleanOptionalAction, default=None)
+    # A/B 消融开关：同一份校准集分别跑 --no-challenger / --challenger，
+    # 差值就是 Challenger 对放水率的实际贡献（白皮书 §8 的消融实验）。
+    parser.add_argument("--challenger", action=argparse.BooleanOptionalAction, default=False)
     args = parser.parse_args()
     adaptive_student = args.adaptive_student
     if adaptive_student is None:
@@ -133,10 +166,11 @@ def main() -> None:
     scenarios = json.loads(CALIBRATION_SET_PATH.read_text())
     provider = build_provider(args.provider)
     auditor = Auditor(provider)
+    challenger = Challenger(provider) if args.challenger else None
 
     results = []
     for scenario in scenarios:
-        actual = run_scenario(auditor, provider, scenario, adaptive_student)
+        actual = run_scenario(auditor, provider, scenario, adaptive_student, challenger)
         expected = scenario["expected_passed"]
         match = actual == expected
         results.append({**scenario, "actual_passed": actual, "match": match})
@@ -157,6 +191,7 @@ def main() -> None:
     print("\n=== summary ===")
     print(f"provider: {args.provider}")
     print(f"adaptive_student: {adaptive_student}")
+    print(f"challenger: {args.challenger}")
     print(f"accuracy: {correct}/{total} = {accuracy:.1f}%")
     print(f"leniency rate (false-pass among should-fail): {len(false_pass)}/{len(should_fail)} = {leniency:.1f}%")
 

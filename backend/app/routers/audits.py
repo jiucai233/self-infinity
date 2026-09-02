@@ -1,10 +1,16 @@
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.agents.auditor import Auditor
-from app.agents.retrieval import find_recurring_misconception, find_relevant_principles
+from app.agents.challenger import ChallengeResult, Challenger
+from app.agents.retrieval import (
+    collect_recent_misconceptions,
+    find_recurring_misconception,
+    find_relevant_principles,
+)
 from app.agents.scribe import Scribe
 from app.db import get_session
 from app.llm import get_provider
@@ -39,6 +45,8 @@ from app.services.focus import compute_focus_score
 from app.services.incentive import compute_reward
 from app.services.vitality import apply_audit_result
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api", tags=["audits"])
 
 CONCEPT_OPENING_TEMPLATE = "假设我完全没听说过「{title}」，从零开始，讲给我听。"
@@ -53,6 +61,23 @@ def _opening_question(skill: SkillNode) -> str:
 def _resolve_max_turns(node_type: NodeType, mode: str) -> int:
     base = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
     return base * 2 if mode == "night" else base
+
+
+def _maybe_challenge(session: Session, skill: SkillNode, history: list[Message]) -> ChallengeResult | None:
+    """对一个 pass 裁决跑一次复核，返回有效挑战；维持原判或复核失败都返回 None。
+
+    Challenger 的作用是收紧裁决，它自己出问题不该让整场审计失败——所以任何异常
+    都吞掉当作"维持原判"，而不是像 Auditor 那样冒 502。
+    """
+    try:
+        misconceptions = collect_recent_misconceptions(session, settings.challenger_misconception_limit)
+        result = Challenger(get_provider()).review(
+            skill.title, skill.description, history, misconceptions
+        )
+    except Exception:
+        logger.warning("challenger failed, upholding the auditor verdict", exc_info=True)
+        return None
+    return result if result.overturned else None
 
 
 def _session_out(session: Session, audit: AuditSession) -> AuditSessionOut:
@@ -135,6 +160,20 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
         session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=result.question))
         session.commit()
         return TurnResultResponse(type="probe", question=result.question)
+
+    # 只复核 pass 裁决，且每场审计至多一次（challenged 是那道收敛保证）。fail 不需要
+    # 复核——Challenger 的目标函数是推翻通过，对一个已经不通过的裁决无事可做。挑战
+    # 不直接翻转裁决，而是变成最后一个追问：用户有机会回应，再由 Auditor 出最终裁决，
+    # 届时 challenged 已为真，不会再次触发。详见 app/agents/challenger.py。
+    if result.passed and settings.challenger_enabled and not audit.challenged:
+        challenge = _maybe_challenge(session, skill, history)
+        if challenge is not None:
+            audit.challenged = True
+            session.add(audit)
+            session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=challenge.question))
+            session.commit()
+            logger.info("challenger overturned a pass verdict: %s", challenge.reason)
+            return TurnResultResponse(type="probe", question=challenge.question)
 
     # Context is computed excluding this session (its own outcome can't
     # leak into the state used to judge which tier was worth recommending

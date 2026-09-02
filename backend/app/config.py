@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     # （见 app/routers/audits.py 的 _resolve_max_turns）。
     audit_max_turns: int = 8
     task_max_turns: int = 4
+    # Challenger（审计复核官）总开关。留成配置项是为了 M2 校准能跑
+    # 单 Auditor vs Auditor+Challenger 的消融对比——见 eval/run_calibration.py。
+    challenger_enabled: bool = True
+    # 注入 Challenger 的历史 misconception 条数上限。取最近的若干条即可：
+    # 全量注入会让 prompt 随使用时长无限膨胀，而越久远的错误模型越可能已经被纠正。
+    challenger_misconception_limit: int = 5
     gemini_timeout_seconds: float = 30.0
     deepseek_timeout_seconds: float = 30.0
 

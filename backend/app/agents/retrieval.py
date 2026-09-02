@@ -90,3 +90,19 @@ def find_relevant_principles(session: Session, skill: SkillNode, limit: int = 3)
     relevant = [(p, score) for p, score in scored if score > 0]
     relevant.sort(key=lambda item: item[1], reverse=True)
     return [p for p, _score in relevant[:limit]]
+
+
+def collect_recent_misconceptions(session: Session, limit: int = 5) -> list[str]:
+    """取最近诊断出的若干条 misconception，供 Challenger 作为挑战来源之一。
+
+    与 find_recurring_misconception 的区别：那个是拿一条新诊断去比对历史找复发，
+    这个不做任何匹配，只是把"这个用户栽过哪些心智模型"整体交给 Challenger，由它
+    在完整对话上下文里判断本次讲解有没有再次落进去——那是文本重叠算不出来的判断。
+    """
+    principles = session.exec(
+        select(Principle)
+        .where(Principle.misconception.is_not(None))
+        .order_by(Principle.created_at.desc())
+        .limit(limit)
+    ).all()
+    return [p.misconception for p in principles if p.misconception]

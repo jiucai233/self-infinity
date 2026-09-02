@@ -62,6 +62,11 @@ class AuditSession(SQLModel, table=True):
     # 会话创建时按 mode + node_type 一次性算出的追问上限，此后终身固定，
     # 不再随全局配置变化而漂移（见 AuditMode / start_audit）。
     max_turns: int = 4
+    # 该会话是否已被 Challenger 复核过。复核每场审计最多一次，这个标记就是那道
+    # 收敛保证（见 app/agents/challenger.py）。刻意声明为 nullable：_add_missing_columns()
+    # 只能给已存在的库追加可空列，NOT NULL 会被它直接拒绝，老数据行读回来是 None，
+    # 判断一律走 `not audit.challenged`。
+    challenged: bool = Field(default=False, nullable=True)
     created_at: datetime = Field(default_factory=utcnow)
 
 

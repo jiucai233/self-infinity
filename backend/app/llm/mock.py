@@ -13,6 +13,12 @@ logger = logging.getLogger(__name__)
 # literal marker in a principle's body.
 _CONTRADICTS_MARKER = "刻意矛盾"
 _CANDIDATE_LINE_RE = re.compile(r"^\[(\d+)\] \((\w+)\) (.+?) —— (.*)$")
+_MISCONCEPTION_LINE_RE = re.compile(r"^- (.+)$")
+# Challenger 的替身判据：用户这轮说的话和某条历史 misconception 文本重叠到这个
+# 程度就算"又落进去了"。真 provider 判的是语义，脚本只能判重叠——和 _link 同样的
+# 妥协。阈值比 retrieval 的复发检测更高：那边比的是两条同为一句话的 misconception，
+# 这边拿整段回答去比，偶然重合的机会大得多。
+_CHALLENGE_THRESHOLD = 8
 
 _FIRST_PROBE = "为什么这个方法能生效？如果去掉关键的那一步，会发生什么？"
 _ERROR_INJECTION_PROBE = (
@@ -42,7 +48,9 @@ class MockProvider:
     def complete(self, messages: list[Message]) -> str:
         start = time.perf_counter()
         system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        if "原则蒸馏官" in system:
+        if "审计复核官" in system:
+            result = self._challenge(messages)
+        elif "原则蒸馏官" in system:
             result = self._distill(messages)
         elif "关联图书管理员" in system:
             result = self._link(messages)
@@ -138,6 +146,29 @@ class MockProvider:
                 related.append({"ref": ref, "reason": "mock: 关键词重叠"})
 
         return json.dumps({"related": related[:4], "contradicts": contradicts})
+
+    @staticmethod
+    def _challenge(messages: list[Message]) -> str:
+        from app.agents.retrieval import relevance_score
+
+        system = next((m["content"] for m in messages if m["role"] == "system"), "")
+        answers = " ".join(m["content"] for m in messages if m["role"] == "user")
+
+        for line in system.splitlines():
+            m = _MISCONCEPTION_LINE_RE.match(line.strip())
+            if not m:
+                continue
+            misconception = m.group(1)
+            if relevance_score(answers, misconception) >= _CHALLENGE_THRESHOLD:
+                return json.dumps(
+                    {
+                        "action": "overturn",
+                        "question": f"你刚才的说法里，是不是又假定了「{misconception}」？说说这里为什么不是。",
+                        "reason": f"mock: 与历史 misconception 文本重叠 —— {misconception}",
+                    }
+                )
+
+        return json.dumps({"action": "uphold", "reason": "mock: 未命中任何历史 misconception"})
 
     @staticmethod
     def _distill(messages: list[Message]) -> str:
