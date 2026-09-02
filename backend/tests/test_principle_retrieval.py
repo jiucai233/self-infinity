@@ -158,7 +158,7 @@ class _CapturingProvider:
 def _generate_root_skill(client, topic: str) -> dict:
     resp = client.post("/api/skills/generate", json={"topic": topic})
     assert resp.status_code == 200
-    nodes = resp.json()
+    nodes = resp.json()["nodes"]
     return next(n for n in nodes if n["parent_id"] is None)
 
 

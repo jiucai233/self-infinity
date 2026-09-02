@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.models import AuditStatus, NodeType, SkillStatus
 
@@ -12,10 +12,22 @@ def _not_blank(value: str) -> str:
     return stripped
 
 
+def _validate_difficulty(value: str) -> str:
+    if value not in ("intro", "standard", "deep"):
+        raise ValueError('difficulty must be "intro", "standard" or "deep"')
+    return value
+
+
 class GenerateTreeRequest(BaseModel):
     topic: str
+    # 课程规模的超参数。上下界是防呆而非性能考虑：少于 4 个节点不成课程，
+    # 多于 30 个则单次生成的质量明显下降、开始出现凑数的空节点。
+    node_count: int = Field(default=12, ge=4, le=30)
+    max_depth: int = Field(default=4, ge=2, le=6)
+    difficulty: str = "standard"
 
     _validate_topic = field_validator("topic")(_not_blank)
+    _validate_difficulty = field_validator("difficulty")(_validate_difficulty)
 
 
 class ClarifyRequest(BaseModel):
@@ -264,3 +276,14 @@ class SearchPlanOut(BaseModel):
     queries: list[str]
     items: list[SearchPlanItemOut]
     created_at: datetime
+
+
+class SkillPrerequisiteOut(BaseModel):
+    skill_id: int
+    prerequisite_id: int
+    reason: str
+
+
+class GenerateTreeResponse(BaseModel):
+    nodes: list[SkillNodeOut]
+    prerequisites: list[SkillPrerequisiteOut]

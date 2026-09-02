@@ -6,7 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
-from app.agents.planner import Planner
+from app.agents.recommender import Recommender
 from app.db import get_session
 from app.llm import get_provider
 from app.models import SkillNode, SkillStatus, StudyPlan
@@ -71,7 +71,7 @@ def generate_plan(session: Session = Depends(get_session)):
     profile = build_profile(session)
 
     try:
-        steps = Planner(get_provider()).plan(
+        steps = Recommender(get_provider()).recommend(
             available,
             tiers,
             suggested_tier=tier,

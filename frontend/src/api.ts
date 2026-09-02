@@ -2,7 +2,9 @@ import type {
   AuditMode,
   CheckInRequest,
   ClarifyResponse,
+  CourseOptions,
   FocusSession,
+  GenerateTreeResponse,
   GraphResponse,
   NarratorBriefing,
   Principle,
@@ -33,10 +35,10 @@ export const api = {
 
   getRecommendation: () => request<RecommendationResponse>('/skills/recommendation'),
 
-  generateTree: (topic: string) =>
-    request<SkillNode[]>('/skills/generate', {
+  generateTree: (topic: string, options?: Partial<CourseOptions>) =>
+    request<GenerateTreeResponse>('/skills/generate', {
       method: 'POST',
-      body: JSON.stringify({ topic }),
+      body: JSON.stringify({ topic, ...options }),
     }),
 
   clarifyTopic: (topic: string) =>

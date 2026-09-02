@@ -1,4 +1,4 @@
-"""Planner：时间顺序规划。
+"""Recommender：在已有节点里挑下一步。
 
 最重要的一条是**不接受指向不存在节点的步骤** —— 模型编 skill_id 是必然会发生的，
 而一个指向空气的步骤在前端就是个点了没反应的按钮。
@@ -7,14 +7,14 @@
 import pytest
 from sqlmodel import Session, select
 
-from app.agents.planner import Planner, format_context
+from app.agents.recommender import Recommender, format_context
 from app.models import SkillNode, SkillStatus, StudyPlan
 from app.services.profile import MisconceptionCluster
 from app.models import utcnow
 
 
 def test_invalid_skill_ids_are_dropped():
-    steps = Planner._parse(
+    steps = Recommender._parse(
         '{"steps": [{"skill_id": 1, "rationale": "有效"}, {"skill_id": 999, "rationale": "编造的"}]}',
         valid_ids={1, 2},
     )
@@ -23,7 +23,7 @@ def test_invalid_skill_ids_are_dropped():
 
 
 def test_duplicate_steps_are_dropped():
-    steps = Planner._parse(
+    steps = Recommender._parse(
         '{"steps": [{"skill_id": 1, "rationale": "第一次"}, {"skill_id": 1, "rationale": "又来一次"}]}',
         valid_ids={1},
     )
@@ -34,18 +34,18 @@ def test_duplicate_steps_are_dropped():
 def test_plan_is_capped_at_five_steps():
     payload = '{"steps": [' + ",".join(f'{{"skill_id": {i}, "rationale": "r"}}' for i in range(1, 9)) + "]}"
 
-    assert len(Planner._parse(payload, valid_ids=set(range(1, 9)))) == 5
+    assert len(Recommender._parse(payload, valid_ids=set(range(1, 9)))) == 5
 
 
 def test_all_invalid_ids_is_an_error_not_an_empty_plan():
     """一份全是废步骤的计划不该被当成"没什么可做"静默返回。"""
     with pytest.raises(ValueError):
-        Planner._parse('{"steps": [{"skill_id": 999, "rationale": "编造的"}]}', valid_ids={1})
+        Recommender._parse('{"steps": [{"skill_id": 999, "rationale": "编造的"}]}', valid_ids={1})
 
 
 def test_malformed_output_raises():
     with pytest.raises(ValueError):
-        Planner._parse("这不是 JSON", valid_ids={1})
+        Recommender._parse("这不是 JSON", valid_ids={1})
 
 
 def test_no_available_nodes_means_no_llm_call():
@@ -57,7 +57,7 @@ def test_no_available_nodes_means_no_llm_call():
         def complete(self, messages):
             raise AssertionError("不该被调用")
 
-    assert Planner(ExplodingProvider()).plan([], {}, "easy", "mid", []) == []
+    assert Recommender(ExplodingProvider()).recommend([], {}, "easy", "mid", []) == []
 
 
 def test_context_marks_cross_domain_clusters():

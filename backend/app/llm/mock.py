@@ -59,8 +59,8 @@ class MockProvider:
             result = self._search_queries(messages)
         elif "资料筛选官" in system:
             result = self._search_select(messages)
-        elif "学习规划官" in system:
-            result = self._plan(messages)
+        elif "下一步推荐官" in system:
+            result = self._recommend(messages)
         elif "叙述官" in system:
             result = self._narrate(messages)
         elif "审计复核官" in system:
@@ -71,7 +71,7 @@ class MockProvider:
             result = self._link(messages)
         elif "澄清官" in system:
             result = self._clarify(messages)
-        elif "技能树规划官" in system:
+        elif "课程编排官" in system:
             result = self._generate_tree(messages)
         elif "任务核验官" in system:
             result = self._audit_task(messages)
@@ -91,48 +91,49 @@ class MockProvider:
 
     @staticmethod
     def _generate_tree(messages: list[Message]) -> str:
+        """确定性课程编排。
+
+        树的形状刻意做成"根是容器、叶子才具体"，并且给出一条**兄弟之间**的先修边
+        （基础 → 进阶）。兄弟先修是树结构表达不了、只能靠先修图承载的那种关系，
+        离线测试必须覆盖到它，否则先修和父子的区别在测试里就看不出来。
+        """
         topic = next((m["content"] for m in messages if m["role"] == "user"), "").strip() or "新主题"
         is_task_oriented = any(kw in topic for kw in _TASK_ORIENTED_KEYWORDS)
         node_type = "task" if is_task_oriented else "concept"
-        # 任务型主题（比如"把大象放进冰箱"）本身就是一整个要做的事，根节点也该是
-        # task，不该被当成需要讲清楚原理的知识点——这正是本文件要纠正的那个 bug。
         nodes = [
             {
                 "slug": "root",
                 "title": topic[:16],
-                "description": f"{topic}的整体目标" if is_task_oriented else f"{topic}的入门整体理解",
+                "description": f"「{topic}」这门课覆盖的范围",
                 "parent_slug": None,
                 "node_type": node_type,
             },
             {
-                "slug": "core",
-                "title": f"{topic[:12]}·第一步" if is_task_oriented else f"{topic[:12]}的核心机制",
-                "description": f"{topic}要先完成的第一个具体步骤"
-                if is_task_oriented
-                else f"支撑{topic}成立的关键原理",
+                "slug": "basics",
+                "title": f"{topic[:12]}·基础",
+                "description": f"{topic}里最先要会的那个具体东西",
                 "parent_slug": "root",
                 "node_type": node_type,
             },
             {
-                "slug": "boundary",
-                "title": f"{topic[:12]}·第二步" if is_task_oriented else f"{topic[:12]}的边界情况",
-                "description": f"{topic}要完成的第二个具体步骤"
-                if is_task_oriented
-                else f"{topic}在什么条件下失效或需要特别处理",
+                "slug": "advanced",
+                "title": f"{topic[:12]}·进阶",
+                "description": f"{topic}里建立在基础之上的具体方法",
                 "parent_slug": "root",
                 "node_type": node_type,
             },
             {
-                "slug": "apply",
-                "title": f"{topic[:12]}·收尾确认" if is_task_oriented else f"{topic[:12]}的实战应用",
-                "description": f"确认{topic}整体是不是真的做完了"
-                if is_task_oriented
-                else f"把{topic}用到一个具体问题里",
-                "parent_slug": "core",
+                "slug": "applied",
+                "title": f"{topic[:12]}·应用",
+                "description": f"把{topic}用到一个具体问题里",
+                "parent_slug": "advanced",
                 "node_type": node_type,
             },
         ]
-        return json.dumps(nodes)
+        prerequisites = [
+            {"from": "basics", "to": "advanced", "reason": "mock: 进阶建立在基础之上（树上是兄弟）"}
+        ]
+        return json.dumps({"nodes": nodes, "prerequisites": prerequisites})
 
     @staticmethod
     def _link(messages: list[Message]) -> str:
@@ -183,7 +184,7 @@ class MockProvider:
         )
 
     @staticmethod
-    def _plan(messages: list[Message]) -> str:
+    def _recommend(messages: list[Message]) -> str:
         """确定性排序：建议档位匹配的节点优先，其余按原顺序补齐，最多 3 步。
 
         这个"优先匹配 bandit 建议档位"的行为刻意和 SkillTree 页的推荐排序保持一致

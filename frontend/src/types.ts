@@ -189,3 +189,28 @@ export interface SearchPlan {
   items: SearchPlanItem[]
   created_at: string
 }
+
+export type CourseDifficulty = 'intro' | 'standard' | 'deep'
+
+export interface CourseOptions {
+  node_count: number
+  max_depth: number
+  difficulty: CourseDifficulty
+}
+
+export interface SkillPrerequisite {
+  skill_id: number
+  prerequisite_id: number
+  reason: string
+}
+
+/**
+ * Two sets of edges over the same nodes: parent_id on each node is
+ * classification ("is a kind of"), prerequisites is ordering ("must know
+ * first"). Tree traversal order is not learning order — siblings can have a
+ * prerequisite between them.
+ */
+export interface GenerateTreeResponse {
+  nodes: SkillNode[]
+  prerequisites: SkillPrerequisite[]
+}

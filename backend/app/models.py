@@ -179,7 +179,7 @@ class NarratorBriefing(SQLModel, table=True):
 
 
 class StudyPlan(SQLModel, table=True):
-    """Planner 生成的一份短期学习顺序。
+    """Recommender 生成的一份短期学习顺序。
 
     落库而不是每次现算：一次规划要调一次 LLM，而用户会反复打开这个页面。context_json
     存的是生成当时的状态快照（难度档位、体力等），这样计划旧了之后能看出它是基于
@@ -204,4 +204,23 @@ class SearchPlan(SQLModel, table=True):
     gap: str
     queries_json: str
     items_json: str
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class SkillPrerequisite(SQLModel, table=True):
+    """先修边：学 skill_id 之前必须先会 prerequisite_id。
+
+    单独一张表，不复用 PrincipleLink——那张表的 source 固定是 principle
+    （principle_id 是必填外键），装不下 skill→skill 的关系。
+
+    这些边和 SkillNode.parent_id 长在同一批节点上，但表达的是完全不同的东西：
+    parent 是分类（属于），这里是顺序（学之前要会）。树的遍历顺序不等于学习顺序，
+    最直接的反例是兄弟节点之间的先修（Fast R-CNN → Faster R-CNN），那在树里
+    根本无从表达。详见 app/agents/planner.py 的模块注释。
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    skill_id: int = Field(foreign_key="skillnode.id")
+    prerequisite_id: int = Field(foreign_key="skillnode.id")
+    reason: str = ""
     created_at: datetime = Field(default_factory=utcnow)

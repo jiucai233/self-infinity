@@ -19,7 +19,7 @@ def test_generate_tree_returns_502_on_provider_failure(client):
     with patch("app.routers.skills.get_provider", return_value=BrokenProvider()):
         resp = client.post("/api/skills/generate", json={"topic": "B 树"})
     assert resp.status_code == 502
-    assert resp.json()["detail"] == "技能树规划失败，请稍后重试"
+    assert resp.json()["detail"] == "课程编排失败，请稍后重试"
 
 
 def test_submit_turn_returns_502_on_provider_failure(client):

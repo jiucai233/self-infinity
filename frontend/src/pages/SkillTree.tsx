@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import KnowledgeGraph from './KnowledgeGraph'
-import type { AuditMode, DifficultyTier, GraphResponse, RecommendationResponse, SkillNode } from '../types'
+import type {
+  AuditMode,
+  CourseDifficulty,
+  CourseOptions,
+  DifficultyTier,
+  GraphResponse,
+  RecommendationResponse,
+  SkillNode,
+} from '../types'
 
 const TIER_LABEL: Record<DifficultyTier, string> = {
   easy: 'Easy',
@@ -105,6 +113,13 @@ export default function SkillTree({
   const [error, setError] = useState<string | null>(null)
   const [topic, setTopic] = useState('')
   const [generating, setGenerating] = useState(false)
+  // Course shape knobs handed to the Planner. Defaults mirror the backend's
+  // (12 / 4 / standard) so an untouched form behaves exactly as before.
+  const [course, setCourse] = useState<CourseOptions>({
+    node_count: 12,
+    max_depth: 4,
+    difficulty: 'standard',
+  })
   const [auditMode, setAuditMode] = useState<AuditMode>('day')
 
   // Clarify-first flow: when the clarify endpoint says the topic is too
@@ -150,7 +165,7 @@ export default function SkillTree({
     setGenerating(true)
     setError(null)
     try {
-      await api.generateTree(finalTopic)
+      await api.generateTree(finalTopic, course)
       setTopic('')
       setClarifyTopicText(null)
       setClarifyQuestions([])
@@ -309,6 +324,51 @@ export default function SkillTree({
           >
             {generating ? 'Planner is breaking it down…' : 'New Mission'}
           </button>
+        </div>
+
+        <div
+          style={{ display: 'flex', gap: 14, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}
+        >
+          <label className="dim" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+            Depth
+            <select
+              value={course.difficulty}
+              disabled={generating}
+              onChange={(e) =>
+                setCourse((c) => ({ ...c, difficulty: e.target.value as CourseDifficulty }))
+              }
+            >
+              <option value="intro">intro — what and why</option>
+              <option value="standard">standard — concrete methods</option>
+              <option value="deep">deep — named models</option>
+            </select>
+          </label>
+
+          <label className="dim" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+            Nodes
+            <input
+              type="number"
+              min={4}
+              max={30}
+              value={course.node_count}
+              disabled={generating}
+              style={{ width: 64 }}
+              onChange={(e) => setCourse((c) => ({ ...c, node_count: Number(e.target.value) }))}
+            />
+          </label>
+
+          <label className="dim" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+            Levels
+            <input
+              type="number"
+              min={2}
+              max={6}
+              value={course.max_depth}
+              disabled={generating}
+              style={{ width: 56 }}
+              onChange={(e) => setCourse((c) => ({ ...c, max_depth: Number(e.target.value) }))}
+            />
+          </label>
         </div>
 
         <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>

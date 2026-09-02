@@ -1,7 +1,7 @@
 def test_elephant_in_fridge_root_is_task_not_concept(client):
     nodes = client.post(
         "/api/skills/generate", json={"topic": "我要把一个大象放到冰箱里"}
-    ).json()
+    ).json()["nodes"]
     root = next(n for n in nodes if n["parent_id"] is None)
     assert root["node_type"] == "task"
 
@@ -9,7 +9,7 @@ def test_elephant_in_fridge_root_is_task_not_concept(client):
 def test_task_node_passes_without_deep_explanation(client):
     nodes = client.post(
         "/api/skills/generate", json={"topic": "我要把一个大象放到冰箱里"}
-    ).json()
+    ).json()["nodes"]
     root = next(n for n in nodes if n["parent_id"] is None)
 
     start = client.post(f"/api/skills/{root['id']}/audits")
@@ -30,7 +30,7 @@ def test_task_node_passes_without_deep_explanation(client):
 def test_task_node_fails_on_hollow_answer(client):
     nodes = client.post(
         "/api/skills/generate", json={"topic": "我要把一个大象放到冰箱里"}
-    ).json()
+    ).json()["nodes"]
     root = next(n for n in nodes if n["parent_id"] is None)
 
     start = client.post(f"/api/skills/{root['id']}/audits")
@@ -43,7 +43,7 @@ def test_task_node_fails_on_hollow_answer(client):
 
 
 def test_concept_topic_still_gets_full_feynman_protocol(client):
-    nodes = client.post("/api/skills/generate", json={"topic": "B 树"}).json()
+    nodes = client.post("/api/skills/generate", json={"topic": "B 树"}).json()["nodes"]
     root = next(n for n in nodes if n["parent_id"] is None)
     assert root["node_type"] == "concept"
 

@@ -251,7 +251,7 @@ describe('SkillTree', () => {
   describe('clarify-first generate flow', () => {
     it('when clarify says needs_clarification: false, calls generateTree directly with no intermediate step', async () => {
       vi.mocked(api.clarifyTopic).mockResolvedValue({ needs_clarification: false, questions: [] })
-      vi.mocked(api.generateTree).mockResolvedValue([])
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [] })
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
@@ -261,9 +261,33 @@ describe('SkillTree', () => {
       await user.click(screen.getByRole('button', { name: 'New Mission' }))
 
       await waitFor(() =>
-        expect(api.generateTree).toHaveBeenCalledWith('Reinforcement learning'),
+        expect(api.generateTree).toHaveBeenCalledWith(
+          'Reinforcement learning',
+          // Course-shape knobs ride along with every generate call; defaults
+          // match the backend's so an untouched form behaves as before.
+          { node_count: 12, max_depth: 4, difficulty: 'standard' },
+        ),
       )
       expect(screen.queryByText('Skip, generate anyway')).not.toBeInTheDocument()
+    })
+
+    it('passes the chosen course shape to the Planner', async () => {
+      vi.mocked(api.clarifyTopic).mockResolvedValue({ needs_clarification: false, questions: [] })
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [] })
+
+      render(<SkillTree onAudit={vi.fn()} />)
+      await waitFor(() => expect(screen.getByPlaceholderText(/B-trees/)).toBeInTheDocument())
+
+      await userEvent.selectOptions(screen.getByLabelText(/Depth/), 'deep')
+      await userEvent.type(screen.getByPlaceholderText(/B-trees/), 'Reinforcement learning')
+      await userEvent.click(screen.getByRole('button', { name: 'New Mission' }))
+
+      await waitFor(() =>
+        expect(api.generateTree).toHaveBeenCalledWith(
+          'Reinforcement learning',
+          expect.objectContaining({ difficulty: 'deep' }),
+        ),
+      )
     })
 
     it('when clarify says needs_clarification: true, renders question inputs and does not call generateTree yet', async () => {
@@ -291,7 +315,7 @@ describe('SkillTree', () => {
         needs_clarification: true,
         questions: ['Which direction do you want to focus on?'],
       })
-      vi.mocked(api.generateTree).mockResolvedValue([])
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [] })
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
@@ -321,7 +345,7 @@ describe('SkillTree', () => {
         needs_clarification: true,
         questions: ['Which direction do you want to focus on?'],
       })
-      vi.mocked(api.generateTree).mockResolvedValue([])
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [] })
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
@@ -335,12 +359,17 @@ describe('SkillTree', () => {
       )
       await user.click(screen.getByRole('button', { name: 'Skip, generate anyway' }))
 
-      await waitFor(() => expect(api.generateTree).toHaveBeenCalledWith('Cooking'))
+      await waitFor(() =>
+        expect(api.generateTree).toHaveBeenCalledWith(
+          'Cooking',
+          { node_count: 12, max_depth: 4, difficulty: 'standard' },
+        ),
+      )
     })
 
     it('falls back to generating directly when the clarify endpoint itself fails', async () => {
       vi.mocked(api.clarifyTopic).mockRejectedValue(new Error('502 Bad Gateway'))
-      vi.mocked(api.generateTree).mockResolvedValue([])
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [] })
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
@@ -350,7 +379,12 @@ describe('SkillTree', () => {
       await user.click(screen.getByRole('button', { name: 'New Mission' }))
 
       await waitFor(() =>
-        expect(api.generateTree).toHaveBeenCalledWith('Reinforcement learning'),
+        expect(api.generateTree).toHaveBeenCalledWith(
+          'Reinforcement learning',
+          // Course-shape knobs ride along with every generate call; defaults
+          // match the backend's so an untouched form behaves as before.
+          { node_count: 12, max_depth: 4, difficulty: 'standard' },
+        ),
       )
     })
   })

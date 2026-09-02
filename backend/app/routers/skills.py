@@ -4,24 +4,27 @@ from sqlmodel import Session, select
 import json
 import logging
 
-from app.agents.architect import Architect, GeneratedNode
 from app.agents.clarifier import Clarifier
+from app.agents.planner import GeneratedNode, Planner
 from app.agents.searcher import Searcher
 from app.db import get_session
 from app.llm import get_provider
-from app.models import Principle, SearchPlan, SkillNode, SkillStatus
+from app.models import Principle, SearchPlan, SkillNode, SkillPrerequisite, SkillStatus
 from app.schemas import (
     ClarifyRequest,
     ClarifyResponse,
     GenerateTreeRequest,
+    GenerateTreeResponse,
     RecommendationOut,
     SearchPlanItemOut,
     SearchPlanOut,
     SearchPlanRequest,
     SkillNodeOut,
+    SkillPrerequisiteOut,
 )
 from app.search import get_search_provider
 from app.services import bandit
+from app.services.prerequisites import add_prerequisites
 from app.utils import slugify
 
 logger = logging.getLogger(__name__)
@@ -60,13 +63,24 @@ def clarify_topic(body: ClarifyRequest):
     return ClarifyResponse(needs_clarification=result.needs_clarification, questions=result.questions)
 
 
-@router.post("/generate", response_model=list[SkillNodeOut])
+@router.post("/generate", response_model=GenerateTreeResponse)
 def generate_tree(body: GenerateTreeRequest, session: Session = Depends(get_session)):
-    architect = Architect(get_provider())
+    """编排一门课：节点 + 分类树 + 先修边。
+
+    先修边和 parent_id 长在同一批节点上但含义不同（分类 vs 顺序），成环的边会在
+    落库时被丢弃——见 app/services/prerequisites.py。
+    """
+    planner = Planner(get_provider())
     try:
-        nodes = architect.generate(body.topic)
+        course = planner.generate(
+            body.topic,
+            node_count=body.node_count,
+            max_depth=body.max_depth,
+            difficulty=body.difficulty,
+        )
     except Exception:
-        raise HTTPException(502, "技能树规划失败，请稍后重试")
+        raise HTTPException(502, "课程编排失败，请稍后重试")
+    nodes = course.nodes
 
     taken_slugs = set(session.exec(select(SkillNode.slug)).all())
 
@@ -127,12 +141,46 @@ def generate_tree(body: GenerateTreeRequest, session: Session = Depends(get_sess
             node_type=node.node_type,
         )
         session.add(row)
+        session.flush()
+        # 这些节点的 parent_slug 解析失败被挂到了根下，但它们仍然可以是先修边的
+        # 端点——不登记就会让本来有效的先修边因为查不到 id 而被丢掉。
+        original_to_id[node.slug] = row.id
         created.append(row)
+
+    # 丢弃与父子关系重合的先修边。它们不是错的，只是冗余：解锁机制本来就规定了
+    # 父节点通过之后子节点才 available，父子顺序已经被强制。prompt 里明确要求过
+    # "不要把父子边抄一遍"，但模型仍会产出，所以这里兜一道。
+    parent_of = {n.slug: n.parent_slug for n in course.nodes}
+    edges = [
+        (original_to_id[p.to_slug], original_to_id[p.from_slug], p.reason)
+        for p in course.prerequisites
+        if p.to_slug in original_to_id
+        and p.from_slug in original_to_id
+        and parent_of.get(p.to_slug) != p.from_slug
+    ]
+    add_prerequisites(session, edges)
 
     session.commit()
     for row in created:
         session.refresh(row)
-    return created
+
+    created_ids = {row.id for row in created}
+    stored_edges = [
+        e
+        for e in session.exec(select(SkillPrerequisite)).all()
+        if e.skill_id in created_ids or e.prerequisite_id in created_ids
+    ]
+    return GenerateTreeResponse(
+        # response_model 不再是 list[SkillNodeOut]，手动构造响应时 pydantic 不会
+        # 再替我们把 ORM 行转过去，必须显式转换。
+        nodes=[SkillNodeOut.model_validate(row, from_attributes=True) for row in created],
+        prerequisites=[
+            SkillPrerequisiteOut(
+                skill_id=e.skill_id, prerequisite_id=e.prerequisite_id, reason=e.reason
+            )
+            for e in stored_edges
+        ],
+    )
 
 
 @router.post("/{skill_id}/search-plan", response_model=SearchPlanOut)
