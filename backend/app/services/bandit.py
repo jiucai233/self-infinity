@@ -27,7 +27,7 @@ from datetime import timedelta
 
 from sqlmodel import Session, select
 
-from app.models import AuditSession, AuditStatus, AuditTurn, BanditArm, SkillNode, utcnow
+from app.models import AuditSession, AuditStatus, AuditTurn, BanditArm, SkillNode, as_utc, utcnow
 from app.services.incentive import node_difficulty_score
 
 TIERS = ("easy", "medium", "hard")
@@ -64,7 +64,7 @@ def _abandon_rate(recent: list[AuditSession]) -> float:
     if not recent:
         return 0.0
     stale_cutoff = utcnow() - timedelta(hours=STALE_ACTIVE_HOURS)
-    stale = sum(1 for s in recent if s.status == AuditStatus.active and s.created_at < stale_cutoff)
+    stale = sum(1 for s in recent if s.status == AuditStatus.active and as_utc(s.created_at) < stale_cutoff)
     return stale / len(recent)
 
 

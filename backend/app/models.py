@@ -9,6 +9,16 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def as_utc(dt: datetime) -> datetime:
+    """Read a stored timestamp back as timezone-aware UTC.
+
+    SQLite has no tz-aware column type, so values written by utcnow() come
+    back naive. Comparing one of those against utcnow() raises TypeError, so
+    anything comparing a persisted timestamp to "now" must go through here.
+    """
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
 class SkillStatus(StrEnum):
     locked = "locked"
     available = "available"
