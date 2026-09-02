@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 
 from app.db import get_session
 from app.llm import get_provider
-from app.models import AuditSession, LinkKind, Principle, PrincipleLink, SkillNode
+from app.models import AuditSession, LinkKind, Principle, PrincipleLink, SkillNode, SkillPrerequisite
 from app.schemas import ContradictionOut, GraphEdgeOut, GraphNodeOut, GraphResponse, RelinkResponse
 from app.services.linking import link_principle
 
@@ -14,9 +14,15 @@ router = APIRouter(prefix="/api", tags=["graph"])
 def get_graph(session: Session = Depends(get_session)):
     """Unified skill-tree + principle-archive graph.
 
-    Four edge kinds, all derived from data that already exists — nothing
+    Five edge kinds, all derived from data that already exists — nothing
     fabricated:
-    - "parent": the real skill-tree structure (SkillNode.parent_id).
+    - "parent": the real skill-tree structure (SkillNode.parent_id) —
+      classification, "is a kind of".
+    - "prerequisite": SkillPrerequisite rows — ordering, "must know first".
+      A second set of edges over the same nodes, and deliberately separate
+      from "parent" because tree traversal order is not learning order:
+      prerequisites routinely run between siblings and across branches,
+      neither of which the tree can express. See app/agents/planner.py.
     - "origin": a principle's real source (Principle.source_session_id ->
       AuditSession.skill_id) — the node whose failed audit produced it.
     - "related" / "contradicts": persisted PrincipleLink rows, judged by the
@@ -31,6 +37,7 @@ def get_graph(session: Session = Depends(get_session)):
     principles = session.exec(select(Principle)).all()
     sessions_by_id = {s.id: s for s in session.exec(select(AuditSession)).all()}
     links = session.exec(select(PrincipleLink)).all()
+    prerequisites = session.exec(select(SkillPrerequisite)).all()
 
     nodes: list[GraphNodeOut] = [
         GraphNodeOut(
@@ -50,6 +57,20 @@ def get_graph(session: Session = Depends(get_session)):
         GraphEdgeOut(source=f"skill-{s.parent_id}", target=f"skill-{s.id}", kind="parent")
         for s in skills
         if s.parent_id is not None
+    ]
+
+    # 方向和阅读顺序一致：从先修节点指向需要它的节点（"先学这个，再学那个"）。
+    skill_ids = {s.id for s in skills}
+    edges += [
+        GraphEdgeOut(
+            source=f"skill-{e.prerequisite_id}",
+            target=f"skill-{e.skill_id}",
+            kind="prerequisite",
+            reason=e.reason or None,
+        )
+        for e in prerequisites
+        # 指向已删除节点的边直接跳过，否则前端会渲染出一条断头的连线。
+        if e.prerequisite_id in skill_ids and e.skill_id in skill_ids
     ]
 
     for p in principles:

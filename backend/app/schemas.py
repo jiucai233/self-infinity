@@ -25,6 +25,8 @@ class GenerateTreeRequest(BaseModel):
     node_count: int = Field(default=12, ge=4, le=30)
     max_depth: int = Field(default=4, ge=2, le=6)
     difficulty: str = "standard"
+    # 关掉可以省一次搜索加一次 LLM 调用；离线演示和不想联网时用。
+    search_syllabus: bool = True
 
     _validate_topic = field_validator("topic")(_not_blank)
     _validate_difficulty = field_validator("difficulty")(_validate_difficulty)
@@ -125,7 +127,7 @@ class GraphNodeOut(BaseModel):
 class GraphEdgeOut(BaseModel):
     source: str
     target: str
-    kind: str  # "parent" | "origin" | "related" | "contradicts"
+    kind: str  # "parent" | "prerequisite" | "origin" | "related" | "contradicts"
     reason: str | None = None
 
 
@@ -284,6 +286,14 @@ class SkillPrerequisiteOut(BaseModel):
     reason: str
 
 
+class CourseSourceOut(BaseModel):
+    course: str
+    url: str
+
+
 class GenerateTreeResponse(BaseModel):
     nodes: list[SkillNodeOut]
     prerequisites: list[SkillPrerequisiteOut]
+    # None 表示没找到可信课纲，这棵树是凭模型自身知识编排的 —— 界面据此决定
+    # 显不显示来源，不要用含糊措辞暗示有出处。
+    source: CourseSourceOut | None = None

@@ -5,6 +5,7 @@ import type {
   AuditMode,
   CourseDifficulty,
   CourseOptions,
+  CourseSource,
   DifficultyTier,
   GraphResponse,
   RecommendationResponse,
@@ -119,7 +120,12 @@ export default function SkillTree({
     node_count: 12,
     max_depth: 4,
     difficulty: 'standard',
+    search_syllabus: true,
   })
+  // Which real course the last generated tree was modelled on, if any. Shown
+  // so the structure can be checked against its source — and left empty when
+  // there wasn't one, rather than hinting vaguely at provenance.
+  const [source, setSource] = useState<CourseSource | null>(null)
   const [auditMode, setAuditMode] = useState<AuditMode>('day')
 
   // Clarify-first flow: when the clarify endpoint says the topic is too
@@ -165,7 +171,8 @@ export default function SkillTree({
     setGenerating(true)
     setError(null)
     try {
-      await api.generateTree(finalTopic, course)
+      const generated = await api.generateTree(finalTopic, course)
+      setSource(generated.source)
       setTopic('')
       setClarifyTopicText(null)
       setClarifyQuestions([])
@@ -345,6 +352,16 @@ export default function SkillTree({
           </label>
 
           <label className="dim" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={course.search_syllabus}
+              disabled={generating}
+              onChange={(e) => setCourse((c) => ({ ...c, search_syllabus: e.target.checked }))}
+            />
+            Look for a real syllabus
+          </label>
+
+          <label className="dim" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
             Nodes
             <input
               type="number"
@@ -370,6 +387,16 @@ export default function SkillTree({
             />
           </label>
         </div>
+
+        {source && (
+          <p className="dim" style={{ fontSize: 11, marginTop: 10, marginBottom: 0 }}>
+            Structure modelled on{' '}
+            <a href={source.url} target="_blank" rel="noreferrer">
+              {source.course}
+            </a>{' '}
+            — topics only, so you can check it against the real course.
+          </p>
+        )}
 
         <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
           <span className="dim" style={{ fontSize: 11 }}>

@@ -29,6 +29,7 @@ from app.models import (
     utcnow,
 )
 from app.services.linking import link_principle
+from app.services.tree import NodePosition, child_titles, node_position
 from app.config import settings
 from app.schemas import (
     AuditSessionOut,
@@ -49,13 +50,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["audits"])
 
-CONCEPT_OPENING_TEMPLATE = "假设我完全没听说过「{title}」，从零开始，讲给我听。"
+# 开场问题也按位置分。一个分类节点上来就问"从零讲给我听"，等于把它当成具体知识点，
+# 后面再怎么追问都拉不回来——第一个问题定了整场审计的框架。
+LEAF_OPENING_TEMPLATE = "假设我完全没听说过「{title}」，从零开始，讲给我听。"
+BRANCH_OPENING_TEMPLATE = "「{title}」下面放着{children}。为什么这几样被归在一起？它们之间怎么选？"
+ROOT_OPENING_TEMPLATE = "什么样的问题该用「{title}」这套方法解决，什么样的不该？说说你判断的依据。"
 TASK_OPENING_TEMPLATE = "「{title}」这一步，你打算具体怎么做？"
 
 
-def _opening_question(skill: SkillNode) -> str:
-    template = CONCEPT_OPENING_TEMPLATE if skill.node_type == NodeType.concept else TASK_OPENING_TEMPLATE
-    return template.format(title=skill.title)
+def _opening_question(skill: SkillNode, position: NodePosition, children: list[str]) -> str:
+    if skill.node_type != NodeType.concept:
+        return TASK_OPENING_TEMPLATE.format(title=skill.title)
+    if position == NodePosition.root:
+        return ROOT_OPENING_TEMPLATE.format(title=skill.title)
+    if position == NodePosition.branch:
+        return BRANCH_OPENING_TEMPLATE.format(title=skill.title, children="、".join(children))
+    return LEAF_OPENING_TEMPLATE.format(title=skill.title)
 
 
 def _resolve_max_turns(node_type: NodeType, mode: str) -> int:
@@ -108,7 +118,7 @@ def start_audit(skill_id: int, body: StartAuditRequest = StartAuditRequest(), se
     session.add(audit)
     session.flush()
 
-    opening = _opening_question(skill)
+    opening = _opening_question(skill, node_position(session, skill), child_titles(session, skill))
     turn = AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=opening)
     session.add(turn)
     session.commit()
@@ -151,6 +161,8 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
             node_type=skill.node_type,
             relevant_principles=principle_texts,
             max_turns=audit.max_turns,
+            position=node_position(session, skill),
+            child_titles=child_titles(session, skill),
         )
     except Exception:
         session.commit()

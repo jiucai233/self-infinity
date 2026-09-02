@@ -224,3 +224,18 @@ class SkillPrerequisite(SQLModel, table=True):
     prerequisite_id: int = Field(foreign_key="skillnode.id")
     reason: str = ""
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class CourseSource(SQLModel, table=True):
+    """这棵树是照着哪份真实课纲编排的。
+
+    存下来是为了能向用户交代"这门课的结构从哪来"——一个能被核对的来源，既是可信度
+    的凭据，也是这套检索确实起了作用的证据。没找到可信课纲时不写入，界面上就什么
+    都不显示，而不是含糊地暗示有来源。
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    root_skill_id: int = Field(foreign_key="skillnode.id")
+    course: str
+    url: str
+    created_at: datetime = Field(default_factory=utcnow)

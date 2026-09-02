@@ -24,6 +24,7 @@ import logging
 from dataclasses import dataclass, field
 
 from app.llm.base import LLMProvider, Message, complete_with_json_retry
+from app.agents.syllabus import SyllabusReference
 from app.models import NodeType
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,22 @@ logger = logging.getLogger(__name__)
 # 而节点越多，单次生成的质量越不可控，也越容易出现凑数的空节点。
 DEFAULT_NODE_COUNT = 12
 DEFAULT_MAX_DEPTH = 4
+
+SYLLABUS_TEMPLATE = """\
+## 参考课纲
+
+检索到一份真实存在的课程大纲，来自 **{course}**，它依次讲了这些主题：
+
+{outline}
+
+**按这个主题结构来编排。** 这是被实际讲授过的顺序，比凭记忆回忆的更可靠，尤其是
+主题之间的先后依赖。
+
+但仍然要遵守上面关于节点形状的全部规则：根节点是容器、叶子必须具体到能问出对错、
+先修边不能照抄父子关系。如果参考课纲的粒度和要求的节点数对不上，以节点数要求为准，
+自行合并或细分——不要为了贴合参考而产出一堆过粗或过细的节点。
+
+"""
 
 DEPTH_PROFILES = {
     "intro": "入门：叶子停在'这是什么、为什么需要它'的层面，不深入具体算法细节。",
@@ -91,7 +108,7 @@ SYSTEM_PROMPT = """\
 - 先修可以**跨分支**：Perceptron 挂在「基础」下，却是 CV、NLP、RL 共同的先修。
 - **大多数节点没有先修。** 不要为了凑数硬加——只在"不先会 A 就真的听不懂 B"时才给。
 
-## 输出
+{syllabus_section}## 输出
 
 只输出严格 JSON：
 {{"nodes": [{{"slug": "<小写字母数字连字符，本次输出内唯一>", "title": "<不超过16字>",
@@ -134,11 +151,19 @@ class Planner:
         node_count: int = DEFAULT_NODE_COUNT,
         max_depth: int = DEFAULT_MAX_DEPTH,
         difficulty: str = "standard",
+        syllabus: SyllabusReference | None = None,
     ) -> GeneratedCourse:
+        syllabus_section = ""
+        if syllabus is not None:
+            syllabus_section = SYLLABUS_TEMPLATE.format(
+                course=syllabus.course,
+                outline="\n".join(f"{i + 1}. {t}" for i, t in enumerate(syllabus.outline)),
+            )
         system = SYSTEM_PROMPT.format(
             node_count=node_count,
             max_depth=max_depth,
             depth_profile=DEPTH_PROFILES.get(difficulty, DEPTH_PROFILES["standard"]),
+            syllabus_section=syllabus_section,
         )
         messages: list[Message] = [
             {"role": "system", "content": system},

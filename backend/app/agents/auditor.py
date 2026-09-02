@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from app.config import settings
 from app.llm.base import LLMProvider, Message, complete_with_json_retry
 from app.models import NodeType
+from app.services.tree import NodePosition
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,70 @@ CONCEPT_SYSTEM_PROMPT = """\
 不要输出 JSON 之外的任何文字。
 """
 
+BRANCH_SYSTEM_PROMPT = """\
+你是费曼审计官。用户要向你讲解「{skill_title}」（{skill_description}）。
+
+**这个节点是一个分类，不是一个具体知识点。** 它下面挂着这些东西：
+{child_list}
+
+所以不要问「什么是{skill_title}」——那是在浪费这个节点的位置，而且这种问题太宽，
+任何泛泛而谈的回答听起来都像回事，你无法判断真假。这个节点的价值在于它**统摄**了
+上面那些内容，用户是否真的掌握它，体现在能不能说清那些内容**之间**的关系。
+
+提问阶段（action=probe 时）只问下面三类问题之一：
+1. **取舍**：什么情况下选其中一个而不选另一个，各自的代价是什么。
+2. **共同的内核**：这些看起来不同的东西，底下共享的那个思路是什么。
+3. **归类依据**：为什么这几样被放在一起，而另一些不属于这里。
+
+规则：
+- 每轮只问一个问题。
+- 只围绕上面列出的子项提问，不要引入列表之外、用户也没提过的东西。
+- 如果用户只是逐个复述每个子项是什么，那**不算掌握**——继续追问它们之间的关系。
+- 已经问清楚了就直接裁决，不要为了凑轮次硬问。
+
+裁决阶段（action=verdict 时）：
+动用你完整的专业知识判断用户说的是否站得住脚。特别注意一种常见的假掌握：能把每个
+子项分别说清楚，但说不出它们之间的区别与联系——那说明用户是分别背下来的，没有形成
+这个分类本身的理解，应当判不通过。
+
+只输出严格 JSON，二选一：
+{{"action": "probe", "question": "<下一个问题>"}}
+{{"action": "verdict", "pass": true|false, "score": 0-100, "gaps": ["<未掌握的点>"], "comment": "<裁决理由>"}}
+不要输出 JSON 之外的任何文字。
+"""
+
+ROOT_SYSTEM_PROMPT = """\
+你是费曼审计官。「{skill_title}」是这门课的根节点——**它是一个容器，不是一个可以被
+讲解的具体知识点**。
+
+这门课覆盖：{skill_description}
+第一层分成这几块：{child_list}
+
+所以绝对不要问「什么是{skill_title}」或者「讲讲{skill_title}」。那种问题太大，用户随便
+说点什么都能听起来像回事，你无法据此判断任何东西。这个位置该验证的是**边界感**：
+用户知不知道这套东西什么时候适用、什么时候不适用。
+
+提问阶段（action=probe 时）只问下面三类之一：
+1. **适用边界**：什么样的问题该用这个领域的方法解决，什么样的不该，判断依据是什么。
+2. **划分依据**：这几个分支为什么这么分，它们各自解决的是什么互不重叠的问题。
+3. **失败模式**：这套方法在什么情况下会失效、或者代价高到不值得。
+
+规则：
+- 每轮只问一个问题。
+- 不要下沉到某个具体子项的实现细节——那是叶子节点该被问的，不是这里。
+- 泛泛的赞美式回答（"应用很广泛""很重要"）不算回答，继续追问要具体的判断依据。
+- 已经问清楚了就直接裁决。
+
+裁决阶段（action=verdict 时）：
+判断标准是用户能否给出**可操作的判断依据**，而不是能否描述这个领域有多大。说不出
+任何"什么时候不该用"的人，没有边界感，应当判不通过。
+
+只输出严格 JSON，二选一：
+{{"action": "probe", "question": "<下一个问题>"}}
+{{"action": "verdict", "pass": true|false, "score": 0-100, "gaps": ["<未掌握的点>"], "comment": "<裁决理由>"}}
+不要输出 JSON 之外的任何文字。
+"""
+
 TASK_SYSTEM_PROMPT = """\
 你是任务核验官（Task Verifier）。用户正在完成任务清单里的一步「{skill_title}」
 （{skill_description}）。
@@ -60,6 +125,21 @@ PRINCIPLE_INJECTION_TEMPLATE = """\
 
 该用户过去在类似问题上暴露过以下原则，请在提问时纳入考虑：
 {principle_lines}"""
+
+
+def _select_template(node_type: NodeType, position: NodePosition) -> str:
+    """按 node_type + 位置挑审计协议。
+
+    task 不分位置：一个具体步骤做没做到，和它在树里挂哪儿无关。concept 才分——
+    位置决定了什么问题问得出深浅（见 app/services/tree.py）。
+    """
+    if node_type != NodeType.concept:
+        return TASK_SYSTEM_PROMPT
+    if position == NodePosition.branch:
+        return BRANCH_SYSTEM_PROMPT
+    if position == NodePosition.root:
+        return ROOT_SYSTEM_PROMPT
+    return CONCEPT_SYSTEM_PROMPT
 
 
 @dataclass
@@ -84,16 +164,20 @@ class Auditor:
         node_type: NodeType = NodeType.concept,
         relevant_principles: list[str] | None = None,
         max_turns: int | None = None,
+        position: NodePosition = NodePosition.leaf,
+        child_titles: list[str] | None = None,
     ) -> AuditorTurnResult:
         if max_turns is None:
             max_turns = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
-        template = CONCEPT_SYSTEM_PROMPT if node_type == NodeType.concept else TASK_SYSTEM_PROMPT
+        template = _select_template(node_type, position)
         # max_turns is intentionally NOT interpolated into the prompt text anymore —
         # it's a server-side safety backstop (see config.py), not a quota the model
         # should feel entitled to use or rush to fill. See _parse()/_forced_verdict().
         system = template.format(
             skill_title=skill_title,
             skill_description=skill_description,
+            # 只有 branch/root 模板用得上 child_list，其余模板的 format 会忽略它。
+            child_list="、".join(child_titles or []) or "（暂无子节点）",
         )
         if relevant_principles:
             principle_lines = "\n".join(f"- {p}" for p in relevant_principles)

@@ -26,6 +26,10 @@ _PLAN_NODE_RE = re.compile(r"^- skill_id=(\d+) 「(.+?)」（(\w+)，难度 (\w+
 _SUGGESTED_TIER_RE = re.compile(r"难度调度器建议的档位：(\w+)")
 _SEARCH_SKILL_RE = re.compile(r"讲解「(.+?)」")
 _CANDIDATE_INDEX_RE = re.compile(r"^\[(\d+)\] ")
+# 课纲甄别的替身判据：候选标题里出现"机构 + 课程编号"的形状（CS285、6.006）才算数。
+# 真 provider 判的是内容可信度，脚本只能判字面模式——但把"必须有课程编号"这条
+# 硬标准保留下来，离线测试才测得到"宁可判定没找到"的行为。
+_COURSE_CODE_RE = re.compile(r"\b([A-Z]{2,}\s?\d{2,}|\d+\.\d+)\b")
 
 _FIRST_PROBE = "为什么这个方法能生效？如果去掉关键的那一步，会发生什么？"
 _ERROR_INJECTION_PROBE = (
@@ -55,7 +59,9 @@ class MockProvider:
     def complete(self, messages: list[Message]) -> str:
         start = time.perf_counter()
         system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        if "检索规划官" in system:
+        if "课纲甄别官" in system:
+            result = self._judge_syllabus(messages)
+        elif "检索规划官" in system:
             result = self._search_queries(messages)
         elif "资料筛选官" in system:
             result = self._search_select(messages)
@@ -162,6 +168,29 @@ class MockProvider:
                 related.append({"ref": ref, "reason": "mock: 关键词重叠"})
 
         return json.dumps({"related": related[:4], "contradicts": contradicts})
+
+    @staticmethod
+    def _judge_syllabus(messages: list[Message]) -> str:
+        system = next((m["content"] for m in messages if m["role"] == "system"), "")
+        for line in system.splitlines():
+            stripped = line.strip()
+            m = _CANDIDATE_INDEX_RE.match(stripped)
+            if not m:
+                continue
+            code = _COURSE_CODE_RE.search(stripped)
+            if not code:
+                continue
+            return json.dumps(
+                {
+                    "found": True,
+                    "index": int(m.group(1)),
+                    "course": f"mock: {code.group(1)}",
+                    "outline": ["mock 主题一", "mock 主题二", "mock 主题三"],
+                }
+            )
+        # 默认走这条：MockSearchProvider 返回的假结果里没有课程编号，正确的行为
+        # 就是判定没找到，而不是把一条假结果当成课纲。
+        return json.dumps({"found": False})
 
     @staticmethod
     def _search_queries(messages: list[Message]) -> str:

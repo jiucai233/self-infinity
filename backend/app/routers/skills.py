@@ -6,14 +6,16 @@ import logging
 
 from app.agents.clarifier import Clarifier
 from app.agents.planner import GeneratedNode, Planner
+from app.agents.syllabus import SyllabusFinder
 from app.agents.searcher import Searcher
 from app.db import get_session
 from app.llm import get_provider
-from app.models import Principle, SearchPlan, SkillNode, SkillPrerequisite, SkillStatus
+from app.models import CourseSource, Principle, SearchPlan, SkillNode, SkillPrerequisite, SkillStatus
 from app.schemas import (
     ClarifyRequest,
     ClarifyResponse,
     GenerateTreeRequest,
+    CourseSourceOut,
     GenerateTreeResponse,
     RecommendationOut,
     SearchPlanItemOut,
@@ -70,13 +72,25 @@ def generate_tree(body: GenerateTreeRequest, session: Session = Depends(get_sess
     先修边和 parent_id 长在同一批节点上但含义不同（分类 vs 顺序），成环的边会在
     落库时被丢弃——见 app/services/prerequisites.py。
     """
-    planner = Planner(get_provider())
+    provider = get_provider()
+
+    # 先找一份真实存在的课纲当参考。找不到就凭模型自身知识编排——那条路本来也能用，
+    # 所以这一步的任何失败都只是降级，不该让整次编排失败。
+    syllabus = None
+    if body.search_syllabus:
+        try:
+            syllabus = SyllabusFinder(provider, get_search_provider()).find(body.topic)
+        except Exception:
+            logger.warning("syllabus lookup failed, falling back to the model's own knowledge", exc_info=True)
+
+    planner = Planner(provider)
     try:
         course = planner.generate(
             body.topic,
             node_count=body.node_count,
             max_depth=body.max_depth,
             difficulty=body.difficulty,
+            syllabus=syllabus,
         )
     except Exception:
         raise HTTPException(502, "课程编排失败，请稍后重试")
@@ -160,6 +174,11 @@ def generate_tree(body: GenerateTreeRequest, session: Session = Depends(get_sess
     ]
     add_prerequisites(session, edges)
 
+    if syllabus is not None and created:
+        session.add(
+            CourseSource(root_skill_id=created[0].id, course=syllabus.course, url=syllabus.url)
+        )
+
     session.commit()
     for row in created:
         session.refresh(row)
@@ -180,6 +199,7 @@ def generate_tree(body: GenerateTreeRequest, session: Session = Depends(get_sess
             )
             for e in stored_edges
         ],
+        source=CourseSourceOut(course=syllabus.course, url=syllabus.url) if syllabus else None,
     )
 
 

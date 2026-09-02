@@ -41,6 +41,9 @@ function linkColor(link: FGLink): string {
   if (link.kind === 'contradicts') return cssVar('--danger')
   if (link.kind === 'origin') return '#facc15'
   if (link.kind === 'parent') return cssVar('--text')
+  // Prerequisites read as the course's spine, so they get the accent and a
+  // directional particle below — parent edges are structure, these are motion.
+  if (link.kind === 'prerequisite') return cssVar('--accent')
   return cssVar('--border-strong')
 }
 
@@ -160,9 +163,19 @@ export default function KnowledgeGraph({
         ctx.fillText(label, node.x ?? 0, (node.y ?? 0) + nodeRadius(node) + 2)
       })
       .linkColor((l) => linkColor(l as unknown as FGLink))
-      .linkWidth((l) => (['parent', 'contradicts'].includes((l as unknown as FGLink).kind) ? 2 : 1))
+      // Only prerequisites are directional — "learn this one first" reads
+      // backwards if you can't see which way the edge points.
+      .linkDirectionalArrowLength((l) =>
+        (l as unknown as FGLink).kind === 'prerequisite' ? 4 : 0,
+      )
+      .linkDirectionalArrowRelPos(1)
+      .linkWidth((l) =>
+        ['parent', 'contradicts', 'prerequisite'].includes((l as unknown as FGLink).kind) ? 2 : 1,
+      )
       .linkLineDash((l) =>
-        ['parent', 'contradicts'].includes((l as unknown as FGLink).kind) ? null : [2, 2],
+        ['parent', 'contradicts', 'prerequisite'].includes((l as unknown as FGLink).kind)
+          ? null
+          : [2, 2],
       )
       .minZoom(0.3)
       .maxZoom(8)
@@ -204,7 +217,8 @@ export default function KnowledgeGraph({
         <p className="dim" style={{ fontSize: 13, marginBottom: 16 }}>
           Every skill node and every Archive principle, wired together by what's actually real:
           parent nodes, the node a principle came from, and what the Librarian (an LLM judgment,
-          not keyword matching) reads as related or contradicting. Drag a node to reposition it,
+          not keyword matching) reads as related or contradicting. Arrows are prerequisites —
+          learning order, which is not the same as the tree structure. Drag a node to reposition it,
           scroll or pinch to zoom.
         </p>
       )}
@@ -220,6 +234,9 @@ export default function KnowledgeGraph({
       >
         <span className="dim" style={{ fontSize: 11 }}>
           <span style={{ color: 'var(--text)' }}>▬</span> parent
+        </span>
+        <span>
+          <span style={{ color: 'var(--accent)' }}>▶</span> prerequisite
         </span>
         <span className="dim" style={{ fontSize: 11 }}>
           <span style={{ color: '#facc15' }}>▬</span> origin

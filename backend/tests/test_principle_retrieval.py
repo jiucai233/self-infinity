@@ -150,7 +150,9 @@ class _CapturingProvider:
         prompts = []
         for messages in self.calls:
             system = next((m["content"] for m in messages if m["role"] == "system"), "")
-            if "正在听用户给你讲解" in system or "任务核验官" in system:
+            # 审计协议现在按节点位置分成四套（叶子/中层/根/任务），措辞各不相同，
+            # 所以按共有的输出契约筛，而不是按某一套的开场白。
+            if '{"action": "probe"' in system:
                 prompts.append(system)
         return prompts
 

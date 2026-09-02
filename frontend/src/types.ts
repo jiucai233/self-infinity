@@ -84,7 +84,9 @@ export interface ClarifyResponse {
 }
 
 export type GraphNodeKind = 'skill' | 'principle'
-export type GraphEdgeKind = 'parent' | 'origin' | 'related' | 'contradicts'
+// 'parent' 是分类（属于），'prerequisite' 是顺序（学之前要会）——两组边长在同一
+// 批节点上，含义不同，所以分开渲染。
+export type GraphEdgeKind = 'parent' | 'prerequisite' | 'origin' | 'related' | 'contradicts'
 
 export interface GraphNode {
   id: string
@@ -196,6 +198,12 @@ export interface CourseOptions {
   node_count: number
   max_depth: number
   difficulty: CourseDifficulty
+  search_syllabus: boolean
+}
+
+export interface CourseSource {
+  course: string
+  url: string
 }
 
 export interface SkillPrerequisite {
@@ -213,4 +221,7 @@ export interface SkillPrerequisite {
 export interface GenerateTreeResponse {
   nodes: SkillNode[]
   prerequisites: SkillPrerequisite[]
+  // null when no trustworthy syllabus was found — show nothing rather than
+  // implying a source exists.
+  source: CourseSource | null
 }

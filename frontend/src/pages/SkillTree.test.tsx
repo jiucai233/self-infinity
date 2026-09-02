@@ -251,7 +251,7 @@ describe('SkillTree', () => {
   describe('clarify-first generate flow', () => {
     it('when clarify says needs_clarification: false, calls generateTree directly with no intermediate step', async () => {
       vi.mocked(api.clarifyTopic).mockResolvedValue({ needs_clarification: false, questions: [] })
-      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [] })
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [], source: null })
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
@@ -265,7 +265,7 @@ describe('SkillTree', () => {
           'Reinforcement learning',
           // Course-shape knobs ride along with every generate call; defaults
           // match the backend's so an untouched form behaves as before.
-          { node_count: 12, max_depth: 4, difficulty: 'standard' },
+          { node_count: 12, max_depth: 4, difficulty: 'standard', search_syllabus: true },
         ),
       )
       expect(screen.queryByText('Skip, generate anyway')).not.toBeInTheDocument()
@@ -273,7 +273,7 @@ describe('SkillTree', () => {
 
     it('passes the chosen course shape to the Planner', async () => {
       vi.mocked(api.clarifyTopic).mockResolvedValue({ needs_clarification: false, questions: [] })
-      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [] })
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [], source: null })
 
       render(<SkillTree onAudit={vi.fn()} />)
       await waitFor(() => expect(screen.getByPlaceholderText(/B-trees/)).toBeInTheDocument())
@@ -288,6 +288,37 @@ describe('SkillTree', () => {
           expect.objectContaining({ difficulty: 'deep' }),
         ),
       )
+    })
+
+    it('credits the real course a tree was modelled on', async () => {
+      vi.mocked(api.clarifyTopic).mockResolvedValue({ needs_clarification: false, questions: [] })
+      vi.mocked(api.generateTree).mockResolvedValue({
+        nodes: [],
+        prerequisites: [],
+        source: { course: 'UC Berkeley CS285', url: 'https://real.invalid/cs285' },
+      })
+
+      render(<SkillTree onAudit={vi.fn()} />)
+      await waitFor(() => expect(screen.getByPlaceholderText(/B-trees/)).toBeInTheDocument())
+      await userEvent.type(screen.getByPlaceholderText(/B-trees/), 'Reinforcement learning')
+      await userEvent.click(screen.getByRole('button', { name: 'New Mission' }))
+
+      const link = await screen.findByRole('link', { name: 'UC Berkeley CS285' })
+      expect(link).toHaveAttribute('href', 'https://real.invalid/cs285')
+    })
+
+    it('says nothing about provenance when no syllabus was found', async () => {
+      vi.mocked(api.clarifyTopic).mockResolvedValue({ needs_clarification: false, questions: [] })
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [], source: null })
+
+      render(<SkillTree onAudit={vi.fn()} />)
+      await waitFor(() => expect(screen.getByPlaceholderText(/B-trees/)).toBeInTheDocument())
+      await userEvent.type(screen.getByPlaceholderText(/B-trees/), 'Reinforcement learning')
+      await userEvent.click(screen.getByRole('button', { name: 'New Mission' }))
+
+      await waitFor(() => expect(api.generateTree).toHaveBeenCalled())
+      // Better to show nothing than to hint vaguely that a source exists.
+      expect(screen.queryByText(/Structure modelled on/)).not.toBeInTheDocument()
     })
 
     it('when clarify says needs_clarification: true, renders question inputs and does not call generateTree yet', async () => {
@@ -315,7 +346,7 @@ describe('SkillTree', () => {
         needs_clarification: true,
         questions: ['Which direction do you want to focus on?'],
       })
-      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [] })
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [], source: null })
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
@@ -345,7 +376,7 @@ describe('SkillTree', () => {
         needs_clarification: true,
         questions: ['Which direction do you want to focus on?'],
       })
-      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [] })
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [], source: null })
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
@@ -362,14 +393,14 @@ describe('SkillTree', () => {
       await waitFor(() =>
         expect(api.generateTree).toHaveBeenCalledWith(
           'Cooking',
-          { node_count: 12, max_depth: 4, difficulty: 'standard' },
+          { node_count: 12, max_depth: 4, difficulty: 'standard', search_syllabus: true },
         ),
       )
     })
 
     it('falls back to generating directly when the clarify endpoint itself fails', async () => {
       vi.mocked(api.clarifyTopic).mockRejectedValue(new Error('502 Bad Gateway'))
-      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [] })
+      vi.mocked(api.generateTree).mockResolvedValue({ nodes: [], prerequisites: [], source: null })
       const user = userEvent.setup()
       render(<SkillTree onAudit={vi.fn()} />)
 
@@ -383,7 +414,7 @@ describe('SkillTree', () => {
           'Reinforcement learning',
           // Course-shape knobs ride along with every generate call; defaults
           // match the backend's so an untouched form behaves as before.
-          { node_count: 12, max_depth: 4, difficulty: 'standard' },
+          { node_count: 12, max_depth: 4, difficulty: 'standard', search_syllabus: true },
         ),
       )
     })
