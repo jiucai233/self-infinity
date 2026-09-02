@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
-import type { AuditMode, AuditTurn, NodeType, TurnResultResponse } from '../types'
+import type {
+  AuditMode,
+  AuditTurn,
+  NodeType,
+  SearchPlan,
+  TurnResultResponse,
+} from '../types'
 
 type Phase = 'loading' | 'active' | 'passed' | 'failed' | 'reflected'
 
@@ -75,6 +81,73 @@ function ChatMessage({ role, content, roleLabel }: AuditTurn & { roleLabel: stri
         <p style={{ fontSize: 14, lineHeight: 1.6 }}>{content}</p>
       </div>
     </div>
+  )
+}
+
+/**
+ * One gap from a verdict, with a way to act on it.
+ *
+ * This is where retrieval belongs: a gap the auditor just exposed is a
+ * concrete, verified hole, so searching for material here is remediation.
+ * A general "find me resources on X" box would turn the product back into a
+ * study-material recommender, which is the thing it exists to be an
+ * alternative to — the backend enforces the same rule by 400-ing on a
+ * request without a gap.
+ */
+function GapRemedy({ skillId, gap }: { skillId: number; gap: string }) {
+  const [plan, setPlan] = useState<SearchPlan | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function find() {
+    setLoading(true)
+    setError(null)
+    try {
+      setPlan(await api.createSearchPlan(skillId, { gap }))
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <li style={{ marginBottom: 10 }}>
+      <span>{gap}</span>
+      {!plan && (
+        <button
+          onClick={find}
+          disabled={loading}
+          style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px' }}
+        >
+          {loading ? 'Searching…' : 'Find material'}
+        </button>
+      )}
+      {error && (
+        <p style={{ color: 'var(--danger)', fontSize: 11, margin: '4px 0 0' }}>{error}</p>
+      )}
+      {plan && plan.items.length === 0 && (
+        <p className="dim" style={{ fontSize: 11, margin: '4px 0 0' }}>
+          Nothing found worth reading for this one.
+        </p>
+      )}
+      {plan && plan.items.length > 0 && (
+        <ul style={{ listStyle: 'none', padding: 0, margin: '6px 0 0' }}>
+          {plan.items.map((item) => (
+            <li key={item.url} style={{ marginTop: 6 }}>
+              {/* URLs come from the search provider, never from the model —
+                  see app/agents/searcher.py. */}
+              <a href={item.url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                {item.title}
+              </a>
+              <p className="dim" style={{ fontSize: 11, margin: '2px 0 0' }}>
+                {item.reason}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   )
 }
 
@@ -326,7 +399,7 @@ export default function AuditRoom({
                 {verdict.gaps && verdict.gaps.length > 0 && (
                   <ul style={{ fontSize: 13, marginTop: 8, paddingLeft: 18 }}>
                     {verdict.gaps.map((g, i) => (
-                      <li key={i}>{g}</li>
+                      <GapRemedy key={i} skillId={skillId} gap={g} />
                     ))}
                   </ul>
                 )}

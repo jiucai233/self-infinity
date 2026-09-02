@@ -3,6 +3,8 @@ import SkillTree from './pages/SkillTree'
 import SkillNodeDetail from './pages/SkillNodeDetail'
 import AuditRoom from './pages/AuditRoom'
 import PrincipleShelf from './pages/PrincipleShelf'
+import Narrator from './pages/Narrator'
+import StudyPlan from './pages/StudyPlan'
 import AvatarPage from './pages/AvatarPage'
 import Quests from './pages/Quests'
 import Guild from './pages/Guild'
@@ -16,11 +18,14 @@ type View =
   | { name: 'tree' }
   | { name: 'nodeDetail'; skillId: number }
   | { name: 'audit'; skillId: number; nodeType: NodeType; mode: AuditMode }
-type Panel = 'none' | 'principles' | 'avatar' | 'quests' | 'guild' | 'support'
+type Panel = 'none' | 'narrator' | 'plan' | 'principles' | 'avatar' | 'quests' | 'guild' | 'support'
 
 function App() {
   const [view, setView] = useState<View>({ name: 'tree' })
-  const [panel, setPanel] = useState<Panel>('none')
+  // Briefing is the landing screen: the misconception profile is the one thing
+  // here no general-purpose assistant can show you, so it shouldn't be buried
+  // three clicks deep behind the tree.
+  const [panel, setPanel] = useState<Panel>('narrator')
 
   // Real mastered-node count, fetched here purely to derive the decorative
   // sidebar "Level" readout below — reuses the same cheap /skills endpoint
@@ -36,6 +41,8 @@ function App() {
   }, [view.name])
 
   const onTree = panel === 'none' && (view.name === 'tree' || view.name === 'nodeDetail')
+  const onNarrator = panel === 'narrator'
+  const onPlan = panel === 'plan'
   const onAvatar = panel === 'avatar'
   const onPrinciples = panel === 'principles'
   const onQuests = panel === 'quests'
@@ -83,6 +90,12 @@ function App() {
 
         <nav className="app-sidebar-nav">
           <button
+            className={`app-sidebar-nav-item${onNarrator ? ' app-sidebar-nav-item--active' : ''}`}
+            onClick={() => setPanel((p) => (p === 'narrator' ? 'none' : 'narrator'))}
+          >
+            Briefing
+          </button>
+          <button
             className={`app-sidebar-nav-item${onAvatar ? ' app-sidebar-nav-item--active' : ''}`}
             onClick={() => setPanel((p) => (p === 'avatar' ? 'none' : 'avatar'))}
           >
@@ -93,6 +106,12 @@ function App() {
             onClick={goToSkills}
           >
             Skills
+          </button>
+          <button
+            className={`app-sidebar-nav-item${onPlan ? ' app-sidebar-nav-item--active' : ''}`}
+            onClick={() => setPanel((p) => (p === 'plan' ? 'none' : 'plan'))}
+          >
+            Plan
           </button>
           <button
             className={`app-sidebar-nav-item${onPrinciples ? ' app-sidebar-nav-item--active' : ''}`}
@@ -135,7 +154,15 @@ function App() {
       <ThemeToggle />
 
       <main className="app-main">
-        {panel === 'principles' ? (
+        {panel === 'narrator' ? (
+          <Narrator />
+        ) : panel === 'plan' ? (
+          <StudyPlan
+            onAudit={(skillId, nodeType, mode) =>
+              setView({ name: 'audit', skillId, nodeType, mode })
+            }
+          />
+        ) : panel === 'principles' ? (
           <PrincipleShelf />
         ) : panel === 'avatar' ? (
           <AvatarPage onInitiateMission={goToSkills} />

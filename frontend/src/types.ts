@@ -127,3 +127,65 @@ export interface RecommendationResponse {
   suggested_tier: DifficultyTier
   skill_tiers: Record<string, DifficultyTier>
 }
+
+export interface MisconceptionCluster {
+  label: string
+  occurrences: number
+  skills: string[]
+  cross_domain: boolean
+  first_seen: string
+  last_seen: string
+  principle_ids: number[]
+}
+
+export interface NarratorBriefing {
+  total_skills: number
+  mastered_skills: number
+  available_skills: number
+  total_audits: number
+  passed_audits: number
+  failed_audits: number
+  pass_rate: number | null
+  clusters: MisconceptionCluster[]
+  health: number | null
+  sanity: number | null
+  focus_score: number | null
+  // The profile numbers above are always freshly computed; the narrative may
+  // be a cached snapshot from an earlier state, or null if never generated.
+  // Keep the two visually distinct so a stale paragraph isn't read as a
+  // description of the current numbers.
+  narrative: string | null
+  narrative_generated_at: string | null
+}
+
+export interface PlanStep {
+  skill_id: number
+  skill_title: string
+  node_type: NodeType
+  rationale: string
+  focus_hint: string
+}
+
+export interface StudyPlan {
+  id: number
+  steps: PlanStep[]
+  suggested_tier: string
+  context_bucket: string
+  created_at: string
+}
+
+export interface SearchPlanItem {
+  title: string
+  url: string
+  snippet: string
+  reason: string
+}
+
+export interface SearchPlan {
+  id: number
+  skill_id: number
+  gap: string
+  queries: string[]
+  items: SearchPlanItem[]
+  created_at: string
+}

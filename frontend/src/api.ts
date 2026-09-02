@@ -4,11 +4,14 @@ import type {
   ClarifyResponse,
   FocusSession,
   GraphResponse,
+  NarratorBriefing,
   Principle,
   RecommendationResponse,
   RelinkResponse,
+  SearchPlan,
   SkillNode,
   StartAuditResponse,
+  StudyPlan,
   TurnResultResponse,
   VitalityState,
 } from './types'
@@ -84,4 +87,19 @@ export const api = {
       throw e
     }
   },
+
+  getBriefing: () => request<NarratorBriefing>('/narrator/briefing'),
+  // The only narrator call that spends money — briefing is pure DB.
+  narrate: () => request<NarratorBriefing>('/narrator/narrate', { method: 'POST' }),
+
+  getCurrentPlan: () => request<StudyPlan | null>('/plan/current'),
+  generatePlan: () => request<StudyPlan>('/plan/generate', { method: 'POST' }),
+
+  // Retrieval is always tied to a concrete gap or a stored misconception —
+  // the backend 400s on a bare request. See app/agents/searcher.py.
+  createSearchPlan: (skillId: number, body: { gap?: string; misconception_id?: number }) =>
+    request<SearchPlan>(`/skills/${skillId}/search-plan`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 }
