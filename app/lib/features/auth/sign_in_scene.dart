@@ -8,8 +8,9 @@ import '../../api/life_tree.dart';
 import '../../api/models.dart';
 import '../../auth/auth_service.dart';
 import '../../theme/tokens.dart';
-import '../../widgets/widgets.dart';
 import '../../l10n/l10n.dart';
+import '../../auth/google_mark.dart';
+import 'landing_page.dart';
 
 /// The front door (`docs/ux-chat.md` §7): a landing hero, and sign in /
 /// create an account (email and password only) in a card over it.
@@ -28,12 +29,7 @@ class SignInScene extends StatefulWidget {
 
 enum _Mode { signIn, signUp, checkInbox, resetSent }
 
-class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStateMixin {
-  /// The entrance: 1.8 s, every part on its own interval of it.
-  late final AnimationController _intro = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1800),
-  );
+class _SignInSceneState extends State<SignInScene> {
   bool _formOpen = false;
   final _email = TextEditingController();
   final _password = TextEditingController();
@@ -47,18 +43,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
   static LifeTree _sample(AppLocalizations l) => _samples[l.localeName] ??= _sampleTree(l);
 
   @override
-  void initState() {
-    super.initState();
-    if (Avatar.animationsEnabled) {
-      _intro.forward();
-    } else {
-      _intro.value = 1;
-    }
-  }
-
-  @override
   void dispose() {
-    _intro.dispose();
     _email.dispose();
     _password.dispose();
     _passwordFocus.dispose();
@@ -85,6 +70,21 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
       _busy = false;
       _error = result.error;
       if (result.needsConfirmation) _mode = _Mode.checkInbox;
+    });
+  }
+
+  /// Off to Google; the session arrives with the redirect back (the auth
+  /// service then turns signed in and the app replaces this page).
+  Future<void> _google() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final result = await context.read<AuthService>().signInWithGoogle();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = result.error;
     });
   }
 
@@ -125,18 +125,17 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
     final wide = MediaQuery.sizeOf(context).width >= AppLayout.heroBreakpoint;
     return Scaffold(
       key: const Key('sign-in'),
-      backgroundColor: AppColors.canvas,
+      backgroundColor: AppColors.surface,
       body: CallbackShortcuts(
         bindings: {const SingleActivator(LogicalKeyboardKey.escape): _close},
+        // The front page takes the keys (its arrows turn screens); Escape
+        // comes up from it.
         child: Focus(
-          autofocus: true,
           child: Stack(
             children: [
               Positioned.fill(
-                child: _Hero(
+                child: LandingPage(
                   tree: _sample(context.l10n),
-                  wide: wide,
-                  intro: _intro,
                   onSignIn: () => _open(_Mode.signIn),
                   onCreate: () => _open(_Mode.signUp),
                 ),
@@ -216,6 +215,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
 
   Widget _body(BuildContext context) {
     final theme = Theme.of(context).textTheme;
+    final auth = context.watch<AuthService>();
     switch (_mode) {
       case _Mode.checkInbox:
       case _Mode.resetSent:
@@ -321,6 +321,30 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
                       )
                     : Text(signUp ? context.l10n.createAccount : context.l10n.signIn),
               ),
+              if (auth.supportsGoogle) ...[
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      child: Text(
+                        context.l10n.orDivider,
+                        style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                      ),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                OutlinedButton.icon(
+                  key: const Key('auth-google'),
+                  onPressed: _busy ? null : _google,
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  icon: const GoogleMark(),
+                  label: Text(context.l10n.continueWithGoogle),
+                ),
+              ],
               const SizedBox(height: AppSpacing.md),
               Wrap(
                 alignment: WrapAlignment.spaceBetween,
@@ -417,390 +441,4 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
       ],
     );
   }
-}
-
-/// The [Curve] of every entrance (the reference's `[0.16, 1, 0.3, 1]`).
-const Curve _ease = Cubic(0.16, 1, 0.3, 1);
-
-/// 0→1 over [from, to] seconds of the 1.8 s entrance.
-Animation<double> _part(AnimationController intro, double from, double to) => CurvedAnimation(
-  parent: intro,
-  curve: Interval(from / 1.8, to / 1.8, curve: _ease),
-);
-
-/// Fades [child] in while it slides from [dy] px to its place.
-class _Rise extends StatelessWidget {
-  const _Rise({required this.t, required this.dy, required this.child});
-
-  final Animation<double> t;
-  final double dy;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: t,
-    child: child,
-    builder: (context, child) => Opacity(
-      opacity: t.value.clamp(0.0, 1.0),
-      child: Transform.translate(offset: Offset(0, dy * (1 - t.value)), child: child),
-    ),
-  );
-}
-
-/// The landing hero.
-class _Hero extends StatelessWidget {
-  const _Hero({
-    required this.tree,
-    required this.wide,
-    required this.intro,
-    required this.onSignIn,
-    required this.onCreate,
-  });
-
-  final LifeTree tree;
-  final bool wide;
-  final AnimationController intro;
-  final VoidCallback onSignIn;
-  final VoidCallback onCreate;
-
-  @override
-  Widget build(BuildContext context) {
-    final night = _part(intro, 0, 1.8);
-    return Padding(
-      padding: const EdgeInsets.all(AppLayout.panelGap),
-      child: ClipRRect(
-        borderRadius: AppRadius.panelBorder,
-        child: ColoredBox(
-          color: AppColors.night,
-          child: Stack(
-            children: [
-              // The tree, like a background film: fades in from a little closer.
-              Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: night,
-                  builder: (context, child) => Opacity(
-                    opacity: night.value.clamp(0.0, 1.0),
-                    child: Transform.scale(scale: 1.05 - 0.05 * night.value, child: child),
-                  ),
-                  child: Padding(
-                    // Keep the tree's center above the paper at the bottom.
-                    padding: EdgeInsets.only(bottom: wide ? 160 : 260),
-                    child: LifeConstellation(tree: tree, compact: true),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _Rise(
-                  t: _part(intro, 0.5, 1.5),
-                  dy: 20,
-                  child: _Footer(wide: wide, intro: intro, onSignIn: onSignIn, onCreate: onCreate),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: SafeArea(
-                  bottom: false,
-                  child: _Rise(
-                    t: _part(intro, 0, 0.8),
-                    dy: -16,
-                    child: _Nav(wide: wide, onSignIn: onSignIn),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The top: the mark and the name on the left, Sign in on the right. Nothing
-/// else — the page is about one sentence and one button.
-class _Nav extends StatelessWidget {
-  const _Nav({required this.wide, required this.onSignIn});
-
-  final bool wide;
-  final VoidCallback onSignIn;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    return Padding(
-      padding: wide
-          ? const EdgeInsets.symmetric(horizontal: AppSpacing.xxl, vertical: AppSpacing.xl)
-          : const EdgeInsets.all(AppSpacing.lg),
-      child: Row(
-        children: [
-          const _Spark(size: 22),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              'Self-Infinity',
-              key: const Key('hero-brand'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.titleMedium?.copyWith(color: AppColors.nightText, letterSpacing: -0.2),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          const _LanguageMenu(),
-          const SizedBox(width: AppSpacing.sm),
-          _CirclePill(
-            key: const Key('hero-sign-in'),
-            circle: wide ? 32 : 28,
-            label: context.l10n.signIn,
-            onTap: onSignIn,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The language of the page (and of the app after signing in): the current
-/// one's name; a tap lists all three.
-class _LanguageMenu extends StatelessWidget {
-  const _LanguageMenu();
-
-  @override
-  Widget build(BuildContext context) {
-    final locale = context.watch<LocaleController>();
-    final style = Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.nightText);
-    return PopupMenuButton<AppLanguage>(
-      key: const Key('hero-language'),
-      tooltip: context.l10n.language,
-      position: PopupMenuPosition.under,
-      onSelected: (language) => unawaited(locale.setLanguage(language)),
-      itemBuilder: (_) => [
-        for (final language in AppLanguage.values)
-          PopupMenuItem(
-            key: Key('hero-language-${language.code}'),
-            value: language,
-            child: Row(
-              children: [
-                Expanded(child: Text(language.nativeName)),
-                if (language == locale.language)
-                  const Icon(Icons.check_rounded, size: 18, color: AppColors.textPrimary),
-              ],
-            ),
-          ),
-      ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.language_rounded, size: 18, color: AppColors.nightText),
-            const SizedBox(width: AppSpacing.xs),
-            Text(locale.language.nativeName, style: style),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// A paper pill: an ink circle with an arrow, then [label]. Hovered, the
-/// arrow morphs into "sign in" (an arrow going through a door).
-class _CirclePill extends StatefulWidget {
-  const _CirclePill({super.key, required this.circle, required this.label, required this.onTap});
-
-  final double circle;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_CirclePill> createState() => _CirclePillState();
-}
-
-class _CirclePillState extends State<_CirclePill> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    return Semantics(
-      button: true,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: Material(
-          color: AppColors.surface,
-          shape: const StadiumBorder(),
-          child: InkWell(
-            customBorder: const StadiumBorder(),
-            onTap: widget.onTap,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, AppSpacing.lg, 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: widget.circle,
-                    height: widget.circle,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: MorphIcon(
-                      from: MorphShapes.arrow,
-                      to: MorphShapes.signIn,
-                      morphed: _hover,
-                      size: 16,
-                      strokeWidth: 2.2,
-                      color: AppColors.onAccent,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text(
-                    widget.label,
-                    style: theme.labelMedium?.copyWith(color: AppColors.textPrimary),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The bottom: paper fading up over the tree, the headline and the buttons.
-class _Footer extends StatelessWidget {
-  const _Footer({
-    required this.wide,
-    required this.intro,
-    required this.onSignIn,
-    required this.onCreate,
-  });
-
-  final bool wide;
-  final AnimationController intro;
-  final VoidCallback onSignIn;
-  final VoidCallback onCreate;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    final left = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _Rise(
-          t: _part(intro, 0.6, 1.4),
-          dy: 16,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(color: AppColors.ember, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Flexible(
-                child: Text(
-                  context.l10n.heroTagline,
-                  style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        _Rise(
-          t: _part(intro, 0.8, 1.6),
-          dy: 20,
-          child: Text(
-            context.l10n.heroHeadline,
-            key: const Key('hero-headline'),
-            style: (wide ? theme.displayLarge : theme.displaySmall)?.copyWith(height: 1.0),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        _Rise(
-          t: _part(intro, 1.0, 1.8),
-          dy: 16,
-          child: Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              FilledButton(
-                key: const Key('hero-get-started'),
-                onPressed: onCreate,
-                child: Text(context.l10n.getStarted),
-              ),
-              OutlinedButton(
-                key: const Key('hero-have-account'),
-                onPressed: onSignIn,
-                child: Text(context.l10n.haveAnAccountButton),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          // Solid paper under the words, then a short fade: a long one mixes the night and
-          // the paper into a muddy grey band.
-          colors: [
-            AppColors.background,
-            AppColors.background,
-            AppColors.background.withValues(alpha: 0.6),
-            AppColors.background.withValues(alpha: 0),
-          ],
-          stops: const [0, 0.62, 0.84, 1],
-        ),
-      ),
-      child: Padding(
-        padding: wide
-            ? const EdgeInsets.fromLTRB(AppSpacing.xxl, 160, AppSpacing.xxl, AppSpacing.xxl)
-            : const EdgeInsets.fromLTRB(AppSpacing.lg, 120, AppSpacing.lg, AppSpacing.xl),
-        child: Align(alignment: Alignment.centerLeft, child: left),
-      ),
-    );
-  }
-}
-
-/// The mark: a four-point spark, like "You" at the center of the tree.
-class _Spark extends StatelessWidget {
-  const _Spark({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) =>
-      CustomPaint(size: Size.square(size), painter: _SparkPainter());
-}
-
-class _SparkPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = size.center(Offset.zero);
-    final r = size.shortestSide / 2;
-    final w = r * 0.22;
-    final path = Path()
-      ..moveTo(c.dx, c.dy - r)
-      ..quadraticBezierTo(c.dx + w * 0.4, c.dy - w * 0.4, c.dx + r, c.dy)
-      ..quadraticBezierTo(c.dx + w * 0.4, c.dy + w * 0.4, c.dx, c.dy + r)
-      ..quadraticBezierTo(c.dx - w * 0.4, c.dy + w * 0.4, c.dx - r, c.dy)
-      ..quadraticBezierTo(c.dx - w * 0.4, c.dy - w * 0.4, c.dx, c.dy - r)
-      ..close();
-    canvas.drawPath(path, Paint()..color = AppColors.emberHot);
-  }
-
-  @override
-  bool shouldRepaint(_SparkPainter old) => false;
 }

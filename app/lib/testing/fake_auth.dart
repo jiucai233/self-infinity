@@ -18,6 +18,9 @@ class FakeAuthService extends AuthService {
   /// Emails a reset link was "sent" to.
   final List<String> resets = [];
 
+  /// The Google account "Continue with Google" signs in as.
+  static const String googleEmail = 'google.user@gmail.com';
+
   @override
   bool get enabled => true;
 
@@ -65,6 +68,18 @@ class FakeAuthService extends AuthService {
   @override
   Future<AuthResult> sendPasswordReset(String email) async {
     resets.add(email.trim());
+    return AuthResult.ok;
+  }
+
+  @override
+  bool get supportsGoogle => true;
+
+  @override
+  Future<AuthResult> signInWithGoogle() async {
+    _passwords.putIfAbsent(googleEmail, () => '');
+    _confirmed.add(googleEmail);
+    _email = googleEmail;
+    notifyListeners();
     return AuthResult.ok;
   }
 

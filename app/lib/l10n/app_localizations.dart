@@ -346,6 +346,66 @@ abstract class AppLocalizations {
   /// **'Calling the Auditor…'**
   String get callingAuditor;
 
+  /// No description provided for @chapterGrowBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Courses grow under the main quests you set for this year. Everything you prove lights up a point in one sphere you can hold: your life tree.'**
+  String get chapterGrowBody;
+
+  /// No description provided for @chapterGrowKicker.
+  ///
+  /// In en, this message translates to:
+  /// **'04 · Grow'**
+  String get chapterGrowKicker;
+
+  /// No description provided for @chapterGrowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your whole life, one tree.'**
+  String get chapterGrowTitle;
+
+  /// No description provided for @chapterLearnBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell the Guide what you want to learn. It finds a real course syllabus and turns it into a tree of ideas you\'ll have to prove, one node at a time.'**
+  String get chapterLearnBody;
+
+  /// No description provided for @chapterLearnKicker.
+  ///
+  /// In en, this message translates to:
+  /// **'01 · Learn'**
+  String get chapterLearnKicker;
+
+  /// No description provided for @chapterLearnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick anything. Get a real syllabus.'**
+  String get chapterLearnTitle;
+
+  /// No description provided for @chapterProveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'No multiple choice. An Auditor asks like a beginner and judges like an expert, and a Challenger double-checks every pass. Only real understanding turns a node gold.'**
+  String get chapterProveBody;
+
+  /// No description provided for @chapterProveKicker.
+  ///
+  /// In en, this message translates to:
+  /// **'02 · Prove'**
+  String get chapterProveKicker;
+
+  /// No description provided for @chapterRememberBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Get it wrong and you write down why. It becomes a lesson card, and the Auditor brings it up next time, so the same misconception can\'t sneak past twice.'**
+  String get chapterRememberBody;
+
+  /// No description provided for @chapterRememberKicker.
+  ///
+  /// In en, this message translates to:
+  /// **'03 · Remember'**
+  String get chapterRememberKicker;
+
   /// No description provided for @characterSheet.
   ///
   /// In en, this message translates to:
@@ -435,6 +495,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue'**
   String get continueLabel;
+
+  /// No description provided for @continueWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get continueWithGoogle;
 
   /// No description provided for @course.
   ///
@@ -646,6 +712,12 @@ abstract class AppLocalizations {
   /// **'Go home'**
   String get goHome;
 
+  /// No description provided for @googleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t start Google sign-in. Please try again.'**
+  String get googleFailed;
+
   /// No description provided for @greetingContinue.
   ///
   /// In en, this message translates to:
@@ -675,6 +747,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Prove you understand.\nWatch your tree grow.'**
   String get heroHeadline;
+
+  /// No description provided for @heroLead.
+  ///
+  /// In en, this message translates to:
+  /// **'An AI that won\'t let you fake it. You level up only by explaining what you learn, in your own words.'**
+  String get heroLead;
 
   /// No description provided for @heroTagline.
   ///
@@ -838,6 +916,12 @@ abstract class AppLocalizations {
   /// **'Meals'**
   String get meals;
 
+  /// No description provided for @menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu'**
+  String get menu;
+
   /// No description provided for @messageHint.
   ///
   /// In en, this message translates to:
@@ -855,6 +939,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'My character'**
   String get myCharacter;
+
+  /// No description provided for @navHowItWorks.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get navHowItWorks;
 
   /// No description provided for @newHere.
   ///
@@ -1198,6 +1288,12 @@ abstract class AppLocalizations {
   /// **'Open node'**
   String get openNode;
 
+  /// No description provided for @orDivider.
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get orDivider;
+
   /// No description provided for @pageNotFound.
   ///
   /// In en, this message translates to:
@@ -1294,6 +1390,12 @@ abstract class AppLocalizations {
   /// **'Resources'**
   String get resources;
 
+  /// No description provided for @robotAlt.
+  ///
+  /// In en, this message translates to:
+  /// **'A robot holding your life tree in its palm'**
+  String get robotAlt;
+
   /// No description provided for @rulePlaceholder.
   ///
   /// In en, this message translates to:
@@ -1371,6 +1473,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t save. {error}'**
   String saveFailed(String error);
+
+  /// No description provided for @scrollHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll'**
+  String get scrollHint;
 
   /// No description provided for @search.
   ///

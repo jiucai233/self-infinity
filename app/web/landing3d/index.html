@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Self-Infinity robot</title>
+  <!-- The front page's robot (lib/features/auth/landing_page.dart embeds this page). -->
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #fbfbf8; }
+    canvas { display: block; opacity: 0; transition: opacity 600ms ease; }
+    canvas.on { opacity: 1; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <script type="module" src="scene.js"></script>
+</body>
+</html>

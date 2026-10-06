@@ -22,6 +22,7 @@ dependencies:
   speech_to_text: ^7.5.0
   supabase_flutter: ^2.18.0
   url_launcher: ^6.3.2
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:
@@ -33,11 +34,14 @@ flutter:
   # Localized strings from lib/l10n/*.arb (l10n.yaml).
   generate: true
 
-  # Line-art pieces of the life tree (lib/widgets/ink_sprites.dart), and the Chinese and Korean
-  # fonts, loaded only when their language is picked (lib/theme/font_loader.dart).
+  # Line-art pieces of the life tree (lib/widgets/ink_sprites.dart), the Chinese and Korean
+  # fonts, loaded only when their language is picked (lib/theme/font_loader.dart), and the
+  # front page's robot (lib/features/auth/landing_page.dart).
   assets:
     - assets/ink/
     - assets/fonts/cjk/
+    - assets/landing/
+    - assets/landing/frames/
 
   # Infinity Sans (Pretendard, Latin subset) for all text, Instrument Serif for headlines, big numbers and the
   # identity quote (docs/DESIGN.md 2.2). SIL Open Font License; see assets/fonts/README.md.

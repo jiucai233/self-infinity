@@ -140,6 +140,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get callingAuditor => 'Calling the Auditor…';
 
   @override
+  String get chapterGrowBody =>
+      'Courses grow under the main quests you set for this year. Everything you prove lights up a point in one sphere you can hold: your life tree.';
+
+  @override
+  String get chapterGrowKicker => '04 · Grow';
+
+  @override
+  String get chapterGrowTitle => 'Your whole life, one tree.';
+
+  @override
+  String get chapterLearnBody =>
+      'Tell the Guide what you want to learn. It finds a real course syllabus and turns it into a tree of ideas you\'ll have to prove, one node at a time.';
+
+  @override
+  String get chapterLearnKicker => '01 · Learn';
+
+  @override
+  String get chapterLearnTitle => 'Pick anything. Get a real syllabus.';
+
+  @override
+  String get chapterProveBody =>
+      'No multiple choice. An Auditor asks like a beginner and judges like an expert, and a Challenger double-checks every pass. Only real understanding turns a node gold.';
+
+  @override
+  String get chapterProveKicker => '02 · Prove';
+
+  @override
+  String get chapterRememberBody =>
+      'Get it wrong and you write down why. It becomes a lesson card, and the Auditor brings it up next time, so the same misconception can\'t sneak past twice.';
+
+  @override
+  String get chapterRememberKicker => '03 · Remember';
+
+  @override
   String get characterSheet => 'Character sheet';
 
   @override
@@ -191,6 +225,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get continueLabel => 'Continue';
+
+  @override
+  String get continueWithGoogle => 'Continue with Google';
 
   @override
   String get course => 'Course';
@@ -298,6 +335,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get goHome => 'Go home';
 
   @override
+  String get googleFailed => 'Couldn\'t start Google sign-in. Please try again.';
+
+  @override
   String greetingContinue(String course) {
     return 'Continue with “$course”?';
   }
@@ -313,6 +353,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get heroHeadline => 'Prove you understand.\nWatch your tree grow.';
+
+  @override
+  String get heroLead =>
+      'An AI that won\'t let you fake it. You level up only by explaining what you learn, in your own words.';
 
   @override
   String get heroTagline => 'A learning game you win by explaining';
@@ -402,6 +446,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get meals => 'Meals';
 
   @override
+  String get menu => 'Menu';
+
+  @override
   String get messageHint => 'Message…';
 
   @override
@@ -409,6 +456,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get myCharacter => 'My character';
+
+  @override
+  String get navHowItWorks => 'How it works';
 
   @override
   String get newHere => 'New here?';
@@ -598,6 +648,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openNode => 'Open node';
 
   @override
+  String get orDivider => 'or';
+
+  @override
   String get pageNotFound => 'Page not found';
 
   @override
@@ -660,6 +713,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resources => 'Resources';
 
   @override
+  String get robotAlt => 'A robot holding your life tree in its palm';
+
+  @override
   String get rulePlaceholder => 'e.g. No phone before the first audit';
 
   @override
@@ -699,6 +755,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String saveFailed(String error) {
     return 'Couldn\'t save. $error';
   }
+
+  @override
+  String get scrollHint => 'Scroll';
 
   @override
   String get search => 'Search';

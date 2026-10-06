@@ -140,6 +140,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get callingAuditor => '正在请审核官…';
 
   @override
+  String get chapterGrowBody => '课程挂在你为今年设定的主线任务下面。你证明的每一样东西，都会点亮这个球里的一个点：这就是你的人生树。';
+
+  @override
+  String get chapterGrowKicker => '04 · 成长';
+
+  @override
+  String get chapterGrowTitle => '你的整个人生，一棵树。';
+
+  @override
+  String get chapterLearnBody => '告诉向导你想学什么。它会找来一份真实的课程大纲，把它变成一棵等你逐个证明的知识树。';
+
+  @override
+  String get chapterLearnKicker => '01 · 学';
+
+  @override
+  String get chapterLearnTitle => '想学什么都行，拿到真实的课程大纲。';
+
+  @override
+  String get chapterProveBody => '没有选择题。审核官像新手一样提问、像专家一样评判，质疑者还会复核每一次通过。只有真的懂了，节点才会变成金色。';
+
+  @override
+  String get chapterProveKicker => '02 · 证明';
+
+  @override
+  String get chapterRememberBody => '答错了就写下原因。它会变成一张教训卡，审核官下次会专门提起，同一个误解没法溜过去两次。';
+
+  @override
+  String get chapterRememberKicker => '03 · 记住';
+
+  @override
   String get characterSheet => '角色卡';
 
   @override
@@ -191,6 +221,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get continueLabel => '继续';
+
+  @override
+  String get continueWithGoogle => '使用 Google 继续';
 
   @override
   String get course => '课程';
@@ -298,6 +331,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get goHome => '回到首页';
 
   @override
+  String get googleFailed => '无法打开 Google 登录，请再试一次。';
+
+  @override
   String greetingContinue(String course) {
     return '继续学「$course」吗？';
   }
@@ -313,6 +349,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get heroHeadline => '证明你真的懂了，\n看着你的树长大。';
+
+  @override
+  String get heroLead => '一个不让你装懂的 AI。只有用自己的话讲明白学到的东西，你才能升级。';
 
   @override
   String get heroTagline => '一个靠讲明白来取胜的学习游戏';
@@ -402,6 +441,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get meals => '饮食';
 
   @override
+  String get menu => '菜单';
+
+  @override
   String get messageHint => '输入消息…';
 
   @override
@@ -409,6 +451,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get myCharacter => '我的角色';
+
+  @override
+  String get navHowItWorks => '怎么玩';
 
   @override
   String get newHere => '第一次来？';
@@ -595,6 +640,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openNode => '打开节点';
 
   @override
+  String get orDivider => '或';
+
+  @override
   String get pageNotFound => '找不到这个页面';
 
   @override
@@ -651,6 +699,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get resources => '资料';
 
   @override
+  String get robotAlt => '一个机器人，掌心托着你的人生树';
+
+  @override
   String get rulePlaceholder => '例如：第一次审核前不碰手机';
 
   @override
@@ -690,6 +741,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String saveFailed(String error) {
     return '保存失败。$error';
   }
+
+  @override
+  String get scrollHint => '向下滚动';
 
   @override
   String get search => '搜索';

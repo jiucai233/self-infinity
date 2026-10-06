@@ -1,4 +1,5 @@
 // Accounts and the first-run tutorial (docs/ux-chat.md §7), through the real app shell.
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,7 +61,11 @@ Future<void> answer(WidgetTester tester, String text) async {
 void main() {
   group('sign in', () {
     testWidgets('signed out: the landing hero; Sign in opens the form over it', (tester) async {
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: FakeAuthService());
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: FakeAuthService(),
+      );
       expect(key('sign-in'), findsOneWidget);
       expect(find.byType(HomeScene), findsNothing);
       expect(key('hero-headline'), findsOneWidget);
@@ -73,7 +78,11 @@ void main() {
     testWidgets('Get started opens the sign-up form, I have an account the sign-in one', (
       tester,
     ) async {
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: FakeAuthService());
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: FakeAuthService(),
+      );
       await tapKey(tester, 'hero-get-started');
       expect(find.text('Create your account'), findsOneWidget);
       await tapKey(tester, 'auth-close');
@@ -83,7 +92,11 @@ void main() {
     });
 
     testWidgets('the form closes with ×, a tap outside it, or Esc', (tester) async {
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: FakeAuthService());
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: FakeAuthService(),
+      );
       await tapKey(tester, 'hero-sign-in');
       await tester.tapAt(const Offset(8, 8)); // the scrim
       await tester.pumpAndSettle();
@@ -94,13 +107,20 @@ void main() {
       expect(key('auth-card'), findsNothing);
     });
 
-    testWidgets('clean: the name, Sign in, one sentence, two buttons; a phone fits it all', (
+    testWidgets('the front page: the name, the headline, two buttons, the robot holding the tree', (
       tester,
     ) async {
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: FakeAuthService());
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: FakeAuthService(),
+      );
       expect(key('hero-brand'), findsOneWidget);
-      expect(find.byType(OutlinedButton), findsOneWidget);
-      expect(find.byType(FilledButton), findsOneWidget);
+      expect(key('hero-headline'), findsOneWidget);
+      expect(key('hero-get-started'), findsOneWidget);
+      expect(key('hero-have-account'), findsOneWidget);
+      expect(key('landing-robot'), findsOneWidget);
+      expect(key('landing-sphere'), findsOneWidget);
       await pumpApp(
         tester,
         api: FakeApiClient(latency: Duration.zero),
@@ -114,8 +134,113 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('each swipe turns a screen; the tree in the palm grows until it fills the window', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: FakeAuthService(),
+      );
+      double sphere() => tester.getSize(key('landing-sphere')).width;
+      final small = sphere();
+      expect(small, lessThan(160)); // a ball in the hand
+
+      // One swipe, one screen.
+      Future<void> swipeUp(int times) async {
+        for (var i = 0; i < times; i++) {
+          await tester.drag(key('landing-scroll'), const Offset(0, -300));
+          await tester.pumpAndSettle();
+        }
+      }
+
+      await swipeUp(2);
+      final big = sphere();
+      expect(big, greaterThan(small * 2));
+      expect(key('landing-chapter-2'), findsOneWidget);
+
+      await swipeUp(2);
+      expect(key('landing-chapter-4'), findsOneWidget);
+      await swipeUp(5); // past the end, it stays there
+      expect(sphere(), greaterThanOrEqualTo(1440)); // the whole window
+      expect(key('landing-robot'), findsNothing); // the robot has stepped back
+      await tapKey(tester, 'landing-end-start');
+      expect(key('auth-card'), findsOneWidget);
+    });
+
+    testWidgets('a flick of the wheel or an arrow key turns one screen', (tester) async {
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: FakeAuthService(),
+      );
+      double offset() =>
+          tester.widget<SingleChildScrollView>(key('landing-scroll')).controller!.offset;
+
+      final wheel = TestPointer(1, PointerDeviceKind.mouse)
+        ..hover(tester.getCenter(key('landing-scroll')));
+      await tester.sendEventToBinding(wheel.scroll(const Offset(0, 120)));
+      await tester.sendEventToBinding(wheel.scroll(const Offset(0, 120))); // the same flick
+      await tester.pumpAndSettle();
+      expect(offset(), 900);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expect(offset(), 1800);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      expect(offset(), 900);
+      await tester.sendKeyEvent(LogicalKeyboardKey.end);
+      await tester.pumpAndSettle();
+      expect(offset(), 5 * 900);
+    });
+
+    testWidgets('a phone has the links behind a burger', (tester) async {
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: FakeAuthService(),
+        size: phoneScreen,
+      );
+      expect(key('hero-sign-in'), findsNothing);
+      await tapKey(tester, 'landing-menu');
+      await tester.tap(
+        find.descendant(of: key('landing-mobile-menu'), matching: find.text('Sign in')),
+      );
+      await tester.pumpAndSettle();
+      expect(key('auth-card'), findsOneWidget);
+    });
+
+    testWidgets('Continue with Google signs in; without accounts there is no Google button', (
+      tester,
+    ) async {
+      final auth = FakeAuthService();
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: auth,
+      );
+      await tapKey(tester, 'hero-sign-in');
+      await tapKey(tester, 'auth-google');
+      expect(auth.signedIn, isTrue);
+      expect(auth.email, FakeAuthService.googleEmail);
+
+      await tester.pumpWidget(const SizedBox()); // a fresh app, not the signed-in one
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: LocalAuth()..signOut(),
+      );
+      await tapKey(tester, 'hero-sign-in');
+      expect(key('auth-google'), findsNothing);
+    });
+
     testWidgets('checks the fields before calling the server', (tester) async {
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: FakeAuthService());
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: FakeAuthService(),
+      );
       await tapKey(tester, 'hero-sign-in');
       await tapKey(tester, 'auth-submit');
       expect(find.text('Enter a valid email address.'), findsOneWidget);
@@ -128,7 +253,11 @@ void main() {
 
     testWidgets('wrong password: an error, still on the page', (tester) async {
       final auth = FakeAuthService(accounts: {'me@x.io': 'right-one'});
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: auth);
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: auth,
+      );
       await tapKey(tester, 'hero-sign-in');
       await enter(tester, 'auth-email', 'me@x.io');
       await enter(tester, 'auth-password', 'wrong-one');
@@ -139,7 +268,11 @@ void main() {
 
     testWidgets('sign up → check your inbox → confirm → sign in → the tutorial', (tester) async {
       final auth = FakeAuthService(confirmEmail: true);
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero, onboarded: false), auth: auth);
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero, onboarded: false),
+        auth: auth,
+      );
       await tapKey(tester, 'hero-sign-in');
       await tapKey(tester, 'auth-switch');
       expect(find.text('Create your account'), findsOneWidget);
@@ -161,7 +294,11 @@ void main() {
 
     testWidgets('forgot password sends the reset email', (tester) async {
       final auth = FakeAuthService(accounts: {'me@x.io': 'secret1'});
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: auth);
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: auth,
+      );
       await tapKey(tester, 'hero-sign-in');
       await tapKey(tester, 'auth-forgot');
       expect(find.text('Enter your email above first.'), findsOneWidget);
@@ -171,10 +308,16 @@ void main() {
       expect(auth.resets, ['me@x.io']);
     });
 
-    testWidgets('an onboarded account goes straight home; signing out returns to sign-in', (tester) async {
+    testWidgets('an onboarded account goes straight home; signing out returns to sign-in', (
+      tester,
+    ) async {
       final auth = FakeAuthService(accounts: {'me@x.io': 'secret1'});
       await auth.signIn('me@x.io', 'secret1');
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: auth);
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero),
+        auth: auth,
+      );
       expect(find.byType(HomeScene), findsOneWidget);
       await tapKey(tester, 'settings-button');
       await tapKey(tester, 'settings-sign-out');
@@ -210,7 +353,9 @@ void main() {
       expect(find.text("Let's set up your character."), findsOneWidget);
     });
 
-    testWidgets('the whole way: answers are saved, the course lands under the quest', (tester) async {
+    testWidgets('the whole way: answers are saved, the course lands under the quest', (
+      tester,
+    ) async {
       final api = FakeApiClient(latency: Duration.zero, onboarded: false);
       await pumpApp(tester, api: api);
       await tapKey(tester, 'onboarding-continue'); // Begin
@@ -218,10 +363,16 @@ void main() {
       await answer(tester, 'Another year of nodding along.');
       await answer(tester, 'I can teach calculus.');
       // The identity line starts with the stem.
-      expect(tester.widget<TextField>(key('onboarding-input')).controller!.text, 'I am the type of person who ');
+      expect(
+        tester.widget<TextField>(key('onboarding-input')).controller!.text,
+        'I am the type of person who ',
+      );
       await answer(tester, 'I am the type of person who explains first.');
       await answer(tester, 'Teach calculus to a stranger');
-      expect(find.text('What do you need to learn first for “Teach calculus to a stranger”?'), findsOneWidget);
+      expect(
+        find.text('What do you need to learn first for “Teach calculus to a stranger”?'),
+        findsOneWidget,
+      );
       await answer(tester, 'math');
       expect(find.text('Your world “High School Math” is ready.'), findsOneWidget);
       await tapKey(tester, 'onboarding-continue');
@@ -245,7 +396,8 @@ void main() {
 
     testWidgets('a syllabus file instead of a topic', (tester) async {
       final api = FakeApiClient(latency: Duration.zero, onboarded: false);
-      final picker = FakeFilePicker()..next = PickedFile(name: 'Linear Algebra.txt', bytes: 'Vectors and matrices'.codeUnits);
+      final picker = FakeFilePicker()
+        ..next = PickedFile(name: 'Linear Algebra.txt', bytes: 'Vectors and matrices'.codeUnits);
       await pumpApp(tester, api: api, picker: picker);
       await tapKey(tester, 'onboarding-continue');
       for (var i = 0; i < 4; i++) {
@@ -283,7 +435,9 @@ void main() {
       expect(find.text('Your world “High School Math” is ready.'), findsOneWidget);
     });
 
-    testWidgets('the course is built whatever the front desk would make of the topic', (tester) async {
+    testWidgets('the course is built whatever the front desk would make of the topic', (
+      tester,
+    ) async {
       final api = FakeApiClient(latency: Duration.zero, onboarded: false);
       await pumpApp(tester, api: api);
       await tapKey(tester, 'onboarding-continue');
@@ -317,7 +471,11 @@ void main() {
 
     testWidgets('dictation goes after what is already written (the identity stem)', (tester) async {
       final voice = FakeVoiceService();
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero, onboarded: false), voice: voice);
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero, onboarded: false),
+        voice: voice,
+      );
       await tapKey(tester, 'onboarding-continue');
       await answer(tester, 'x');
       await answer(tester, 'y');
@@ -341,7 +499,11 @@ void main() {
 
     testWidgets('stop, or Continue, ends the listening; late words are dropped', (tester) async {
       final voice = FakeVoiceService();
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero, onboarded: false), voice: voice);
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero, onboarded: false),
+        voice: voice,
+      );
       await tapKey(tester, 'onboarding-continue');
       await tapKey(tester, 'dictation-button');
       await tapKey(tester, 'dictation-stop');
@@ -361,7 +523,11 @@ void main() {
 
     testWidgets('no speech recognition here: a toast, the field still works', (tester) async {
       final voice = FakeVoiceService(available: false);
-      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero, onboarded: false), voice: voice);
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero, onboarded: false),
+        voice: voice,
+      );
       await tapKey(tester, 'onboarding-continue');
       await tester.tap(key('dictation-button'));
       await tester.pump();

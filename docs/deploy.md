@@ -29,6 +29,19 @@
    - **数据库连接串**：右上角 **Connect → Transaction pooler**，端口 6543，形如
      `postgresql://postgres.<ref>:<密码>@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres`
 
+### Google 登录（可选，约 10 分钟，你来做）
+
+登录卡片里的 “Continue with Google” 走 Supabase 的 Google provider，代码已经接好，只差两边的配置：
+
+1. **Google Cloud Console** → APIs & Services → Credentials → Create credentials → **OAuth client ID**，类型选 **Web application**。
+   - 第一次用要先配 **OAuth consent screen**（External，填应用名和你的邮箱即可；测试阶段把自己加进 Test users）。
+   - **Authorized redirect URIs** 填：`https://<ref>.supabase.co/auth/v1/callback`
+   - 记下 Client ID 和 Client secret。
+2. **Supabase** → Authentication → Sign In / Providers → **Google**：打开，填上面的 Client ID 和 Client secret，保存。
+3. **Supabase** → Authentication → URL Configuration：Redirect URLs 里要有 Vercel 网址和 `selfinfinity://login-callback`（第 1 节第 3 步已经加过就不用再加）。
+
+用 Google 登录的账号和邮箱账号一样，各自一个 schema，数据互不相通；同一个邮箱先用密码注册、后用 Google 登录，Supabase 会把它们并成一个账号。
+
 ## 2. Vercel（你来做）
 
 1. 登录：在项目目录运行 `npx vercel login`（会打开浏览器）。

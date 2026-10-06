@@ -65,6 +65,27 @@ class SupabaseAuthService extends AuthService {
       _guard(() => _auth.resetPasswordForEmail(email.trim(), redirectTo: redirectUrl));
 
   @override
+  bool get supportsGoogle => true;
+
+  /// Google must be on under Authentication → Providers in Supabase, with the
+  /// OAuth client of a Google Cloud project (docs/deploy.md).
+  @override
+  Future<AuthResult> signInWithGoogle() async {
+    try {
+      final started = await _auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: redirectUrl,
+        authScreenLaunchMode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+      );
+      return started ? AuthResult.ok : AuthResult(error: l10nNow.googleFailed);
+    } on AuthException catch (e) {
+      return AuthResult(error: messageFor(e));
+    } on Object {
+      return AuthResult(error: l10nNow.googleFailed);
+    }
+  }
+
+  @override
   Future<void> signOut() => _auth.signOut();
 
   Future<AuthResult> _guard(Future<Object?> Function() call) async {

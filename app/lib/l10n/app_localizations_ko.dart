@@ -140,6 +140,39 @@ class AppLocalizationsKo extends AppLocalizations {
   String get callingAuditor => '심사관을 부르는 중…';
 
   @override
+  String get chapterGrowBody =>
+      '강좌는 올해 정한 메인 퀘스트 아래에서 자라요. 증명한 모든 것이 손에 쥘 수 있는 구슬 속 점 하나를 밝혀요. 그게 당신의 인생 나무예요.';
+
+  @override
+  String get chapterGrowKicker => '04 · 성장하기';
+
+  @override
+  String get chapterGrowTitle => '당신의 삶 전체가, 나무 한 그루.';
+
+  @override
+  String get chapterLearnBody => '배우고 싶은 걸 가이드에게 말하세요. 실제 강의계획서를 찾아, 하나씩 증명해야 할 개념의 나무로 바꿔 줘요.';
+
+  @override
+  String get chapterLearnKicker => '01 · 배우기';
+
+  @override
+  String get chapterLearnTitle => '무엇이든 고르면, 진짜 강의계획서가 와요.';
+
+  @override
+  String get chapterProveBody =>
+      '객관식은 없어요. 심사관은 초보자처럼 묻고 전문가처럼 판단하고, 반론자가 모든 통과를 다시 확인해요. 정말 이해해야만 노드가 금색으로 바뀌어요.';
+
+  @override
+  String get chapterProveKicker => '02 · 증명하기';
+
+  @override
+  String get chapterRememberBody =>
+      '틀리면 왜 틀렸는지 적어요. 그게 교훈 카드가 되고, 심사관이 다음에 꼭 꺼내 와요. 같은 오개념이 두 번 빠져나갈 순 없어요.';
+
+  @override
+  String get chapterRememberKicker => '03 · 기억하기';
+
+  @override
   String get characterSheet => '캐릭터 시트';
 
   @override
@@ -191,6 +224,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get continueLabel => '계속';
+
+  @override
+  String get continueWithGoogle => 'Google로 계속하기';
 
   @override
   String get course => '강좌';
@@ -298,6 +334,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get goHome => '홈으로';
 
   @override
+  String get googleFailed => 'Google 로그인을 시작하지 못했어요. 다시 시도해 주세요.';
+
+  @override
   String greetingContinue(String course) {
     return '“$course” 이어서 할까요?';
   }
@@ -313,6 +352,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get heroHeadline => '이해했다는 걸 증명하고,\n나무가 자라는 걸 지켜보세요.';
+
+  @override
+  String get heroLead => '아는 척은 통하지 않는 AI. 배운 걸 자기 말로 설명해야만 레벨이 올라요.';
 
   @override
   String get heroTagline => '설명해야 이기는 학습 게임';
@@ -402,6 +444,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get meals => '식사';
 
   @override
+  String get menu => '메뉴';
+
+  @override
   String get messageHint => '메시지…';
 
   @override
@@ -409,6 +454,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get myCharacter => '내 캐릭터';
+
+  @override
+  String get navHowItWorks => '작동 방식';
 
   @override
   String get newHere => '처음이신가요?';
@@ -595,6 +643,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get openNode => '노드 열기';
 
   @override
+  String get orDivider => '또는';
+
+  @override
   String get pageNotFound => '페이지를 찾을 수 없어요';
 
   @override
@@ -651,6 +702,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get resources => '자료';
 
   @override
+  String get robotAlt => '손바닥 위에 인생 나무를 올린 로봇';
+
+  @override
   String get rulePlaceholder => '예: 첫 심사 전엔 휴대폰 금지';
 
   @override
@@ -690,6 +744,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String saveFailed(String error) {
     return '저장하지 못했어요. $error';
   }
+
+  @override
+  String get scrollHint => '스크롤';
 
   @override
   String get search => '검색';

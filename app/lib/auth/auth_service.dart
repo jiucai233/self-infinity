@@ -51,6 +51,15 @@ abstract class AuthService extends ChangeNotifier {
   /// Sends a "reset your password" email.
   Future<AuthResult> sendPasswordReset(String email);
 
+  /// Whether "Continue with Google" is offered.
+  bool get supportsGoogle => false;
+
+  /// Signs in (or up) with a Google account. On the web the page goes to
+  /// Google and comes back signed in; on a phone the browser opens and the
+  /// app link brings the session back. The result only says whether the
+  /// trip could start — [signedIn] turns true when the session arrives.
+  Future<AuthResult> signInWithGoogle() async => AuthResult(error: l10nNow.googleFailed);
+
   Future<void> signOut();
 
   /// Checks an email + password pair before calling the server; null if fine.

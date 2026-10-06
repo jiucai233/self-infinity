@@ -34,7 +34,9 @@ Future<void> _loadFonts() async {
     final loader = FontLoader(family);
     for (final path in paths) {
       final file = File(path);
-      if (file.existsSync()) loader.addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
+      if (file.existsSync()) {
+        loader.addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
+      }
     }
     await loader.load();
   }
@@ -176,7 +178,13 @@ void main() {
       await scene(tester, size: size, name: '2-map-$tag', location: '/map');
     });
     testWidgets(skip: dir == null, 'sign in ($tag)', (tester) async {
-      await scene(tester, size: size, name: '0-sign-in-$tag', location: '/', auth: FakeAuthService());
+      await scene(
+        tester,
+        size: size,
+        name: '0-sign-in-$tag',
+        location: '/',
+        auth: FakeAuthService(),
+      );
     });
     testWidgets(skip: dir == null, 'sign in form ($tag)', (tester) async {
       await scene(
@@ -186,11 +194,46 @@ void main() {
         location: '/',
         auth: FakeAuthService(),
         act: (t) async {
-          await t.tap(find.byKey(const Key('hero-sign-in')));
+          await t.tap(find.byKey(const Key('hero-have-account')));
           await t.pumpAndSettle();
         },
       );
     });
+    for (final screen in [0, 1, 2, 3, 4, 5]) {
+      testWidgets(skip: dir == null, 'front page, screen $screen ($tag)', (tester) async {
+        await scene(
+          tester,
+          size: size,
+          name: '0-landing-$screen-$tag',
+          location: '/',
+          auth: FakeAuthService(),
+          act: (t) async {
+            // The film's track loads, and images decode, for real, outside the fake clock.
+            bool filmOn() {
+              final robot = find.byKey(const Key('landing-robot'));
+              if (robot.evaluate().isEmpty) return false;
+              final image = t.widget<Image>(robot).image;
+              return image is AssetImage && image.assetName.contains('frames');
+            }
+
+            for (var i = 0; i < 30 && !filmOn(); i++) {
+              await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+              await t.pump();
+            }
+            for (var i = 0; i < screen; i++) {
+              await t.drag(find.byKey(const Key('landing-scroll')), const Offset(0, -300));
+              await t.pumpAndSettle();
+            }
+            final robot = find.byKey(const Key('landing-robot'));
+            if (robot.evaluate().isNotEmpty) {
+              final image = t.widget<Image>(robot).image;
+              await t.runAsync(() => precacheImage(image, t.element(robot)));
+              await t.pump();
+            }
+          },
+        );
+      });
+    }
     testWidgets(skip: dir == null, 'check your inbox ($tag)', (tester) async {
       await scene(
         tester,
@@ -208,7 +251,12 @@ void main() {
         },
       );
     });
-    Future<void> onboarding(WidgetTester tester, String name, int steps, {List<String> answers = const []}) async {
+    Future<void> onboarding(
+      WidgetTester tester,
+      String name,
+      int steps, {
+      List<String> answers = const [],
+    }) async {
       await scene(
         tester,
         size: size,
@@ -254,13 +302,45 @@ void main() {
       );
     });
     testWidgets(skip: dir == null, 'tutorial course ($tag)', (tester) async {
-      await onboarding(tester, '0-tutorial-course', 5, answers: ['Another year of nodding along.', 'I can teach it.', '', 'Teach calculus to a stranger']);
+      await onboarding(
+        tester,
+        '0-tutorial-course',
+        5,
+        answers: [
+          'Another year of nodding along.',
+          'I can teach it.',
+          '',
+          'Teach calculus to a stranger',
+        ],
+      );
     });
     testWidgets(skip: dir == null, 'tutorial course ready ($tag)', (tester) async {
-      await onboarding(tester, '0-tutorial-ready', 6, answers: ['Another year of nodding along.', 'I can teach it.', '', 'Teach calculus to a stranger', 'math']);
+      await onboarding(
+        tester,
+        '0-tutorial-ready',
+        6,
+        answers: [
+          'Another year of nodding along.',
+          'I can teach it.',
+          '',
+          'Teach calculus to a stranger',
+          'math',
+        ],
+      );
     });
     testWidgets(skip: dir == null, 'tutorial tour ($tag)', (tester) async {
-      await onboarding(tester, '0-tutorial-tour', 7, answers: ['Another year of nodding along.', 'I can teach it.', '', 'Teach calculus to a stranger', 'math']);
+      await onboarding(
+        tester,
+        '0-tutorial-tour',
+        7,
+        answers: [
+          'Another year of nodding along.',
+          'I can teach it.',
+          '',
+          'Teach calculus to a stranger',
+          'math',
+        ],
+      );
     });
     testWidgets(skip: dir == null, 'scene 2 a node card ($tag)', (tester) async {
       await scene(
