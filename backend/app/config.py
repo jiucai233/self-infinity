@@ -1,6 +1,8 @@
 import json
 import logging
+import os
 
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -28,11 +30,17 @@ class Settings(BaseSettings):
     kimi_api_key: str = ""
     # 留空则用离线搜索替身。搜索是独立于 LLM provider 的一层，互不影响。
     tavily_api_key: str = ""
-    database_url: str = "sqlite:///./self_infinity.db"
+    # POSTGRES_URL is what the Vercel ↔ Supabase integration sets (the transaction pooler);
+    # DATABASE_URL wins when both are there.
+    database_url: str = Field(
+        "sqlite:///./self_infinity.db", validation_alias=AliasChoices("database_url", "postgres_url")
+    )
     # dev：不登录，所有请求都是同一个本地用户（本地开发、测试、离线演示）。
     # supabase：每个请求必须带 Supabase 的 access token（Authorization: Bearer ...），
     # 每个账号的数据放在自己的 schema 里（见 app/db.py）。
-    auth_mode: str = "dev"
+    # 留空：在 Vercel 上（有 VERCEL 环境变量）是 supabase，别处是 dev——公开的网站
+    # 不该默认成"谁都是同一个本地用户"。
+    auth_mode: str = ""
     # Supabase 项目地址，例如 https://abcd.supabase.co；用它的 JWKS 验证 token。
     supabase_url: str = ""
     # 旧项目用 HS256 共享密钥签 token 时才需要（Project Settings → API → JWT Secret）。
@@ -49,6 +57,12 @@ class Settings(BaseSettings):
     challenger_misconception_limit: int = 5
     llm_timeout_seconds: float = 30.0
     search_timeout_seconds: float = 15.0
+
+    @model_validator(mode="after")
+    def _default_auth_mode(self) -> "Settings":
+        if not self.auth_mode:
+            self.auth_mode = "supabase" if os.environ.get("VERCEL") else "dev"
+        return self
 
     def parsed_model_overrides(self) -> dict[str, str]:
         if not self.llm_model_overrides.strip():

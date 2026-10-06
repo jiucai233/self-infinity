@@ -19,5 +19,10 @@ dependencies = [
 ]
 
 [tool.vercel.scripts]
-# The Flutter web app goes to public/ (served by the CDN); skipped when it is already there.
+# The Flutter web app goes to web/ (app/main.py mounts it); skipped when it is already there.
 build = "bash build_web.sh"
+
+[tool.vercel.fastapi.static]
+# Serve the mounted web app from the CDN although app/main.py has a top-level (CORS) middleware;
+# the web app's files need no middleware.
+cdn = true

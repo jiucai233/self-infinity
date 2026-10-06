@@ -4,7 +4,7 @@
 
 ```
 浏览器 ──► Vercel（一个项目，根目录 backend/）
-            ├─ public/          Flutter web（CDN 直接给）
+            ├─ web/             Flutter web（FastAPI 挂载，构建时推到 CDN）
             └─ app/main.py      FastAPI（一个 Vercel Function，最长 300 秒）
                    │  Authorization: Bearer <Supabase access token>
                    ▼
@@ -33,18 +33,21 @@
 
 1. 登录：在项目目录运行 `npx vercel login`（会打开浏览器）。
 2. 在 `backend/` 里运行 `npx vercel link`，新建项目（名字随意，例如 `self-infinity`）。
-3. 设置环境变量（Vercel 项目 → Settings → Environment Variables，或 `npx vercel env add`）：
+3. 环境变量：在 Vercel 的 Integrations 里连上 Supabase，它会自动加好 `SUPABASE_URL`、`SUPABASE_ANON_KEY`、`POSTGRES_URL` 等。后端直接认这些名字：
+
+   - 数据库：读 `DATABASE_URL`，没有就读集成给的 `POSTGRES_URL`（transaction pooler，端口 6543）。
+   - 登录：Vercel 上 `AUTH_MODE` 默认就是 `supabase`，不用设。
+   - 网页打包用 `SUPABASE_URL` + `SUPABASE_ANON_KEY`。
+
+   只需要自己再加（勾上 **Production** 和 Preview）：
 
 | 变量 | 值 |
 |---|---|
-| `AUTH_MODE` | `supabase` |
-| `SUPABASE_URL` | Project URL |
-| `SUPABASE_ANON_KEY` | Publishable / anon key（推 GitHub 自动部署时构建机用它打包网页；`deploy.sh` 本地打包则不需要） |
-| `DATABASE_URL` | Transaction pooler 连接串 |
-| `LLM_PROVIDER` | `deepseek`（或 `mock` 先跑通流程，不花钱） |
-| `DEEPSEEK_API_KEY` | 你的 key |
+| `LLM_PROVIDER` | 不设 = 没配 key 时用 `mock`；要真模型就设 `deepseek` |
+| `DEEPSEEK_API_KEY` | 你的 key（用 `mock` 时不用） |
 | `TAVILY_API_KEY` | 可选，不填用离线搜索替身 |
-| `APP_TIMEZONE` | `Asia/Seoul` |
+
+   改了环境变量要 **Redeploy** 才生效。
 
 > 注意：网站公开后任何人都能注册，每次审计和生成课程都花你的 DeepSeek 额度。先用 `LLM_PROVIDER=mock` 跑通，或者先别把网址给别人。
 
@@ -55,7 +58,7 @@ SUPABASE_URL=https://<ref>.supabase.co SUPABASE_ANON_KEY=<publishable key> scrip
 SUPABASE_URL=...                       SUPABASE_ANON_KEY=...               scripts/deploy.sh --prod   # 正式
 ```
 
-脚本先在本地 `flutter build web`（`API_BASE_URL=/api`，同域名，不用 CORS）输出到 `backend/public/`，再把 `backend/` 传给 Vercel。`.vercelignore` 保证 `.env`、本地数据库、测试不会被上传。
+脚本先在本地 `flutter build web`（`API_BASE_URL=/api`，同域名，不用 CORS）输出到 `backend/web/`，再把 `backend/` 传给 Vercel。`.vercelignore` 保证 `.env`、本地数据库、测试不会被上传。
 
 以后想改成推 GitHub 自动部署：Vercel 项目 Root Directory 设 `backend`，并打开 “Include files outside the root directory”，`build_web.sh` 会在构建机上装 Flutter 再打包（每次多 2～3 分钟）。Build Command 留空（Project Settings 里填了会覆盖 `pyproject.toml` 里的 build 脚本）。
 

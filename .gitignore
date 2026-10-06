@@ -12,5 +12,5 @@ backend/.venv/
 .claude/agent-ws/
 
 # Flutter web build for Vercel (scripts/deploy.sh)
-backend/public/
+backend/web/
 backend/.vercel/

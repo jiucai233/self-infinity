@@ -14,7 +14,7 @@ ENV_NAMES = [
 
 @pytest.fixture(name="clean_env")
 def clean_env_fixture(monkeypatch):
-    for name in ENV_NAMES:
+    for name in ENV_NAMES + ["POSTGRES_URL", "VERCEL"]:
         monkeypatch.delenv(name, raising=False)
 
 
@@ -75,3 +75,42 @@ def test_the_example_env_file_lists_every_setting():
     listed = {line.split("=")[0] for line in example.splitlines() if "=" in line and not line.startswith("#")}
 
     assert listed == set(ENV_NAMES)
+
+
+# ---------------------------------------------------------------- Vercel + Supabase integration
+
+
+def test_the_supabase_integrations_postgres_url_is_the_database(clean_env, monkeypatch):
+    monkeypatch.setenv("POSTGRES_URL", "postgres://from-integration")
+    assert Settings(_env_file=None).database_url == "postgres://from-integration"
+
+    monkeypatch.setenv("DATABASE_URL", "postgres://explicit")
+    assert Settings(_env_file=None).database_url == "postgres://explicit"
+
+
+def test_auth_defaults_to_supabase_on_vercel_and_dev_elsewhere(clean_env, monkeypatch):
+    assert Settings(_env_file=None).auth_mode == "dev"
+
+    monkeypatch.setenv("VERCEL", "1")
+    assert Settings(_env_file=None).auth_mode == "supabase"
+
+    monkeypatch.setenv("AUTH_MODE", "dev")
+    assert Settings(_env_file=None).auth_mode == "dev"
+
+
+def test_postgres_urls_lose_the_tags_libpq_does_not_know(monkeypatch):
+    from app.db import _make_engine
+
+    monkeypatch.delenv("VERCEL", raising=False)
+    eng = _make_engine("postgres://u:p@host:6543/postgres?sslmode=require&supa=base-pooler.x&pgbouncer=true")
+
+    assert eng.url.drivername == "postgresql+psycopg"
+    assert dict(eng.url.query) == {"sslmode": "require"}
+
+
+def test_sqlite_is_refused_on_vercel_with_a_readable_error(monkeypatch):
+    from app.db import _make_engine
+
+    monkeypatch.setenv("VERCEL", "1")
+    with pytest.raises(RuntimeError, match="POSTGRES_URL"):
+        _make_engine("sqlite:///./self_infinity.db")

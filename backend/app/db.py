@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from fastapi import Depends
@@ -25,7 +26,16 @@ def _make_engine(url: str) -> Engine:
     if url.startswith(("postgres://", "postgresql://")):
         url = "postgresql+psycopg://" + url.split("://", 1)[1]
     if url.startswith("postgresql"):
-        return create_engine(url, poolclass=NullPool, connect_args={"prepare_threshold": None})
+        # The Supabase integration's URLs carry tags for other clients (`supa=…`, Prisma's
+        # `pgbouncer=true`); libpq rejects unknown options, so drop them.
+        parsed = make_url(url).difference_update_query(["supa", "pgbouncer"])
+        return create_engine(parsed, poolclass=NullPool, connect_args={"prepare_threshold": None})
+    if os.environ.get("VERCEL"):
+        # The function's file system is read-only: SQLite would fail on the first write anyway.
+        raise RuntimeError(
+            "No Postgres database on Vercel: set DATABASE_URL, or connect the Supabase "
+            "integration (it sets POSTGRES_URL)."
+        )
     sqlite = create_engine(url, connect_args={"check_same_thread": False})
     event.listen(sqlite, "connect", _attach_known_schemas)
     return sqlite

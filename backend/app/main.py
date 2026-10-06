@@ -49,11 +49,17 @@ def health():
     return {"status": "ok", "llm_provider": get_provider().name}
 
 
-# Dev workflow (run.sh) runs `flutter run` on :8090 separately, so this mount is
-# only used by Self-Infinity.command, which builds the Flutter web app once into
-# app/build/web and lets this process serve it — one port, one thing to start.
-# Registered last: Starlette matches routes in registration order, so the
-# `/api/...` routers above still take priority over this catch-all mount.
-_WEB_BUILD = Path(__file__).resolve().parent.parent.parent / "app" / "build" / "web"
-if _WEB_BUILD.is_dir():
+# The built Flutter web app, served by this process: on Vercel from backend/web (build_web.sh
+# or scripts/deploy.sh put it there; Vercel moves a StaticFiles mount to its CDN, see
+# [tool.vercel.fastapi.static] in pyproject.toml), locally from app/build/web, which
+# Self-Infinity.command builds once — one port, one thing to start. The dev workflow (run.sh)
+# runs `flutter run` on :8090 separately and has neither.
+# Registered last: Starlette matches routes in registration order, so the `/api/...` routers
+# above still take priority over this catch-all mount.
+_BACKEND = Path(__file__).resolve().parent.parent
+_WEB_BUILD = next(
+    (d for d in (_BACKEND / "web", _BACKEND.parent / "app" / "build" / "web") if (d / "index.html").is_file()),
+    None,
+)
+if _WEB_BUILD:
     app.mount("/", StaticFiles(directory=_WEB_BUILD, html=True), name="app")
