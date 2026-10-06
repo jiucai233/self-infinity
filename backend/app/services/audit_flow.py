@@ -39,6 +39,7 @@ from app.models import (
     SkillStatus,
     TurnRole,
 )
+from app.i18n import join_list, quote, t
 from app.services import bandit
 from app.services.condition import audit_pacing
 from app.services.incentive import compute_reward
@@ -48,14 +49,7 @@ logger = logging.getLogger(__name__)
 
 # 开场问题按节点位置分（plan 17.2）。第一个问题定了整场审计的框架：一个分类节点上来
 # 就问"从头讲给我听"，等于把它当成具体知识点，后面再怎么追问都拉不回来。
-LEAF_OPENING = "Explain “{title}” from scratch to someone who has never heard of it."
-BRANCH_OPENING = (
-    "“{title}” covers {children}. Why do these belong together, and when do you use which?"
-)
-ROOT_OPENING = (
-    "Which problems call for “{title}”, and which don't? How do you decide?"
-)
-TASK_OPENING = "How exactly will you do “{title}”?"
+# The texts are in app/i18n.py (opening_leaf / _branch / _root / _task), in three languages.
 
 
 class AuditorUnavailable(Exception):
@@ -87,12 +81,12 @@ TurnOutcome = ProbeOutcome | VerdictOutcome
 
 def opening_question(skill: SkillNode, position: NodePosition, children: list[str]) -> str:
     if skill.node_type == NodeType.task:
-        return TASK_OPENING.format(title=skill.title)
+        return t("opening_task", title=quote(skill.title))
     if position == NodePosition.root:
-        return ROOT_OPENING.format(title=skill.title)
+        return t("opening_root", title=quote(skill.title))
     if position == NodePosition.branch:
-        return BRANCH_OPENING.format(title=skill.title, children=", ".join(children))
-    return LEAF_OPENING.format(title=skill.title)
+        return t("opening_branch", title=quote(skill.title), children=join_list(children))
+    return t("opening_leaf", title=quote(skill.title))
 
 
 def max_turns_for(node_type: NodeType, mode: str) -> int:

@@ -4,6 +4,7 @@ import '../../api/api.dart';
 import '../../api/api_exception.dart';
 import '../../api/models.dart';
 import '../../upload/file_picker_service.dart';
+import '../../l10n/l10n.dart';
 
 /// The files attached to the next chat message (the ⊕ button of scenes 1 and
 /// 5): pick → upload → a chip above the input until the message is sent.
@@ -16,7 +17,7 @@ class UploadsController extends ChangeNotifier {
   /// At most this many files go with one message.
   static const int maxFiles = 3;
 
-  static const String badFileText = 'Only PDF, TXT or MD files up to 4 MB.';
+  static String get badFileText => l10nNow.uploadBadFile;
 
   final List<UploadedFile> _files = [];
   String? _uploadingName;
@@ -37,7 +38,7 @@ class UploadsController extends ChangeNotifier {
   /// message when something went wrong (for a snackbar), else null.
   Future<String?> pick() async {
     if (busy) return null;
-    if (_files.length >= maxFiles) return 'You can attach up to $maxFiles files.';
+    if (_files.length >= maxFiles) return l10nNow.uploadTooMany(maxFiles);
     final file = await picker.pick();
     if (file == null || _disposed) return null;
     final name = file.name.toLowerCase();

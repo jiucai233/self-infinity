@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import '../api/life_tree.dart';
 import '../theme/tokens.dart';
 import 'avatar.dart';
+import '../l10n/l10n.dart';
 
 /// The life tree as a constellation on the night panel (`docs/DESIGN.md` §4):
 /// you in the middle, main quests on the first ring, courses on the next,
@@ -474,7 +475,7 @@ class _NightPainter extends CustomPainter {
         LifeKind.self || LifeKind.goal => titleStyle,
         _ => labelStyle,
       };
-      final label = n.kind == LifeKind.self ? 'You' : n.label;
+      final label = n.kind == LifeKind.self ? l10nNow.you : n.label;
       _text(canvas, label, style.copyWith(color: style.color!.withValues(alpha: f)), hit + Offset(u * 2.4, 0), 200);
     }
   }

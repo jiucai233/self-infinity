@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../theme/tokens.dart';
+import '../../l10n/l10n.dart';
 
 /// How an [InlineEditField] is drawn.
 enum InlineEditVariant {
@@ -320,7 +321,7 @@ class _InlineEditFieldState extends State<InlineEditField> {
           const SizedBox(width: AppSpacing.xs),
           Expanded(
             child: Text(
-              "Couldn't save. $_error",
+              context.l10n.saveFailed('$_error'),
               key: widget.errorKey ?? const Key('field-error'),
               style: theme.bodySmall?.copyWith(color: AppColors.danger),
             ),

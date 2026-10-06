@@ -2,6 +2,7 @@
 // only runs when SHOTS_DIR is set and never compares anything.
 //
 //   SHOTS_DIR=/some/dir flutter test test/screenshots_test.dart
+//   SHOTS_LANG=zh (or ko) renders them in that language.
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -21,30 +22,39 @@ import 'package:self_infinity/testing/fake_voice.dart';
 import 'package:self_infinity/testing/test_app.dart';
 import 'package:self_infinity/widgets/avatar.dart';
 import 'package:self_infinity/widgets/life_constellation.dart';
+import 'package:self_infinity/l10n/l10n.dart';
+import 'package:self_infinity/theme/tokens.dart';
 
 const _flutterFonts = '/Users/jiucai/development/flutter/bin/cache/artifacts/material_fonts';
 
-/// Latin text in Roboto, Hangul in AppleGothic (the theme falls back to
-/// `Noto Sans KR`), icons in the Material Icons font.
+/// The app's own fonts (the bundled sans and serif, and every CJK family), and
+/// icons in the Material Icons font.
 Future<void> _loadFonts() async {
-  Future<void> load(String family, String path) async {
-    final file = File(path);
-    if (!file.existsSync()) return;
-    final loader = FontLoader(family)
-      ..addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
+  Future<void> load(String family, List<String> paths) async {
+    final loader = FontLoader(family);
+    for (final path in paths) {
+      final file = File(path);
+      if (file.existsSync()) loader.addFont(Future.value(ByteData.sublistView(file.readAsBytesSync())));
+    }
     await loader.load();
   }
 
-  await load('Roboto', '$_flutterFonts/Roboto-Regular.ttf');
-  final serif = FontLoader('InstrumentSerif');
-  for (final name in ['InstrumentSerif-Regular.ttf', 'InstrumentSerif-Italic.ttf']) {
-    serif.addFont(Future.value(ByteData.sublistView(File('assets/fonts/$name').readAsBytesSync())));
+  await load(AppFonts.sans, [
+    for (final w in ['Regular', 'Medium', 'SemiBold']) 'assets/fonts/InfinitySans-$w.ttf',
+  ]);
+  await load(AppFonts.display, [
+    for (final s in ['Regular', 'Italic']) 'assets/fonts/InstrumentSerif-$s.ttf',
+  ]);
+  for (final language in AppLanguage.values) {
+    for (final font in AppFonts.bundledFor(language)) {
+      await load(font.name, [for (final f in font.files) 'assets/fonts/cjk/$f']);
+    }
   }
-  await serif.load();
-  await load('MaterialIcons', '$_flutterFonts/MaterialIcons-Regular.otf');
-  await load('Noto Sans KR', '/System/Library/Fonts/Supplemental/AppleGothic.ttf');
-  await load('Apple SD Gothic Neo', '/System/Library/Fonts/Supplemental/AppleGothic.ttf');
+  await load('MaterialIcons', ['$_flutterFonts/MaterialIcons-Regular.otf']);
 }
+
+/// `SHOTS_LANG`: the language of the screenshots (English by default).
+final AppLanguage _language = AppLanguage.fromCode(Platform.environment['SHOTS_LANG']);
 
 Future<FakeApiClient> _seed() async {
   final api = FakeApiClient(latency: Duration.zero);
@@ -122,6 +132,7 @@ void main() {
           voice: voice ?? FakeVoiceService(),
           filePicker: FakeFilePicker(),
           initialLocation: location,
+          locale: LocaleController(_language),
         ),
       ),
     );

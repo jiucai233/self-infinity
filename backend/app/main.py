@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.db import init_db
+from app.i18n import parse_accept_language, reset_language, set_language
 from app.llm import get_provider
 from app.routers import audits, chat, checkins, courses, goals, graph, journal, narrator, plan, principles, profile, skills, uploads
 
@@ -20,6 +21,31 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Self-Infinity API", lifespan=lifespan)
+
+
+class LanguageMiddleware:
+    """Accept-Language → the request's language (app/i18n.py), for the whole request.
+
+    Plain ASGI rather than BaseHTTPMiddleware, so the context variable is set in the task that
+    runs the endpoint and its background tasks.
+    """
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.inner(scope, receive, send)
+            return
+        header = dict(scope.get("headers") or []).get(b"accept-language", b"").decode("latin-1")
+        token = set_language(parse_accept_language(header))
+        try:
+            await self.inner(scope, receive, send)
+        finally:
+            reset_language(token)
+
+
+app.add_middleware(LanguageMiddleware)
 
 # Flutter 的 web 开发服务器每次起在不同的端口，所以放行任意 localhost / 127.0.0.1 端口。
 app.add_middleware(

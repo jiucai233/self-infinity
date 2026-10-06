@@ -12,6 +12,7 @@ import '../../widgets/widgets.dart';
 import 'inline_edit_field.dart';
 import 'profile_controller.dart';
 import 'stage_controller.dart';
+import '../../l10n/l10n.dart';
 
 /// The top of the left panel (`docs/ux-chat.md` §6.1): an identity line, two
 /// editable cards — `Win condition` (vision) and `Stakes` (anti-vision) —,
@@ -23,8 +24,7 @@ class CharacterSheet extends StatelessWidget {
   const CharacterSheet({super.key});
 
   /// What an empty identity line starts with.
-  static const String identityStem = 'I am the type of person who ';
-  static const String identityPlaceholder = 'I am the type of person who…';
+  static String get identityStem => l10nNow.identityStem;
 
   @override
   Widget build(BuildContext context) {
@@ -45,8 +45,8 @@ class CharacterSheet extends StatelessWidget {
               key: const Key('field-identity'),
               inputKey: const Key('identity-input'),
               value: profile.identity,
-              placeholder: identityPlaceholder,
-              prefill: identityStem,
+              placeholder: context.l10n.identityPlaceholder,
+              prefill: context.l10n.identityStem,
               maxLength: Profile.maxTextLength,
               maxLines: 4,
               displayLines: 2,
@@ -65,9 +65,9 @@ class CharacterSheet extends StatelessWidget {
           key: const Key('field-vision'),
           inputKey: const Key('vision-input'),
           variant: InlineEditVariant.card,
-          label: 'Win condition',
+          label: context.l10n.winCondition,
           value: profile.vision,
-          placeholder: 'What does winning look like?',
+          placeholder: context.l10n.winConditionPlaceholder,
           maxLength: Profile.maxTextLength,
           maxLines: 5,
           displayLines: 2,
@@ -78,9 +78,9 @@ class CharacterSheet extends StatelessWidget {
           key: const Key('field-anti-vision'),
           inputKey: const Key('anti-vision-input'),
           variant: InlineEditVariant.card,
-          label: 'Stakes',
+          label: context.l10n.stakes,
           value: profile.antiVision,
-          placeholder: 'What if nothing changes?',
+          placeholder: context.l10n.stakesPlaceholder,
           maxLength: Profile.maxTextLength,
           maxLines: 5,
           displayLines: 2,
@@ -138,7 +138,7 @@ class _RulesBlockState extends State<_RulesBlock> {
     final rules = widget.rules;
     return CollapsibleSection(
       compact: true,
-      title: 'Rules',
+      title: context.l10n.rules,
       trailing: '${rules.length}/${Profile.maxRules}',
       toggleKey: const Key('toggle-rules'),
       folded: layout.isSectionFolded('rules'),
@@ -178,7 +178,7 @@ class _RulesBlockState extends State<_RulesBlock> {
                 ),
                 IconButton(
                   key: Key('rule-remove-$i'),
-                  tooltip: 'Remove rule',
+                  tooltip: context.l10n.removeRule,
                   visualDensity: VisualDensity.compact,
                   constraints: const BoxConstraints.tightFor(width: 28, height: 28),
                   padding: EdgeInsets.zero,
@@ -191,7 +191,7 @@ class _RulesBlockState extends State<_RulesBlock> {
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.xs),
               child: Text(
-                "Couldn't save. $_removeError",
+                context.l10n.saveFailed('$_removeError'),
                 key: const Key('rules-error'),
                 style: theme.bodySmall?.copyWith(color: AppColors.danger),
               ),
@@ -205,7 +205,7 @@ class _RulesBlockState extends State<_RulesBlock> {
                       inputKey: const Key('rule-new-input'),
                       value: '',
                       startEditing: true,
-                      placeholder: 'e.g. No phone before the first audit',
+                      placeholder: context.l10n.rulePlaceholder,
                       maxLength: Profile.maxRuleLength,
                       maxLines: 3,
                       onSave: _add,
@@ -221,7 +221,7 @@ class _RulesBlockState extends State<_RulesBlock> {
                         _removeError = null;
                       }),
                       icon: const Icon(Icons.add_rounded, size: 16),
-                      label: const Text('Add a rule'),
+                      label: Text(context.l10n.addRule),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                         minimumSize: const Size(0, 32),
@@ -288,7 +288,7 @@ class _MainQuestsBlockState extends State<_MainQuestsBlock> {
     final theme = Theme.of(context).textTheme;
     return CollapsibleSection(
       compact: true,
-      title: 'Main quests',
+      title: context.l10n.mainQuests,
       trailing: '${goals.length}/${Goal.maxGoals}',
       toggleKey: const Key('toggle-main-quests'),
       folded: layout.isSectionFolded('main-quests'),
@@ -321,7 +321,7 @@ class _MainQuestsBlockState extends State<_MainQuestsBlock> {
                 ),
                 IconButton(
                   key: Key('goal-remove-${g.id}'),
-                  tooltip: 'Remove main quest',
+                  tooltip: context.l10n.removeMainQuest,
                   visualDensity: VisualDensity.compact,
                   constraints: const BoxConstraints.tightFor(width: 28, height: 28),
                   padding: EdgeInsets.zero,
@@ -334,7 +334,7 @@ class _MainQuestsBlockState extends State<_MainQuestsBlock> {
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.xs),
               child: Text(
-                "Couldn't save. $_error",
+                context.l10n.saveFailed('$_error'),
                 key: const Key('main-quests-error'),
                 style: theme.bodySmall?.copyWith(color: AppColors.danger),
               ),
@@ -348,7 +348,7 @@ class _MainQuestsBlockState extends State<_MainQuestsBlock> {
                       inputKey: const Key('goal-new-input'),
                       value: '',
                       startEditing: true,
-                      placeholder: 'e.g. Teach calculus to a stranger',
+                      placeholder: context.l10n.mainQuestPlaceholder,
                       maxLength: Goal.maxTitleLength,
                       maxLines: 2,
                       onSave: _add,
@@ -364,7 +364,7 @@ class _MainQuestsBlockState extends State<_MainQuestsBlock> {
                         _error = null;
                       }),
                       icon: const Icon(Icons.add_rounded, size: 16),
-                      label: const Text('Add a main quest'),
+                      label: Text(context.l10n.addMainQuest),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                         minimumSize: const Size(0, 32),

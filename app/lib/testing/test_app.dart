@@ -17,6 +17,7 @@ import '../api/api.dart';
 import '../api/fake_api.dart';
 import '../api/models.dart';
 import '../auth/auth_service.dart';
+import '../l10n/l10n.dart';
 import '../app/app_state.dart';
 import '../app/panel_layout.dart';
 import '../app/providers.dart';
@@ -27,6 +28,7 @@ import '../voice/voice_service.dart';
 import '../widgets/avatar.dart';
 import 'fake_file_picker.dart';
 import 'fake_voice.dart';
+import 'package:provider/provider.dart';
 
 /// Wraps [child] the way the real app does: the providers, the light theme and
 /// a `GoRouter` — so that screens can call
@@ -38,6 +40,7 @@ import 'fake_voice.dart';
 ///   [FakeFilePicker]; no plugin is ever touched.
 /// * [layout] keeps which panels are folded across several [buildTestApp]s.
 /// * [clock] is “now” (UTC) for the daily quests; the system clock by default.
+/// * [language] is the UI language (English by default).
 /// * The avatar animations are switched off ([Avatar.animationsEnabled]).
 /// * [child] is mounted at an internal route. Navigating anywhere else —
 ///   `/`, `/map`, `/skill/:id`, `/skill/:id/audit` — shows a placeholder whose
@@ -53,8 +56,10 @@ Widget buildTestApp({
   PanelLayout? layout,
   DateTime Function()? clock,
   AuthService? auth,
+  AppLanguage language = AppLanguage.en,
 }) {
   Avatar.animationsEnabled = false;
+  LocaleController.current = language;
   final router = GoRouter(
     initialLocation: _testRoute,
     routes: [
@@ -75,7 +80,7 @@ Widget buildTestApp({
         ),
     ],
   );
-  return AppProviders(
+  final providers = AppProviders(
     api: api ?? FakeApiClient(latency: Duration.zero),
     appState: state ?? AppState(),
     voice: voice ?? FakeVoiceService(),
@@ -83,11 +88,21 @@ Widget buildTestApp({
     layout: layout,
     clock: clock,
     auth: auth,
-    child: MaterialApp.router(
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      routerConfig: router,
+    // Follows the LocaleController, like the app's MaterialApps.
+    child: Consumer<LocaleController>(
+      builder: (context, locale, _) => MaterialApp.router(
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(locale.language),
+        locale: locale.language.locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        routerConfig: router,
+      ),
     ),
+  );
+  return ChangeNotifierProvider<LocaleController>(
+    create: (_) => LocaleController(language),
+    child: providers,
   );
 }
 

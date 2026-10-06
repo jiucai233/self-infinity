@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/foundation.dart';
+import '../l10n/l10n.dart';
 
 /// What a sign-in / sign-up / reset call came to: [error] is the English text
 /// to show (null on success); [needsConfirmation] means the account exists
@@ -56,11 +57,11 @@ abstract class AuthService extends ChangeNotifier {
   static String? validate(String email, String password, {bool newPassword = false}) {
     final e = email.trim();
     if (e.isEmpty || !e.contains('@') || e.startsWith('@') || e.endsWith('@')) {
-      return 'Enter a valid email address.';
+      return l10nNow.authInvalidEmail;
     }
-    if (password.isEmpty) return 'Enter your password.';
+    if (password.isEmpty) return l10nNow.authEnterPassword;
     if (newPassword && password.length < minPasswordLength) {
-      return 'Use at least $minPasswordLength characters for your password.';
+      return l10nNow.authPasswordTooShort(minPasswordLength);
     }
     return null;
   }

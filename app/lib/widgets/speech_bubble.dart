@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import 'avatar.dart';
 import 'vocabulary.dart';
+import '../l10n/l10n.dart';
 
 /// Where the small tail of a [SpeechBubble] points (toward the avatar).
 enum BubbleTail { none, bottomLeft, bottomCenter, bottomRight, left, right }
@@ -131,7 +132,7 @@ class SpeechBubble extends StatelessWidget {
               right: AppSpacing.sm,
             ),
             child: Text(
-              agentLabel(name),
+              agentLabel(context.l10n, name),
               key: const Key('speaker-name'),
               style: Theme.of(context).textTheme.labelMedium,
             ),

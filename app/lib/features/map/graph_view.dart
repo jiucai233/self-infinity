@@ -6,6 +6,7 @@ import '../../api/graph_utils.dart';
 import '../../api/models.dart';
 import '../../theme/tokens.dart';
 import 'graph_layout.dart';
+import '../../l10n/l10n.dart';
 
 /// How a dot of the skill graph is colored (`docs/DESIGN.md` Section 3).
 enum DotKind {
@@ -290,16 +291,17 @@ class GraphLegend extends StatelessWidget {
   const GraphLegend({super.key});
 
   /// The legend's entries, in order.
-  static const List<(DotKind, String)> entries = [
-    (DotKind.available, 'Ready'),
-    (DotKind.mastered, 'Cleared'),
-    (DotKind.failed, 'Failed'),
-    (DotKind.locked, 'Locked'),
+  static List<(DotKind, String)> entries(AppLocalizations l) => [
+    (DotKind.available, l.dotReady),
+    (DotKind.mastered, l.dotCleared),
+    (DotKind.failed, l.auditFailed),
+    (DotKind.locked, l.dotLocked),
   ];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
+    final entries = GraphLegend.entries(context.l10n);
     final rows = <Widget>[
       for (final e in entries)
         _legendRow(theme, DotMark(key: Key('legend-dot-${e.$1.name}'), kind: e.$1), e.$2),
@@ -311,7 +313,7 @@ class GraphLegend extends StatelessWidget {
           boss: true,
           color: AppColors.textSecondary,
         ),
-        'Boss',
+        context.l10n.boss,
       ),
     ];
     return DecoratedBox(

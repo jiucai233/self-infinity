@@ -2,6 +2,8 @@ import json
 import re
 from typing import Protocol, TypedDict
 
+from app.i18n import language_instruction
+
 
 class Message(TypedDict):
     role: str  # "system" | "user" | "assistant"
@@ -29,6 +31,20 @@ def agent_of(messages: list[Message]) -> str | None:
     system = next((m["content"] for m in messages if m["role"] == "system"), "")
     match = _AGENT_TAG_RE.match(system.lstrip())
     return match.group(1) if match else None
+
+
+def with_language(messages: list[Message]) -> list[Message]:
+    """[messages] with the request's language instruction (app/i18n.py) appended to the system
+    prompt; unchanged for English. The real providers call it on every request."""
+    instruction = language_instruction()
+    if instruction is None:
+        return messages
+    out = [dict(m) for m in messages]
+    for m in out:
+        if m["role"] == "system":
+            m["content"] = f"{m['content']}\n\n{instruction}"
+            return out  # type: ignore[return-value]
+    return [{"role": "system", "content": instruction}, *messages]
 
 
 def fill_template(template: str, **values: str) -> str:

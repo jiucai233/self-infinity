@@ -30,6 +30,7 @@ class HttpApi implements SelfInfinityApi {
     this.timeout = const Duration(seconds: 240),
     this.token,
     this.onUnauthorized,
+    this.language,
   }) : _client = client ?? http.Client(),
        _ownsClient = client == null;
 
@@ -39,6 +40,11 @@ class HttpApi implements SelfInfinityApi {
 
   /// Called when the server answers 401 (the session expired or was revoked).
   final void Function()? onUnauthorized;
+
+  /// The app's language (`en`, `zh`, `ko`), read before every request and sent
+  /// as `Accept-Language`: the backend writes its replies in it. No function =
+  /// no header (English).
+  final String Function()? language;
 
   /// Local backend (`--dart-define=API_BASE_URL=...` overrides it in `main`).
   static const String defaultBaseUrl = 'http://127.0.0.1:8000/api';
@@ -283,10 +289,12 @@ class HttpApi implements SelfInfinityApi {
     if (query != null && query.isNotEmpty) uri = uri.replace(queryParameters: query);
 
     final bearer = token?.call();
+    final lang = language?.call();
     final headers = <String, String>{
       'Accept': 'application/json',
       if (body != null) 'Content-Type': 'application/json; charset=utf-8',
       if (bearer != null) 'Authorization': 'Bearer $bearer',
+      'Accept-Language': ?lang,
     };
 
     final http.Response response;
@@ -297,6 +305,7 @@ class HttpApi implements SelfInfinityApi {
           ..headers['Accept'] = 'application/json'
           ..files.add(file);
         if (bearer != null) request.headers['Authorization'] = 'Bearer $bearer';
+        if (lang != null) request.headers['Accept-Language'] = lang;
         future = _client.send(request).then(http.Response.fromStream);
       } else if (method == 'GET') {
         future = _client.get(uri, headers: headers);

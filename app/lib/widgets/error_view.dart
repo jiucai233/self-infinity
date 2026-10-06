@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_exception.dart';
 import '../theme/tokens.dart';
+import '../l10n/l10n.dart';
 
 /// Shows a failed call in plain English — never a stack trace (FT-12).
 ///
@@ -50,7 +51,7 @@ class ErrorView extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: onRetry,
                   icon: const Icon(Icons.refresh_rounded, size: 20),
-                  label: const Text('Try again'),
+                  label: Text(context.l10n.tryAgain),
                 ),
               ],
             ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/models.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
+import '../../l10n/l10n.dart';
 
 /// One line of a conversation as the chat panel shows it.
 @immutable
@@ -32,7 +33,7 @@ class ChatThread extends StatefulWidget {
     super.key,
     required this.entries,
     this.listKey,
-    this.emptyText = 'No conversation yet.',
+    this.emptyText,
   });
 
   /// Oldest first.
@@ -40,7 +41,8 @@ class ChatThread extends StatefulWidget {
 
   /// The key of the scrolling list.
   final Key? listKey;
-  final String emptyText;
+  /// Defaults to “No conversation yet.”
+  final String? emptyText;
 
   /// Size of the agent portraits.
   static const double portrait = 28;
@@ -82,7 +84,7 @@ class _ChatThreadState extends State<ChatThread> {
       _shown = entries.length;
       _toEnd();
     }
-    if (entries.isEmpty) return EmptyView(message: widget.emptyText);
+    if (entries.isEmpty) return EmptyView(message: widget.emptyText ?? context.l10n.noConversationYet);
     final theme = Theme.of(context).textTheme;
     final children = <Widget>[];
     String? day;
@@ -184,7 +186,7 @@ class _AgentLine extends StatelessWidget {
                 children: [
                   Flexible(
                     child: Text(
-                      agentLabel(agent),
+                      agentLabel(context.l10n, agent),
                       key: const Key('chat-agent-name'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -193,7 +195,7 @@ class _AgentLine extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Text(
-                    formatLocal(entry.time, pattern: 'HH:mm'),
+                    formatLocal(entry.time, style: DateStyle.time),
                     key: const Key('chat-time'),
                     style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
                   ),

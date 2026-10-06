@@ -1,4 +1,4 @@
-/// English UI vocabulary and the colors that go with each enum value, so that
+/// UI vocabulary (localized) and the colors that go with each enum value, so that
 /// every screen says and colors the same thing the same way.
 library;
 
@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../api/graph_utils.dart';
 import '../api/models.dart';
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 
 /// The condition bar of the left panel: how full it is and what color.
@@ -24,37 +25,37 @@ extension ConditionFlagUi on ConditionFlag {
   };
 
   /// `Good` · `Low` · `No record` (shown as `Condition: Good`).
-  String get label => switch (this) {
-    ConditionFlag.normal => 'Good',
-    ConditionFlag.low => 'Low',
-    ConditionFlag.unknown => 'No record',
+  String label(AppLocalizations l) => switch (this) {
+    ConditionFlag.normal => l.conditionGood,
+    ConditionFlag.low => l.conditionLow,
+    ConditionFlag.unknown => l.conditionNoRecord,
   };
 }
 
 /// Display names of the agents (the label in the history lists).
-String agentLabel(String? agent) => switch (agent) {
-  'front_desk' => 'Guide',
-  'narrator' => 'Narrator',
-  'recommender' => 'Recommender',
-  'planner' => 'Planner',
-  'clarifier' => 'Clarifier',
-  'syllabus_finder' => 'Syllabus Finder',
-  'material_finder' => 'Material Finder',
-  'auditor' => 'Auditor',
-  'challenger' => 'Challenger',
-  'recorder' => 'Recorder',
-  'linker' => 'Linker',
-  'checkin_converter' => 'Check-in',
-  null => 'You',
+String agentLabel(AppLocalizations l, String? agent) => switch (agent) {
+  'front_desk' => l.agentGuide,
+  'narrator' => l.agentNarrator,
+  'recommender' => l.agentRecommender,
+  'planner' => l.agentPlanner,
+  'clarifier' => l.agentClarifier,
+  'syllabus_finder' => l.agentSyllabusFinder,
+  'material_finder' => l.agentMaterialFinder,
+  'auditor' => l.agentAuditor,
+  'challenger' => l.agentChallenger,
+  'recorder' => l.agentRecorder,
+  'linker' => l.agentLinker,
+  'checkin_converter' => l.agentCheckIn,
+  null => l.you,
   _ => agent,
 };
 
 /// `Passed` · `Failed` · `In progress` for an audit in the history list.
 extension AuditStatusUi on AuditStatus {
-  String get label => switch (this) {
-    AuditStatus.passed => 'Passed',
-    AuditStatus.failed => 'Failed',
-    AuditStatus.active => 'In progress',
+  String label(AppLocalizations l) => switch (this) {
+    AuditStatus.passed => l.auditPassed,
+    AuditStatus.failed => l.auditFailed,
+    AuditStatus.active => l.auditInProgress,
   };
 
   Color get color => switch (this) {

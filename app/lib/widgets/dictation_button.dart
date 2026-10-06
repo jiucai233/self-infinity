@@ -6,6 +6,7 @@ import '../voice/voice_service.dart';
 import 'toast.dart';
 import 'morph_icon.dart';
 import 'voice_wave.dart';
+import '../l10n/l10n.dart';
 
 /// A microphone for a text field (the `suffixIcon`): tap it and speak, and
 /// the words are typed into [controller] after what is already there.
@@ -33,7 +34,7 @@ class DictationButton extends StatefulWidget {
   /// Thinking out loud takes longer pauses than chatting, hence 3 s.
   final Duration pauseFor;
 
-  static const String unavailableText = "Voice input isn't available on this device.";
+  static String get unavailableText => l10nNow.voiceUnavailable;
 
   @override
   State<DictationButton> createState() => _DictationButtonState();
@@ -135,7 +136,7 @@ class _DictationButtonState extends State<DictationButton> {
         if (_listening) SizedBox(width: 56, height: 22, child: VoiceWave(level: _level)),
         IconButton(
           key: Key(_listening ? 'dictation-stop' : 'dictation-button'),
-          tooltip: _listening ? 'Stop listening' : 'Speak your answer',
+          tooltip: _listening ? context.l10n.stopListening : context.l10n.speakYourAnswer,
           onPressed: _listening || widget.enabled ? _toggle : null,
           icon: MorphIcon(
             key: _icon,

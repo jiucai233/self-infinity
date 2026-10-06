@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../theme/tokens.dart';
 import 'avatar.dart';
+import '../l10n/l10n.dart';
 
 /// Scene 1: the wizard holding a crystal ball (`docs/ux-chat.md` Scene 1,
 /// `docs/DESIGN.md` §4).
@@ -132,7 +133,7 @@ class _OrbAvatarState extends State<OrbAvatar> with SingleTickerProviderStateMix
             height: d,
             child: Semantics(
               button: widget.onOrbTap != null,
-              label: 'Crystal ball',
+              label: context.l10n.crystalBall,
               child: MouseRegion(
                 cursor: widget.onOrbTap == null ? MouseCursor.defer : SystemMouseCursors.click,
                 onEnter: (_) => setState(() => _hover = true),

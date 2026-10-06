@@ -2,8 +2,11 @@
 /// touch the `speech_to_text` / `flutter_tts` plugins directly.
 library;
 
-/// The recognition and synthesis locale (US English).
-const String kVoiceLocale = 'en_US';
+import '../l10n/app_language.dart';
+
+/// The recognition and synthesis locale: the app's language (`en_US`,
+/// `zh_CN`, `ko_KR`), read at the start of every listen and utterance.
+String get kVoiceLocale => LocaleController.current.speechLocale;
 
 /// How long a silence ends an utterance in voice mode (`docs/ux-chat.md` 3).
 const Duration kVoicePause = Duration(milliseconds: 1500);

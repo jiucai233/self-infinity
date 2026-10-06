@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import '../l10n/l10n.dart';
 
 /// A NotebookLM panel (`docs/DESIGN.md` Section 3): a white card with radius
 /// 20 and no border, a 56 px title bar and, when [onCollapse] is given, a
@@ -86,7 +87,7 @@ class AppPanel extends StatelessWidget {
                     if (onCollapse != null)
                       IconButton(
                         key: collapseKey,
-                        tooltip: 'Collapse',
+                        tooltip: context.l10n.collapse,
                         icon: Icon(collapseIcon, size: 20),
                         onPressed: onCollapse,
                       ),
@@ -133,7 +134,7 @@ class PanelRail extends StatelessWidget {
               child: Center(
                 child: IconButton(
                   key: expandKey,
-                  tooltip: 'Expand',
+                  tooltip: context.l10n.expand,
                   icon: Icon(expandIcon, size: 20),
                   onPressed: onExpand,
                 ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
+import '../../l10n/l10n.dart';
 
 /// A node that a pass opened: shown as a blue chip on the [CelebrationCard].
 @immutable
@@ -112,13 +113,13 @@ class _CelebrationCardState extends State<CelebrationCard> with SingleTickerProv
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               GradientText(
-                widget.boss ? 'Boss cleared!' : 'Cleared!',
+                widget.boss ? context.l10n.bossCleared : context.l10n.cleared,
                 key: const Key('celebration-title'),
                 style: theme.displaySmall,
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                '${widget.score} pts',
+                context.l10n.points(widget.score),
                 key: const Key('celebration-score'),
                 textAlign: TextAlign.center,
                 style: theme.headlineMedium,
@@ -144,7 +145,7 @@ class _CelebrationCardState extends State<CelebrationCard> with SingleTickerProv
               if (widget.unlocked.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xl),
                 Text(
-                  'New nodes unlocked',
+                  context.l10n.newNodesUnlocked,
                   textAlign: TextAlign.center,
                   style: theme.labelMedium,
                 ),
@@ -172,12 +173,12 @@ class _CelebrationCardState extends State<CelebrationCard> with SingleTickerProv
                   TextButton(
                     key: const Key('celebration-close'),
                     onPressed: widget.onClose,
-                    child: const Text('Close'),
+                    child: Text(context.l10n.close),
                   ),
                   FilledButton(
                     key: const Key('celebration-continue'),
                     onPressed: widget.onContinue,
-                    child: const Text('Back to node'),
+                    child: Text(context.l10n.backToNode),
                   ),
                 ],
               ),

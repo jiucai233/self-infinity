@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api/models.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
+import '../../l10n/l10n.dart';
 
 /// The lesson card the Recorder made (`docs/ux-chat.md` 5.9): once the
 /// reflection is sent it flips from its back (a quiet `Lesson card`) to its
@@ -110,7 +111,7 @@ class _Front extends StatelessWidget {
               children: [
                 const Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.primary),
                 const SizedBox(width: AppSpacing.xs + 2),
-                Text('Lesson card', style: theme.labelMedium?.copyWith(color: AppColors.primary)),
+                Text(context.l10n.lessonCard, style: theme.labelMedium?.copyWith(color: AppColors.primary)),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
@@ -119,7 +120,7 @@ class _Front extends StatelessWidget {
             Text(principle.body, key: const Key('lesson-body'), style: theme.bodyMedium),
             if (principle.hasMisconception) ...[
               const SizedBox(height: AppSpacing.lg),
-              Text('Misconception', style: theme.labelSmall),
+              Text(context.l10n.misconception, style: theme.labelSmall),
               const SizedBox(height: AppSpacing.xs),
               DecoratedBox(
                 decoration: BoxDecoration(
@@ -174,7 +175,7 @@ class _Back extends StatelessWidget {
             const Icon(Icons.auto_awesome_rounded, size: 28, color: AppColors.primary),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Lesson card',
+              context.l10n.lessonCard,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.primary),
             ),
           ],

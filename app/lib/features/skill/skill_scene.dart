@@ -19,6 +19,7 @@ import '../chat/chat_navigation.dart';
 import '../stage/last_said.dart';
 import '../stage/stage_input_bar.dart';
 import '../stage/stage_scaffold.dart';
+import '../../l10n/l10n.dart';
 
 /// Scene 4 of `docs/ux-chat.md`: the overview of one node — the node's name in
 /// the stage's title bar (with a status chip), a contents card (description,
@@ -63,7 +64,7 @@ class _SkillSceneState extends State<SkillScene> {
     _voiceMode = VoiceModeController(
       voice: context.read<VoiceService>(),
       onHeard: _onHeard,
-      onUnavailable: () => showToast(context, "Voice mode isn't available on this device."),
+      onUnavailable: () => showToast(context, context.l10n.voiceModeUnavailable),
     );
     unawaited(_load());
   }
@@ -135,7 +136,7 @@ class _SkillSceneState extends State<SkillScene> {
     });
     _input.clear();
     _lastSaid.say(trimmed);
-    final saved = await _chat.send('About “${overview.skill.title}”: $trimmed');
+    final saved = await _chat.send(context.l10n.aboutNodeMessage(overview.skill.title, trimmed));
     if (!mounted) return;
     if (saved == null) {
       _lastSaid.clear();
@@ -166,7 +167,7 @@ class _SkillSceneState extends State<SkillScene> {
     return StageScaffold(
       topLeading: IconButton(
         key: const Key('back-map'),
-        tooltip: 'Back',
+        tooltip: context.l10n.back,
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => context.go(AppRoutes.map),
       ),
@@ -177,9 +178,9 @@ class _SkillSceneState extends State<SkillScene> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (_boss) ...[
-                  const StatusChip(
-                    key: Key('boss-chip'),
-                    label: 'Boss',
+                  StatusChip(
+                    key: const Key('boss-chip'),
+                    label: context.l10n.boss,
                     color: AppColors.onAccent,
                     fill: AppColors.textPrimary,
                   ),
@@ -188,7 +189,7 @@ class _SkillSceneState extends State<SkillScene> {
                 _statusChip(overview),
               ],
             ),
-      historyTitle: 'Attempts',
+      historyTitle: context.l10n.attempts,
       history: overview == null ? const SizedBox.shrink() : _AuditHistory(audits: overview.audits),
       stage: CallbackShortcuts(
         bindings: {const SingleActivator(LogicalKeyboardKey.escape): () => _voiceMode.stop()},
@@ -201,7 +202,7 @@ class _SkillSceneState extends State<SkillScene> {
               StageInputBar(
                 controller: _input,
                 focusNode: _focus,
-                hint: 'Ask about this node…',
+                hint: context.l10n.askAboutNodeHint,
                 enabled: overview != null && !chat.sending,
                 onSubmit: () => _ask(_input.text),
                 voiceMode: _voiceMode,
@@ -218,11 +219,12 @@ class _SkillSceneState extends State<SkillScene> {
   /// Where the node stands: cleared, locked, failed last time or open.
   Widget _statusChip(SkillOverview overview) {
     final node = overview.skill;
-    if (node.isMastered) return const StatusChip.success('Cleared');
-    if (node.isLocked) return const StatusChip.neutral('Locked');
+    final l = context.l10n;
+    if (node.isMastered) return StatusChip.success(l.dotCleared);
+    if (node.isLocked) return StatusChip.neutral(l.dotLocked);
     final last = overview.audits.firstOrNull;
-    if (last != null && last.status == AuditStatus.failed) return const StatusChip.danger('Failed');
-    return const StatusChip.primary('Ready');
+    if (last != null && last.status == AuditStatus.failed) return StatusChip.danger(l.auditFailed);
+    return StatusChip.primary(l.dotReady);
   }
 
   Widget _body(BuildContext context, ChatController chat) {
@@ -328,10 +330,10 @@ class _ContentsCardState extends State<_ContentsCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('About', style: theme.labelMedium),
+            Text(context.l10n.about, style: theme.labelMedium),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              node.description.isEmpty ? 'No description yet.' : node.description,
+              node.description.isEmpty ? context.l10n.noDescriptionYet : node.description,
               key: const Key('skill-description'),
               style: theme.bodyLarge,
             ),
@@ -339,7 +341,7 @@ class _ContentsCardState extends State<_ContentsCard> {
               const SizedBox(height: AppSpacing.lg),
               const Divider(),
               const SizedBox(height: AppSpacing.md),
-              Text('Resources', style: theme.labelMedium),
+              Text(context.l10n.resources, style: theme.labelMedium),
               const SizedBox(height: AppSpacing.xs),
             ],
             for (final item in shown)
@@ -352,10 +354,10 @@ class _ContentsCardState extends State<_ContentsCard> {
             if (course.hasSource)
               _MaterialRow(
                 key: const Key('course-source'),
-                title: 'Source: ${course.sourceCourse!}',
+                title: context.l10n.sourceLabel(course.sourceCourse!),
                 subtitle: course.hasSourceLink
                     ? displayDomain(course.sourceUrl!)
-                    : 'Uploaded course material',
+                    : context.l10n.uploadedCourseMaterial,
                 icon: Icons.menu_book_outlined,
                 onTap: course.hasSourceLink
                     ? () => openExternalUrl(context, course.sourceUrl!)
@@ -370,7 +372,7 @@ class _ContentsCardState extends State<_ContentsCard> {
                     if (page > 0)
                       IconButton(
                         key: const Key('links-prev'),
-                        tooltip: 'Previous',
+                        tooltip: context.l10n.previous,
                         visualDensity: VisualDensity.compact,
                         icon: const Icon(Icons.chevron_left_rounded),
                         onPressed: () => setState(() => _page = page - 1),
@@ -379,7 +381,7 @@ class _ContentsCardState extends State<_ContentsCard> {
                     if (page < pages - 1)
                       IconButton(
                         key: const Key('links-next'),
-                        tooltip: 'Next',
+                        tooltip: context.l10n.next,
                         visualDensity: VisualDensity.compact,
                         icon: const Icon(Icons.chevron_right_rounded),
                         onPressed: () => setState(() => _page = page + 1),
@@ -495,16 +497,14 @@ class _AvatarColumn extends StatelessWidget {
   final double size;
   final VoidCallback onStart;
 
-  String _line() {
+  String _line(AppLocalizations l) {
     final node = overview.skill;
     if (reply != null) return reply!;
     if (node.isLocked) {
       final parent = overview.containsParents.firstOrNull;
-      return parent == null
-          ? 'Still locked. Clear the parent node first.'
-          : 'Still locked. Clear “${parent.title}” first.';
+      return parent == null ? l.lockedClearParent : l.lockedClearNamed(parent.title);
     }
-    return 'Ready to try?';
+    return l.readyToTry;
   }
 
   @override
@@ -539,12 +539,12 @@ class _AvatarColumn extends StatelessWidget {
                   : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Flexible(child: Text(_line(), style: theme.bodyLarge)),
+                        Flexible(child: Text(_line(context.l10n), style: theme.bodyLarge)),
                         if (!node.isLocked) ...[
                           const SizedBox(width: AppSpacing.md),
                           IconButton(
                             key: const Key('start-audit'),
-                            tooltip: 'Start audit',
+                            tooltip: context.l10n.startAudit,
                             visualDensity: VisualDensity.compact,
                             style: IconButton.styleFrom(
                               backgroundColor: AppColors.primary,
@@ -588,7 +588,7 @@ class _AuditHistory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (audits.isEmpty) return const EmptyView(message: 'No attempts yet.');
+    if (audits.isEmpty) return EmptyView(message: context.l10n.noAttemptsYet);
     final theme = Theme.of(context).textTheme;
     return ListView(
       key: const Key('skill-audits'),
@@ -618,12 +618,12 @@ class _AuditHistory extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            formatLocal(a.createdAt, pattern: 'MMM d, y HH:mm'),
+                            formatLocal(a.createdAt, style: DateStyle.dateTime),
                             style: theme.bodySmall,
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
-                            a.score == null ? '—' : '${a.score} pts',
+                            a.score == null ? '—' : context.l10n.points(a.score!),
                             key: const Key('audit-score'),
                             style: theme.titleLarge,
                           ),
@@ -631,7 +631,7 @@ class _AuditHistory extends StatelessWidget {
                       ),
                     ),
                     StatusChip(
-                      label: a.status.label,
+                      label: a.status.label(context.l10n),
                       color: a.status.color,
                       fill: a.status.fill,
                     ),

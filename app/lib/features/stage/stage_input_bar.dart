@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/tokens.dart';
 import '../../voice/voice_mode.dart';
 import '../../widgets/widgets.dart';
+import '../../l10n/l10n.dart';
 
 /// A file chip above the input (`report.pdf ✕`).
 class InputAttachment {
@@ -68,9 +69,9 @@ class StageInputBar extends StatefulWidget {
 
   /// The status line above the waveform for a voice-mode state.
   static String statusOf(VoiceModeState state) => switch (state) {
-    VoiceModeState.listening => 'Listening…',
-    VoiceModeState.thinking => 'Thinking…',
-    VoiceModeState.speaking => 'Speaking…',
+    VoiceModeState.listening => l10nNow.voiceListening,
+    VoiceModeState.thinking => l10nNow.voiceThinking,
+    VoiceModeState.speaking => l10nNow.voiceSpeaking,
     VoiceModeState.off => '',
   };
 
@@ -253,7 +254,7 @@ class _StageInputBarState extends State<StageInputBar> {
           ),
         ),
         Tooltip(
-          message: 'Tap to turn off voice mode',
+          message: context.l10n.voiceTapToTurnOff,
           child: MouseRegion(
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
@@ -298,7 +299,7 @@ class _StageInputBarState extends State<StageInputBar> {
                   if (onUpload != null)
                     IconButton(
                       key: const Key('upload'),
-                      tooltip: 'Upload a file',
+                      tooltip: context.l10n.uploadFile,
                       onPressed: enabled && uploadEnabled ? onUpload : null,
                       icon: const Icon(Icons.add_circle_outline_rounded, size: 24),
                     ),
@@ -339,7 +340,7 @@ class _StageInputBarState extends State<StageInputBar> {
                     listenable: controller,
                     builder: (context, _) => _SendButton(
                       key: const Key('send'),
-                      tooltip: search ? 'Search' : 'Send',
+                      tooltip: search ? context.l10n.search : context.l10n.send,
                       // Disabled while her answer is on its way: the arrow turns into a spinner.
                       busy: !enabled,
                       onPressed: enabled && controller.text.trim().isNotEmpty ? _submit : null,
@@ -385,7 +386,7 @@ class _VoiceModeButtonState extends State<_VoiceModeButton> {
       onExit: (_) => setState(() => _hover = false),
       child: IconButton(
         key: const Key('voice-mode'),
-        tooltip: 'Voice mode',
+        tooltip: context.l10n.voiceMode,
         onPressed: widget.onPressed,
         style: IconButton.styleFrom(
           backgroundColor: AppColors.surfaceHigh,

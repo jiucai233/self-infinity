@@ -5,6 +5,7 @@ import '../../app/panel_layout.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
 import 'left_panel.dart';
+import '../../l10n/l10n.dart';
 
 /// The NotebookLM frame (`docs/DESIGN.md` Section 3, `docs/ux-chat.md` 5.1):
 /// three white panels with 12 px gaps on the blue-grey canvas — the left
@@ -25,7 +26,7 @@ class StageScaffold extends StatelessWidget {
     super.key,
     required this.stage,
     this.history,
-    this.historyTitle = 'Chat',
+    this.historyTitle,
     this.title,
     this.titleChip,
     this.topLeading,
@@ -36,7 +37,8 @@ class StageScaffold extends StatelessWidget {
 
   /// The content of the right panel; null = no right panel.
   final Widget? history;
-  final String historyTitle;
+  /// Defaults to “Chat”.
+  final String? historyTitle;
   final String? title;
   final Widget? titleChip;
   final Widget? topLeading;
@@ -44,13 +46,13 @@ class StageScaffold extends StatelessWidget {
   /// With a chat panel the left panel only stays open from this width on.
   static const double threeColumnWidth = 1180;
 
-  static const String leftTitle = 'My character';
-
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= AppLayout.wideBreakpoint;
     final history = this.history;
+    final leftTitle = context.l10n.myCharacter;
+    final historyTitle = this.historyTitle ?? context.l10n.chatTitle;
     final layout = context.watch<PanelLayout>();
     final squeezed = wide && history != null && width < threeColumnWidth;
     final leftRail = wide && (layout.leftCollapsed || squeezed);
@@ -190,7 +192,8 @@ class _StagePanel extends StatelessWidget {
   final Widget? topLeading;
   final bool wide;
   final bool hasHistory;
-  final String historyTitle;
+  /// Defaults to “Chat”.
+  final String? historyTitle;
   final Widget child;
 
   @override
@@ -216,7 +219,7 @@ class _StagePanel extends StatelessWidget {
                         Builder(
                           builder: (context) => IconButton(
                             key: const Key('open-left-drawer'),
-                            tooltip: StageScaffold.leftTitle,
+                            tooltip: context.l10n.myCharacter,
                             icon: const Icon(Icons.menu_rounded),
                             onPressed: () => Scaffold.of(context).openDrawer(),
                           ),

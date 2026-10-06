@@ -109,6 +109,7 @@ class PlatformVoiceService implements VoiceService {
     final tts = _tts;
     if (tts == null || text.trim().isEmpty) return;
     try {
+      await tts.setLanguage(kVoiceLocale.replaceAll('_', '-'));
       await tts.speak(text);
     } on Object catch (e) {
       debugPrint('PlatformVoiceService: could not speak ($e)');

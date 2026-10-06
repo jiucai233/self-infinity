@@ -9,6 +9,7 @@ import '../features/chat/home_scene.dart';
 import '../features/map/map_scene.dart';
 import '../features/skill/skill_scene.dart';
 import '../widgets/widgets.dart';
+import '../l10n/l10n.dart';
 
 /// Path helpers, so that no screen has to spell a route by hand.
 ///
@@ -122,9 +123,9 @@ class NotFoundScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Self-Infinity')),
       body: EmptyView(
-        message: 'Page not found',
+        message: context.l10n.pageNotFound,
         action: PrimaryButton(
-          label: 'Go home',
+          label: context.l10n.goHome,
           onPressed: () => GoRouter.of(context).go(AppRoutes.home),
         ),
       ),

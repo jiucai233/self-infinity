@@ -6,7 +6,7 @@ from concurrent.futures import TimeoutError as FutureTimeoutError
 from google import genai
 
 from app.config import settings
-from app.llm.base import Message, agent_of, strip_code_fence
+from app.llm.base import Message, agent_of, strip_code_fence, with_language
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ class GeminiProvider:
         return self._model or settings.llm_model or self.default_model
 
     def complete(self, messages: list[Message]) -> str:
+        messages = with_language(messages)
         system = "\n".join(m["content"] for m in messages if m["role"] == "system")
         turns = [m for m in messages if m["role"] != "system"]
         contents = [

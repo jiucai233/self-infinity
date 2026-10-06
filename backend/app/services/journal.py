@@ -13,29 +13,36 @@ from sqlmodel import Session, col, select
 from app import utils
 from app.config import settings
 from app.models import JournalEntry
+from app.i18n import reflection_prompt, reflection_variants
 from app.schemas import REFLECTION_PROMPTS
 
 # (start minute of the KST day, prompt). Each window runs until the next start; the last one
 # (21:00) runs through midnight until 02:59, and 00:00-02:59 belongs to the previous day's evening.
 _WINDOW_STARTS = (3 * 60, 11 * 60, 13 * 60 + 30, 15 * 60 + 15, 17 * 60, 19 * 60 + 30, 21 * 60)
-WINDOWS = tuple(zip(_WINDOW_STARTS, REFLECTION_PROMPTS, strict=True))
+WINDOWS = tuple(zip(_WINDOW_STARTS, REFLECTION_PROMPTS, strict=True))  # English, for reading
 _DAY_STARTS_AT = 3 * 60  # the evening window wraps midnight, so its "day" turns over at 03:00
 
 
 @dataclass(frozen=True)
 class ReflectionWindow:
-    prompt: str
+    index: int  # 0-6, in window order
     day: date  # the KST date the window started on (after midnight: still the previous date)
     wraps_midnight: bool
+
+    @property
+    def prompt(self) -> str:
+        """In the request's language."""
+        return reflection_prompt(self.index)
 
 
 def current_window(now: datetime | None = None) -> ReflectionWindow:
     now = now or utils.local_now()
     minutes = now.hour * 60 + now.minute
+    last = len(_WINDOW_STARTS) - 1
     if minutes < _DAY_STARTS_AT:
-        return ReflectionWindow(WINDOWS[-1][1], now.date() - timedelta(days=1), True)
-    prompt = [p for start, p in WINDOWS if start <= minutes][-1]
-    return ReflectionWindow(prompt, now.date(), prompt == WINDOWS[-1][1])
+        return ReflectionWindow(last, now.date() - timedelta(days=1), True)
+    index = [i for i, start in enumerate(_WINDOW_STARTS) if start <= minutes][-1]
+    return ReflectionWindow(index, now.date(), index == last)
 
 
 def _answered_between(window: ReflectionWindow) -> tuple[datetime, datetime]:
@@ -50,12 +57,13 @@ def _answered_between(window: ReflectionWindow) -> tuple[datetime, datetime]:
 
 
 def current_prompt(session: Session) -> str | None:
-    """The prompt of the current window, or None when it was already answered in this window today."""
+    """The prompt of the current window (in the request's language), or None when it was already
+    answered in this window today — in any language."""
     window = current_window()
     start, end = _answered_between(window)
     answered = session.exec(
         select(JournalEntry.id).where(
-            JournalEntry.prompt == window.prompt,
+            col(JournalEntry.prompt).in_(reflection_variants(window.index)),
             JournalEntry.created_at >= start,
             JournalEntry.created_at < end,
         )

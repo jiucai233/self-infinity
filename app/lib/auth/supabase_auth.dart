@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_service.dart';
+import '../l10n/l10n.dart';
 
 /// Accounts on Supabase Auth (email + password). Supabase keeps the session
 /// in the browser and refreshes the token by itself; [accessToken] always
@@ -55,7 +56,7 @@ class SupabaseAuthService extends AuthService {
     } on AuthException catch (e) {
       return AuthResult(error: messageFor(e));
     } on Object {
-      return const AuthResult(error: "Can't reach the server. Check your connection.");
+      return AuthResult(error: l10nNow.authOffline);
     }
   }
 
@@ -73,23 +74,23 @@ class SupabaseAuthService extends AuthService {
     } on AuthException catch (e) {
       return AuthResult(error: messageFor(e));
     } on Object {
-      return const AuthResult(error: "Can't reach the server. Check your connection.");
+      return AuthResult(error: l10nNow.authOffline);
     }
   }
 
   /// Supabase's error, in the app's voice.
   static String messageFor(AuthException e) {
     final m = e.message.toLowerCase();
-    if (m.contains('invalid login credentials')) return 'Wrong email or password.';
-    if (m.contains('email not confirmed')) return 'Confirm your email first — check your inbox.';
+    if (m.contains('invalid login credentials')) return l10nNow.authWrongCredentials;
+    if (m.contains('email not confirmed')) return l10nNow.authConfirmEmailFirst;
     if (m.contains('already registered') || m.contains('already been registered')) {
-      return 'That email already has an account. Sign in instead.';
+      return l10nNow.authAlreadyRegistered;
     }
     if (m.contains('rate limit') || e.statusCode == '429') {
-      return 'Too many tries. Wait a minute and try again.';
+      return l10nNow.authRateLimited;
     }
     if (m.contains('password')) return e.message;
-    return 'Something went wrong. Please try again.';
+    return l10nNow.somethingWentWrong;
   }
 
   @override

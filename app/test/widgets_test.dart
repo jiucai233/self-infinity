@@ -17,6 +17,7 @@ import 'package:self_infinity/theme/app_theme.dart';
 import 'package:self_infinity/theme/tokens.dart';
 import 'package:self_infinity/voice/voice_mode.dart';
 import 'package:self_infinity/widgets/widgets.dart';
+import 'package:self_infinity/l10n/l10n.dart';
 
 Future<void> pumpApp(WidgetTester tester, Widget child, {SelfInfinityApi? api}) async {
   tester.view.physicalSize = const Size(1000, 800);
@@ -118,9 +119,10 @@ void main() {
 
   group('vocabulary', () {
     test('English labels', () {
-      expect(AuditStatus.passed.label, 'Passed');
-      expect(AuditStatus.failed.label, 'Failed');
-      expect(AuditStatus.active.label, 'In progress');
+      final l = lookupAppLocalizations(const Locale('en'));
+      expect(AuditStatus.passed.label(l), 'Passed');
+      expect(AuditStatus.failed.label(l), 'Failed');
+      expect(AuditStatus.active.label(l), 'In progress');
     });
 
     test('status and condition colors follow the tokens', () {
@@ -131,9 +133,10 @@ void main() {
       expect(ConditionFlag.unknown.color, AppColors.primary);
       expect(AuditStatus.passed.fill, AppColors.successSoft);
       expect(AuditStatus.failed.fill, AppColors.dangerSoft);
-      expect(ConditionFlag.normal.label, 'Good');
-      expect(ConditionFlag.low.label, 'Low');
-      expect(ConditionFlag.unknown.label, 'No record');
+      final l = lookupAppLocalizations(const Locale('en'));
+      expect(ConditionFlag.normal.label(l), 'Good');
+      expect(ConditionFlag.low.label(l), 'Low');
+      expect(ConditionFlag.unknown.label(l), 'No record');
     });
 
     test('the condition bar: normal full, low half and red, unknown empty', () {
@@ -143,11 +146,12 @@ void main() {
     });
 
     test('agentLabel names every agent; user messages are You', () {
-      expect(agentLabel(null), 'You');
-      expect(agentLabel('front_desk'), 'Guide');
-      expect(agentLabel('auditor'), 'Auditor');
-      expect(agentLabel('recorder'), 'Recorder');
-      expect(agentLabel('unknown'), 'unknown');
+      final l = lookupAppLocalizations(const Locale('en'));
+      expect(agentLabel(l, null), 'You');
+      expect(agentLabel(l, 'front_desk'), 'Guide');
+      expect(agentLabel(l, 'auditor'), 'Auditor');
+      expect(agentLabel(l, 'recorder'), 'Recorder');
+      expect(agentLabel(l, 'unknown'), 'unknown');
     });
 
     test('formatNumber trims useless zeros', () {

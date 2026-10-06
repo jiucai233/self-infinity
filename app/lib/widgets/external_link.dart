@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'toast.dart';
+import '../l10n/l10n.dart';
 
 /// Opens [url] in the system browser / a new browser tab.
 ///
@@ -18,7 +19,7 @@ Future<void> openExternalUrl(BuildContext context, String url) async {
     }
   }
   if (!opened) {
-    if (context.mounted) showToast(context, "Couldn't open the link.");
+    if (context.mounted) showToast(context, context.l10n.linkOpenFailed);
   }
 }
 

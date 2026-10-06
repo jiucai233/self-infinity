@@ -1,10 +1,17 @@
 # English strings (binding, 2026-10-02)
 
-The whole product is English: client UI, backend replies, the Mock / Fake demo script, LLM output. Backend and client must use **exactly** these strings where listed; anything not listed is translated in the same voice.
+> **Languages (2026-10-06).** English is the default and the source; the app also speaks Chinese
+> and Korean, picked in the ◎ menu or on the front page. Client strings live in
+> `app/lib/l10n/app_{en,zh,ko}.arb` (the English ones are the strings below); the backend's fixed
+> texts and reflection prompts in `backend/app/i18n.py`; LLM output follows the request's
+> `Accept-Language` (api-contract §1). In Chinese, titles are quoted `「X」`; in Korean `“X”`, with
+> sentences written so no particle follows a title. The Mock / Fake demo script stays English.
+
+The whole product is English by default: client UI, backend replies, the Mock / Fake demo script, LLM output. Backend and client must use **exactly** these strings where listed; anything not listed is translated in the same voice.
 
 **Voice**: short, warm, plain English, second person, no exclamation spam (one `!` at most per screen). Sentence case for labels and buttons. Quote titles with curly quotes `“X”` (replaces Korean `「X」`). Numbers as digits.
 
-**Speech**: STT and TTS locale `en-US` (was `ko_KR`).
+**Speech**: STT and TTS locale follow the app language: `en-US`, `zh-CN`, `ko-KR`.
 
 ---
 

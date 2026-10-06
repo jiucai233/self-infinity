@@ -1,0 +1,462 @@
+{
+  "@@locale": "en",
+  "about": "About",
+  "aboutNodeMessage": "About “{title}”: {text}",
+  "@aboutNodeMessage": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "account": "Account",
+  "addMainQuest": "Add a main quest",
+  "addRule": "Add a rule",
+  "agentAuditor": "Auditor",
+  "agentChallenger": "Challenger",
+  "agentCheckIn": "Check-in",
+  "agentClarifier": "Clarifier",
+  "agentGuide": "Guide",
+  "agentLinker": "Linker",
+  "agentMaterialFinder": "Material Finder",
+  "agentNarrator": "Narrator",
+  "agentPlanner": "Planner",
+  "agentRecommender": "Recommender",
+  "agentRecorder": "Recorder",
+  "agentSyllabusFinder": "Syllabus Finder",
+  "answerHint": "Your answer…",
+  "askAboutNodeHint": "Ask about this node…",
+  "askTodaysQuests": "What should I do today?",
+  "attachCourse": "Attach a course",
+  "attempts": "Attempts",
+  "auditFailed": "Failed",
+  "auditHistory": "Audit history",
+  "auditInProgress": "In progress",
+  "auditPassed": "Passed",
+  "auditorTagline": "Asks like a beginner, judges like an expert",
+  "authAlreadyRegistered": "That email already has an account. Sign in instead.",
+  "authConfirmEmailFirst": "Confirm your email first — check your inbox.",
+  "authEnterPassword": "Enter your password.",
+  "authInvalidEmail": "Enter a valid email address.",
+  "authOffline": "Can't reach the server. Check your connection.",
+  "authPasswordTooShort": "Use at least {count} characters for your password.",
+  "@authPasswordTooShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "authRateLimited": "Too many tries. Wait a minute and try again.",
+  "authWrongCredentials": "Wrong email or password.",
+  "back": "Back",
+  "backToNode": "Back to node",
+  "backToSignIn": "Back to sign in",
+  "best": "Best",
+  "boss": "Boss",
+  "bossCleared": "Boss cleared!",
+  "callingAuditor": "Calling the Auditor…",
+  "characterSheet": "Character sheet",
+  "chatTitle": "Chat",
+  "checkInbox": "Check your inbox",
+  "chooseMainQuest": "Choose a main quest",
+  "cleared": "Cleared!",
+  "clearedBar": "Cleared {mastered}/{total}",
+  "@clearedBar": {
+    "placeholders": {
+      "mastered": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "clearedWithScore": "Cleared! {score} pts",
+  "@clearedWithScore": {
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "close": "Close",
+  "collapse": "Collapse",
+  "conditionBar": "Condition: {state}",
+  "@conditionBar": {
+    "placeholders": {
+      "state": {
+        "type": "String"
+      }
+    }
+  },
+  "conditionGood": "Good",
+  "conditionLow": "Low",
+  "conditionNoRecord": "No record",
+  "confirmLinkSent": "We sent a link to {email}. Open it to confirm your email, then sign in here.",
+  "@confirmLinkSent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "continueLabel": "Continue",
+  "course": "Course",
+  "courses": "Courses",
+  "createAccount": "Create account",
+  "createAnAccount": "Create an account",
+  "createYourAccount": "Create your account",
+  "crystalBall": "Crystal ball",
+  "dailyQuests": "Daily quests",
+  "dotCleared": "Cleared",
+  "dotLocked": "Locked",
+  "dotReady": "Ready",
+  "dragToTurn": "Drag to turn · tap a point",
+  "editUnderCharacter": "Edit these under My character.",
+  "email": "Email",
+  "enterApp": "Enter Self-Infinity",
+  "enterEmailFirst": "Enter your email above first.",
+  "errAiFailure": "Something went wrong on our side. Please try again.",
+  "errAuditClosed": "This audit has already ended.",
+  "errBadRequest": "You can't do that right now.",
+  "errFileUnreadable": "Couldn't read any text from this file.",
+  "errInvalidInput": "Please check what you entered.",
+  "errLessonAlreadyMade": "The lesson card is already made.",
+  "errLessonOnlyAfterFail": "Lesson cards can only be made after a failed audit.",
+  "errMaxMainQuests": "You can have at most 3 main quests.",
+  "errNetwork": "Can't reach the server. Check your connection.",
+  "errNoNodeReady": "No node is ready yet. Make a world first.",
+  "errNodeLocked": "This node is locked. Clear its parent first.",
+  "errNotFound": "We couldn't find that.",
+  "errPickGap": "Pick a gap or misconception to search for.",
+  "errSignedOut": "Your session ended. Please sign in again.",
+  "expand": "Expand",
+  "explainHint": "Explain it in your own words…",
+  "forgotPassword": "Forgot password?",
+  "getStarted": "Get started",
+  "getTodaysQuests": "Get today's quests →",
+  "goHome": "Go home",
+  "greetingContinue": "Continue with “{course}”?",
+  "@greetingContinue": {
+    "placeholders": {
+      "course": {
+        "type": "String"
+      }
+    }
+  },
+  "greetingNew": "What shall we learn today?",
+  "haveAccount": "Have an account?",
+  "haveAnAccountButton": "I have an account",
+  "heroHeadline": "Prove you understand.\nWatch your tree grow.",
+  "heroTagline": "A learning game you win by explaining",
+  "hidePassword": "Hide password",
+  "hintContinue": "Tap the crystal ball to open your life tree.",
+  "hintNew": "Tell the Guide what you want to learn.",
+  "hoursShort": "{hours} h",
+  "@hoursShort": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "identityPlaceholder": "I am the type of person who…",
+  "identityStem": "I am the type of person who ",
+  "journal": "Journal",
+  "language": "Language",
+  "lessonCard": "Lesson card",
+  "lessonCardCreated": "Lesson card created.",
+  "lessonCards": "Lesson cards",
+  "lessons": "Lessons",
+  "levelBar": "Lv {level} · {progress}/5",
+  "@levelBar": {
+    "placeholders": {
+      "level": {
+        "type": "int"
+      },
+      "progress": {
+        "type": "int"
+      }
+    }
+  },
+  "lifeTree": "Life tree",
+  "linkOpenFailed": "Couldn't open the link.",
+  "loading": "Loading…",
+  "localModeNoAccount": "Local mode (no account)",
+  "lockedClearNamed": "Still locked. Clear “{title}” first.",
+  "@lockedClearNamed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "lockedClearParent": "Still locked. Clear the parent node first.",
+  "mainQuest": "Main quest",
+  "mainQuestPlaceholder": "e.g. Teach calculus to a stranger",
+  "mainQuests": "Main quests",
+  "makeLessonCard": "Make a lesson card",
+  "mapEmptyLine": "No quest line yet. Tell the Guide what you want to learn.",
+  "mapTapNode": "Tap a node to take it on.",
+  "meals": "Meals",
+  "messageHint": "Message…",
+  "misconception": "Misconception",
+  "myCharacter": "My character",
+  "newHere": "New here?",
+  "newNodesUnlocked": "New nodes unlocked",
+  "next": "Next",
+  "noAttemptsYet": "No attempts yet.",
+  "noAuditsYet": "No audits yet.",
+  "noConversationYet": "No conversation yet.",
+  "noCourseServesQuest": "No course serves this quest yet.",
+  "noDescriptionYet": "No description yet.",
+  "noMatchingNode": "No matching node.",
+  "noQuestLineYet": "No quest line yet",
+  "node": "Node",
+  "notQuite": "Not quite.",
+  "onbBegin": "Begin",
+  "onbBuildFailed": "I couldn't build that world. Try again, or skip for now.",
+  "onbBuildIt": "Build it",
+  "onbBuildingBody": "I look for a real syllabus and turn it into a tree of things to prove. This can take a minute.",
+  "onbBuildingTitle": "Building your world…",
+  "onbCourseKicker": "FIRST COURSE",
+  "onbDoneGuide": "Done.",
+  "onbFlipGuide": "Now flip it.",
+  "onbHiGuide": "Hi, I'm your Guide.",
+  "onbIdentityHelper": "Write it as if it's already true.",
+  "onbIdentityKicker": "IDENTITY",
+  "onbIdentityTitle": "Finish the sentence.",
+  "onbLearnFirst": "What do you want to learn first?",
+  "onbLearnFirstFor": "What do you need to learn first for “{quest}”?",
+  "@onbLearnFirstFor": {
+    "placeholders": {
+      "quest": {
+        "type": "String"
+      }
+    }
+  },
+  "onbMomentGuide": "Give me a moment.",
+  "onbNeedTopic": "Tell me a topic, or pick a syllabus file.",
+  "onbNodesToProve": "{count} nodes to prove.",
+  "@onbNodesToProve": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "onbNodesToProveUnder": "{count} nodes to prove, under “{quest}”.",
+  "@onbNodesToProveUnder": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "quest": {
+        "type": "String"
+      }
+    }
+  },
+  "onbQuestGuide": "Pick one quest for this year.",
+  "onbQuestHelper": "You can have up to three. One is plenty to start.",
+  "onbQuestKicker": "MAIN QUEST",
+  "onbQuestTitle": "What's one goal that moves you toward your win condition?",
+  "onbSetUpCharacter": "Let's set up your character.",
+  "onbSkillsGuide": "Every quest needs skills.",
+  "onbSkipSetup": "Skip setup",
+  "onbStakesGuide": "Let's start with what's at stake.",
+  "onbStakesHelper": "Be honest. This is what you're playing against.",
+  "onbStakesHint": "Another year of…",
+  "onbStakesKicker": "STAKES",
+  "onbStakesTitle": "A year from now, nothing has changed. What does your life look like?",
+  "onbStepOf": "Step {step} of {total}",
+  "@onbStepOf": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "onbTopicBody": "A topic is enough. Got a syllabus? Use the file instead (PDF, TXT or MD).",
+  "onbTopicHint": "e.g. Calculus",
+  "onbUseSyllabusFile": "Use a syllabus file",
+  "onbWantToLearn": "I want to learn {topic}",
+  "@onbWantToLearn": {
+    "placeholders": {
+      "topic": {
+        "type": "String"
+      }
+    }
+  },
+  "onbWantToLearnThis": "I want to learn this",
+  "onbWelcomeBody": "In Self-Infinity you level up by proving you understand things: you explain them in your own words, and the Auditor decides. A few questions first. One or two sentences each (type them, or tap the mic and say them); you can change everything later.",
+  "onbWhoGuide": "Who gets there?",
+  "onbWinHelper": "Concrete beats impressive.",
+  "onbWinHint": "I can…",
+  "onbWinKicker": "WIN CONDITION",
+  "onbWinTitle": "A year from now, you've won. What does that look like?",
+  "onbWorldReady": "Your world “{course}” is ready.",
+  "@onbWorldReady": {
+    "placeholders": {
+      "course": {
+        "type": "String"
+      }
+    }
+  },
+  "openLifeTree": "Open life tree",
+  "openNode": "Open node",
+  "pageNotFound": "Page not found",
+  "password": "Password",
+  "passwordWithMin": "Password (at least {count} characters)",
+  "@passwordWithMin": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "points": "{score} pts",
+  "@points": {
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "pointsUnit": "pts",
+  "previous": "Previous",
+  "questProgress": "{done} of {total} nodes cleared across {count, plural, =1{1 course} other{{count} courses}}.",
+  "@questProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "readyToTry": "Ready to try?",
+  "recorderAsk": "What did you misunderstand?",
+  "recorderTagline": "Turns a miss into a lesson",
+  "removeMainQuest": "Remove main quest",
+  "removeRule": "Remove rule",
+  "renameUnderCharacter": "Rename or remove it under My character.",
+  "replayTutorial": "Replay the tutorial",
+  "resetLinkSent": "We sent a password reset link to {email}.",
+  "@resetLinkSent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "resources": "Resources",
+  "rulePlaceholder": "e.g. No phone before the first audit",
+  "rules": "Rules",
+  "sampleCalculus": "Calculus",
+  "sampleClarity": "Clarity",
+  "sampleDerivatives": "Derivatives",
+  "sampleInference": "Inference",
+  "sampleIntegrals": "Integrals",
+  "sampleLimits": "Limits",
+  "sampleProbability": "Probability",
+  "sampleStatistics": "Statistics",
+  "sampleStructure": "Structure",
+  "sampleWriting": "Writing",
+  "saveFailed": "Couldn't save. {error}",
+  "@saveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "search": "Search",
+  "searchNodesHint": "Search nodes…",
+  "seeOutline": "See the outline →",
+  "send": "Send",
+  "serves": "Serves",
+  "showPassword": "Show password",
+  "sideQuest": "Side quest",
+  "sideQuestCourse": "Side quest · Course",
+  "sideQuestNone": "Side quest (none)",
+  "signIn": "Sign in",
+  "signInBlurb": "Sign in to pick up where you left off.",
+  "signOut": "Sign out",
+  "signUpBlurb": "Your tree, your lessons and your rules stay in your account.",
+  "signedInAs": "Signed in as",
+  "skip": "Skip",
+  "sleep": "Sleep",
+  "somethingWentWrong": "Something went wrong. Please try again.",
+  "somethingWentWrongShort": "Something went wrong.",
+  "sourceLabel": "Source: {source}",
+  "@sourceLabel": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "speakYourAnswer": "Speak your answer",
+  "stakes": "Stakes",
+  "stakesPlaceholder": "What if nothing changes?",
+  "startAudit": "Start audit",
+  "stats": "Stats",
+  "stopListening": "Stop listening",
+  "takeItOn": "Take it on",
+  "today": "Today",
+  "tourBallBody": "You in the middle, your quests around you, every skill beyond. Tap the ball on the home screen to open the full tree.",
+  "tourBallKicker": "YOUR CRYSTAL BALL",
+  "tourBallTitle": "Your whole life tree, in one ball.",
+  "tourLessonsBody": "When an audit fails, write down what you got wrong. It becomes a lesson card, and the Auditor remembers it next time.",
+  "tourLessonsKicker": "LESSONS",
+  "tourLessonsTitle": "Every miss becomes a lesson.",
+  "tourNext": "Next",
+  "tourProveBody": "Open a point and explain it in your own words. The Auditor asks follow-ups until it's sure you understand. Then the point turns gold.",
+  "tourProveKicker": "PROVE IT",
+  "tourProveTitle": "Explain it. The Auditor decides.",
+  "treeStartsWithYou": "Your tree starts with you.",
+  "tryAgain": "Try again",
+  "uploadBadFile": "Only PDF, TXT or MD files up to 4 MB.",
+  "uploadFile": "Upload a file",
+  "uploadTooMany": "You can attach up to {count} files.",
+  "@uploadTooMany": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "uploadedCourseMaterial": "Uploaded course material",
+  "uploading": "Uploading…",
+  "verdict": "VERDICT",
+  "verdictCleared": "Cleared.",
+  "verdictNotYet": "Not yet.",
+  "viewFrontPage": "View the front page",
+  "viewOutline": "Outline",
+  "viewTree": "Tree",
+  "voiceListening": "Listening…",
+  "voiceMode": "Voice mode",
+  "voiceModeUnavailable": "Voice mode isn't available on this device.",
+  "voiceSpeaking": "Speaking…",
+  "voiceTapToTurnOff": "Tap to turn off voice mode",
+  "voiceThinking": "Thinking…",
+  "voiceUnavailable": "Voice input isn't available on this device.",
+  "welcomeBack": "Welcome back",
+  "whatWasMissing": "What was missing",
+  "whatWentWrongHint": "What did you get wrong?…",
+  "winCondition": "Win condition",
+  "winConditionPlaceholder": "What does winning look like?",
+  "worthSecondLook": "Worth a second look",
+  "you": "You"
+}

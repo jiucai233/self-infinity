@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +9,7 @@ import '../../api/models.dart';
 import '../../auth/auth_service.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
+import '../../l10n/l10n.dart';
 
 /// The front door (`docs/ux-chat.md` §7): a landing hero, and sign in /
 /// create an account (email and password only) in a card over it.
@@ -40,7 +43,8 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
   bool _showPassword = false;
   String? _error;
 
-  static final LifeTree _sample = _sampleTree();
+  static final Map<String, LifeTree> _samples = {};
+  static LifeTree _sample(AppLocalizations l) => _samples[l.localeName] ??= _sampleTree(l);
 
   @override
   void initState() {
@@ -87,7 +91,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
   Future<void> _reset() async {
     final email = _email.text.trim();
     if (AuthService.validate(email, 'x') != null) {
-      setState(() => _error = 'Enter your email above first.');
+      setState(() => _error = context.l10n.enterEmailFirst);
       return;
     }
     setState(() => _busy = true);
@@ -130,7 +134,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
             children: [
               Positioned.fill(
                 child: _Hero(
-                  tree: _sample,
+                  tree: _sample(context.l10n),
                   wide: wide,
                   intro: _intro,
                   onSignIn: () => _open(_Mode.signIn),
@@ -197,7 +201,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
                   right: AppSpacing.sm,
                   child: IconButton(
                     key: const Key('auth-close'),
-                    tooltip: 'Close',
+                    tooltip: context.l10n.close,
                     onPressed: _busy ? null : _close,
                     icon: const Icon(Icons.close_rounded, size: 20),
                   ),
@@ -223,19 +227,19 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
           children: [
             const Icon(Icons.mark_email_unread_outlined, size: 28, color: AppColors.textPrimary),
             const SizedBox(height: AppSpacing.lg),
-            Text('Check your inbox', style: theme.headlineMedium),
+            Text(context.l10n.checkInbox, style: theme.headlineMedium),
             const SizedBox(height: AppSpacing.sm),
             Text(
               inbox
-                  ? 'We sent a link to ${_email.text.trim()}. Open it to confirm your email, then sign in here.'
-                  : 'We sent a password reset link to ${_email.text.trim()}.',
+                  ? context.l10n.confirmLinkSent(_email.text.trim())
+                  : context.l10n.resetLinkSent(_email.text.trim()),
               style: theme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: AppSpacing.xl),
             OutlinedButton(
               key: const Key('back-to-sign-in'),
               onPressed: () => _switch(_Mode.signIn),
-              child: const Text('Back to sign in'),
+              child: Text(context.l10n.backToSignIn),
             ),
           ],
         );
@@ -248,15 +252,15 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                signUp ? 'Create your account' : 'Welcome back',
+                signUp ? context.l10n.createYourAccount : context.l10n.welcomeBack,
                 key: const Key('auth-title'),
                 style: theme.headlineMedium,
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 signUp
-                    ? 'Your tree, your lessons and your rules stay in your account.'
-                    : 'Sign in to pick up where you left off.',
+                    ? context.l10n.signUpBlurb
+                    : context.l10n.signInBlurb,
                 style: theme.bodyMedium?.copyWith(color: AppColors.textTertiary),
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -268,7 +272,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
                 textInputAction: TextInputAction.next,
                 enabled: !_busy,
                 onSubmitted: (_) => _passwordFocus.requestFocus(),
-                decoration: const InputDecoration(hintText: 'Email'),
+                decoration: InputDecoration(hintText: context.l10n.email),
               ),
               const SizedBox(height: AppSpacing.md),
               TextField(
@@ -282,10 +286,10 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
                 onSubmitted: (_) => _submit(),
                 decoration: InputDecoration(
                   hintText: signUp
-                      ? 'Password (at least ${AuthService.minPasswordLength} characters)'
-                      : 'Password',
+                      ? context.l10n.passwordWithMin(AuthService.minPasswordLength)
+                      : context.l10n.password,
                   suffixIcon: IconButton(
-                    tooltip: _showPassword ? 'Hide password' : 'Show password',
+                    tooltip: _showPassword ? context.l10n.hidePassword : context.l10n.showPassword,
                     icon: Icon(
                       _showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                       size: 18,
@@ -315,7 +319,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
                           color: AppColors.textTertiary,
                         ),
                       )
-                    : Text(signUp ? 'Create account' : 'Sign in'),
+                    : Text(signUp ? context.l10n.createAccount : context.l10n.signIn),
               ),
               const SizedBox(height: AppSpacing.md),
               Wrap(
@@ -327,7 +331,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
-                        signUp ? 'Have an account?' : 'New here?',
+                        signUp ? context.l10n.haveAccount : context.l10n.newHere,
                         style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
                       ),
                       TextButton(
@@ -335,7 +339,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
                         onPressed: _busy
                             ? null
                             : () => _switch(signUp ? _Mode.signIn : _Mode.signUp),
-                        child: Text(signUp ? 'Sign in' : 'Create an account'),
+                        child: Text(signUp ? context.l10n.signIn : context.l10n.createAnAccount),
                       ),
                     ],
                   ),
@@ -344,7 +348,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
                       key: const Key('auth-forgot'),
                       onPressed: _busy ? null : _reset,
                       style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
-                      child: const Text('Forgot password?'),
+                      child: Text(context.l10n.forgotPassword),
                     ),
                 ],
               ),
@@ -356,7 +360,7 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
 
   /// A small sample tree for the night panel: a few courses, some of it
   /// cleared.
-  static LifeTree _sampleTree() {
+  static LifeTree _sampleTree(AppLocalizations l) {
     CourseMap course(int id, String root, List<String> branches, int cleared) {
       final nodes = <SkillNode>[];
       final edges = <SkillEdge>[];
@@ -403,13 +407,13 @@ class _SignInSceneState extends State<SignInScene> with SingleTickerProviderStat
 
     return LifeTree.build(
       goals: [
-        Goal(id: 1, title: 'Main quest', courseIds: const [1, 2], createdAt: DateTime.utc(2026)),
-        Goal(id: 2, title: 'Main quest', courseIds: const [3], createdAt: DateTime.utc(2026)),
+        Goal(id: 1, title: l.mainQuest, courseIds: const [1, 2], createdAt: DateTime.utc(2026)),
+        Goal(id: 2, title: l.mainQuest, courseIds: const [3], createdAt: DateTime.utc(2026)),
       ],
       maps: [
-        course(1, 'Calculus', ['Limits', 'Derivatives', 'Integrals'], 7),
-        course(2, 'Statistics', ['Probability', 'Inference'], 3),
-        course(3, 'Writing', ['Clarity', 'Structure'], 4),
+        course(1, l.sampleCalculus, [l.sampleLimits, l.sampleDerivatives, l.sampleIntegrals], 7),
+        course(2, l.sampleStatistics, [l.sampleProbability, l.sampleInference], 3),
+        course(3, l.sampleWriting, [l.sampleClarity, l.sampleStructure], 4),
       ],
     );
   }
@@ -545,13 +549,58 @@ class _Nav extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
+          const _LanguageMenu(),
+          const SizedBox(width: AppSpacing.sm),
           _CirclePill(
             key: const Key('hero-sign-in'),
             circle: wide ? 32 : 28,
-            label: 'Sign in',
+            label: context.l10n.signIn,
             onTap: onSignIn,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The language of the page (and of the app after signing in): the current
+/// one's name; a tap lists all three.
+class _LanguageMenu extends StatelessWidget {
+  const _LanguageMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = context.watch<LocaleController>();
+    final style = Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.nightText);
+    return PopupMenuButton<AppLanguage>(
+      key: const Key('hero-language'),
+      tooltip: context.l10n.language,
+      position: PopupMenuPosition.under,
+      onSelected: (language) => unawaited(locale.setLanguage(language)),
+      itemBuilder: (_) => [
+        for (final language in AppLanguage.values)
+          PopupMenuItem(
+            key: Key('hero-language-${language.code}'),
+            value: language,
+            child: Row(
+              children: [
+                Expanded(child: Text(language.nativeName)),
+                if (language == locale.language)
+                  const Icon(Icons.check_rounded, size: 18, color: AppColors.textPrimary),
+              ],
+            ),
+          ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.language_rounded, size: 18, color: AppColors.nightText),
+            const SizedBox(width: AppSpacing.xs),
+            Text(locale.language.nativeName, style: style),
+          ],
+        ),
       ),
     );
   }
@@ -659,7 +708,7 @@ class _Footer extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               Flexible(
                 child: Text(
-                  'A learning game you win by explaining',
+                  context.l10n.heroTagline,
                   style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
                 ),
               ),
@@ -671,7 +720,7 @@ class _Footer extends StatelessWidget {
           t: _part(intro, 0.8, 1.6),
           dy: 20,
           child: Text(
-            'Prove you understand.\nWatch your tree grow.',
+            context.l10n.heroHeadline,
             key: const Key('hero-headline'),
             style: (wide ? theme.displayLarge : theme.displaySmall)?.copyWith(height: 1.0),
           ),
@@ -687,12 +736,12 @@ class _Footer extends StatelessWidget {
               FilledButton(
                 key: const Key('hero-get-started'),
                 onPressed: onCreate,
-                child: const Text('Get started'),
+                child: Text(context.l10n.getStarted),
               ),
               OutlinedButton(
                 key: const Key('hero-have-account'),
                 onPressed: onSignIn,
-                child: const Text('I have an account'),
+                child: Text(context.l10n.haveAnAccountButton),
               ),
             ],
           ),

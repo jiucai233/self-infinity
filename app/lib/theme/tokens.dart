@@ -3,13 +3,87 @@ library;
 
 import 'package:flutter/material.dart';
 
-/// Font families. Everything is the platform sans (Roboto on the web) except
-/// the display serif, which the theme puts on the display styles and
+import '../l10n/app_language.dart';
+
+/// Font families (all OFL, `assets/fonts/README.md`). Everything is [sans]
+/// except the display serif, which the theme puts on the display styles and
 /// `headlineLarge` (big numbers); [AppTheme.serif] puts it on anything else
 /// (the identity quote). It has one weight, 400: never make it bold.
+///
+/// Neither has Chinese or Korean. Those come from per-language fallbacks
+/// ([sansFallback], [displayFallback]) that [AppFontLoader] loads when the
+/// language is picked: Infinity Sans KR for Korean (the Korean of the same
+/// design as [sans]), Noto Sans SC for Chinese, and Noto Serif KR / SC under
+/// the display serif.
 abstract final class AppFonts {
-  /// Instrument Serif (OFL), bundled in `assets/fonts/`.
+  /// Instrument Serif, bundled in `assets/fonts/`.
   static const String display = 'InstrumentSerif';
+
+  /// Infinity Sans: Pretendard (whose Latin is Inter-like), subsetted to
+  /// Latin and renamed as its license asks of modified versions; 400 / 500 /
+  /// 600, bundled in `assets/fonts/`.
+  static const String sans = 'InfinitySans';
+
+  static const BundledFont _sansKo = BundledFont('InfinitySansKR', [
+    'InfinitySansKR-Regular.ttf',
+    'InfinitySansKR-SemiBold.ttf',
+  ]);
+  static const BundledFont _sansZh = BundledFont('Noto Sans SC', [
+    'NotoSansSC-Regular.ttf',
+    'NotoSansSC-SemiBold.ttf',
+  ]);
+  static const BundledFont _serifKo = BundledFont('Noto Serif KR', ['NotoSerifKR-Medium.ttf']);
+  static const BundledFont _serifZh = BundledFont('Noto Serif SC', ['NotoSerifSC-Medium.ttf']);
+
+  /// The lazily loaded families [language] needs.
+  static List<BundledFont> bundledFor(AppLanguage language) => switch (language) {
+    AppLanguage.en => const [],
+    AppLanguage.ko => const [_sansKo, _serifKo],
+    AppLanguage.zh => const [_sansZh, _serifZh],
+  };
+
+  /// Platform fonts after the bundled ones: what shows a script nothing
+  /// bundled covers (or before a family has loaded).
+  static const List<String> _platform = [
+    'Apple SD Gothic Neo',
+    'PingFang SC',
+    'Malgun Gothic',
+    'Microsoft YaHei',
+    'Noto Sans KR',
+    'Noto Sans CJK SC',
+    'sans-serif',
+  ];
+
+  /// For text in [sans]: the language's own CJK font first (so Han
+  /// characters in Korean text and Hangul in Chinese text still match).
+  static List<String> sansFallback(AppLanguage language) => [
+    ...switch (language) {
+      AppLanguage.zh => [_sansZh.name, _sansKo.name],
+      _ => [_sansKo.name, _sansZh.name],
+    },
+    ..._platform,
+  ];
+
+  /// For text in [display]: the CJK serif of the language, then the sans.
+  static List<String> displayFallback(AppLanguage language) => [
+    ...switch (language) {
+      AppLanguage.zh => [_serifZh.name],
+      AppLanguage.ko => [_serifKo.name],
+      AppLanguage.en => const <String>[],
+    },
+    sans,
+    ...sansFallback(language),
+  ];
+}
+
+/// A font family that ships as plain assets in `assets/fonts/cjk/` and is
+/// loaded on demand ([AppFontLoader]).
+@immutable
+class BundledFont {
+  const BundledFont(this.name, this.files);
+
+  final String name;
+  final List<String> files;
 }
 
 /// Colors. "Paper & Ember": warm grey paper, near-black ink for every action,

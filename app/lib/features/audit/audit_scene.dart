@@ -21,6 +21,7 @@ import '../stage/stage_scaffold.dart';
 import 'celebration_card.dart';
 import 'lesson_card.dart';
 import 'verdict_card.dart';
+import '../../l10n/l10n.dart';
 
 /// Scene 4-1 of `docs/ux-chat.md`: the audit as one dialogue column.
 ///
@@ -124,7 +125,7 @@ class _AuditSceneState extends State<AuditScene> {
     _voiceMode = VoiceModeController(
       voice: context.read<VoiceService>(),
       onHeard: _onHeard,
-      onUnavailable: () => showToast(context, "Voice mode isn't available on this device."),
+      onUnavailable: () => showToast(context, context.l10n.voiceModeUnavailable),
     );
     unawaited(_start());
   }
@@ -272,13 +273,13 @@ class _AuditSceneState extends State<AuditScene> {
       setState(() {
         _principle = principle;
         _lines.add(
-          _Line(fromUser: false, agent: 'recorder', text: _lessonLine, kind: _Kind.lesson),
+          _Line(fromUser: false, agent: 'recorder', text: context.l10n.lessonCardCreated, kind: _Kind.lesson),
         );
         _sending = false;
       });
       _appState.markDataChanged();
       unawaited(_searchFirstGap());
-      return _lessonLine;
+      return context.l10n.lessonCardCreated;
     } on Object catch (e) {
       if (!mounted) return null;
       _fail(e, text, line: line, restoreOnError: restoreOnError);
@@ -286,15 +287,10 @@ class _AuditSceneState extends State<AuditScene> {
     return null;
   }
 
-  static const String _lessonLine = 'Lesson card created.';
-
   /// A call failed: her bubble says why and the text goes back to the input
   /// (a closed session cannot go on).
   void _fail(Object e, String text, {_Line? line, required bool restoreOnError}) {
-    final closed =
-        e is ApiException &&
-        e.statusCode == 400 &&
-        e.userMessage == ApiException.known400Messages['audit session is already closed'];
+    final closed = e is ApiException && e.isAuditClosed;
     setState(() {
       _sending = false;
       if (line != null) _lines.remove(line);
@@ -327,22 +323,23 @@ class _AuditSceneState extends State<AuditScene> {
   String _verdictLine(VerdictResult v) {
     if (v.passed) {
       final xp = v.rewardAmount == null ? '' : ' · +${v.rewardAmount} XP';
-      return 'Cleared! ${v.score} pts$xp';
+      return '${context.l10n.clearedWithScore(v.score)}$xp';
     }
     final comment = v.comment ?? '';
-    return comment.isEmpty ? 'Not quite.' : 'Not quite. $comment';
+    return comment.isEmpty ? context.l10n.notQuite : '${context.l10n.notQuite} $comment';
   }
 
   /// The chip in the title bar.
   Widget _statusChip() {
     final verdict = _verdict;
-    if (verdict == null) return const StatusChip.primary('In progress');
-    return verdict.passed ? const StatusChip.success('Passed') : const StatusChip.danger('Failed');
+    final l = context.l10n;
+    if (verdict == null) return StatusChip.primary(l.auditInProgress);
+    return verdict.passed ? StatusChip.success(l.auditPassed) : StatusChip.danger(l.auditFailed);
   }
 
   void _askRecorder() => setState(() {
     _recorderAsks = true;
-    _lines.add(_Line(fromUser: false, agent: 'recorder', text: 'What did you misunderstand?'));
+    _lines.add(_Line(fromUser: false, agent: 'recorder', text: context.l10n.recorderAsk));
   });
 
   /// What was in the column when it last scrolled to the bottom.
@@ -375,7 +372,7 @@ class _AuditSceneState extends State<AuditScene> {
       titleChip: _session == null ? null : _statusChip(),
       topLeading: IconButton(
         key: const Key('audit-back'),
-        tooltip: 'Back',
+        tooltip: context.l10n.back,
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => context.go(AppRoutes.skill(widget.skillId)),
       ),
@@ -387,7 +384,7 @@ class _AuditSceneState extends State<AuditScene> {
   }
 
   Widget _stage(BuildContext context) {
-    if (_starting) return const LoadingView(message: 'Calling the Auditor…');
+    if (_starting) return LoadingView(message: context.l10n.callingAuditor);
     if (_startError != null) {
       return ErrorView(error: _startError!, onRetry: () => unawaited(_start()));
     }
@@ -408,8 +405,8 @@ class _AuditSceneState extends State<AuditScene> {
                 controller: _input,
                 focusNode: _focus,
                 hint: _verdict == null
-                    ? 'Explain it in your own words…'
-                    : 'What did you get wrong?…',
+                    ? context.l10n.explainHint
+                    : context.l10n.whatWentWrongHint,
                 enabled: !_sending,
                 onSubmit: () => unawaited(_handleInput(_input.text)),
                 voiceMode: _voiceMode,
@@ -590,13 +587,11 @@ class _SpeakerHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
     final doing = switch (state) {
-      AvatarState.thinking => 'Thinking…',
-      AvatarState.listening => 'Listening…',
-      AvatarState.speaking => 'Speaking…',
+      AvatarState.thinking => context.l10n.voiceThinking,
+      AvatarState.listening => context.l10n.voiceListening,
+      AvatarState.speaking => context.l10n.voiceSpeaking,
       AvatarState.idle =>
-        agent == 'recorder'
-            ? 'Turns a miss into a lesson'
-            : 'Asks like a beginner, judges like an expert',
+        agent == 'recorder' ? context.l10n.recorderTagline : context.l10n.auditorTagline,
     };
     return Row(
       key: const Key('audit-speaker'),
@@ -610,7 +605,7 @@ class _SpeakerHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(agentLabel(agent), style: theme.titleMedium),
+              Text(agentLabel(context.l10n, agent), style: theme.titleMedium),
               const SizedBox(height: AppSpacing.xs),
               Text(doing, style: theme.bodySmall?.copyWith(color: AppColors.textTertiary)),
             ],
@@ -638,7 +633,7 @@ class _Question extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          agentLabel(agent),
+          agentLabel(context.l10n, agent),
           style: theme.labelSmall?.copyWith(color: AppColors.textTertiary, letterSpacing: 0.4),
         ),
         const SizedBox(height: AppSpacing.xs),

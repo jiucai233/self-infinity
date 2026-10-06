@@ -594,8 +594,8 @@ void main() {
     test('formatLocal shows English dates and 24 h times in local time', () {
       final t = DateTime(2026, 10, 2, 11, 4).toUtc();
       expect(formatLocal(t), 'Oct 2, 2026');
-      expect(formatLocal(t, pattern: 'HH:mm'), '11:04');
-      expect(formatLocal(DateTime(2026, 10, 2, 23, 59).toUtc(), pattern: 'HH:mm'), '23:59');
+      expect(formatLocal(t, style: DateStyle.time), '11:04');
+      expect(formatLocal(DateTime(2026, 10, 2, 23, 59).toUtc(), style: DateStyle.time), '23:59');
     });
 
     test('formatKst accepts a local DateTime too', () {

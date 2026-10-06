@@ -3,6 +3,7 @@
 字段名和枚举值是和 Flutter 客户端的约定，改动要先改契约。
 """
 
+from app.i18n import ENGLISH_REFLECTION_PROMPTS, is_reflection_prompt
 from datetime import date as date_
 from datetime import datetime
 from typing import Annotated, Any, Literal, Union
@@ -352,7 +353,7 @@ class ChatRequest(BaseModel):
     @field_validator("reflection_prompt")
     @classmethod
     def _known_prompt(cls, value: str | None) -> str | None:
-        if value is not None and value not in REFLECTION_PROMPTS:
+        if value is not None and not is_reflection_prompt(value):
             raise ValueError("must be one of the reflection prompts")
         return value
 
@@ -414,16 +415,9 @@ class SkillOverviewOut(BaseModel):
 
 # ---------------------------------------------------------------- life-as-a-game layer (contract section 6)
 
-# One per KST time window, in window order starting at 03:00. The strings are binding.
-REFLECTION_PROMPTS: tuple[str, ...] = (
-    "Who are you becoming this week? One sentence.",
-    "What are you putting off right now?",
-    "Looking at the last two hours, what were you really after?",
-    "Is today pulling you toward your vision or your anti-vision?",
-    "What matters most that you've been ignoring?",
-    "Today, were you guarding an image of yourself or going after what you want?",
-    "When did you feel most alive today, and when least?",
-)
+# One per KST time window, in window order starting at 03:00. The strings are binding; the
+# Chinese and Korean versions are in app/i18n.py.
+REFLECTION_PROMPTS: tuple[str, ...] = ENGLISH_REFLECTION_PROMPTS
 
 PROFILE_TEXT_MAX = 280
 PROFILE_RULES_MAX = 5

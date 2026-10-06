@@ -4,24 +4,15 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_language.dart';
 import 'tokens.dart';
 
 /// Builds the app's [ThemeData]. Light only.
 ///
 /// ```dart
-/// MaterialApp(theme: AppTheme.light(), ...)
+/// MaterialApp(theme: AppTheme.light(language), ...)
 /// ```
 abstract final class AppTheme {
-  /// Korean text (user content may still be Korean) falls back to these fonts; on the web Flutter fetches
-  /// `Noto Sans KR` itself.
-  static const List<String> fontFallback = [
-    'Noto Sans KR',
-    'Apple SD Gothic Neo',
-    'Malgun Gothic',
-    'NanumGothic',
-    'sans-serif',
-  ];
-
   static ColorScheme get colorScheme => const ColorScheme(
     brightness: Brightness.light,
     primary: AppColors.primary,
@@ -63,21 +54,25 @@ abstract final class AppTheme {
   /// into component themes — AppBar title, input hints, ... — would lack them.)
   ///
   /// Weights stay at 400 / 500 / 600; nothing is bold-black.
-  static TextTheme _textTheme(ColorScheme scheme) {
+  static TextTheme _textTheme(ColorScheme scheme, AppLanguage language) {
     final typography = Typography.material2021(colorScheme: scheme);
     final base = typography.englishLike
         .merge(typography.black)
         .apply(
           bodyColor: AppColors.textPrimary,
           displayColor: AppColors.textPrimary,
-          fontFamilyFallback: fontFallback,
+          fontFamily: AppFonts.sans,
+          fontFamilyFallback: AppFonts.sansFallback(language),
         );
     TextStyle? t(TextStyle? s, double size, FontWeight w, [double height = 1.4, double tracking = 0]) =>
         s?.copyWith(fontSize: size, fontWeight: w, letterSpacing: tracking, height: height);
     // The display serif runs a little small for its size, hence the larger sizes; it has one
-    // weight (400) and no Korean, which falls back to the sans.
+    // weight (400) and no Chinese or Korean, which come from the language's CJK serif.
     TextStyle? serif(TextStyle? s, double size, [double height = 1.1, double tracking = -0.3]) =>
-        t(s, size, FontWeight.w400, height, tracking)?.copyWith(fontFamily: AppFonts.display);
+        t(s, size, FontWeight.w400, height, tracking)?.copyWith(
+          fontFamily: AppFonts.display,
+          fontFamilyFallback: AppFonts.displayFallback(language),
+        );
     return base.copyWith(
       // Display sizes are editorial headlines in the serif: big, tight, two lines at most.
       displayLarge: serif(base.displayLarge, 60, 1.02, -1.0),
@@ -108,13 +103,21 @@ abstract final class AppTheme {
   /// [style] in the display serif (weight 400, the only one it has), e.g.
   /// `AppTheme.serif(text.titleLarge)?.copyWith(fontStyle: FontStyle.italic)`
   /// for the identity quote. Pages may not name a font family themselves.
-  static TextStyle? serif(TextStyle? style) =>
-      style?.copyWith(fontFamily: AppFonts.display, fontWeight: FontWeight.w400);
+  static TextStyle? serif(TextStyle? style) => style?.copyWith(
+    fontFamily: AppFonts.display,
+    fontWeight: FontWeight.w400,
+    fontFamilyFallback: AppFonts.displayFallback(LocaleController.current),
+  );
 
-  /// The light theme.
-  static ThemeData light() {
+  /// The light theme, with the fonts of [language] (English by default).
+  static ThemeData light([AppLanguage language = AppLanguage.en]) =>
+      _themes[language] ??= _light(language);
+
+  static final Map<AppLanguage, ThemeData> _themes = {};
+
+  static ThemeData _light(AppLanguage language) {
     final scheme = colorScheme;
-    final text = _textTheme(scheme);
+    final text = _textTheme(scheme, language);
     final cardShape = RoundedRectangleBorder(
       borderRadius: AppRadius.cardBorder,
       side: const BorderSide(color: AppColors.outline),

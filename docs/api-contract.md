@@ -19,6 +19,7 @@ Related plan sections: 4 (course structure), 5 (schema), 6 (API), 7.4 (agents), 
   422 uses FastAPI's default body (`detail` is a list); clients show a generic message for 422.
 - CORS: any `http://localhost:*` and `http://127.0.0.1:*` origin is allowed (Flutter web dev server).
 - Enum values are lower-case strings exactly as written here.
+- **Language.** The client sends `Accept-Language: en | zh | ko` (its UI language) on every request. The backend writes its fixed texts (chat replies, suggestions, audit opening questions, reflection prompts) and asks every agent for learner-facing text in that language; ids, slugs and enum values stay English. Missing or unknown → English. Stored content (course titles, lessons) keeps the language it was made in. Error `detail` messages are always English; clients translate the known ones. A journal entry answers a reflection window whichever language its prompt was in.
 
 ---
 

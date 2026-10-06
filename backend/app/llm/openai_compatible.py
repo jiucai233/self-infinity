@@ -15,7 +15,7 @@ import time
 import httpx
 
 from app.config import settings
-from app.llm.base import Message, agent_of, strip_code_fence
+from app.llm.base import Message, agent_of, strip_code_fence, with_language
 
 
 class OpenAICompatibleAPIError(RuntimeError):
@@ -56,6 +56,7 @@ class OpenAICompatibleProvider:
         return logging.getLogger(type(self).__module__)
 
     def complete(self, messages: list[Message]) -> str:
+        messages = with_language(messages)
         logger = self._logger
         agent = agent_of(messages) or "-"
         body = {

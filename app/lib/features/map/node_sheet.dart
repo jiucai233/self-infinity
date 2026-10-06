@@ -13,6 +13,7 @@ import '../../widgets/widgets.dart';
 import '../stage/profile_controller.dart';
 import '../stage/stage_controller.dart';
 import 'stat_strip.dart';
+import '../../l10n/l10n.dart';
 
 /// The card that opens when you tap a point of the life tree: a stack of
 /// paper (two sheets peek out behind it) with what that point means for you.
@@ -67,7 +68,7 @@ class NodeSheet extends StatelessWidget {
               Expanded(child: _Kicker(node: node)),
               IconButton(
                 key: const Key('node-sheet-close'),
-                tooltip: 'Close',
+                tooltip: context.l10n.close,
                 visualDensity: VisualDensity.compact,
                 icon: const Icon(Icons.close_rounded, size: 18),
                 onPressed: onClose,
@@ -143,10 +144,10 @@ class _Kicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = switch (node.kind) {
-      LifeKind.self => 'You',
-      LifeKind.goal => 'Main quest',
-      LifeKind.course => node.goalId == null ? 'Side quest · Course' : 'Course',
-      LifeKind.skill => node.boss ? 'Boss' : 'Node',
+      LifeKind.self => context.l10n.you,
+      LifeKind.goal => context.l10n.mainQuest,
+      LifeKind.course => node.goalId == null ? context.l10n.sideQuestCourse : context.l10n.course,
+      LifeKind.skill => node.boss ? context.l10n.boss : context.l10n.node,
     };
     return Text(
       text.toUpperCase(),
@@ -303,24 +304,24 @@ class _SkillBodyState extends State<_SkillBody> {
             if (n.kind == LifeKind.course) _CourseProgress(node: n, tree: widget.tree, onOutline: widget.onOutline),
             if (n.skillId != null)
               _Numbers([
-                ('Best', best == null ? '—' : '$best'),
-                ('Attempts', '${audits.length}'),
-                ('Lessons', '${lessons.length}'),
+                (context.l10n.best, best == null ? '—' : '$best'),
+                (context.l10n.attempts, '${audits.length}'),
+                (context.l10n.lessons, '${lessons.length}'),
               ]),
             if (n.skillId != null) ...[
-              const _SectionLabel('Audit history'),
+              _SectionLabel(context.l10n.auditHistory),
               if (snap.hasError)
                 Text(
                   snap.error is ApiException
                       ? (snap.error! as ApiException).userMessage
-                      : 'Something went wrong.',
+                      : context.l10n.somethingWentWrongShort,
                   style: theme.bodySmall?.copyWith(color: AppColors.danger),
                 )
               else if (overview == null)
                 const LinearProgressIndicator(minHeight: 2)
               else if (audits.isEmpty)
                 Text(
-                  'No audits yet.',
+                  context.l10n.noAuditsYet,
                   key: const Key('node-sheet-no-audits'),
                   style: theme.bodyMedium?.copyWith(color: AppColors.textTertiary),
                 )
@@ -328,7 +329,7 @@ class _SkillBodyState extends State<_SkillBody> {
                 for (final a in audits.take(8)) _AuditRow(audit: a),
             ],
             if (lessons.isNotEmpty) ...[
-              const _SectionLabel('Lesson cards'),
+              _SectionLabel(context.l10n.lessonCards),
               for (final p in lessons.take(3)) _LessonRow(lesson: p),
             ],
             if (n.skillId != null) ...[
@@ -336,7 +337,7 @@ class _SkillBodyState extends State<_SkillBody> {
               FilledButton(
                 key: const Key('node-sheet-open'),
                 onPressed: () => widget.onOpenSkill(n.skillId!),
-                child: Text(n.isLocked ? 'Open node' : 'Take it on'),
+                child: Text(n.isLocked ? context.l10n.openNode : context.l10n.takeItOn),
               ),
             ],
           ],
@@ -377,11 +378,11 @@ class _AuditRow extends StatelessWidget {
               SizedBox(
                 width: 64,
                 child: Text(
-                  formatLocal(audit.createdAt, pattern: 'MMM d'),
+                  formatLocal(audit.createdAt, style: DateStyle.monthDay),
                   style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
                 ),
               ),
-              Text(passed ? 'Passed' : 'Failed', style: theme.labelMedium?.copyWith(color: color)),
+              Text(passed ? context.l10n.auditPassed : context.l10n.auditFailed, style: theme.labelMedium?.copyWith(color: color)),
               const Spacer(),
               Text(score == null ? '—' : '$score', style: theme.labelLarge),
             ],
@@ -458,21 +459,21 @@ class _CourseProgress extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Serves', style: theme.labelSmall?.copyWith(color: AppColors.textTertiary)),
+                Text(context.l10n.serves, style: theme.labelSmall?.copyWith(color: AppColors.textTertiary)),
                 PopupMenuButton<int>(
                   key: const Key('course-goal-menu'),
-                  tooltip: 'Choose a main quest',
+                  tooltip: context.l10n.chooseMainQuest,
                   onSelected: (goalId) => unawaited(_attach(context, goals, goalId)),
                   itemBuilder: (_) => [
                     for (final g in goals) PopupMenuItem(value: g.id, child: Text(g.title)),
-                    const PopupMenuItem(value: -1, child: Text('Side quest (none)')),
+                    PopupMenuItem(value: -1, child: Text(context.l10n.sideQuestNone)),
                   ],
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Flexible(
                         child: Text(
-                          current?.title ?? 'Side quest',
+                          current?.title ?? context.l10n.sideQuest,
                           key: const Key('course-goal'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -487,7 +488,7 @@ class _CourseProgress extends StatelessWidget {
                   key: const Key('course-outline'),
                   style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 28)),
                   onPressed: () => onOutline(node.courseId!),
-                  child: const Text('See the outline →'),
+                  child: Text(context.l10n.seeOutline),
                 ),
               ],
             ),
@@ -557,16 +558,15 @@ class _GoalBody extends StatelessWidget {
               Expanded(
                 child: Text(
                   skills.isEmpty
-                      ? 'No course serves this quest yet.'
-                      : '$done of ${skills.length} nodes cleared across ${courses.length} '
-                            '${courses.length == 1 ? 'course' : 'courses'}.',
+                      ? context.l10n.noCourseServesQuest
+                      : context.l10n.questProgress(done, skills.length, courses.length),
                   style: theme.bodyMedium?.copyWith(color: AppColors.textSecondary),
                 ),
               ),
             ],
           ),
         ),
-        const _SectionLabel('Courses'),
+        _SectionLabel(context.l10n.courses),
         if (courses.isEmpty)
           Text('—', style: theme.bodyMedium?.copyWith(color: AppColors.textTertiary)),
         for (final c in courses)
@@ -585,7 +585,7 @@ class _GoalBody extends StatelessWidget {
         if (goal != null && side.isNotEmpty)
           PopupMenuButton<int>(
             key: const Key('goal-attach'),
-            tooltip: 'Attach a course',
+            tooltip: context.l10n.attachCourse,
             onSelected: (courseId) => unawaited(_attach(context, goal, courseId)),
             itemBuilder: (_) => [
               for (final c in side) PopupMenuItem(value: c.courseId, child: Text(c.label)),
@@ -597,14 +597,14 @@ class _GoalBody extends StatelessWidget {
                 children: [
                   const Icon(Icons.add_rounded, size: 16),
                   const SizedBox(width: AppSpacing.xs),
-                  Text('Attach a course', style: theme.labelLarge),
+                  Text(context.l10n.attachCourse, style: theme.labelLarge),
                 ],
               ),
             ),
           ),
         const SizedBox(height: AppSpacing.md),
         Text(
-          'Rename or remove it under My character.',
+          context.l10n.renameUnderCharacter,
           style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
         ),
       ],
@@ -648,17 +648,17 @@ class _SelfBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Title(profile.identity.isEmpty ? 'You' : profile.identity),
+        _Title(profile.identity.isEmpty ? context.l10n.you : profile.identity),
         _Numbers([
-          ('Cleared', '${tree.stats.mastered}'),
-          ('Main quests', '${goals.length}'),
-          ('Lessons', '${tree.stats.lessons}'),
+          (context.l10n.dotCleared, '${tree.stats.mastered}'),
+          (context.l10n.mainQuests, '${goals.length}'),
+          (context.l10n.lessons, '${tree.stats.lessons}'),
         ]),
-        quote('Win condition', profile.vision),
-        quote('Stakes', profile.antiVision),
+        quote(context.l10n.winCondition, profile.vision),
+        quote(context.l10n.stakes, profile.antiVision),
         const SizedBox(height: AppSpacing.lg),
         Text(
-          'Edit these under My character.',
+          context.l10n.editUnderCharacter,
           style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
         ),
       ],

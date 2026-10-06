@@ -16,6 +16,7 @@ from pathlib import PurePath
 
 from sqlmodel import Session, col, select
 
+from app.i18n import join_list, quote, t
 from app.agents.front_desk import FrontDesk, FrontDeskResult
 from app.llm.base import LLMProvider
 from app.agents.planner import SyllabusText
@@ -160,12 +161,12 @@ def _run_generate_course(
     except CourseGenerationError:
         logger.warning("chat: course generation failed", exc_info=True)
         session.rollback()
-        return _save(session, "assistant", "I couldn't build that world. Please try again in a moment.", "front_desk")
+        return _save(session, "assistant", t("world_failed"), "front_desk")
     root = next((n for n in generated.nodes if n.status == SkillStatus.available), generated.nodes[0])
     return _save(
         session,
         "assistant",
-        f"Your world “{root.title}” is ready — {len(generated.nodes)} nodes.",
+        t("world_ready", title=quote(root.title), count=len(generated.nodes)),
         "planner",
         {
             "type": "course",
@@ -179,18 +180,18 @@ def _checkin_summary(result) -> str:
     c = result.checkin
     parts = []
     if c.sleep_hours is not None:
-        parts.append(f"sleep {c.sleep_hours} h")
+        parts.append(t("checkin_sleep", hours=c.sleep_hours))
     if c.exercised is not None:
-        parts.append(f"exercise {'yes' if c.exercised else 'no'}")
+        parts.append(t("checkin_exercise_yes" if c.exercised else "checkin_exercise_no"))
     if c.diet_note:
-        parts.append(f"meals {c.diet_note}")
+        parts.append(t("checkin_meals", note=c.diet_note))
     if c.focus is not None:
-        parts.append(f"focus {c.focus}/5")
+        parts.append(t("checkin_focus", value=c.focus))
     if c.stress is not None:
-        parts.append(f"stress {c.stress}/5")
+        parts.append(t("checkin_stress", value=c.stress))
     if not parts:
-        return "I couldn't find anything to log. Tell me about sleep, exercise or meals."
-    return "Logged: " + " · ".join(parts)
+        return t("checkin_nothing")
+    return t("checkin_logged", parts=" · ".join(parts))
 
 
 def _run_checkin(session: Session, message: str, provider_for: ProviderFor) -> ChatMessage:
@@ -208,15 +209,15 @@ def _run_plan(session: Session, provider_for: ProviderFor) -> ChatMessage:
     try:
         plan = planning.generate_plan(session, provider_for)
     except NoAvailableNode:
-        return _save(session, "assistant", "No node is ready yet. Make a world first.", "front_desk")
+        return _save(session, "assistant", t("no_node_ready"), "front_desk")
     except PlanFailed:
         session.rollback()
-        return _save(session, "assistant", "I couldn't pick today's quests. Please try again.", "front_desk")
-    titles = ", ".join(f"“{s.skill_title}”" for s in plan.steps)
+        return _save(session, "assistant", t("plan_failed"), "front_desk")
+    titles = join_list([quote(s.skill_title) for s in plan.steps])
     return _save(
         session,
         "assistant",
-        f"Today's quests: {titles}.",
+        t("todays_quests", titles=titles),
         "recommender",
         {"type": "plan", "plan": plan.model_dump(mode="json")},
     )
@@ -227,7 +228,7 @@ def _run_briefing(session: Session, provider_for: ProviderFor) -> ChatMessage:
         briefing = briefing_service.narrate(session, provider_for)
     except BriefingFailed:
         session.rollback()
-        return _save(session, "assistant", "I couldn't put your status together. Please try again.", "front_desk")
+        return _save(session, "assistant", t("briefing_failed"), "front_desk")
     return _save(
         session,
         "assistant",
@@ -253,7 +254,7 @@ def handle_message(
 
     if course_topic is not None:
         topic = course_topic.strip() or PurePath(uploads[0].filename).stem
-        first = _save(session, "assistant", f"I'll build a world for “{topic}”.", "front_desk")
+        first = _save(session, "assistant", t("build_world", topic=quote(topic)), "front_desk")
         syllabus = _syllabus_text(uploads) if uploads else None
         built = _run_generate_course(session, topic, provider_for, search_provider_for, syllabus)
         return [message_out(m) for m in (user, first, built)]
@@ -273,7 +274,7 @@ def handle_message(
     if intent == "open_skill":
         node = resolve_node(nodes, str(routed.args.get("skill") or ""))
         if node is None:
-            content = "Which node do you mean? Tell me its name."
+            content = t("which_node")
         else:
             action = {"type": "navigate", "scene": "skill", "skill_id": node.id}
     elif intent == "open_map":
@@ -321,7 +322,7 @@ def suggestions(session: Session) -> list[ChatSuggestionOut]:
     items: list[ChatSuggestionOut] = []
 
     if checkin_service.todays_checkin(session) is None:
-        items.append(ChatSuggestionOut(label="How was your day?", message="Let me log my day", skill_id=None))
+        items.append(ChatSuggestionOut(label=t("suggest_checkin_label"), message=t("suggest_checkin_message"), skill_id=None))
     else:
         # Once the day is logged, item 1 is the current time window's reflection prompt (unless answered).
         prompt = journal.current_prompt(session)
@@ -335,7 +336,7 @@ def suggestions(session: Session) -> list[ChatSuggestionOut]:
         .order_by(col(AuditSession.created_at).desc(), col(AuditSession.id).desc())
     ).first()
     if last is not None and last.status != SkillStatus.mastered:
-        label = f"Continue “{last.title}”"
+        label = t("suggest_continue", title=quote(last.title))
         items.append(ChatSuggestionOut(label=label, message=label, skill_id=last.id))
         return items
 
@@ -349,9 +350,9 @@ def suggestions(session: Session) -> list[ChatSuggestionOut]:
             .order_by(SkillNode.id)
         ).first()
     if node is not None:
-        label = f"Start with “{node.title}”"
+        label = t("suggest_start", title=quote(node.title))
         items.append(ChatSuggestionOut(label=label, message=label, skill_id=node.id))
     else:
         # No course (or nothing left to open): the client only focuses the input.
-        items.append(ChatSuggestionOut(label="Tell me what you want to learn", message="", skill_id=None))
+        items.append(ChatSuggestionOut(label=t("suggest_learn"), message="", skill_id=None))
     return items

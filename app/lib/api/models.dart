@@ -162,16 +162,36 @@ DateTime toKst(DateTime t) => t.toUtc().add(kstOffset);
 
 /// Formats [t] in KST. The default pattern is `2026.10.05 12:12`.
 ///
-/// [pattern] is an `intl` [DateFormat] pattern such as `'MMM d, y HH:mm'`
-/// (English month names).
+/// [pattern] is an `intl` [DateFormat] pattern such as `'yyyy-MM-dd'`.
 String formatKst(DateTime t, {String pattern = 'yyyy.MM.dd HH:mm'}) =>
-    DateFormat(pattern, 'en_US').format(toKst(t));
+    DateFormat(pattern).format(toKst(t));
 
-/// Formats [t] in the device's local time zone with English names: the default
-/// is `Oct 2, 2026`; use `'HH:mm'` for `11:04` (24 h). This is what chat
-/// dates and times show.
-String formatLocal(DateTime t, {String pattern = 'MMM d, y'}) =>
-    DateFormat(pattern, 'en_US').format(t.toLocal());
+/// How [formatLocal] writes a date, in the app's language (`Intl.defaultLocale`).
+enum DateStyle {
+  /// `Oct 2, 2026` · `2026年10月2日` · `2026. 10. 2.`
+  date,
+
+  /// `Oct 2` · `10月2日` · `10월 2일`
+  monthDay,
+
+  /// `Oct 2, 2026 11:04` · `2026年10月2日 11:04` · `2026. 10. 2. 11:04`
+  dateTime,
+
+  /// `11:04` (24 h)
+  time,
+}
+
+/// Formats [t] in the device's local time zone, in the app's language. This
+/// is what chat dates and times show.
+String formatLocal(DateTime t, {DateStyle style = DateStyle.date}) {
+  final format = switch (style) {
+    DateStyle.date => DateFormat.yMMMd(),
+    DateStyle.monthDay => DateFormat.MMMd(),
+    DateStyle.dateTime => DateFormat.yMMMd().add_Hm(),
+    DateStyle.time => DateFormat.Hm(),
+  };
+  return format.format(t.toLocal());
+}
 
 /// Formats the KST calendar date of [t] as `YYYY-MM-DD`
 /// (the format of `DailyCheckIn.date`).

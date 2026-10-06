@@ -22,6 +22,7 @@ import '../stage/uploads_controller.dart';
 import 'chat_controller.dart';
 import 'chat_history_panel.dart';
 import 'chat_navigation.dart';
+import '../../l10n/l10n.dart';
 
 /// Scene 1 (entering) and scene 5 (text / voice chat) of `docs/ux-chat.md`.
 ///
@@ -181,7 +182,7 @@ class _HomeSceneState extends State<HomeScene> {
   }
 
   void _voiceUnavailable() {
-    showToast(context, "Voice mode isn't available on this device.");
+    showToast(context, context.l10n.voiceModeUnavailable);
   }
 
   Future<void> _startVoice() async {
@@ -197,7 +198,6 @@ class _HomeSceneState extends State<HomeScene> {
     final chat = context.watch<ChatController>();
     return StageScaffold(
       history: _chatting ? const ChatHistoryPanel() : null,
-      historyTitle: 'Chat',
       stage: CallbackShortcuts(
         bindings: {const SingleActivator(LogicalKeyboardKey.escape): () => _voiceMode.stop()},
         child: Focus(
@@ -225,7 +225,7 @@ class _HomeSceneState extends State<HomeScene> {
                 StageInputBar(
                   controller: _input,
                   focusNode: _focus,
-                  hint: _asked == null ? 'Message…' : 'Your answer…',
+                  hint: _asked == null ? context.l10n.messageHint : context.l10n.answerHint,
                   enabled: !chat.sending,
                   onSubmit: () => _send(_input.text),
                   onUpload: _pickUpload,
@@ -240,7 +240,7 @@ class _HomeSceneState extends State<HomeScene> {
                         onRemove: () => _uploads.remove(f.id),
                       ),
                     if (_uploads.uploadingName != null)
-                      InputAttachment(id: 'uploading', label: 'Uploading…', busy: true),
+                      InputAttachment(id: 'uploading', label: context.l10n.uploading, busy: true),
                   ],
                   error: _error,
                 ),
@@ -274,11 +274,11 @@ class _HomeSceneState extends State<HomeScene> {
     final avatar = _avatarSize(box);
     final typing = _input.text.isNotEmpty;
     final greeting = map == null
-        ? 'What shall we learn today?'
-        : 'Continue with “${courseNameOf(map)}”?';
+        ? context.l10n.greetingNew
+        : context.l10n.greetingContinue(courseNameOf(map));
     final hint = map == null
-        ? 'Tell the Guide what you want to learn.'
-        : 'Tap the crystal ball to open your life tree.';
+        ? context.l10n.hintNew
+        : context.l10n.hintContinue;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -381,7 +381,7 @@ class _ReplyBubbleContent extends StatelessWidget {
             onPressed: () => context.go(AppRoutes.map),
             iconAlignment: IconAlignment.end,
             icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-            label: const Text('Open life tree'),
+            label: Text(context.l10n.openLifeTree),
             style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32)),
           ),
         ],

@@ -12,6 +12,7 @@ import '../chat/chat_controller.dart';
 import 'character_sheet.dart';
 import 'profile_controller.dart';
 import 'stage_controller.dart';
+import '../../l10n/l10n.dart';
 
 /// The content of the left panel “My character” (`docs/ux-chat.md` 1.1, 5.7, 6),
 /// the same on every scene. Top to bottom, each block folds by tapping its
@@ -46,19 +47,19 @@ class LeftPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const _PanelSection(
+                  _PanelSection(
                     id: 'character',
-                    title: 'Character sheet',
-                    child: CharacterSheet(),
+                    title: context.l10n.characterSheet,
+                    child: const CharacterSheet(),
                   ),
                   const _SectionDivider(),
-                  const _PanelSection(id: 'stats', title: 'Stats', child: _Stats()),
+                  _PanelSection(id: 'stats', title: context.l10n.stats, child: const _Stats()),
                   const _SectionDivider(),
                   const _DailyQuestsSection(),
                   const _SectionDivider(),
                   _PanelSection(
                     id: 'today',
-                    title: 'Today',
+                    title: context.l10n.today,
                     child: _TodaySummary(checkIn: today),
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -125,13 +126,13 @@ class _Stats extends StatelessWidget {
       children: [
         StatBar(
           key: const Key('stat-level'),
-          label: 'Lv ${xp.level} · ${mastered % 5}/5',
+          label: context.l10n.levelBar(xp.level, mastered % 5),
           value: xp.levelProgress,
         ),
         const SizedBox(height: AppSpacing.md),
         StatBar(
           key: const Key('stat-clear'),
-          label: 'Cleared $mastered/$total',
+          label: context.l10n.clearedBar(mastered, total),
           labelColor: AppColors.success,
           value: total == 0 ? 0 : mastered / total,
           color: AppColors.success,
@@ -139,7 +140,7 @@ class _Stats extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         StatBar(
           key: const Key('stat-condition'),
-          label: 'Condition: ${flag.label}',
+          label: context.l10n.conditionBar(flag.label(context.l10n)),
           labelColor: flag == ConditionFlag.low ? AppColors.danger : AppColors.textPrimary,
           value: flag.fill,
           color: flag.color,
@@ -160,7 +161,7 @@ class _DailyQuestsSection extends StatelessWidget {
     final done = steps.where(stage.isQuestDone).length;
     return _PanelSection(
       id: 'quests',
-      title: 'Daily quests',
+      title: context.l10n.dailyQuests,
       trailing: steps.isEmpty ? null : '$done/${steps.length}',
       child: steps.isEmpty
           ? const _GetQuestsRow()
@@ -234,7 +235,7 @@ class _GetQuestsRow extends StatelessWidget {
   const _GetQuestsRow();
 
   /// What the row says to the Guide.
-  static const String message = 'What should I do today?';
+  static String get message => l10nNow.askTodaysQuests;
 
   @override
   Widget build(BuildContext context) {
@@ -252,7 +253,7 @@ class _GetQuestsRow extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
           child: Text(
-            "Get today's quests →",
+            context.l10n.getTodaysQuests,
             style: theme.labelLarge?.copyWith(color: AppColors.primary),
           ),
         ),
@@ -286,11 +287,11 @@ class _TodaySummary extends StatelessWidget {
           children: [
             _row(
               context,
-              'Sleep',
-              c?.sleepHours == null ? _none : '${formatNumber(c!.sleepHours!)} h',
+              context.l10n.sleep,
+              c?.sleepHours == null ? _none : context.l10n.hoursShort(formatNumber(c!.sleepHours!)),
             ),
-            _row(context, 'Meals', (c?.dietNote ?? '').isEmpty ? _none : c!.dietNote!),
-            _row(context, 'Journal', diary.isEmpty ? _none : diary, maxLines: 3, last: true),
+            _row(context, context.l10n.meals, (c?.dietNote ?? '').isEmpty ? _none : c!.dietNote!),
+            _row(context, context.l10n.journal, diary.isEmpty ? _none : diary, maxLines: 3, last: true),
           ],
         ),
       ),
@@ -333,15 +334,20 @@ class _SettingsButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
+    final current = context.watch<LocaleController>().language;
     final theme = Theme.of(context).textTheme;
     return Align(
       alignment: Alignment.centerLeft,
       child: PopupMenuButton<String>(
         key: const Key('settings-button'),
-        tooltip: 'Account',
+        tooltip: context.l10n.account,
         position: PopupMenuPosition.over,
         offset: const Offset(0, -8),
         onSelected: (value) async {
+          if (value.startsWith('lang:')) {
+            await context.read<LocaleController>().setLanguage(AppLanguage.fromCode(value.substring(5)));
+            return;
+          }
           switch (value) {
             case 'tutorial':
               await context.read<ProfileController>().setOnboarded(false);
@@ -355,9 +361,9 @@ class _SettingsButton extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Signed in as', style: theme.labelSmall?.copyWith(color: AppColors.textTertiary)),
+                Text(context.l10n.signedInAs, style: theme.labelSmall?.copyWith(color: AppColors.textTertiary)),
                 Text(
-                  auth.enabled ? (auth.email ?? '') : 'Local mode (no account)',
+                  auth.enabled ? (auth.email ?? '') : context.l10n.localModeNoAccount,
                   key: const Key('settings-account'),
                   style: theme.bodyMedium,
                 ),
@@ -365,24 +371,45 @@ class _SettingsButton extends StatelessWidget {
             ),
           ),
           const PopupMenuDivider(),
-          const PopupMenuItem<String>(
-            key: Key('settings-tutorial'),
+          PopupMenuItem<String>(
+            enabled: false,
+            height: 32,
+            child: Text(
+              context.l10n.language,
+              style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
+            ),
+          ),
+          for (final language in AppLanguage.values)
+            PopupMenuItem<String>(
+              key: Key('settings-language-${language.code}'),
+              value: 'lang:${language.code}',
+              child: Row(
+                children: [
+                  Expanded(child: Text(language.nativeName)),
+                  if (language == current)
+                    const Icon(Icons.check_rounded, size: 18, color: AppColors.textPrimary),
+                ],
+              ),
+            ),
+          const PopupMenuDivider(),
+          PopupMenuItem<String>(
+            key: const Key('settings-tutorial'),
             value: 'tutorial',
-            child: Text('Replay the tutorial'),
+            child: Text(context.l10n.replayTutorial),
           ),
           if (auth.enabled)
-            const PopupMenuItem<String>(
-              key: Key('settings-sign-out'),
+            PopupMenuItem<String>(
+              key: const Key('settings-sign-out'),
               value: 'sign-out',
-              child: Text('Sign out'),
+              child: Text(context.l10n.signOut),
             )
           else
             // Local mode has no account to leave; this shows the front page, and
             // any email and password there come straight back.
-            const PopupMenuItem<String>(
-              key: Key('settings-front-page'),
+            PopupMenuItem<String>(
+              key: const Key('settings-front-page'),
               value: 'sign-out',
-              child: Text('View the front page'),
+              child: Text(context.l10n.viewFrontPage),
             ),
         ],
         child: Container(

@@ -1,6 +1,8 @@
 /// The one exception type thrown by every [SelfInfinityApi] implementation.
 library;
 
+import '../l10n/l10n.dart';
+
 /// A failed API call.
 ///
 /// * [statusCode] is the HTTP status, or `null` when there was no response at
@@ -8,7 +10,7 @@ library;
 /// * [serverMessage] is the raw English `detail` message from the server
 ///   (for logs). **Never show it to the user** — show [userMessage].
 ///
-/// [userMessage] implements the English error text table of `docs/ui-spec.md`
+/// [userMessage] implements the error text table of `docs/ui-spec.md`
 /// Section 5, including the translations of the known 400 messages.
 class ApiException implements Exception {
   const ApiException(this.statusCode, [this.serverMessage]);
@@ -22,48 +24,52 @@ class ApiException implements Exception {
   /// Whether the server could not be reached at all.
   bool get isNetworkError => statusCode == null;
 
-  // -- English texts (ui-spec Section 5) -------------------------------------
+  // -- texts (ui-spec Section 5), in the app's language -----------------------
 
-  static const String networkText = "Can't reach the server. Check your connection.";
-  static const String badRequestText = "You can't do that right now.";
-  static const String notFoundText = "We couldn't find that.";
-  static const String invalidInputText = 'Please check what you entered.';
-  static const String aiFailureText = 'Something went wrong on our side. Please try again.';
-  static const String unknownText = 'Something went wrong.';
+  static String get networkText => l10nNow.errNetwork;
+  static String get badRequestText => l10nNow.errBadRequest;
+  static String get notFoundText => l10nNow.errNotFound;
+  static String get invalidInputText => l10nNow.errInvalidInput;
+  static String get aiFailureText => l10nNow.errAiFailure;
+  static String get unknownText => l10nNow.somethingWentWrongShort;
 
-  /// Server message (lower-cased, whitespace-collapsed) → English text, for the
+  /// Server message (lower-cased, whitespace-collapsed) → its text, for the
   /// known 400 responses.
-  static const Map<String, String> known400Messages = {
-    'skill is locked': 'This node is locked. Clear its parent first.',
-    'audit session is already closed': 'This audit has already ended.',
-    'reflection is only accepted for a failed audit':
-        'Lesson cards can only be made after a failed audit.',
-    'reflection already submitted for this audit': 'The lesson card is already made.',
-    'no node is available yet. generate a course or pass an existing node first.':
-        'No node is ready yet. Make a world first.',
-    'a gap or misconception id is required. search targets a specific gap only.':
-        'Pick a gap or misconception to search for.',
-    'only pdf, txt or md files up to 4 mb.': 'Only PDF, TXT or MD files up to 4 MB.',
-    'no text could be read from this file.': "Couldn't read any text from this file.",
+  static final Map<String, String Function(AppLocalizations)> known400Messages = {
+    'skill is locked': (l) => l.errNodeLocked,
+    _auditClosed: (l) => l.errAuditClosed,
+    'reflection is only accepted for a failed audit': (l) => l.errLessonOnlyAfterFail,
+    'reflection already submitted for this audit': (l) => l.errLessonAlreadyMade,
+    'no node is available yet. generate a course or pass an existing node first.': (l) =>
+        l.errNoNodeReady,
+    'a gap or misconception id is required. search targets a specific gap only.': (l) =>
+        l.errPickGap,
+    'only pdf, txt or md files up to 4 mb.': (l) => l.uploadBadFile,
+    'no text could be read from this file.': (l) => l.errFileUnreadable,
   };
 
-  /// 401: the session expired or was revoked (the app then shows sign-in).
-  static const String signedOutText = 'Your session ended. Please sign in again.';
+  static const String _auditClosed = 'audit session is already closed';
 
-  /// The English message that is safe to show in the UI.
+  /// The audit was already over (a 400 the audit page handles by closing).
+  bool get isAuditClosed => statusCode == 400 && _normalize(serverMessage) == _auditClosed;
+
+  /// 401: the session expired or was revoked (the app then shows sign-in).
+  static String get signedOutText => l10nNow.errSignedOut;
+
+  /// The message that is safe to show in the UI, in the app's language.
   String get userMessage {
     final code = statusCode;
     if (code == null) return networkText;
     switch (code) {
       case 400:
         final known = known400Messages[_normalize(serverMessage)];
-        return known ?? badRequestText;
+        return known?.call(l10nNow) ?? badRequestText;
       case 401:
         return signedOutText;
       case 404:
         return notFoundText;
       case 409:
-        return serverMessage == 'at most 3 main quests' ? 'You can have at most 3 main quests.' : unknownText;
+        return serverMessage == 'at most 3 main quests' ? l10nNow.errMaxMainQuests : unknownText;
       case 422:
         return invalidInputText;
       case 502:

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/theme/app_theme.dart';
 import 'package:self_infinity/theme/tokens.dart';
+import 'package:self_infinity/l10n/l10n.dart';
 
 void main() {
   test('the design tokens are the values of docs/DESIGN.md Section 2', () {
@@ -155,10 +156,23 @@ void main() {
     }
   });
 
-  test('Korean text falls back to the platform fonts; only the display serif is bundled', () {
-    final family = AppTheme.light().textTheme.bodyMedium?.fontFamilyFallback;
-    expect(family, containsAllInOrder(['Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic']));
-    expect(AppTheme.light().textTheme.bodyMedium?.fontFamily, isNot('Galmuri11'));
+  test('text is in Infinity Sans; Chinese and Korean fall back to the bundled CJK fonts, then the platform', () {
+    final en = AppTheme.light().textTheme.bodyMedium!;
+    expect(en.fontFamily, 'InfinitySans');
+    expect(en.fontFamilyFallback, containsAllInOrder(['InfinitySansKR', 'Noto Sans SC', 'Apple SD Gothic Neo']));
+    // Each language puts its own CJK font first (Han characters in Korean text, Hangul in Chinese).
+    final zh = AppTheme.light(AppLanguage.zh).textTheme.bodyMedium!;
+    expect(zh.fontFamilyFallback!.first, 'Noto Sans SC');
+    final ko = AppTheme.light(AppLanguage.ko).textTheme.bodyMedium!;
+    expect(ko.fontFamilyFallback!.first, 'InfinitySansKR');
+  });
+
+  test('the display serif falls back to the language\'s CJK serif, then the sans', () {
+    final zh = AppTheme.light(AppLanguage.zh).textTheme.displayLarge!;
+    expect(zh.fontFamily, AppFonts.display);
+    expect(zh.fontFamilyFallback, containsAllInOrder(['Noto Serif SC', 'InfinitySans', 'Noto Sans SC']));
+    final ko = AppTheme.light(AppLanguage.ko).textTheme.headlineLarge!;
+    expect(ko.fontFamilyFallback!.first, 'Noto Serif KR');
   });
 
   testWidgets('an AppBar title is 18 px (titleLarge) in the real widget tree', (tester) async {

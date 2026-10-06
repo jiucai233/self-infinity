@@ -15,6 +15,7 @@ import '../stage/stage_scaffold.dart';
 import 'graph_view.dart';
 import 'node_sheet.dart';
 import 'stat_strip.dart';
+import '../../l10n/l10n.dart';
 
 /// Scene 2 of `docs/ux-chat.md`: your **life tree**.
 ///
@@ -66,7 +67,7 @@ class _MapSceneState extends State<MapScene> {
         return;
       }
     }
-    setState(() => _searchError = 'No matching node.');
+    setState(() => _searchError = context.l10n.noMatchingNode);
   }
 
   @override
@@ -75,10 +76,10 @@ class _MapSceneState extends State<MapScene> {
     final tree = stage.lifeTree;
     final maps = stage.courseMaps;
     return StageScaffold(
-      title: 'Life tree',
+      title: context.l10n.lifeTree,
       topLeading: IconButton(
         key: const Key('back-home'),
-        tooltip: 'Back',
+        tooltip: context.l10n.back,
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => context.go(AppRoutes.home),
       ),
@@ -118,7 +119,7 @@ class _MapSceneState extends State<MapScene> {
           StageInputBar(
             controller: _search,
             focusNode: _focus,
-            hint: 'Search nodes…',
+            hint: context.l10n.searchNodesHint,
             search: true,
             onSubmit: () => _submitSearch(maps),
             onChanged: (_) => setState(() => _searchError = null),
@@ -199,7 +200,7 @@ class _MapSceneState extends State<MapScene> {
                     right: AppSpacing.lg,
                     bottom: AppSpacing.lg,
                     child: Text(
-                      'Drag to turn · tap a point',
+                      context.l10n.dragToTurn,
                       style: theme.bodySmall?.copyWith(color: AppColors.nightMuted),
                     ),
                   ),
@@ -209,7 +210,7 @@ class _MapSceneState extends State<MapScene> {
                     right: 0,
                     bottom: box.maxHeight * 0.18,
                     child: Text(
-                      'Your tree starts with you.',
+                      context.l10n.treeStartsWithYou,
                       key: const Key('life-empty'),
                       textAlign: TextAlign.center,
                       style: theme.bodyLarge?.copyWith(color: AppColors.nightLine),
@@ -340,7 +341,7 @@ class _MapSceneState extends State<MapScene> {
           if (map == null)
             Center(
               child: Text(
-                'No quest line yet',
+                context.l10n.noQuestLineYet,
                 style: Theme.of(context).textTheme.bodyLarge
                     ?.copyWith(color: AppColors.textTertiary),
               ),
@@ -391,8 +392,8 @@ class _ViewToggle extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            item(_View.constellation, 'Tree'),
-            item(_View.outline, 'Outline'),
+            item(_View.constellation, context.l10n.viewTree),
+            item(_View.outline, context.l10n.viewOutline),
           ],
         ),
       ),
@@ -422,12 +423,12 @@ class _NightLegend extends StatelessWidget {
       ),
     );
     final entries = <(Widget, String)>[
-      (dot(fill: AppColors.nightText), 'You'),
-      (dot(ring: AppColors.nightText), 'Main quest'),
-      (dot(ring: AppColors.nightText, fill: AppColors.night), 'Ready'),
-      (dot(fill: AppColors.ember), 'Cleared'),
-      (dot(fill: AppColors.emberRed), 'Failed'),
-      (dot(fill: AppColors.nightMuted), 'Locked'),
+      (dot(fill: AppColors.nightText), context.l10n.you),
+      (dot(ring: AppColors.nightText), context.l10n.mainQuest),
+      (dot(ring: AppColors.nightText, fill: AppColors.night), context.l10n.dotReady),
+      (dot(fill: AppColors.ember), context.l10n.dotCleared),
+      (dot(fill: AppColors.emberRed), context.l10n.auditFailed),
+      (dot(fill: AppColors.nightMuted), context.l10n.dotLocked),
     ];
     return Wrap(
       key: const Key('night-legend'),
@@ -458,8 +459,8 @@ class _Guide extends StatelessWidget {
   Widget build(BuildContext context) {
     final narrow = MediaQuery.sizeOf(context).width < AppLayout.wideBreakpoint;
     final line = empty
-        ? 'No quest line yet. Tell the Guide what you want to learn.'
-        : 'Tap a node to take it on.';
+        ? context.l10n.mapEmptyLine
+        : context.l10n.mapTapNode;
     return Row(
       key: const Key('map-guide'),
       mainAxisSize: MainAxisSize.min,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/models.dart';
 import '../../theme/tokens.dart';
+import '../../l10n/l10n.dart';
 
 /// The Auditor's verdict, in the dialogue column of the audit (scene 4-1):
 /// the outcome in the display serif, the score, her comment and — the part
@@ -39,7 +40,7 @@ class VerdictCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('VERDICT', style: theme.labelSmall?.copyWith(letterSpacing: 1.6)),
+          Text(context.l10n.verdict, style: theme.labelSmall?.copyWith(letterSpacing: 1.6)),
           const SizedBox(height: AppSpacing.sm),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -47,7 +48,7 @@ class VerdictCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  passed ? 'Cleared.' : 'Not yet.',
+                  passed ? context.l10n.verdictCleared : context.l10n.verdictNotYet,
                   key: const Key('verdict-title'),
                   style: theme.displaySmall?.copyWith(
                     color: passed ? AppColors.success : AppColors.textPrimary,
@@ -56,7 +57,7 @@ class VerdictCard extends StatelessWidget {
               ),
               Text('${verdict.score}', key: const Key('verdict-score'), style: theme.headlineLarge),
               const SizedBox(width: AppSpacing.xs),
-              Text('pts', style: theme.labelMedium),
+              Text(context.l10n.pointsUnit, style: theme.labelMedium),
             ],
           ),
           if (passed && xp != null) ...[
@@ -75,7 +76,7 @@ class VerdictCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             const Divider(height: 1),
             const SizedBox(height: AppSpacing.lg),
-            Text(passed ? 'Worth a second look' : 'What was missing', style: theme.labelMedium),
+            Text(passed ? context.l10n.worthSecondLook : context.l10n.whatWasMissing, style: theme.labelMedium),
             const SizedBox(height: AppSpacing.sm),
             for (final (i, gap) in verdict.gaps.indexed)
               Padding(
@@ -109,12 +110,12 @@ class VerdictCard extends StatelessWidget {
                 FilledButton(
                   key: const Key('audit-next'),
                   onPressed: onLesson,
-                  child: const Text('Make a lesson card'),
+                  child: Text(context.l10n.makeLessonCard),
                 ),
               TextButton(
                 key: const Key('audit-done'),
                 onPressed: onBack,
-                child: const Text('Back to node'),
+                child: Text(context.l10n.backToNode),
               ),
             ],
           ),

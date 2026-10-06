@@ -46,8 +46,8 @@
 ### 2.2 字体
 
 两种字体：
-- **展示衬线** `AppFonts.display` = Instrument Serif（OFL，打包在 `app/assets/fonts/`，只有 400 一个字重，另有斜体）。主题把 `display*` 和 `headlineLarge` 设成它；其他地方用 `AppTheme.serif(style)` 取（页面里不能写 `fontFamily:`）。不加粗。它没有韩文/中文字形，会回退到无衬线。
-- 其余全部是平台无衬线字体（web 为 Roboto），韩文回退 Noto Sans KR。字重 400 / 500 / 600。
+- **展示衬线** `AppFonts.display` = Instrument Serif（OFL，打包在 `app/assets/fonts/`，只有 400 一个字重，另有斜体）。主题把 `display*` 和 `headlineLarge` 设成它；其他地方用 `AppTheme.serif(style)` 取（页面里不能写 `fontFamily:`）。不加粗。它没有中文/韩文字形：中文落到思源宋体 SC（Noto Serif SC），韩文落到 Noto Serif KR，都是 500 字重、按语言懒加载。
+- 其余全部是 `AppFonts.sans` = Infinity Sans（Pretendard 的拉丁子集，按 OFL 改名；拉丁部分接近 Inter），字重 400 / 500 / 600，常驻。韩文落到同一设计的 Infinity Sans KR，中文落到思源黑体 SC（Noto Sans SC），切到对应语言时才加载（`lib/theme/font_loader.dart`）。来源、子集范围和重建方法见 `app/assets/fonts/README.md`。
 
 | 样式 | 用途 |
 |---|---|
