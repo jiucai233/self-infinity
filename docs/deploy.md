@@ -39,6 +39,7 @@
 |---|---|
 | `AUTH_MODE` | `supabase` |
 | `SUPABASE_URL` | Project URL |
+| `SUPABASE_ANON_KEY` | Publishable / anon key（推 GitHub 自动部署时构建机用它打包网页；`deploy.sh` 本地打包则不需要） |
 | `DATABASE_URL` | Transaction pooler 连接串 |
 | `LLM_PROVIDER` | `deepseek`（或 `mock` 先跑通流程，不花钱） |
 | `DEEPSEEK_API_KEY` | 你的 key |
@@ -56,7 +57,9 @@ SUPABASE_URL=...                       SUPABASE_ANON_KEY=...               scrip
 
 脚本先在本地 `flutter build web`（`API_BASE_URL=/api`，同域名，不用 CORS）输出到 `backend/public/`，再把 `backend/` 传给 Vercel。`.vercelignore` 保证 `.env`、本地数据库、测试不会被上传。
 
-以后想改成推 GitHub 自动部署：Vercel 项目 Root Directory 设 `backend`，并打开 “Include files outside the root directory”，`build_web.sh` 会在构建机上装 Flutter 再打包（每次多 2～3 分钟）。
+以后想改成推 GitHub 自动部署：Vercel 项目 Root Directory 设 `backend`，并打开 “Include files outside the root directory”，`build_web.sh` 会在构建机上装 Flutter 再打包（每次多 2～3 分钟）。Build Command 留空（Project Settings 里填了会覆盖 `pyproject.toml` 里的 build 脚本）。
+
+> Vercel 按 `backend/pyproject.toml` 的 `dependencies` 装包，**不读 `requirements.txt`**。加新依赖两边都要写，`tests/test_deploy_config.py` 会检查。
 
 ## 4. 检查
 

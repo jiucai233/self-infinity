@@ -3,6 +3,20 @@
 name = "self-infinity-backend"
 version = "0.1.0"
 requires-python = ">=3.12"
+# Runtime packages, pinned as in requirements.txt (tests/test_deploy_config.py keeps them in step).
+# Vercel installs these, not requirements.txt — without them the function cannot import FastAPI.
+dependencies = [
+    "fastapi==0.115.6",
+    "sqlmodel==0.0.22",
+    "pydantic-settings==2.7.1",
+    "python-dotenv==1.0.1",
+    "google-genai==0.3.0",
+    "httpx==0.28.1",
+    "python-multipart==0.0.32",
+    "pypdf==6.19.0",
+    "PyJWT[crypto]==2.10.1",
+    "psycopg[binary]==3.2.10",
+]
 
 [tool.vercel.scripts]
 # The Flutter web app goes to public/ (served by the CDN); skipped when it is already there.
