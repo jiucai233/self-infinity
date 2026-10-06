@@ -74,14 +74,14 @@ def test_complete_passes_configured_timeout(monkeypatch: pytest.MonkeyPatch):
     在应用层用线程池强制超时。这里只验证 settings.gemini_timeout_seconds 确实
     被读取并用于限制这次调用等待的时长，而不是被忽略。
     """
-    monkeypatch.setattr(settings, "gemini_timeout_seconds", 0.05)
+    monkeypatch.setattr(settings, "llm_timeout_seconds", 0.05)
     provider = _make_provider(monkeypatch, '{"title": "t", "body": "b"}', delay=5.0)
     with pytest.raises(GeminiTimeoutError):
         provider.complete([{"role": "system", "content": "sys"}, {"role": "user", "content": "hi"}])
 
 
 def test_complete_succeeds_when_within_timeout(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(settings, "gemini_timeout_seconds", 5.0)
+    monkeypatch.setattr(settings, "llm_timeout_seconds", 5.0)
     provider = _make_provider(monkeypatch, '{"title": "t", "body": "b"}')
     result = provider.complete([{"role": "system", "content": "sys"}, {"role": "user", "content": "hi"}])
     assert result == '{"title": "t", "body": "b"}'

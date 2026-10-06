@@ -1,237 +1,140 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
-
 import json
 import logging
 
-from app.agents.clarifier import Clarifier
-from app.agents.planner import GeneratedNode, Planner
-from app.agents.syllabus import SyllabusFinder
-from app.agents.searcher import Searcher
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session, col, select
+
+from app.agents.clarifier import Clarifier, ClarifyResult
+from app.agents.material_finder import MaterialFinder
 from app.db import get_session
 from app.llm import get_provider
-from app.models import CourseSource, Principle, SearchPlan, SkillNode, SkillPrerequisite, SkillStatus
+from app.models import AuditSession, Course, EdgeKind, Principle, SearchPlan, SkillEdge, SkillNode
+from app.routers.audits import audit_summary
 from app.schemas import (
     ClarifyRequest,
     ClarifyResponse,
-    GenerateTreeRequest,
-    CourseSourceOut,
-    GenerateTreeResponse,
+    CourseGraphOut,
+    CourseOut,
+    GenerateCourseRequest,
     RecommendationOut,
+    RequiredSkillOut,
     SearchPlanItemOut,
     SearchPlanOut,
     SearchPlanRequest,
+    SkillEdgeOut,
     SkillNodeOut,
-    SkillPrerequisiteOut,
+    SkillOverviewOut,
 )
 from app.search import get_search_provider
-from app.services import bandit
-from app.services.prerequisites import add_prerequisites
-from app.utils import slugify
+from app.services import bandit, course_generation
+from app.services.course_generation import CourseGenerationError
+from app.services.tree import contains_parents, depth_map
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
 
+def search_plan_out(plan: SearchPlan) -> SearchPlanOut:
+    return SearchPlanOut(
+        id=plan.id,
+        skill_id=plan.skill_id,
+        gap=plan.gap,
+        queries=json.loads(plan.queries_json),
+        items=[SearchPlanItemOut(**item) for item in json.loads(plan.items_json)],
+        created_at=plan.created_at,
+    )
+
+
 @router.get("", response_model=list[SkillNodeOut])
-def list_skills(session: Session = Depends(get_session)):
-    return session.exec(select(SkillNode)).all()
+def list_skills(course_id: int | None = None, session: Session = Depends(get_session)):
+    """Nodes ordered by id; all courses unless `course_id` narrows it."""
+    query = select(SkillNode).order_by(SkillNode.id)
+    if course_id is not None:
+        query = query.where(SkillNode.course_id == course_id)
+    return session.exec(query).all()
 
 
 @router.get("/recommendation", response_model=RecommendationOut)
 def get_recommendation(session: Session = Depends(get_session)):
-    """V2.1 contextual bandit (whitepaper §4.4): which difficulty tier the
-    user's recent audit history suggests they're ready for right now, plus
-    each available node's tier so the frontend can highlight matches. Every
-    call re-samples the bandit's posterior (Thompson Sampling), so repeated
-    calls can legitimately return different tiers — that's exploration
-    working as intended, not flicker to be "fixed" with caching."""
+    """Which difficulty tier the user's recent audit history suggests they're ready for
+    right now (contextual bandit, see app/services/bandit.py), plus every node's tier so
+    the client can highlight matches. Every call re-samples the bandit's posterior
+    (Thompson Sampling), so repeated calls can legitimately return different tiers —
+    that's exploration working as intended, not flicker to be "fixed" with caching.
+    """
     bucket = bandit.context_bucket(session)
     tier = bandit.choose_tier(session, bucket)
-    available = session.exec(select(SkillNode).where(SkillNode.status == SkillStatus.available)).all()
-    tiers = {s.id: bandit.difficulty_tier(session, s) for s in available}
-    session.commit()
+    depths = depth_map(session)
+    nodes = session.exec(select(SkillNode).order_by(SkillNode.id)).all()
+    tiers = {n.id: bandit.difficulty_tier(session, n, depths.get(n.id, 0)) for n in nodes}
+    session.commit()  # choose_tier may have created bandit arms
     return RecommendationOut(context_bucket=bucket, suggested_tier=tier, skill_tiers=tiers)
 
 
 @router.post("/clarify", response_model=ClarifyResponse)
 def clarify_topic(body: ClarifyRequest):
-    clarifier = Clarifier(get_provider())
+    # Clarifier 失败不是错误：当作"不需要澄清"，用户直接进入生成。
     try:
-        result = clarifier.clarify(body.topic)
+        result = Clarifier(get_provider("clarifier")).clarify(body.topic)
     except Exception:
-        raise HTTPException(502, "澄清问题生成失败，请稍后重试")
+        logger.warning("clarifier could not run, skipping clarification", exc_info=True)
+        result = ClarifyResult(needs_clarification=False, questions=[])
     return ClarifyResponse(needs_clarification=result.needs_clarification, questions=result.questions)
 
 
-@router.post("/generate", response_model=GenerateTreeResponse)
-def generate_tree(body: GenerateTreeRequest, session: Session = Depends(get_session)):
-    """编排一门课：节点 + 分类树 + 先修边。
+@router.post("/generate", response_model=CourseGraphOut)
+def generate_course(body: GenerateCourseRequest, session: Session = Depends(get_session)):
+    """编排一门课：节点 + contains 边 + requires 边。
 
-    先修边和 parent_id 长在同一批节点上但含义不同（分类 vs 顺序），成环的边会在
-    落库时被丢弃——见 app/services/prerequisites.py。
+    Planner 的输出先过 Structure Validator 再落库，所以保存下来的课程一定满足 plan 8.3 的
+    结构性质。只有根节点是 available。
     """
-    provider = get_provider()
-
-    # 先找一份真实存在的课纲当参考。找不到就凭模型自身知识编排——那条路本来也能用，
-    # 所以这一步的任何失败都只是降级，不该让整次编排失败。
-    syllabus = None
-    if body.search_syllabus:
-        try:
-            syllabus = SyllabusFinder(provider, get_search_provider()).find(body.topic)
-        except Exception:
-            logger.warning("syllabus lookup failed, falling back to the model's own knowledge", exc_info=True)
-
-    planner = Planner(provider)
     try:
-        course = planner.generate(
-            body.topic,
+        generated = course_generation.generate_course(
+            session,
+            topic=body.topic,
             node_count=body.node_count,
             max_depth=body.max_depth,
             difficulty=body.difficulty,
-            syllabus=syllabus,
+            search_syllabus=body.search_syllabus,
+            planner_provider=get_provider("planner"),
+            syllabus_provider=get_provider("syllabus_finder"),
+            search_provider=get_search_provider(),
         )
-    except Exception:
-        raise HTTPException(502, "课程编排失败，请稍后重试")
-    nodes = course.nodes
-
-    taken_slugs = set(session.exec(select(SkillNode.slug)).all())
-
-    def unique_slug(base: str) -> str:
-        candidate = base or "node"
-        if candidate not in taken_slugs:
-            taken_slugs.add(candidate)
-            return candidate
-        i = 2
-        while f"{candidate}-{i}" in taken_slugs:
-            i += 1
-        final = f"{candidate}-{i}"
-        taken_slugs.add(final)
-        return final
-
-    # 生成节点的 parent_slug 引用的是本批次内的原始 slug，需要先落库拿到真实 id
-    # 再解析子节点，父节点未落库前子节点必须等待——用重复扫描直到全部解决。
-    pending: list[GeneratedNode] = list(nodes)
-    original_to_id: dict[str, int] = {}
-    created: list[SkillNode] = []
-
-    max_passes = len(pending) + 1
-    for _ in range(max_passes):
-        if not pending:
-            break
-        still_pending: list[GeneratedNode] = []
-        for node in pending:
-            parent_resolved = node.parent_slug is None or node.parent_slug in original_to_id
-            if not parent_resolved:
-                still_pending.append(node)
-                continue
-
-            parent_id = original_to_id.get(node.parent_slug) if node.parent_slug else None
-            status = SkillStatus.available if parent_id is None else SkillStatus.locked
-            row = SkillNode(
-                slug=unique_slug(slugify(node.title)),
-                title=node.title,
-                description=node.description,
-                parent_id=parent_id,
-                status=status,
-                node_type=node.node_type,
-            )
-            session.add(row)
-            session.flush()
-            original_to_id[node.slug] = row.id
-            created.append(row)
-        pending = still_pending
-
-    # 剩下没能解析父节点的（LLM 输出了不存在的 parent_slug），一律挂到根节点下。
-    root_id = created[0].id if created else None
-    for node in pending:
-        row = SkillNode(
-            slug=unique_slug(slugify(node.title)),
-            title=node.title,
-            description=node.description,
-            parent_id=root_id,
-            status=SkillStatus.locked,
-            node_type=node.node_type,
-        )
-        session.add(row)
-        session.flush()
-        # 这些节点的 parent_slug 解析失败被挂到了根下，但它们仍然可以是先修边的
-        # 端点——不登记就会让本来有效的先修边因为查不到 id 而被丢掉。
-        original_to_id[node.slug] = row.id
-        created.append(row)
-
-    # 丢弃与父子关系重合的先修边。它们不是错的，只是冗余：解锁机制本来就规定了
-    # 父节点通过之后子节点才 available，父子顺序已经被强制。prompt 里明确要求过
-    # "不要把父子边抄一遍"，但模型仍会产出，所以这里兜一道。
-    parent_of = {n.slug: n.parent_slug for n in course.nodes}
-    edges = [
-        (original_to_id[p.to_slug], original_to_id[p.from_slug], p.reason)
-        for p in course.prerequisites
-        if p.to_slug in original_to_id
-        and p.from_slug in original_to_id
-        and parent_of.get(p.to_slug) != p.from_slug
-    ]
-    add_prerequisites(session, edges)
-
-    if syllabus is not None and created:
-        session.add(
-            CourseSource(root_skill_id=created[0].id, course=syllabus.course, url=syllabus.url)
-        )
-
-    session.commit()
-    for row in created:
-        session.refresh(row)
-
-    created_ids = {row.id for row in created}
-    stored_edges = [
-        e
-        for e in session.exec(select(SkillPrerequisite)).all()
-        if e.skill_id in created_ids or e.prerequisite_id in created_ids
-    ]
-    return GenerateTreeResponse(
-        # response_model 不再是 list[SkillNodeOut]，手动构造响应时 pydantic 不会
-        # 再替我们把 ORM 行转过去，必须显式转换。
-        nodes=[SkillNodeOut.model_validate(row, from_attributes=True) for row in created],
-        prerequisites=[
-            SkillPrerequisiteOut(
-                skill_id=e.skill_id, prerequisite_id=e.prerequisite_id, reason=e.reason
-            )
-            for e in stored_edges
-        ],
-        source=CourseSourceOut(course=syllabus.course, url=syllabus.url) if syllabus else None,
+    except CourseGenerationError:
+        logger.warning("course generation failed", exc_info=True)
+        raise HTTPException(502, "Course generation failed. Please try again.")
+    return CourseGraphOut(
+        course=CourseOut.model_validate(generated.course),
+        nodes=[SkillNodeOut.model_validate(n) for n in generated.nodes],
+        edges=[SkillEdgeOut.model_validate(e) for e in generated.edges],
     )
 
 
 @router.post("/{skill_id}/search-plan", response_model=SearchPlanOut)
-def create_search_plan(
-    skill_id: int, body: SearchPlanRequest, session: Session = Depends(get_session)
-):
-    """为一个具体缺口检索补救材料。
-
-    强制要求 gap 或 misconception_id：检索是验证失败之后的补救动作，不是一个泛用的
-    资料搜索入口（见 app/agents/searcher.py 的模块注释）。缺了上下文直接 400，
-    而不是friendly 地退化成主题搜索——那个退化正是要防的东西。
-    """
+def create_search_plan(skill_id: int, body: SearchPlanRequest, session: Session = Depends(get_session)):
+    """Material for one specific gap. A gap or a misconception id is required: search is a
+    remedy after a failed audit, not a general material search."""
+    gap = (body.gap or "").strip()
+    if not gap and body.misconception_id is None:
+        raise HTTPException(400, "A gap or misconception id is required. Search targets a specific gap only.")
     skill = session.get(SkillNode, skill_id)
     if skill is None:
         raise HTTPException(404, "skill not found")
-
-    gap = (body.gap or "").strip()
-    if not gap and body.misconception_id is not None:
-        principle = session.get(Principle, body.misconception_id)
-        if principle is None or not principle.misconception:
-            raise HTTPException(404, "principle not found or has no misconception")
-        gap = principle.misconception
     if not gap:
-        raise HTTPException(400, "必须提供 gap 或 misconception_id —— 检索只针对具体缺口")
+        principle = session.get(Principle, body.misconception_id)
+        if principle is None or not (principle.misconception or "").strip():
+            raise HTTPException(404, "misconception not found")
+        gap = principle.misconception.strip()
 
-    searcher = Searcher(get_provider(), get_search_provider())
     try:
-        queries, items = searcher.plan(skill.title, skill.description, gap)
+        queries, items = MaterialFinder(get_provider("material_finder"), get_search_provider()).find(
+            skill.title, skill.description, gap
+        )
     except Exception:
         logger.warning("search plan failed", exc_info=True)
-        raise HTTPException(502, "资料检索失败，请稍后重试")
+        raise HTTPException(502, "Material search failed. Please try again.")
 
     plan = SearchPlan(
         skill_id=skill.id,
@@ -245,12 +148,38 @@ def create_search_plan(
     session.add(plan)
     session.commit()
     session.refresh(plan)
+    return search_plan_out(plan)
 
-    return SearchPlanOut(
-        id=plan.id,
-        skill_id=plan.skill_id,
-        gap=plan.gap,
-        queries=queries,
-        items=[SearchPlanItemOut(title=i.title, url=i.url, snippet=i.snippet, reason=i.reason) for i in items],
-        created_at=plan.created_at,
+
+@router.get("/{skill_id}/overview", response_model=SkillOverviewOut)
+def get_overview(skill_id: int, session: Session = Depends(get_session)):
+    """One node with its course, contains parents, required nodes, audits and materials (no LLM)."""
+    skill = session.get(SkillNode, skill_id)
+    if skill is None:
+        raise HTTPException(404, "skill not found")
+    course = session.get(Course, skill.course_id)
+
+    required = session.exec(
+        select(SkillEdge, SkillNode)
+        .join(SkillNode, SkillNode.id == SkillEdge.from_id)
+        .where(SkillEdge.to_id == skill.id, SkillEdge.kind == EdgeKind.requires)
+        .order_by(SkillEdge.id)
+    ).all()
+    audits = session.exec(
+        select(AuditSession)
+        .where(AuditSession.skill_id == skill.id)
+        .order_by(col(AuditSession.created_at).desc(), col(AuditSession.id).desc())
+    ).all()
+    plans = session.exec(
+        select(SearchPlan)
+        .where(SearchPlan.skill_id == skill.id)
+        .order_by(col(SearchPlan.created_at).desc(), col(SearchPlan.id).desc())
+    ).all()
+    return SkillOverviewOut(
+        skill=SkillNodeOut.model_validate(skill),
+        course=CourseOut.model_validate(course),
+        contains_parents=[SkillNodeOut.model_validate(p) for p in contains_parents(session, skill.id)],
+        requires=[RequiredSkillOut(skill=SkillNodeOut.model_validate(n), reason=e.reason) for e, n in required],
+        audits=[audit_summary(a, skill) for a in audits],
+        materials=[search_plan_out(p) for p in plans],
     )

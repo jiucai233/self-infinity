@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Protocol, TypedDict
 
 
@@ -15,10 +16,44 @@ class LLMProvider(Protocol):
         ...
 
 
+# 每个子 agent 的 system prompt 第一行都是 "[agent: <name>]"。它有两个用途：日志里能
+# 看出是哪个子 agent 在调用；Mock 靠它路由，而不是去匹配会随调优改动的提示词措辞。
+_AGENT_TAG_RE = re.compile(r"^\[agent: ([a-z_]+)\]")
+
+
+def agent_tag(agent: str) -> str:
+    return f"[agent: {agent}]"
+
+
+def agent_of(messages: list[Message]) -> str | None:
+    system = next((m["content"] for m in messages if m["role"] == "system"), "")
+    match = _AGENT_TAG_RE.match(system.lstrip())
+    return match.group(1) if match else None
+
+
+def fill_template(template: str, **values: str) -> str:
+    """Fill `{name}` placeholders in one pass, so inserted text is never re-scanned.
+
+    The templates are written for str.format (literal braces doubled); this keeps that
+    convention but is safe for values that are JSON or user text full of braces.
+    """
+    pattern = re.compile("|".join("\\{" + re.escape(k) + "\\}" for k in values) + r"|\{\{|\}\}")
+
+    def sub(match: re.Match) -> str:
+        token = match.group(0)
+        if token == "{{":
+            return "{"
+        if token == "}}":
+            return "}"
+        return values[token[1:-1]]
+
+    return pattern.sub(sub, template)
+
+
 def strip_code_fence(text: str) -> str:
     """去掉模型响应外层可能包裹的 ```json ... ``` 或 ``` ... ``` 代码块标记。
 
-    Gemini 与 DeepSeek 两个真实 provider 共用这一逻辑，避免重复实现。
+    所有真实 provider 共用这一逻辑，避免重复实现。
     """
     stripped = text.strip()
     if not stripped.startswith("```"):
@@ -31,7 +66,10 @@ def strip_code_fence(text: str) -> str:
     return "\n".join(lines).strip()
 
 
-_JSON_RETRY_NOTICE = "上一次的回复不是合法 JSON，请只输出合法 JSON，不要有任何额外文字或代码块标记。"
+JSON_RETRY_NOTICE = (
+    "Your previous reply was not valid JSON. Reply with valid JSON only, "
+    "with no extra text and no code fences."
+)
 
 
 def complete_with_json_retry(provider: LLMProvider, messages: list[Message]) -> str:
@@ -44,5 +82,5 @@ def complete_with_json_retry(provider: LLMProvider, messages: list[Message]) -> 
         json.loads(raw)
         return raw
     except (json.JSONDecodeError, TypeError):
-        retry_messages: list[Message] = [*messages, {"role": "user", "content": _JSON_RETRY_NOTICE}]
+        retry_messages: list[Message] = [*messages, {"role": "user", "content": JSON_RETRY_NOTICE}]
         return provider.complete(retry_messages)

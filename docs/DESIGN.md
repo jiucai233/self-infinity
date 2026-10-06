@@ -1,518 +1,116 @@
-# Self-Infinity 前端设计规范
+# Self-Infinity 设计规范（Paper & Ember · Material 3 Light）
 
-本文档是当前实现的设计系统的**代码级参考**（token 值、组件规则、使用约束），
-面向以后改前端样式时对照，避免再靠感觉猜。产品层面"为什么长这样"（历次改版
-的历史与取舍）见 `docs/WHITEPAPER.md` §7；本文件只管"现在长什么样、怎么用"。
+**唯一来源**：`app/lib/theme/`（token 与 Material 主题）和 `app/lib/widgets/`。页面代码不写颜色、圆角、字号、字体的字面量。值有冲突时以代码为准，并回头修本文件。
 
-设计语言基准：2026-07-19 从"Notion 扁平 + 紫色主色调"改版为**纯黑白灰的像素
-风格**（Google Stitch 生成的参考设计系统，位于
-`stitch_continuous_momentum_tracker/self_infinity_mono_system/DESIGN.md` 与
-`skill_tree_hub_pixel_mono_white/code.html`），只保留结构化的游戏感元素（技能
-树折线连接、像素描边、分段体力条），去掉所有品牌色相。
+参考（2026-10-05，用户提供的录屏 `~/Movies/2026-10-05 18-17-18.mov`）：一个 Obsidian 创作工作台——暖灰纸面、几乎没有颜色、黑色胶囊主按钮、杂志式大标题、大数字小标签、一叠错开的纸卡片，以及整页唯一发光的东西：深色网格星座里的金色火花。
 
 ---
 
-## 1. 设计原则
+## 1. 原则
 
-1. **纯黑白灰**：只用 `#000000`/`#ffffff` 及其灰阶过渡，**没有紫色，没有
-   蓝色，没有任何品牌强调色**。"强调"靠黑/白实心填充和描边表达，不靠色相。
-2. **像素描边，不用圆角**：所有表面（面板/按钮/输入框/标签/技能树卡片）用
-   `border-radius: 0`，边框用"四个方向偏移 box-shadow"伪造出的像素级台阶
-   描边（`.pixel-border` / `.pixel-border-active`），不是普通的 1px CSS
-   border。
-3. **游戏感来自结构，不是装饰**：技能树的"游戏感"关键是节点间的**直角折线
-   连接**（Manhattan path，不是曲线）和像素描边卡片，不加光效/模糊/渐变。
-4. **深浅主题对等**：每个 token 在 `:root`（深色）和 `:root[data-theme=
-   'light']`（浅色）里都有对应值，对比度纪律两边一致。
-5. **两个功能性例外色**：`--danger`（审计失败/力场低专注档）和硬编码的
-   `#facc15` 金色（"已掌握"状态、Sanity 条填充色）是仅有的非灰阶颜色——
-   它们是状态指示器，不是品牌强调色，不受"纯黑白灰"规则约束。
+1. **对话是主角。** 右侧聊天面板是完整的对话记录；舞台上只放她当前说的话。
+2. **纸面，不是屏幕。** 画布 `#E6E6E1`，舞台 `#F5F5F1`，侧栏深一档 `#EEEEE9`，卡片是浮起来的纸 `#FBFBF8`。圆角 20、间距 12。
+3. **墨色是唯一的操作色。** 发送键、主按钮、链接、可挑战节点都是近黑 `#151514`；次按钮是一圈细描边。
+4. **金色只给挣来的东西。** 通过、掌握、XP、火花用琥珀/金；失败用砖红。蓝色、Gemini 渐变全部去掉。
+5. **整页只有一处发光**：人生树的深色面板（和水晶球里面）。其他地方安静。
+6. **排版像杂志**：首页问候语 40 号、紧字距；数字用大号细字（30 / 400），标签用小号灰字。
+7. **动效有意义**：场景切换淡入 + 轻微上移（220ms）；星座缓慢自转；通过时金色星光散开；节点卡片淡入上移。
 
 ---
 
-## 2. 颜色 Token
+## 2. Token（`lib/theme/tokens.dart`）
 
-定义在 `frontend/src/index.css` 的 `:root` / `:root[data-theme='light']`。
+### 2.1 颜色 `AppColors`
 
-| Token | 深色 | 浅色 | 用途 |
-|---|---|---|---|
-| `--bg` | `#191919` | `#ffffff` | 页面背景 |
-| `--panel` | `#191919` | `#ffffff` | 面板背景（=页面背景，靠像素描边分隔） |
-| `--panel-translucent` | `#202020` | `#ffffff` | nav / 紧凑分身徽章背景，比 panel 略深一档 |
-| `--border` | `rgba(255,255,255,.09)` | `rgba(55,53,47,.09)` | 极淡分隔线（nav 底边、点状网格背景） |
-| `--border-strong` | `rgba(255,255,255,.13)` | `rgba(55,53,47,.16)` | 默认态像素描边颜色（`.pixel-border`）、锁定态连线 |
-| `--hover-wash` | `rgba(255,255,255,.055)` | `rgba(55,53,47,.08)` | 按钮 hover 底色 |
-| `--text` | `#e9e9e7` | `#37352f` | 正文/标题文字，也是唯一的"强调色" |
-| `--dim` | `#9b9b96` | `#787774` | 次要文字、力场 mid 档描边 |
-| `--accent` / `--accent-fill` | `#e9e9e7` | `#37352f` | 与 `--text` 同值——"强调"就是主墨色的黑/白实心填充，不是另一个色相 |
-| `--accent-fill-text` | `#191919` | `#ffffff` | 实心填充按钮/pixel-border-active 上的反色文字 |
-| `--danger` | `#ff6b6b` | `#c9362c` | 审计失败、力场低专注档（功能性例外色） |
-| `#facc15`（无 token，硬编码） | 同左 | 同左 | "已掌握"状态色、Sanity 条填充色（功能性例外色，是"成就金"不是品牌色） |
+| token | 值 | 用途 |
+|---|---|---|
+| `canvas` | `#E6E6E1` | 面板后面的画布 |
+| `background` | `#F5F5F1` | 舞台面板 |
+| `sidebar` | `#EEEEE9` | 左栏、聊天面板 |
+| `surface` | `#FBFBF8` | 卡片（浮起来的纸） |
+| `surfaceHigh` | `#EBEBE6` | 输入栏、她的气泡、hover |
+| `userBubble` | `#E2E2DC` | 你的聊天气泡 |
+| `outline` / `outlineStrong` | `#DEDED8` / `#C6C6BF` | 分割线 / 次按钮描边 |
+| `textPrimary` / `textSecondary` / `textTertiary` | `#151514` / `#565651` / `#696963` | 文字三级（`textTertiary` 在 background / surface / surfaceHigh 上都 ≥ 4.5:1） |
+| `primary` | `#151514` | 墨色：所有操作 |
+| `primarySoft` / `glow` | `#ECF2C9` / `#D4E57E` | 浅柠檬：选中底色 / 选中与节点卡片的边缘光 |
+| `success` / `successSoft` | `#8A5B0C` / `#F5E6C3` | 琥珀：通过、掌握、XP |
+| `danger` / `dangerSoft` | `#A23B2C` / `#F2DCD6` | 失败、错误 |
+| `locked` / `requires` | `#C9C9C2` / `#8F8F88` | 锁住的节点 / 技能图的边 |
+| `night` / `nightHigh` | `#1A1A19` / `#2A2A28` | 人生树面板、水晶球内部 |
+| `nightLine` / `nightText` / `nightMuted` | `#8E8E87` / `#EEEEE9` / `#6F6F69` | 夜色上的网格线 / 文字 / 暗点 |
+| `ember` / `emberHot` / `emberRed` | `#F0B23E` / `#FFE0A0` / `#E0644E` | 夜色上的掌握节点与火花 / 失败节点 |
+| `glass` | `#45453F → #242422 → #0E0E0D` | 烟色水晶球 |
+| `magic` | `#3A2A10 → #B7791F → #F0B23E` | 古铜到金：思考微光、语音、庆祝 |
 
-**两份 Stitch DESIGN.md 的取舍说明**：`self_infinity_mono_system/DESIGN.md`
-文件里有两段颜色定义——顶部 YAML frontmatter 是一份通用 Material 风格的色板
-倾倒（`surface`/`surface-dim`/`surface-bright` 等），里面混了 `#fdf8f7`
-这种偏暖调的"类灰"背景色，并不是严格纯灰；文件下方"## 2. Color Tokens"
-表格给出的 `--bg`/`--text`/`--border` 等值是纯 `#ffffff`/`#191919` 灰阶，且
-与本项目改版前的 Notion token 数值完全一致。本项目采用后者（表格），frontmatter
-的暖色调色板未采用——理由是表格更符合"纯黑白灰"这条核心原则，采用它也让改版
-的实际 diff 更小（颜色数值本身几乎不用改，改的是边框/圆角/连线的画法）。
+### 2.2 字体
 
----
+两种字体：
+- **展示衬线** `AppFonts.display` = Instrument Serif（OFL，打包在 `app/assets/fonts/`，只有 400 一个字重，另有斜体）。主题把 `display*` 和 `headlineLarge` 设成它；其他地方用 `AppTheme.serif(style)` 取（页面里不能写 `fontFamily:`）。不加粗。它没有韩文/中文字形，会回退到无衬线。
+- 其余全部是平台无衬线字体（web 为 Roboto），韩文回退 Noto Sans KR。字重 400 / 500 / 600。
 
-## 3. 字体与间距
+| 样式 | 用途 |
+|---|---|
+| `displayMedium` 48 / 400 衬线，字距 -0.6 | 首页问候语（墨色，无渐变） |
+| `displaySmall` 38 / 400 衬线，字距 -0.3 | 庆祝卡标题、审计裁决卡的结论 |
+| `headlineLarge` 36 / 400 衬线 | 大数字（统计条、节点卡片、裁决卡的分数） |
+| `AppTheme.serif(headlineSmall)` 斜体 | 身份宣言（左栏角色卡）；人生树顶上的引文用 `titleLarge` 的衬线斜体 |
+| `headlineMedium` 24 / 600 | 节点卡片标题、手机上的问候语 |
+| `headlineSmall` 20 / 600 | 舞台标题 |
+| `titleMedium` 15 / 600 | 面板标题 |
+| `bodyLarge` 16 / 400，行高 1.6 | 她的气泡、聊天正文 |
+| `labelLarge` / `labelMedium` / `labelSmall` | 按钮 / 标签 / 大数字上方的小标签 |
 
-- 正文字体栈：`ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
-  Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji",
-  "Segoe UI Symbol"`（不变，Press Start 2P 在段落长度不可读，只用于标签）。
-- 像素显示字体：`"Press Start 2P"`（Google Fonts，`frontend/index.html` 里
-  `<link>` 加载），通过 `.pixel-font` 工具类应用在：页面标题（h1/h2）、技能
-  节点标题、nav 品牌字样、关键数值展示（体力条数值、审计得分）。**不要**
-  用于正文/描述文字——8px 像素字体在长句子上不可读。
-- 圆角：`--radius-control` / `--radius-panel` / `--radius-pill` 三个 token
-  全部是 `0px`（像素风格没有圆角，token 保留是为了少改调用点，值已归零）。
-- 面板内边距：`--gap: 20px`。
-- 像素描边偏移：`--pixel-offset: 4px`（面板用 3px，按钮/输入框用 2px，见下）。
+### 2.3 尺寸
 
----
-
-## 4. 组件规则
-
-### 4.1 像素描边（`.pixel-border` / `.pixel-border-active`）
-移植自 `skill_tree_hub_pixel_mono_white/code.html` 的核心技术：不用普通
-`border`，而是四个方向、零模糊、固定偏移的 `box-shadow` 叠出"台阶"描边：
-
-```css
-box-shadow:
-  0 -4px 0 0 <color>,
-  0  4px 0 0 <color>,
-  -4px 0 0 0 <color>,
-  4px  0 0 0 <color>;
-```
-
-- `.pixel-border`：默认/锁定态，`--border-strong`（灰）描边 + `--panel` 背景。
-- `.pixel-border-active`：主操作/激活态，`--text`（黑/白）描边 + `--text`
-  实心填充 + `--bg` 反色文字。
-
-`.panel`、按钮、`input`/`textarea`、技能树节点卡片都用这套技术而不是
-`border` 属性；因为 `box-shadow` 不占布局空间，相邻元素之间留了 2-3px
-`margin` 防止描边互相重叠。
-
-### 4.2 Button
-- 默认态：`.pixel-border` 灰描边，透明背景，hover 才出现 `--hover-wash` 底色，
-  active 态有 1px 的 `translate` 位移模拟按下反馈。
-- `.accent`（主操作按钮）：`.pixel-border-active` 同款黑/白实心填充。
-- `disabled`：`opacity: 0.4`。
-
-### 4.3 Tag（`.tag`，2026-07-19 改版）
-不再用色相区分分类，圆角归零，边框改成 1.5px 纯色描边。concept/task 两种
-节点类型靠**描边 vs 填充**这一维度区分，而不是颜色：
-- `.tag--outline`（concept，"讲清楚为什么"）：透明背景 + `--text` 描边，
-  视觉上更"轻"。
-- `.tag--filled`（task，"做到就行"）：`--text` 实心填充 + `--bg` 反色文字，
-  视觉上更"重"，呼应"任务是要交付的承诺"。
-
-### 4.4 Input / Textarea
-`--panel` 背景、`.pixel-border` 同款灰描边、`border-radius: 0`。聚焦态：
-描边颜色从 `--border-strong` 变为 `--text`（`.pixel-border-active` 的描边
-配色，但不填充背景，只换描边色）。
-
-单选框/复选框：`accent-color: var(--accent)`（现在等于 `--text`，覆盖浏览器
-默认蓝色原生控件配色）。
-
-### 4.5 Bar（体力条 / Sanity 条，`Avatar.tsx` 内部 `Bar` 组件，2026-07-19 改版）
-从"一条圆角连续填充"改为**分段像素条**（`.pixel-bar-segment`）——非紧凑态
-20 格、紧凑态（nav 徽章）8 格，按 `value/max` 比例取整决定填充格数，未填充格
-只有描边、透明背景。
-
-轨道容器本身的宽度仍然按 `max/trackMax` 缩放（继承自 Notion 版的规则，行为
-不变）——Sanity 条的轨道宽度随 `sanity_cap` 收缩，体现"体力值影响精神值上限"
-这条规则的是**可用格子总数变少**，不只是"填充格子变少"。
-
-### 4.6 Force Field（力场环，专注度可视化，2026-07-19 改版）
-四档区分改为纯灰阶（去掉原来的琥珀色 `#d9a441`）：
-- `idle`：`--border-strong` 细描边。
-- `low`：`--danger` 红描边（功能性例外色，唯一非灰阶档位）。
-- `mid`：`--dim` 灰虚线描边。
-- `high`：`--text`（黑/白）实心描边。
-不用 blur/box-shadow 光晕/动画。
-
-### 4.7 技能树连接线（`.skill-edge`，2026-07-19 改版：贝塞尔 → 直角折线）
-技能树节点之间的父子连线，SVG 描边路径，不填充（`fill: none`）。**画法从
-三次贝塞尔曲线改成 Manhattan/直角折线**（移植自
-`skill_tree_hub_pixel_mono_white/code.html` 的 `M x1 y1 L x1 midY L x2 midY
-L x2 y2` 写法），从父节点底部中点直下，到两节点纵向中点转折，横向平移到子
-节点 x 坐标，再直下进入子节点顶部中点——三段折线，不需要更复杂的路由。
-
-`d` 字符串生成逻辑在 `frontend/src/pages/SkillTree.tsx` 的 `recomputeEdges`
-闭包里；**节点定位算法 `computeSkillTreeLayout()`（子树感知的居中布局）本身
-完全未改动**，这次改版只换了连线的画法，没碰坐标数学。
-
-- `.skill-edge--locked`：`--border-strong` 描边，`stroke-width: 3`，
-  虚线（`stroke-dasharray: 8 8`）。
-- `.skill-edge--active`（子节点状态为 available/mastered）：`--text`
-  描边，`stroke-width: 4`，实线。
-
-技能树画布容器额外叠加了 `.pixel-grid`（点状网格背景，`repeating-linear-
-gradient` 20px 间距），让整个滚动区域读起来像"棋盘/游戏画面"而不是空白页。
-
-### 4.8 Nav（已废弃，见 §4.9）
-旧版是 `sticky` 顶部导航，`--panel-translucent` 背景，底部 1px `--border`
-分隔线。2026-07-19（第二次改版）已替换为左侧栏，见下。
-
-### 4.9 App Shell — 左侧栏布局（2026-07-19 第二次改版）
-在"只换视觉语言，不动页面骨架"之后，用户明确要求把 Stitch 参考稿的**页面
-布局**也搬过来，不只是 token。`App.tsx` 从"顶部横向 nav + `max-width: 880px`
-居中单栏"改成持久左侧栏 + 主内容区占满剩余宽度，对应
-`character_dashboard_pixel_mono_white/screen.png` 的整体骨架。
-
-- `.app-shell`：`display: flex`，侧栏 + `<main>` 左右布局，`min-height: 100svh`。
-- `.app-sidebar`：固定 220px 宽，`position: sticky; top: 0`，内容从上到下是
-  品牌字样、紧凑 `<Avatar compact />`、`.app-sidebar-nav` 竖排导航列表。
-  背景复用 `--panel-translucent`，右边 1px `--border` 分隔线（沿用旧 nav 的
-  分隔线数值，只是方向从水平变竖直）。
-- `.app-sidebar-nav-item` / `.app-sidebar-nav-item--active`：导航项从旧版的
-  横排按钮组改成竖排整行点击区，激活项用 `--hover-wash` 底色 + 左侧 3px
-  `--text` 实心竖条，对应参考稿里 "Skills" 高亮行的画法（整行色块，不是
-  加粗文字）。
-- `.app-main`：`flex: 1`，`padding: 32px`，不再有 `max-width` 居中限制——
-  内容用满侧栏之外的全部宽度，同参考稿"主内容区顶格铺满"的观感。
-- `ThemeToggle` 保持原来 `position: fixed` 悬浮右下角的实现，没有并入侧栏
-  （悬浮位置在有侧栏之后依然合理，未强行改造）。
-
-### 4.10 分身页仪表盘网格（`AvatarPage.tsx`，2026-07-19）
-对应 `character_dashboard_pixel_mono_white/screen.png` 的双栏布局。
-`Avatar.tsx` 拆出两个可独立摆放的命名导出（默认导出 `Avatar` 的紧凑/完整
-渲染保持不变，用于侧栏和历史测试）：
-- `useVitalityFocus(refreshKey?)`：抽出的数据获取 hook，`AvatarPage` 用它
-  一次性拿到 `vitality`/`focus`，分别传给下面两块，不再各自发请求。
-- `AvatarPortrait`：只渲染力场环 + 像素小人 + 专注度文字（原非紧凑渲染的
-  下半部分）。
-- `VitalsPanel`：只渲染 Health/Sanity 分段条（原非紧凑渲染的上半部分）。
-
-`AvatarPage.tsx` 用 `.avatar-dashboard-grid`（`grid-template-columns:
-minmax(220px,1fr) minmax(260px,2fr)`，720px 以下退化为单列）把
-`AvatarPortrait` 放左侧面板（标题"分身"），`VitalsPanel` 放右侧面板
-（标题"VITALS STATUS"），网格下方是 `.avatar-stat-row`——一排
-`.stat-card`（小号像素描边方块，上方 dim 小标签+下方粗体像素数字），对应
-参考稿 STRENGTH/DEXTERITY/INTELLECT/LUCK 四格的**视觉样式**，但内容换成
-本项目真实有的数字：HEALTH、SANITY（含 cap）、FOCUS（仅当存在最新专注度
-会话时才渲染这一格，不伪造 0 值）。签到表单面板保持原位置和逻辑不变，挪到
-网格下方。
-
-### 4.11 技能树画布统计徽章（`SkillTree.tsx`，2026-07-19）
-对应 `skill_tree_hub_pixel_mono_white/screen.png` 画布右上角的
-"SKILL POINTS"/"ESSENCE" 小方块——**只搬视觉样式，不搬虚构资源**。新增
-`.skilltree-stat-pills`（`position: absolute; top/right: 12px`，挂在
-`.pixel-grid` 容器内，容器加 `position: relative`），内容是一个
-`.stat-pill`：「已掌握 X / Y」，X/Y 是从已加载的 `skills` 数组客户端算出的
-真实节点数（`status === 'mastered'` 计数 / 总数），没有引入 SKILL
-POINTS/ESSENCE 这类不存在的货币概念。
-
-### 4.12 审计室沉浸式暗色画布（`AuditRoom.tsx`，2026-07-19）
-对应 `focus_mode_pixel_mono/screen.png`——参考稿里这个页面是**始终纯黑**的
-独立画布，不跟随浅色/深色主题切换（"专注模式"本身就是自己的沉浸式场景）。
-新增 `.audit-immersive`：`background: #0a0a0a`（硬编码，不用 `--bg` token），
-浅色文字，替代 `App.tsx` 给这个视图套的 `<main>` padding（`isAuditView` 为真
-时 `<main>` 用 `.app-main--bleed` 去掉 32px padding，让 `.audit-immersive`
-自己的 32px padding 顶到侧栏边界和视口边缘，不留一圈平时主题色的窄边）。
-
-布局用 `.audit-immersive-layout`（grid，`1fr minmax(220px,280px)`，800px
-以下退化单列）：左侧是原有对话记录 + 输入框（功能完全不变），右侧
-`.audit-quest-card` 是仿 Stitch ACTIVE_QUEST 卡片的信息面板，显示：
-`roleLabel`（费曼审计官/任务核验官）、当前节点类型（概念/任务）、真实的
-"已提交轮次"计数（`turns.filter(t => t.role === 'user').length`，本来就在
-组件 state 里，不需要后端改动）。**没有搬** Stitch 卡片里的 EXP 百分比和
-剩余时间倒计时——这两个需要 `max_turns`/计时数据，当前没有传进这个组件，
-本次改版选择省略而不是编造假数字，代码注释里留了这个决定的记录。返回
-技能树按钮、verdict/reflection/principle 流程逻辑完全不变。
+- 间距 4 / 8 / 12 / 16 / 24 / 32。
+- 圆角：面板 `panel 20`、卡片 `card 16`、气泡 `bubble 20`、chip `8`、输入栏 `pill 28`。
+- 阴影（柔、宽，像桌上的纸）：`input`（极淡）、`paper`（纸卡片）、`float`（节点卡片、庆祝卡、菜单；两层）。
+- 布局：左栏 280、聊天面板 380、面板间距 12、舞台内容最宽 720、断点 900。
 
 ---
 
-## 5. 已知取舍 / 不做的事
+## 3. 组件
 
-- 不做卡片阴影分层（elevation）——像素描边本身已经是"轮廓感"的来源，不需要
-  额外阴影暗示层级。
-- 不做玻璃/模糊效果——Liquid Glass 版本已经试过并被否决（用户原话
-  "简直是屎"），详见白皮书 §7；这次改版延续"零装饰"纪律，只是把描边语言从
-  Notion 的 1px 细线换成像素台阶。
-- 不照搬 Stitch 参考稿里的 Guild/Quests/Inventory/装备栏/ESSENCE 货币等
-  虚构 RPG 功能——这些是 Stitch 生成的通用"Chronos/Vanguard"模板里的功能，
-  本项目没有对应实际功能，移植的是视觉语言和**页面骨架**（侧栏、网格、
-  统计徽章、沉浸式暗色画布），骨架里填的永远是本项目真实数据，不编造数值。
-- 审计室 ACTIVE_QUEST 卡片不做 EXP% / 倒计时——数据源不存在，见 §4.12。
-
----
-
-## 6. 待办 / 已知不足
-
-- Avatar 的像素小人（`PixelFigure`）明确是占位符（代码注释里写死了），
-  不是最终美术资源，不需要为它抠细节。
-- 技能树连线依赖 `getBoundingClientRect()` 做实际测量定位，在 jsdom 测试
-  环境下无法获得真实布局（永远返回 0），测试只验证连线元素存在/状态样式
-  正确（class 名），不验证 `d` 属性里的具体像素坐标。
-
----
-
-## 7. 全英文 1:1 复刻（2026-07-19，第三次改版）
-
-用户明确要求"一比一，完全复制，用英语"——不再只搬视觉语言和页面骨架，连
-§5 里明确说"不照搬"的 Guild/Quests/Inventory/装备栏/ESSENCE 也要按模板加上
-（作为装饰性占位，不接后端逻辑），并把现有 UI 文案全部从中文改成英文。
-本节记录这次改版做了什么、哪些数字是真的哪些是装饰性的——§5 那条"不照搬
-虚构 RPG 功能"的取舍到这次改版为止已被用户显式推翻，但原文保留不改，改动
-记录在这里。
-
-### 7.1 全量英文化
-`App.tsx`／`SkillTree.tsx`／`AuditRoom.tsx`／`AvatarPage.tsx`／
-`PrincipleShelf.tsx`／`Avatar.tsx`／`ThemeToggle.tsx` 里所有面向用户的中文
-字符串（标题、按钮、占位符、状态文案、错误提示、aria-label）改成英文，
-配套测试（`SkillTree.test.tsx`／`AuditRoom.test.tsx`／`Avatar.test.tsx`）
-里对应的 `getByText`/`getByRole(name:)` 查询同步改成英文断言，没有削弱
-覆盖率。`原则卷轴`/PrincipleShelf 按模板的 "Archive" nav 槽位改名为
-"Archive"（组件文件名本身没改，只改了渲染文案，避免无意义的大范围
-重命名）。语音识别用的 `recognition.lang = 'zh-CN'`
-没有改——语音输入的目标用户仍然讲中文，这是功能配置不是 UI 文案。
-
-### 7.2 侧栏导航扩展 + 新增装饰页面（`App.tsx`）
-侧栏 nav 从三项（技能树/分身/原则卷轴）扩到模板的全量七项：
-`Character`／`Skills`／`Archive`／`Quests`／`Guild`／`Map`／`Support`／
-`Log Out`（disabled 按钮，无 onClick——本项目没有真实登录系统，不为了
-凑一个导航项去搭一套假登录）。新增 `pages/Quests.tsx`／`Guild.tsx`／
-`Map.tsx`／`Support.tsx`：纯静态装饰页，`.panel` 包一段 flavor
-文案，主题贴本项目"学习审计"而不是模板原版的科幻叙事，不接任何后端
-状态。侧栏新增装饰性 "Level N / Auditor Class" 卡片——Level 从真实的
-已掌握节点数派生（`1 + Math.floor(masteredCount / 3)`），Class 是写死的
-flavor 字符串；侧栏底部新增 "New Mission" 按钮，真实功能是跳转回 Skills
-视图（`goToSkills`）。
-
-### 7.3 技能节点详情页（新增 `pages/SkillNodeDetail.tsx`）
-`SkillTree.tsx` 每张卡片新增一个 "Details" 按钮（保留原有 "Start
-Audit"/"Audit Passed" 按钮行为不变），点击后 `App.tsx` 切到
-`{ name: 'nodeDetail'; skillId }` 视图。页面内容：
-- Breadcrumb "Skills > NODE DETAIL"，点 "Skills" 回到技能树。
-- 标题/描述用真实 `skill.title`/`description`，子标题是真实
-  `node_type`（"Concept Node"/"Task Node"），不是模板假的
-  "ACTIVE ABILITY / LEVEL 3"。
-- Progression 条：真实——`mastered` 时用 `mastery_score`，否则 0%。
-- Requirements 框：真实——有 `parent_id` 就显示 "Requires: <父节点标题>"，
-  否则 "No prerequisites"。
-- Benefits 框：装饰性 flavor 文案（"+Understanding" / "+Progress toward
-  mastery"），代码注释标了 decorative——没有数值 buff 系统支撑这两行。
-- 操作按钮 "Allocate Skill Point"：真实，复用 `onAudit` 回调，日/夜模式
-  这里没有选择器，固定传 `'day'`（代码注释里写了这个简化）。
-- 底部统计行：`UNLOCKED NODES` 真实（同技能树画布的 mastered/total 徽章）；
-  `GLOBAL RANK`／`TIME PLAYED` 是装饰性静态值（`#128`／`12H 40M`），本项目
-  没有排名/时长统计，注释标了 decorative，纯粹为了不让这一行看起来像
-  没做完。
-
-### 7.4 技能树画布第二个统计徽章（`SkillTree.tsx`）
-"Mastered X / Y" 真实徽章旁边新增装饰性 "Essence" 徽章
-（`masteredCount * 25`，代码注释标 decorative），凑成模板里
-SKILL POINTS/ESSENCE 那种成对徽章的视觉。"生成技能树" 按钮改名
-"New Mission"（真实生成行为不变）。
-
-### 7.5 分身页仪表盘补全（`AvatarPage.tsx`／`Avatar.tsx`）
-- `VitalsPanel` 的 Health/Sanity 条显示文案改成 "Health Score"/"Mental
-  Score"（`Bar` 组件新增 `displayLabel` 参数，与原有 `label` 参数分离——
-  `label` 仍然是 "Health"/"Sanity"，因为它同时驱动
-  `data-testid="bar-track-Health"` 等既有测试钩子，改文案不需要连带改
-  测试选择器）。
-- 新增 Strength/Dexterity/Intellect/Luck 四格属性行：Intellect 从真实的
-  已获得原则数派生（`10 + principles.length`），其余三个是装饰性静态值，
-  代码注释标了 decorative。
-- 新增 "Equipped Gear" 面板：真实数据——复用 `api.listPrinciples()` 取最近
-  2 条原则，标题 + "+Audit Passed" 徽章；没有原则时显示提示文案，不编造
-  假装备。
-- 新增 "Recent Records" 面板：同样复用最近 2 条原则（标题 + 正文截断），
-  不是独立的假日志时间戳。
-- 新增右下角 "Initiate Mission" 悬浮按钮（`onInitiateMission` prop，
-  `App.tsx` 传入 `goToSkills`），效果同侧栏 "New Mission"。
-
-### 7.6 审计室 quest 卡片补一条进度条（`AuditRoom.tsx`）
-新增 `estimateMaxTurns(nodeType, mode)`——镜像
-`backend/app/routers/audits.py` 的 `_resolve_max_turns`（concept 基数 4／
-task 基数 2，night 模式翻倍），仅用于渲染 quest 卡片里的一条
-`已提交轮次 / 估算上限` 进度条，纯展示用途，不是新的后端调用；如果后端
-`app/config.py` 的默认值以后改了，这条进度条的百分比会跟着漂移，代码注释
-里写明了这一点。真实的"什么时候强制裁决"仍然完全由后端 `_resolve_max_
-turns` 决定，前端这条只是估算展示。
+| 组件 | 规则 |
+|---|---|
+| **面板** | 白底、圆角 20、无边框；顶部 56 高的标题栏（`titleMedium` + 右侧折叠图标）。 |
+| **输入栏** | `surfaceHigh` 填充的胶囊，无边框、聚焦时 1px 墨色边；左 ⊕，右侧发送键是墨色圆形（空输入时灰色）。语音键在框外，40px 圆形 `surfaceHigh`。 |
+| **问候语**（scene 1） | `displayMedium`（手机 `headlineMedium`），墨色，居中；下面一行 `bodyLarge` 三级灰。 |
+| **推荐卡片**（scene 1） | `surfaceHigh` 底、圆角 16、内边距 16，左上一个小图标，文字 `labelLarge`；最多两张并排（窄屏竖排）；hover 时底色加深。 |
+| **她的气泡**（舞台） | `surfaceHigh` 底、圆角 20、尾巴指向 avatar；气泡上方一行小字是说话的 agent 名（`labelMedium`）。思考时气泡里是一条流动的古铜到金微光（三行骨架）。 |
+| **你的最后一句**（舞台） | 发送后、她回答前，在输入栏上方右对齐显示一个 `userBubble` 小气泡；回答到达后淡出（它已经在聊天面板里）。审计页不用它：回答直接进对话列。 |
+| **审计对话列**（scene 4-1） | 一列，最宽 720。顶部钉住说话人：形象 76 + 名字（`titleMedium`）+ 在做什么（`bodySmall` 三级灰），下面一条分隔线。之前的问题：agent 名（`labelSmall` 三级灰）+ `bodyMedium` 次要色；**当前的问题**：`AppTheme.serif(headlineMedium)`，行高 1.25；你的回答：右侧 `userBubble` 气泡。 |
+| **裁决卡**（scene 4-1） | `surface` 底、圆角 16、`paper` 阴影，1px 边：通过 `ember`、失败 `outline`。`VERDICT`（`labelSmall`，字距 1.6）→ 结论（`displaySmall` 衬线，通过时琥珀）与分数（`headlineLarge` 衬线 + `pts`）同一基线 → `+N XP` → 评语 `bodyLarge` → 分隔线 + `What was missing` 与圆点列表（失败砖红点、通过灰点）→ 墨色主按钮 `Make a lesson card` + 文字按钮 `Back to node`。 |
+| **聊天面板** | 你的话右对齐 `userBubble` 气泡（圆角 20，右上角 4）；她的话左对齐无气泡，左侧 28px 圆形 agent 小头像 + 名字 + 时间，正文 `bodyLarge`。日期分隔是居中的小字。新消息自动滚到底。 |
+| **左栏** | 标题栏 `My character`：身份宣言、Win condition、Stakes、Main quests、Rules；三条属性条（`Lv 2 · 3/5`、`Cleared 4/12`、`Condition: …`），条高 8、圆角 4，填充墨色（Cleared 为琥珀，状态差为砖红）；Daily quests；Today。 |
+| **统计条**（scene 2） | 进度环（细墨线，中间 `3/22`）+ 大数字小标签：`Cleared 3 / 22`、`Progress 13%`、`Ready`、`Audits`、`Lessons`。 |
+| **人生树面板**（scene 2） | `night` 底、圆角 20。左上 `Tree | Outline` 胶囊切换；上方居中一行斜体身份宣言；左下图例；右下 `Drag to turn · tap a point`。 |
+| **节点卡片**（scene 2） | 一叠纸：前面一张 `surface` 卡片（1px `glow` 边、`float` 阴影），后面错开两张更暗的纸。小号大写 kicker（`BOSS` / `MAIN QUEST` / `COURSE` / `YOU`）→ 标题 → 状态 chip → 大数字（Best / Attempts / Lessons）→ `Audit history`（日期、Passed/Failed、分数条）→ 教训卡 → 墨色 `Take it on`。 |
+| **contents 卡片**（scene 4） | 白卡、1px `outline`、圆角 16。资料是一行一个：网站小图标位（首字母圆点）+ 标题 + 域名（次要色），整行可点。 |
+| **技能图**（Outline 视图） | 圆点 14；可挑战 = 白底墨色描边，掌握 = 琥珀实心，失败 = 砖红实心，锁住 = 灰实心，Boss 多一圈；左下角图例。 |
+| **庆祝卡片**（审计通过） | 舞台中央浮出的纸卡（`float` 阴影、圆角 20）：古铜到金的星光散开，`Cleared!` / `Boss cleared!` + 分数，`+N XP`（琥珀），等级提升时 `Lv N → N+1`，新解锁节点为浅柠檬 chip（点了进 scene 4）。 |
+| **教训卡**（反思之后） | 卡片从背面翻到正面（300ms）：标题、正文、误解（红色小标签）。 |
+| **形变图标**（`MorphIcon`，参考 Morphicons） | 线条图标放在 24 网格上，用折线描述；每笔重采样到同样多的点，在弹簧上移动（stiffness 420、damping 30，略过冲后很快停下）。笔画数不同时，多出来的那笔从另一形状最后一点长出或缩回。用在：发送键 → 等她回答时变成转圈（`ring`，转动），回来后变回箭头；∿ 悬停时竖条换一个节拍；听写麦克风 ↔ 停止方块；落地页 `Sign in` 悬停时箭头穿过一扇门（`signIn`）。动画关闭时直接到终态。 |
+| **语音模式** | 输入栏变成 `surfaceHigh` 胶囊里的实时声波条（随音量跳动，古铜到金），上方一行状态字 `Listening… / Thinking… / Speaking…`，再上方是实时字幕（你说的话，灰色）。 |
 
 ---
 
-## 8. 审计室对话重做 + 知识图谱（2026-07-19，第四次改版）
+## 4. 形象占位（`Avatar`）
 
-用户反馈两件事：（1）审计室"太无聊了"，对话没有 NPC 感，而且浅色主题下
-背景还是黑的；（2）希望整站往"带 agent 的 Obsidian"方向走——技能树和
-原则卷轴目前是两个互不relate的孤立结构，应该有一个知识图谱把两者连起来。
+黑色细线小人，和手绘稿一个画法。每个 agent 一个区别（发型 / 眼镜 / 帽子 / 领结）；front_desk 是魔法师（尖帽带星、长发、长袍），scene 1 用 `OrbAvatar` 手托水晶球。
 
-### 8.1 修复审计室主题 bug + NPC 对话重做（`AuditRoom.tsx`）
-`.audit-immersive` 之前故意写死 `background: #0a0a0a`，不跟随
-`--bg`/`--panel` 主题 token（§7 之前没有这个问题，这是更早一次改版引入的
-设计决策，仿照 Stitch 参考稿里 Focus Mode 是一个独立永远深色的沉浸画布）。
-用户反馈这在浅色主题下看起来像没生效的 bug，而不是有意的设计——采纳这个
-反馈，整段 `.audit-immersive`/`.audit-quest-card` 深色写死样式删掉，
-`AuditRoom.tsx` 改回用标准 `.panel`，和其余页面一样跟随主题 token。
-
-对话区改造：上网查了视觉小说/RPG 对话框的通用做法（头像+称呼贴着文本框，
-不是纯文字滚动记录），新增 `AuditorPortrait`（`AuditRoom.tsx` 内部组件）——
-一个跟玩家 `PixelFigure`（`Avatar.tsx`）区分开的像素半身像（宽头+一条
-"面罩"横线，没有腿，纯头像不是缩小版玩家造型），页面顶部新增一张常驻的
-"角色卡"（头像+身份+一句入戏台词），对话记录改成类似 Claude.ai 的消息流
-布局——每条消息一行「头像 + 发言人名字 + 正文」，不是之前那种只有文字、
-没有头像的纯文本堆叠。玩家消息用一个 "YOU" 方块头像区分。对话逻辑、
-verdict/reflection 流程、右侧 quest 卡片的真实数据（角色、节点类型、
-已提交轮次、估算进度）都没有变，只是把外层容器从 `.audit-immersive`
-换回 `.panel`，把消息渲染换成 `ChatMessage` 组件。
-
-### 8.2 知识图谱（新增 `pages/KnowledgeGraph.tsx`，后端新增 `GET /api/graph`）
-不是装饰性占位，是把技能树（`SkillNode.parent_id`）和原则卷轴
-（`Principle`）两套已有的真实数据结构第一次连起来展示成一张图，复用侧栏
-模板里原本装饰性的 "Map" 槽位（导航文案改成 "Graph"，删掉原来的
-`pages/Map.tsx` 占位页）。
-
-**后端**（`backend/app/routers/graph.py`）：`GET /api/graph` 返回
-`{nodes, edges}`，三种边全部从已有数据推导，没有新增任何编造字段：
-- `parent`：技能树原有的 `parent_id` 结构。
-- `origin`：一条原则真实来源于哪个节点——`Principle.source_session_id`
-  → `AuditSession.skill_id`，这条关系本来就存在（审计失败时生成原则），
-  只是之前没有暴露成图的边。
-- `related`：把 `app/agents/retrieval.py` 里审计开始时用来做"历史相关
-  原则检索"的字符 2-gram/词重叠打分函数（`_relevance_score` 改名导出成
-  公开的 `relevance_score`，供两处复用）用在原则文本 vs. 技能节点文本上，
-  取分数最高的最多 2 个非来源节点连边，超过 `MAX_RELATED_EDGES_PER_
-  PRINCIPLE` 的直接丢弃，避免变成一团乱麻。新增 `tests/test_graph.py`
-  验证空态（只有技能节点、只有 parent 边）和有原则时的 origin 边。
-
-**前端**：`graphLayout.ts` 实现了一个不依赖任何图表库的力导向布局
-（Fruchterman-Reingold 思路：全节点两两互斥 + 沿边吸引 + 向中心的弱回拉力 +
-线性降温），初始角度用节点 id 的确定性哈希算出（不是 `Math.random()`），
-保证同一份图数据每次渲染布局一致，不会每次刷新都跳动——`graphLayout.
-test.ts` 验证了这一点，以及所有坐标都是有限数且落在画布范围内。
-`KnowledgeGraph.tsx` 用一个 SVG 画布渲染：技能节点是方块（已掌握用金色
-`#facc15` 填充，呼应"已掌握"在别处的配色），原则节点是圆圈，三种边用不同
-线型区分（parent 实线／origin 金色虚线／related 灰色虚线，图例列在画布
-上方）。点技能节点会真的跳转到该节点的 `SkillNodeDetail` 页
-（`onOpenSkill` 回调）；点原则节点会在画布下方弹出一张真实标题的信息卡，
-不是纯装饰的点击效果。
-
-**已知取舍**：布局是"渲染时算一次、之后不再动"的静态力导向图，没有做
-拖拽重新定位或持续动画——真正的 Obsidian 图谱视图支持拖拽/缩放/物理引擎
-持续运行，这里先做到"结构真实、位置合理、可点击探索"，拖拽交互留到下次
-如果需要再加，不在这次范围内声称做到。
+**水晶球**（参考 React Bits Orb、react-ai-orb、Aceternity Sparkles 的做法，用 CustomPainter 自绘，不引入依赖）：
+- 分层：烟色玻璃底（`glass`，左上受光）→ 三团古铜到金的雾气，各自慢速漂移 → 人生树星座 → 高光椭圆、边缘暗角、每 7 秒一道扫光 → 2.5px 线稿描边（和小人同粗）。
+- **星图**（2026-10-05 起是 `LifeConstellation`，取代 `MiniTree`；下面是旧版说明，留作对照）：径向布局，根节点在球心，每一层是一圈，子树按叶子数分扇区，半径按平方根分布让外圈宽松；连线是向球心微弯的弧线。掌握 = 绿点带柔光，可挑战 = 白芯蓝环且在呼吸（每个节点相位错开），锁住 = 暗灰小点。
+- **动效**：出场 1.2 秒，由内向外一圈圈出现，节点轻弹出现，连线从父节点画向子节点；平时整片星座 60 秒自转一圈，带轻微倾斜晃动；每 3.2 秒有一个光点沿一条连线由内向外跑；周围四颗星各自闪烁。
+- **交互**：悬停时球放大到 1.04、雾气变浓、星座转速变成 3.5 倍、星星变大；按下缩到 0.97；点击进 scene 2。
+- **人生树星座**（`LifeConstellation`，水晶球和 scene 2 共用）：你在球心（白点 + 四角星 + 暖光），一圈主线任务（空心环 + 中心点），再往外课程与节点；节点按叶子数分扇区、半径按平方根分布，每个节点有一点高度差，整盘绕竖轴 90 秒转一圈，带透视（远处变暗变小）。外面一层 120 个点的线框球壳（近邻连线 + 少量三角面），像录屏里的网格。掌握 = 金色实心带光晕、往上冒火花；失败 = 砖红；可挑战 = 白环呼吸；锁住 = 暗灰小环；Boss 多一圈细环。每 2.6 秒一个金色光点沿一条边由内向外跑。水晶球里是同一棵树的 `compact` 版（无文字、点更少）。
+- 系统开启"减少动态效果"或在测试中：所有动效停止，直接显示最终画面。avatar 下方或气泡上方总有 agent 名字。聊天面板里的小头像是同一个形象的头部特写，放在 28px 圆里。3D 做好后按 agent 名替换。
 
 ---
 
-## 9. 图谱换 force-graph 库 + 技能树画布退休为推荐列表（2026-07-20，第五次改版）
+## 5. 约束
 
-用户反馈：知识图谱要"一个球一个球"（全部圆形节点）+ 真的能拖拽/缩放，§8
-那版静态一次性力导向布局不够；同时明确要求"那个树的话也别干了"——
-`SkillTree.tsx` 的树状画布不再维护，改成一个"接下来该做什么"的推荐列表，
-每条推荐能看到网络里最近的 3 个关联节点。技术选型上，最初打算继续手写
-SVG + 自写力学（延续 §8 的 `graphLayout.ts`），用户建议用 three.js；权衡后
-选了同作者的 2D 版本 `force-graph`（而不是 3D 的 `3d-force-graph`）——
-理由：这个图谱信息密度高、以阅读文字标签为主，3D 透视会让密集文字标签
-变形/互相遮挡，Obsidian 自己的图谱视图默认也是 2D，不是 3D。
-
-### 9.1 `KnowledgeGraph.tsx` 换用 `force-graph`
-`frontend/src/graphLayout.ts`／`graphLayout.test.ts`（§8 的手写力导向实现）
-已删除——`force-graph` 自带 d3-force 物理引擎，没必要维护两套并行的力学
-实现。新实现：
-- 所有节点渲染成圆（`nodeVal`）——技能节点更大，已掌握用金色 `#facc15`
-  填充；原则节点更小、用 `--dim` 灰色，不再用方块/圆形区分技能/原则。
-- 拖拽重新定位、滚轮/触控板缩放/平移全部是库自带行为
-  （`enableNodeDrag`/内置 zoom+pan），没有写任何手动 pointer/wheel 事件
-  处理代码。
-- 颜色通过 `getComputedStyle(document.documentElement)` 在每次渲染回调
-  里现读 CSS 变量（`--text`/`--dim`/`--border-strong`），因为 Canvas 的
-  `fillStyle`/`strokeStyle` 不能直接吃 `var(--x)` 这种 CSS 自定义属性
-  字符串——这样处理还带来一个好处：亮暗主题切换会在下一帧自动生效，不需要
-  额外监听 `data-theme` 变化重新初始化图实例。
-- 节点标签用 `nodeCanvasObjectMode('after') + nodeCanvasObject` 在库画完
-  默认圆之后叠加文字，而不是自定义整个渲染（复用库的圆形渲染 + 只接管
-  文字部分）。
-- 点击技能节点仍然真实跳转到 `SkillNodeDetail`（`onNodeClick` 回调），
-  点原则节点弹出真实标题/状态的信息卡——这部分行为和 §8 版本一致，只是
-  底层从手写 SVG 换成了库的 canvas 渲染 + 回调。
-
-### 9.2 `SkillTree.tsx`：树状画布退休，改成推荐列表
-`computeSkillTreeLayout()`、Manhattan SVG 连线、绝对定位卡片全部删除——
-不是隐藏，是真的不再维护（对应用户"别干了"的原话）。技能树底层数据结构
-（`parent_id` 关系）没有变，`SkillNodeDetail` 的前置节点面包屑、
-`KnowledgeGraph` 的 `parent` 边都还在用它，只是不再有一个专门的画布把它
-画成树。
-
-页面顶部的主题输入框/澄清追问流程/日夜审计模式切换/新手引导面板完全不变
-（这部分是真实功能，不是画布的一部分）。画布位置换成：
-- **推荐列表**：只列真实的 `status === 'available'` 节点（locked 还不能
-  操作，mastered 已经做完，两者都不属于"接下来该做什么"）。排序按该节点
-  的直接子节点数量降序（能解锁的下游节点越多，优先级越高——真实计算，
-  不是编的分数），同分按 id 升序稳定排序。
-- **最近 3 个关联节点**：`api.getGraph()` 拉一次完整图数据，把 `edges`
-  当无向图建邻接表（不管 `source`/`target` 谁是谁，parent/origin/related
-  三种边都算相邻），从推荐节点做 BFS，按发现顺序（=最近优先）取前 3 个
-  不同节点，够不到 3 个就有几个显示几个，不补假数据。技能邻居点击后
-  真的跳转到该节点详情页；原则邻居只是静态标签（还没有单独的原则详情页）。
-- 空态区分两种情况："没有任何技能节点"（`No skills yet — generate one
-  above to get started.`）vs "有节点但没有 available 的"（`Nothing
-  available right now — everything's either locked or already
-  mastered.`），不是笼统一句提示。
-
-### 9.3 测试改动
-`SkillTree.test.tsx` 里专门测 `computeSkillTreeLayout` 子树居中数学的
-`describe` 块（子树布局 bug 回归测试）和测 SVG 连线 class 的
-`describe` 块整个删除——这些测的行为已经不存在了，不是简化断言。新增
-测试覆盖：只列出 available 节点（locked/mastered 不出现）、两种空态、
-"最近关联节点" chip 渲染与点击跳转。`KnowledgeGraph.tsx` 没有新增单测——
-`force-graph` 渲染到真实 DOM 容器的 Canvas，jsdom 里容器尺寸为 0 且
-Canvas API 基本是空实现，深度交互测试在这个环境下没有意义（和 §7 记录的
-SVG 连线在 jsdom 下测不了像素坐标是同一个限制），验证方式是本节改动都过了
-`tsc -b`/`npm test`/`npm run lint` 加真实浏览器截图（亮/暗主题各一张）。
-
-## 10. Knowledge Graph：Librarian 语义关联 + 矛盾检测（2026-07-20，第六次改版）
-
-`related` 边的判断从关键词重叠启发式换成了 LLM（Librarian agent）——细节
-和取舍见 `docs/WHITEPAPER.md` §4.3。这里只记视觉/组件层面的改动：
-
-- **新增 `contradicts` 边**：唯一一处不用黑白灰的边——复用系统里本来就有
-  的 `--danger` 红（错误提示用的同一个变量），不是新引入一个"分类色"，
-  逻辑上和"金色只留给已掌握"是同一条规则：颜色只用来传递语义信号
-  （警示/成就），不用来做类目区分。渲染为实线（`linkLineDash: null`，
-  和 `parent` 边一样），比虚线的 `related` 边更显眼——矛盾比"这两个东西
-  有点关系"更值得被注意到。
-- **"Rebuild Links" 按钮**：在图谱工具条最右侧，触发 `POST
-  /api/graph/relink`（后端对全库原则重新跑一次 Librarian 判断，见
-  WHITEPAPER §4.3），成功后用返回的最新数据重新拉一次 `/api/graph`。
-  没有原则数据时按钮禁用（`disabled`），避免对着空库点一个必然无事发生
-  的按钮。
-- **"LIBRARIAN LINT" 面板**：`Rebuild Links` 点过一次之后才出现（初始
-  不显示，不是"没矛盾"和"还没检查过"两种状态糊在一起），红色描边
-  （`borderColor: 'var(--danger)'`）+ 逐条列出矛盾的原则标题对和 LLM
-  给的一句话原因；没有矛盾时显示"No contradictions found across the
-  archive."而不是把面板隐藏掉——用户点了"检查一下"这个动作理应有反馈，
-  不能因为结果是"没问题"就假装什么都没发生。
-- 后端没有新增 UI 相关内容，但新增了 `backend/app/agents/librarian.py`
-  （新 agent）、`backend/app/services/linking.py`（复用于原则创建时自动
-  关联 + relink 端点的批量重跑）、`backend/app/models.py` 的
-  `PrincipleLink` 表（新表，`SQLModel.metadata.create_all` 自动建表，
-  不需要手动迁移）。测试见 `backend/tests/test_linking.py`。
-
-## 11. Skills 页：contextual bandit 难度建议（2026-07-20，第七次改版）
-
-落地白皮书 §4.4 V2.1 的 contextual bandit（细节/算法取舍见 WHITEPAPER）。
-UI 侧只做了两处克制的改动，没有新起一个"推荐"板块：
-
-- **顶部一行提示**：`Recommended Next` 标题下面一行 `dim` 小字——
-  "Based on your recent audits, {tier} nodes are probably the best fit
-  right now"，内嵌一个 `tag tag--outline` 样式的 `Suggested` 徽标示例，
-  告诉用户接下来看到的徽标是什么意思。请求失败（`getRecommendation` 是
-  独立于 `skills`/`graph` 的 best-effort 请求）时这行连同下面所有
-  `Suggested` 徽标一起消失，不显示错误提示——这条建议本身就是锦上添花，
-  不是核心数据，没必要为它单独弹错误横幅。
-- **`Suggested` 徽标 + 稳定重排**：卡片按真实子节点数（解锁杠杆）排序的
-  规则不变，只是命中 bandit 建议难度档的卡片会被稳定地挪到最前面
-  （sort 比较函数里加一层最高优先级 key，不是重新打分），同时在
-  node_type 标签右边追加一个 `Suggested` 标签。命中判断纯前端用
-  `skill_tiers[id] === suggested_tier` 比对，后端已经把"这个节点是什么
-  难度档"算好了（`node_difficulty_score` 复用自激励引擎），前端不重复
-  实现这套规则。
+- 页面里出现 `Color(0x…)`、非 token 的 `BorderRadius.circular`、`fontSize:`、`fontFamily:` 字面量视为违规；图标、头像、气泡最大宽度这类布局尺寸除外。
+- `test/theme_test.dart` 锁定 token 值和主题关键规则；改 token 要同步改测试。

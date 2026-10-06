@@ -6,7 +6,7 @@ from concurrent.futures import TimeoutError as FutureTimeoutError
 from google import genai
 
 from app.config import settings
-from app.llm.base import Message, strip_code_fence
+from app.llm.base import Message, agent_of, strip_code_fence
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class GeminiEmptyResponseError(RuntimeError):
 
 
 class GeminiTimeoutError(RuntimeError):
-    """Gemini 调用超过 settings.gemini_timeout_seconds 仍未返回。
+    """Gemini 调用超过 settings.llm_timeout_seconds 仍未返回。
 
     注意：pinned 的 google-genai==0.3.0 SDK 本身不支持任何超时配置——它的
     HttpOptions 只有 base_url/api_version/headers/response_payload，底层
@@ -28,9 +28,17 @@ class GeminiTimeoutError(RuntimeError):
 
 class GeminiProvider:
     name = "gemini"
+    default_model = "gemini-2.5-flash"
+    # get_provider(agent) 按子 agent 解析出来的模型；None 表示用全局 LLM_MODEL 或默认值。
+    _model: str | None = None
 
-    def __init__(self) -> None:
+    def __init__(self, model: str | None = None) -> None:
         self._client = genai.Client(api_key=settings.gemini_api_key)
+        self._model = model or None
+
+    @property
+    def model(self) -> str:
+        return self._model or settings.llm_model or self.default_model
 
     def complete(self, messages: list[Message]) -> str:
         system = "\n".join(m["content"] for m in messages if m["role"] == "system")
@@ -40,11 +48,13 @@ class GeminiProvider:
             for m in turns
         ]
 
+        agent = agent_of(messages) or "-"
         start = time.perf_counter()
         logger.info(
-            "gemini complete() start model=%s timeout_s=%.1f",
-            settings.llm_model,
-            settings.gemini_timeout_seconds,
+            "gemini complete() start agent=%s model=%s timeout_s=%.1f",
+            agent,
+            self.model,
+            settings.llm_timeout_seconds,
         )
         try:
             response = self._generate_with_timeout(contents, system)
@@ -53,10 +63,10 @@ class GeminiProvider:
             logger.error(
                 "gemini complete() timed out after %.0fms (limit=%.1fs)",
                 elapsed_ms,
-                settings.gemini_timeout_seconds,
+                settings.llm_timeout_seconds,
             )
             raise GeminiTimeoutError(
-                f"Gemini 调用超过 {settings.gemini_timeout_seconds}s 未返回"
+                f"Gemini 调用超过 {settings.llm_timeout_seconds}s 未返回"
             ) from None
         except Exception:
             elapsed_ms = (time.perf_counter() - start) * 1000
@@ -77,14 +87,14 @@ class GeminiProvider:
         try:
             future = executor.submit(
                 self._client.models.generate_content,
-                model=settings.llm_model,
+                model=self.model,
                 contents=contents,
                 config={
                     "system_instruction": system,
                     "response_mime_type": "application/json",
                 },
             )
-            return future.result(timeout=settings.gemini_timeout_seconds)
+            return future.result(timeout=settings.llm_timeout_seconds)
         finally:
             # wait=False：超时后不阻塞等待后台线程结束，让它自然收尾（SDK 本身
             # 不提供取消正在进行的 HTTP 请求的方式）。

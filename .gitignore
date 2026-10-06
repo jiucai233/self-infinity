@@ -7,3 +7,10 @@ node_modules/
 dist/
 .DS_Store
 backend/.venv/
+
+# per-agent Flutter workspaces (temporary)
+.claude/agent-ws/
+
+# Flutter web build for Vercel (scripts/deploy.sh)
+backend/public/
+backend/.vercel/

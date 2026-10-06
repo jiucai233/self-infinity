@@ -1,124 +1,199 @@
-"""Recommender：在已有节点里挑下一步。
+"""Recommender (UT-26) and the plan endpoints (IT-27)."""
 
-最重要的一条是**不接受指向不存在节点的步骤** —— 模型编 skill_id 是必然会发生的，
-而一个指向空气的步骤在前端就是个点了没反应的按钮。
-"""
+import json
 
 import pytest
-from sqlmodel import Session, select
+from sqlmodel import Session
 
-from app.agents.recommender import Recommender, format_context
-from app.models import SkillNode, SkillStatus, StudyPlan
-from app.services.profile import MisconceptionCluster
-from app.models import utcnow
+from app.agents.recommender import Candidate, Recommender, RecommenderError
+from app.llm.mock import MockProvider
+from app.models import EdgeKind, SkillStatus
+from tests.helpers import (
+    BrokenProvider,
+    CountingProvider,
+    ScriptedProvider,
+    generate,
+    ids_by_slug,
+    link,
+    make_course,
+    make_skill,
+    pass_node,
+    set_status,
+)
+
+REASON = "Prerequisites checked — you can take this on now."
+HINT = "Explain the why before the definition."
 
 
-def test_invalid_skill_ids_are_dropped():
-    steps = Recommender._parse(
-        '{"steps": [{"skill_id": 1, "rationale": "有效"}, {"skill_id": 999, "rationale": "编造的"}]}',
-        valid_ids={1, 2},
+def candidates(*ids: int, position="leaf") -> list[Candidate]:
+    return [Candidate(skill_id=i, title=f"Node {i}", position=position, tier="medium") for i in ids]
+
+
+def reply(*ids, extra=()) -> ScriptedProvider:
+    steps = [{"skill_id": i, "rationale": f"r{i}", "focus_hint": f"h{i}"} for i in ids]
+    return ScriptedProvider(recommender=json.dumps({"steps": [*steps, *extra]}))
+
+
+def recommend(provider, available, flag="normal"):
+    return Recommender(provider).recommend(available, "medium", [], flag)
+
+
+def test_ut26_an_unknown_skill_id_is_dropped():
+    steps = recommend(reply(1, 99, 2), candidates(1, 2, 3))
+
+    assert [s.skill_id for s in steps] == [1, 2]
+
+
+def test_duplicates_are_dropped_and_at_most_five_are_kept():
+    steps = recommend(reply(1, 1, 2, 3, 4, 5, 6, 7), candidates(*range(1, 8)))
+
+    assert [s.skill_id for s in steps] == [1, 2, 3, 4, 5]
+
+
+def test_string_ids_are_accepted_but_junk_is_skipped():
+    provider = ScriptedProvider(recommender=json.dumps({"steps": [
+        {"skill_id": "2", "rationale": "a", "focus_hint": "b"}, {"skill_id": True}, {"skill_id": None}, {"x": 1}]}))
+
+    assert [s.skill_id for s in recommend(provider, candidates(1, 2))] == [2]
+
+
+@pytest.mark.parametrize("raw", ["not json", '{"steps": 3}', '{"steps": []}', '{"steps": [{"skill_id": 99}]}'])
+def test_no_usable_step_is_an_error(raw):
+    with pytest.raises(RecommenderError):
+        recommend(ScriptedProvider(recommender=raw), candidates(1, 2))
+
+
+def test_the_prompt_lists_nodes_tier_clusters_and_condition():
+    provider = reply(1)
+    Recommender(provider).recommend(
+        [Candidate(1, "Quadratic Functions", "leaf", "hard", ["Quadratic Equations"])], "medium", [], "low"
     )
 
-    assert [s.skill_id for s in steps] == [1]
+    (system,) = provider.system_prompts("recommender")
+    assert system.startswith("[agent: recommender]")
+    nodes = json.loads(system.split("<available_nodes>\n")[1].split("\n</available_nodes>")[0])
+    assert nodes == [{"skill_id": 1, "title": "Quadratic Functions", "position": "leaf", "tier": "hard", "unmet_requires": ["Quadratic Equations"]}]
+    assert "Suggested difficulty tier: medium" in system and "Condition: low" in system
 
 
-def test_duplicate_steps_are_dropped():
-    steps = Recommender._parse(
-        '{"steps": [{"skill_id": 1, "rationale": "第一次"}, {"skill_id": 1, "rationale": "又来一次"}]}',
-        valid_ids={1},
-    )
-
-    assert len(steps) == 1
+# ---------------------------------------------------------------- the Mock script, contract 4.6
 
 
-def test_plan_is_capped_at_five_steps():
-    payload = '{"steps": [' + ",".join(f'{{"skill_id": {i}, "rationale": "r"}}' for i in range(1, 9)) + "]}"
+def test_46_mock_takes_the_first_five_available_nodes_by_id():
+    steps = recommend(MockProvider(), candidates(9, 3, 5, 1, 7, 8, 2))
 
-    assert len(Recommender._parse(payload, valid_ids=set(range(1, 9)))) == 5
-
-
-def test_all_invalid_ids_is_an_error_not_an_empty_plan():
-    """一份全是废步骤的计划不该被当成"没什么可做"静默返回。"""
-    with pytest.raises(ValueError):
-        Recommender._parse('{"steps": [{"skill_id": 999, "rationale": "编造的"}]}', valid_ids={1})
+    assert [s.skill_id for s in steps] == [1, 2, 3, 5, 7]
+    assert {(s.rationale, s.focus_hint) for s in steps} == {(REASON, HINT)}
 
 
-def test_malformed_output_raises():
-    with pytest.raises(ValueError):
-        Recommender._parse("这不是 JSON", valid_ids={1})
+def test_46_mock_puts_leaves_first_when_the_condition_is_low():
+    available = [Candidate(1, "a", "branch", "easy"), Candidate(2, "b", "leaf", "easy"),
+                 Candidate(3, "c", "root", "easy"), Candidate(4, "d", "leaf", "easy")]
+
+    assert [s.skill_id for s in recommend(MockProvider(), available, "low")] == [2, 4, 1, 3]
+    assert [s.skill_id for s in recommend(MockProvider(), available, "normal")] == [1, 2, 3, 4]
 
 
-def test_no_available_nodes_means_no_llm_call():
-    """没有可选节点时直接返回空，不该浪费一次调用。"""
-
-    class ExplodingProvider:
-        name = "exploding"
-
-        def complete(self, messages):
-            raise AssertionError("不该被调用")
-
-    assert Recommender(ExplodingProvider()).recommend([], {}, "easy", "mid", []) == []
+# ---------------------------------------------------------------- endpoints
 
 
-def test_context_marks_cross_domain_clusters():
-    cluster = MisconceptionCluster(
-        label="以为相关性就是因果关系",
-        occurrences=2,
-        skills=["统计学", "投资"],
-        first_seen=utcnow(),
-        last_seen=utcnow(),
-    )
+def test_it27_plan_with_no_available_node_is_400(client):
+    response = client.post("/api/plan/generate")
 
-    context = format_context("hard", "high", [cluster], health=80.0, sanity=60.0)
-
-    assert "【跨领域】" in context
-    assert "统计学、投资" in context
-    assert "hard" in context
+    assert response.status_code == 400
+    assert response.json() == {"detail": "No node is available yet. Generate a course or pass an existing node first."}
+    assert client.get("/api/plan/current").json() is None
 
 
-def test_generate_plan_requires_available_nodes(client, client_engine):
+def test_plan_generation_returns_and_stores_a_study_plan(client):
+    ids = ids_by_slug(generate(client))
+    pass_node(client, ids["high-school-math"])
+
+    response = client.post("/api/plan/generate")
+
+    assert response.status_code == 200
+    plan = response.json()
+    assert set(plan) == {"id", "suggested_tier", "context_bucket", "created_at", "steps"}
+    assert plan["suggested_tier"] in ("easy", "medium", "hard") and plan["context_bucket"] in ("low", "mid", "high")
+    assert [s["skill_id"] for s in plan["steps"]] == [ids["algebra"], ids["functions"], ids["calculus"]]
+    assert plan["steps"][0] == {"skill_id": ids["algebra"], "course_id": 1, "skill_title": "Algebra",
+                                "node_type": "concept", "rationale": REASON, "focus_hint": HINT}
+    assert client.get("/api/plan/current").json() == plan
+
+
+def test_current_plan_is_the_latest_one(client):
+    ids = ids_by_slug(generate(client))
+    first = client.post("/api/plan/generate").json()
+    pass_node(client, ids["high-school-math"])
+    second = client.post("/api/plan/generate").json()
+
+    assert second["id"] != first["id"] and len(second["steps"]) == 3 and len(first["steps"]) == 1
+    assert client.get("/api/plan/current").json() == second
+
+
+def test_plan_is_capped_at_five_steps_over_several_courses(client, client_engine):
     with Session(client_engine) as session:
-        for skill in session.exec(select(SkillNode)).all():
-            skill.status = SkillStatus.locked
-            session.add(skill)
-        session.commit()
+        course = make_course(session)
+        for i in range(8):
+            make_skill(session, course, f"n{i}", f"Node {i}")
 
-    assert client.post("/api/plan/generate").status_code == 400
-
-
-def test_current_plan_is_null_before_anything_is_generated(client):
-    resp = client.get("/api/plan/current")
-
-    assert resp.status_code == 200
-    assert resp.json() is None
+    assert len(client.post("/api/plan/generate").json()["steps"]) == 5
 
 
-def test_generate_then_read_back(client, client_engine):
-    generated = client.post("/api/plan/generate")
-    assert generated.status_code == 200
-    body = generated.json()
-
-    assert body["steps"]
-    assert body["suggested_tier"]
-    # 每一步都指向一个真实存在的节点，并带回它当下的标题。
-    for step in body["steps"]:
-        assert step["skill_title"]
-        assert step["rationale"]
-
+def test_only_available_nodes_are_offered(client, client_engine):
     with Session(client_engine) as session:
-        assert len(session.exec(select(StudyPlan)).all()) == 1
+        course = make_course(session)
+        a_id = make_skill(session, course, "a", "A", status=SkillStatus.available).id
+        make_skill(session, course, "b", "B", status=SkillStatus.locked)
+        make_skill(session, course, "c", "C", status=SkillStatus.mastered)
 
-    assert client.get("/api/plan/current").json()["id"] == body["id"]
+    assert [s["skill_id"] for s in client.post("/api/plan/generate").json()["steps"]] == [a_id]
 
 
-def test_steps_pointing_at_deleted_nodes_are_skipped(client, client_engine):
-    body = client.post("/api/plan/generate").json()
-    removed_id = body["steps"][0]["skill_id"]
-
+def test_unmet_requires_reach_the_recommender(client, client_engine, monkeypatch):
     with Session(client_engine) as session:
-        session.delete(session.get(SkillNode, removed_id))
-        session.commit()
+        course = make_course(session)
+        first = make_skill(session, course, "f", "First")
+        second = make_skill(session, course, "s", "Second")
+        link(session, first, second, EdgeKind.requires)
+        first_id, second_id = first.id, second.id
+    provider = reply(first_id, second_id)
+    monkeypatch.setattr("app.routers.plan.get_provider", lambda agent=None: provider)
 
-    remaining = client.get("/api/plan/current").json()
+    client.post("/api/plan/generate")
 
-    assert removed_id not in [s["skill_id"] for s in remaining["steps"]]
+    (system,) = provider.system_prompts("recommender")
+    nodes = json.loads(system.split("<available_nodes>\n")[1].split("\n</available_nodes>")[0])
+    assert {n["title"]: n["unmet_requires"] for n in nodes} == {"First": [], "Second": ["First"]}
+
+
+def test_hallucinated_ids_are_dropped_by_the_endpoint(client, monkeypatch):
+    ids = ids_by_slug(generate(client))
+    monkeypatch.setattr("app.routers.plan.get_provider", lambda agent=None: reply(999, ids["high-school-math"]))
+
+    steps = client.post("/api/plan/generate").json()["steps"]
+
+    assert [s["skill_id"] for s in steps] == [ids["high-school-math"]]
+
+
+@pytest.mark.parametrize("provider", [BrokenProvider(), ScriptedProvider(recommender="nope"), reply(999)])
+def test_plan_failure_is_502_and_nothing_is_stored(client, monkeypatch, provider):
+    generate(client)
+    monkeypatch.setattr("app.routers.plan.get_provider", lambda agent=None: provider)
+
+    response = client.post("/api/plan/generate")
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "Plan generation failed. Please try again."}
+    assert client.get("/api/plan/current").json() is None
+
+
+def test_plan_generation_asks_the_recommender_once(client, monkeypatch):
+    generate(client)
+    provider = CountingProvider()
+    requested = []
+    monkeypatch.setattr("app.routers.plan.get_provider", lambda agent=None: (requested.append(agent), provider)[1])
+
+    client.post("/api/plan/generate")
+
+    assert requested == ["recommender"] and provider.counts == {"recommender": 1}

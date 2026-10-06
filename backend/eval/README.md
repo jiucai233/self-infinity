@@ -1,8 +1,7 @@
 # Auditor calibration harness
 
 Offline evaluation of `Auditor.next_turn` judgment quality against a hand-labeled
-30-scenario calibration set (`calibration_set.json`), per WHITEPAPER.md §9 M2:
-"接入 Gemini + 校准集 | 30 条校准集裁决准确率 ≥ 80%，放水率 ≤ 10%".
+30-scenario calibration set (`calibration_set.json`), per docs/WHITEPAPER.md §8: accuracy ≥ 80%, leniency ≤ 10%.
 
 ## Running
 

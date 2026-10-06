@@ -1,0 +1,7 @@
+<!-- A leaf with its veins, line art. Anchor: the foot of the stalk; it points up.
+     Tinted red it marks a failed node; in ink it decorates a branch. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" data-anchor="50 100">
+  <path data-role="line" d="M50 100 L 50 88"/>
+  <path data-role="tint line" d="M50 88 C 33 76, 30 47, 50 16 C 70 47, 67 76, 50 88 Z"/>
+  <path data-role="hair" d="M50 88 C 49 66, 49 44, 50 22 M50 72 L 40 63 M50 72 L 60 63 M50 57 L 41 48 M50 57 L 59 48 M50 42 L 44 35 M50 42 L 56 35"/>
+</svg>

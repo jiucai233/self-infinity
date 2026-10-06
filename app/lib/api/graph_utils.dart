@@ -1,0 +1,151 @@
+/// Pure helpers over the contains/requires edges of a course
+/// (`docs/api-contract.md`, "Node position" in Section 2).
+///
+/// All functions take the full edge list of a course (as returned by
+/// `getCourseMap`) and return plain ids or edges. They never mutate their
+/// arguments and are cheap enough to call per node for the ≤ 30 nodes of a
+/// course.
+///
+/// Terminology
+/// * *contains* edge: `fromId` is the parent group, `toId` the child.
+///   A node can have several contains parents; exactly one is the *main*
+///   parent (`isPrimary == true`) and the node is drawn inside it.
+/// * *requires* edge: `fromId` is learned first, `toId` after.
+library;
+
+import 'models.dart';
+
+/// All contains-parents of [nodeId], the main parent first, then the others
+/// in edge order. Empty for a root.
+///
+/// If the server flags no parent as primary, the first listed parent counts as
+/// the main one.
+List<int> containsParentsOf(int nodeId, List<SkillEdge> edges) {
+  final parents = <int>[];
+  int? primary;
+  for (final e in edges) {
+    if (!e.isContains || e.toId != nodeId) continue;
+    if (!parents.contains(e.fromId)) parents.add(e.fromId);
+    if (e.isPrimary == true) primary ??= e.fromId;
+  }
+  if (primary != null) {
+    parents
+      ..remove(primary)
+      ..insert(0, primary);
+  }
+  return parents;
+}
+
+/// The main (primary) contains-parent of [nodeId], or null for a root.
+int? mainParentOf(int nodeId, List<SkillEdge> edges) {
+  final parents = containsParentsOf(nodeId, edges);
+  return parents.isEmpty ? null : parents.first;
+}
+
+/// The contains-parents of [nodeId] other than the main one — the
+/// `Also under` badge of a multi-parent node.
+List<int> otherParentsOf(int nodeId, List<SkillEdge> edges) =>
+    containsParentsOf(nodeId, edges).skip(1).toList();
+
+/// All contains-children of [nodeId], in edge order. A multi-parent child is
+/// listed under each of its parents (use this for the outline).
+List<int> containsChildren(int nodeId, List<SkillEdge> edges) {
+  final children = <int>[];
+  for (final e in edges) {
+    if (e.isContains && e.fromId == nodeId && !children.contains(e.toId)) {
+      children.add(e.toId);
+    }
+  }
+  return children;
+}
+
+/// The children whose **main** parent is [nodeId] — the tree in which every
+/// node appears exactly once (use this to draw the learning map).
+List<int> primaryChildren(int nodeId, List<SkillEdge> edges) => [
+  for (final c in containsChildren(nodeId, edges))
+    if (mainParentOf(c, edges) == nodeId) c,
+];
+
+/// Position of a node, per the contract: no contains parent → root; a contains
+/// parent but no contains child → leaf; otherwise branch.
+NodePosition positionOf(int nodeId, List<SkillEdge> edges) {
+  var hasParent = false;
+  var hasChild = false;
+  for (final e in edges) {
+    if (!e.isContains) continue;
+    if (e.toId == nodeId) hasParent = true;
+    if (e.fromId == nodeId) hasChild = true;
+  }
+  if (!hasParent) return NodePosition.root;
+  return hasChild ? NodePosition.branch : NodePosition.leaf;
+}
+
+/// Whether [nodeId] is a **boss** of the game layer (contract Section 6): a
+/// root or a branch, i.e. anything but a leaf.
+bool isBoss(int nodeId, List<SkillEdge> edges) => positionOf(nodeId, edges) != NodePosition.leaf;
+
+/// The ids of the bosses among [nodes] (see [isBoss]).
+Set<int> bossIds(Iterable<SkillNode> nodes, List<SkillEdge> edges) => {
+  for (final n in nodes)
+    if (isBoss(n.id, edges)) n.id,
+};
+
+/// The nodes without a contains-parent, in the order of [nodes].
+List<SkillNode> rootNodes(Iterable<SkillNode> nodes, List<SkillEdge> edges) {
+  final children = <int>{
+    for (final e in edges)
+      if (e.isContains) e.toId,
+  };
+  return [
+    for (final n in nodes)
+      if (!children.contains(n.id)) n,
+  ];
+}
+
+/// Every node reachable from [nodeId] through contains edges (excluding
+/// [nodeId] itself), breadth first, each id once.
+List<int> descendantsOf(int nodeId, List<SkillEdge> edges) {
+  final seen = <int>{nodeId};
+  final order = <int>[];
+  final queue = <int>[nodeId];
+  while (queue.isNotEmpty) {
+    final current = queue.removeAt(0);
+    for (final child in containsChildren(current, edges)) {
+      if (seen.add(child)) {
+        order.add(child);
+        queue.add(child);
+      }
+    }
+  }
+  return order;
+}
+
+/// The chain of main parents from the root down to [nodeId], both included.
+List<int> mainPathTo(int nodeId, List<SkillEdge> edges) {
+  final path = <int>[nodeId];
+  var current = nodeId;
+  while (true) {
+    final parent = mainParentOf(current, edges);
+    if (parent == null || path.contains(parent)) break; // root reached (or a cycle)
+    path.insert(0, parent);
+    current = parent;
+  }
+  return path;
+}
+
+/// Depth of [nodeId] in the main-parent tree. A root has depth 0.
+int depthOf(int nodeId, List<SkillEdge> edges) => mainPathTo(nodeId, edges).length - 1;
+
+/// `requires` edges that **point at** [nodeId]: its prerequisites
+/// (`fromId` must be learned first).
+List<SkillEdge> requiresIn(int nodeId, List<SkillEdge> edges) => [
+  for (final e in edges)
+    if (e.isRequires && e.toId == nodeId) e,
+];
+
+/// `requires` edges that **leave** [nodeId]: the nodes that need it
+/// (`toId` is learned after).
+List<SkillEdge> requiresOut(int nodeId, List<SkillEdge> edges) => [
+  for (final e in edges)
+    if (e.isRequires && e.fromId == nodeId) e,
+];

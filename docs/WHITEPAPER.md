@@ -1,343 +1,237 @@
 # Self-Infinity 技术白皮书
 
-**版本** v0.1 · 2026-07-17
-**性质** 软件工程 Capstone 设计文档（同时作为范围冻结文件）
+**版本** v0.2 · 2026-10-01（v0.1 · 2026-07-17 的架构已整体替换，见文末「版本记录」）
+**性质** Capstone 技术设计文档，描述仓库里**现在**的实现。面向教授的计划书在 Notion，本文件不替代它。
 **一句话** 把"自以为会"和"真的会"之间的差距，做成可测量、可游玩的产品机制。
 
 ---
 
 ## 0. 摘要
 
-Self-Infinity 是一个游戏化学习验证系统（Web 全栈应用）。现有学习工具只记录"学了"，不验证"会了"；本系统用 LLM 扮演的**费曼审计官（Feynman Auditor）**对用户进行多轮压力测试——能用直觉层语言解释、能识破故意埋下的错误、能说出边界条件，技能树节点才会点亮为「原理方块」。审计失败强制触发结构化反思，反思被提炼为可执行的「原则卷轴」，长期存档并在后续审计中作为上下文复用。
+Self-Infinity 是一个游戏化的学习验证应用。现有学习工具只记录"学了"，不验证"会了"。本系统让用户把一个主题生成为一张课程图，图上每个节点都要通过 LLM 扮演的**费曼审计**才算掌握。审计失败时，用户写一段反思，系统把它整理成一张「교훈 카드」（原则卡），之后的审计会把这张卡拿出来追问。
 
-**产品定位**：费曼审计是唯一的核心机制，其余一切都是围绕它的动机层。游戏化的作用不是娱乐，而是给"验证是否真的学会"这件反人性的苦事提供持续的正反馈。养成对象不是虚拟宠物，而是**用户自己的赛博分身**——技能树、原理方块、原则卷轴、体力值，全部是同一个人真实能力与状态的镜像渲染，玩的是自己，不是一个和自己无关的角色。
+费曼审计是唯一的核心机制，其余部分（XP、地图解锁、简报、每日打卡）都是围绕它的动机层。
 
-交付物：React + FastAPI 全栈应用，含 LLM Provider 抽象层、可离线演示的 Mock 审计、审计协议校准集与用户评估数据。
+**交付物**：Flutter 客户端（web / iOS / Android 一套代码）+ FastAPI 后端，LLM Provider 抽象层，可完全离线运行的 Mock，审计校准集。同一个项目同时作为 Capstone 与 Mobile Programming（GAI3008-01）的作业。
 
 ---
 
 ## 1. 问题定义
 
-现有 to-do / 打卡 / 学习类产品有三个可观察的失败模式：
-
-1. **验证缺失**。"完成"的定义是打了卡，不是掌握了。自评掌握度系统性虚高——重复阅读产生的熟悉感被误判为理解（流利性错觉）。
-2. **反馈错配**。奖励与行为数量挂钩（连续打卡天数、专注分钟数），与学习质量零相关。用户很快学会刷奖励，而不是学习。
-3. **失败无沉淀**。放弃、跳票、犯错只产生负面情绪，不产生任何结构化、可复用的知识。
-
-Self-Infinity 的三个对应设计：
-
-| 失败模式 | 对应机制 | 章节 |
-|---|---|---|
-| 验证缺失 | 费曼审计：LLM 守门人，通过才算完成 | §4.2 |
-| 反馈错配 | 激励引擎：奖励只挂在审计通过上，不挂在活动量上 | §4.4 |
-| 失败无沉淀 | 原则回放：失败强制转化为可执行行为规则 | §4.3 |
+| 失败模式 | 现象 | 本系统的对应机制 | 章节 |
+|---|---|---|---|
+| 验证缺失 | "完成"等于打了卡；重复阅读产生的熟悉感被误判为理解 | 费曼审计：通过才算掌握 | §4.2 |
+| 反馈错配 | 奖励挂在活动量上，用户学会刷奖励 | 奖励只在审计通过时结算 | §4.4 |
+| 失败无沉淀 | 失败只留下负面情绪 | 失败强制反思 → 原则卡 → 下次审计复用 | §4.3 |
 
 ---
 
 ## 2. 命名约定与技术口径
 
-先把话说清楚，避免过度声明。产品叙事和技术口径分开维护：
-
 | 产品叙事 | 技术口径 | 为什么 |
 |---|---|---|
-| "动态奖励 / Modified Advantage" | **确定性激励引擎（RL-inspired）** | 系统中没有被学习的 policy、没有被估计的 value function，不构成强化学习。真正的可学习组件在 V2.1（contextual bandit）才引入 |
-| "Watcher / Architect / Auditor / Scribe 多智能体共治" | **多角色 LLM 编排**（同一模型、不同角色 prompt） | 角色之间没有独立目标函数、没有博弈，不构成 MAS |
-| "PFC 护盾 / 多巴胺" | **专注度评分（focus score）** | 技术文档只使用可定义、可测量的量 |
+| "多 agent" | **多角色 LLM 编排**：同一模型、不同角色 prompt，由代码按固定流水线调用 | agent 之间没有独立目标、不互相调用（AD-7），不构成多智能体系统 |
+| "动态奖励" | **确定性激励引擎**（RL-inspired，不是 RL） | 没有被学习的 policy 或 value function |
+| "自适应难度" | **contextual bandit**（Thompson Sampling） | 这是系统里唯一真正在学习的组件 |
+| "컨디션" | 最近 3 次打卡的睡眠/压力均值得出的标记 | 只用用户自报的数字，不推断、不监测 |
 
-这张表本身是项目的答辩资产：**文档里每一个术语都经得起追问到底。**
+agent 命名规则：大的协调角色叫 *Agent*，单一职责的角色以 *-er* 结尾（Recorder、Linker、Transcriber…）。
 
 ---
 
 ## 3. 系统架构
 
 ```
-┌─ Frontend   React 18 + Vite + TypeScript        (Pixel Minimalism 渲染层)
-│      技能树 · 审计室 · 原则卷轴架
-│      │  /api  (dev 反向代理)
-├─ Backend    FastAPI (Python 3.13) + SQLite      (V2 迁移 Postgres)
-│      ├─ routers/    REST API
-│      ├─ agents/     architect(主题拆解) · auditor(审计协议状态机) · scribe(原则蒸馏)
-│      ├─ llm/        Provider 抽象: GeminiProvider | MockProvider
-│      └─ engine/     激励引擎 (V1.5)
-└─ LLM        Gemini (云端多模态)；经 Provider 抽象解耦，可替换
+app/ (Flutter 3.47, Dart 3.13)
+  features/  stage · chat（scene 1/5）· map（scene 2）· skill（scene 4）· audit（scene 4-1）
+  api/       ApiClient 接口 → HttpApi（真后端） | FakeApiClient（离线，同一份 Mock 脚本）
+  theme/ + widgets/   样式的唯一来源（见 DESIGN.md）
+        │  REST /api（契约：docs/api-contract.md）
+backend/ (FastAPI + SQLModel + SQLite)
+  routers/   24 个端点（18–24 为舞台界面新增）
+  services/  确定性代码：course_generation · structure_validator · audit_flow · incentive · bandit · condition · profile · linking
+  agents/    LLM 角色：clarifier · syllabus · planner · material_finder · auditor · challenger · recorder · linker · checkin_converter · narrator · recommender
+  llm/       Provider 抽象：DeepSeek | OpenAI | Kimi | Gemini | Mock
+  search/    搜索抽象：Tavily | Mock（与 LLM 正交）
 ```
 
-### 关键架构决策（ADR）
+### 3.1 Agent 一览（17 个）
 
-- **ADR-1 Web 优先。** 演示零安装；浏览器 MediaRecorder / getUserMedia 直接覆盖 V1.1 语音审计的输入需求；迭代速度最大化。移动端推迟到 V3。
-- **ADR-2 不做 iOS 屏幕语义监控。** 平台事实：iOS 禁止 App 截取其他 App 的屏幕；Screen Time API（FamilyControls / DeviceActivity）返回不透明 token，用量数据只能在沙盒化报告扩展内渲染，且分发需向 Apple 申请 entitlement。截图级语义监控只在桌面端（macOS ScreenCaptureKit）可行，安排在 V2；移动端 V3 只做"应用类别用量阈值"降级方案。
-- **ADR-3 LLM Provider 抽象。** 所有 agent 只依赖 `complete(messages) -> str` 契约。MockProvider 提供确定性脚本化审计：离线可演示、CI 可测试、不被任何供应商锁定。
-- **ADR-4 审计输出为强约束 JSON 协议。** probe / verdict 双形式 + 轮次上限 + 服务端兜底裁决。LLM 不守约时系统仍然收敛，不存在"审计永不结束"状态。
+| 组 | 角色 | 实现 | 职责 |
+|---|---|---|---|
+| Super Managing | Orchestrator | 代码 | 按固定流水线调用下面各角色 |
+| | Front Desk | LLM | 对话入口：只判断用户这句话的意图，再由代码跑对应流水线 |
+| | Narrator | LLM | 把聚合好的事实讲成一段简报，只能引用传入的事实 |
+| | Recommender | LLM | 今日任务（3–5 步），输入含 bandit 建议难度 |
+| Planning | Clarifier | LLM | 主题太模糊时最多问 2 个问题 |
+| | Syllabus Finder | LLM + 搜索 | 找真实课程大纲作为生成依据 |
+| | Planner | LLM | 生成课程图（节点 + contains / requires 边） |
+| | Structure Validator | 代码 | 11 条规则校验图结构，不合法则修正或拒绝 |
+| | Material Finder | LLM + 搜索 | 针对某个 gap 找补充材料；URL 只来自搜索结果，绝不由 LLM 生成 |
+| Audit loop | Memory Retriever | 代码 | 取 ≤3 张相关原则卡交给 Auditor |
+| | Auditor | LLM | 多轮追问并裁决 |
+| | Challenger | LLM | 对"通过"做一次对抗复核 |
+| | Recorder | LLM | 把失败反思整理成原则卡 |
+| | Linker | LLM | 判断新卡与旧卡/节点的 related / contradicts 关系（后台运行） |
+| Analyst | Transcriber | 平台 STT | 语音转文字（客户端，规划中） |
+| | Check-in Converter | LLM | 自由文本打卡 → 结构化字段，缺的字段留空不猜 |
+| | Profile Builder | 代码 | 汇总画像：反复出现的误解、跨领域复发 |
+
+**AD-7**：agent 之间从不互相调用，只有代码按固定顺序调用它们。每个 prompt 以 `[agent: name]` 开头，Mock 按这个标签分派。
+
+### 3.2 关键架构决策
+
+- **ADR-1 Flutter 一套代码。** 2026-10-01 起前端从 React 换成 Flutter：一套代码覆盖 web 演示和手机端，同时满足 Mobile Programming 课的要求。旧 React 客户端已删除。
+- **ADR-2 不做屏幕/传感器监控。** iOS 不允许读取其他 App 的屏幕，Screen Time 数据只能在沙盒扩展里渲染。컨디션只来自用户自报的打卡。
+- **ADR-3 LLM Provider 抽象。** 选择顺序：显式 `LLM_PROVIDER` → 第一个配置了 key 的 provider → Mock。`LLM_MODEL_OVERRIDES`（JSON）可按 agent 单独指定模型。DeepSeek / OpenAI / Kimi 共用一个 OpenAI 兼容实现。
+- **ADR-4 审计输出是强约束 JSON。** probe / verdict 二选一 + 服务端轮次上限 + 超限强制裁决，模型不守约时系统仍然收敛。
+- **ADR-5 搜索是 harness 的一层，不绑模型。** 不用模型自带的 grounding：换 provider 会让校准作废，且 grounding 配合结构化输出时拿不到来源 URL。
+- **ADR-6 API 契约先行。** `docs/api-contract.md` 是约束性契约；后端 Mock 与客户端 `FakeApiClient` 跑同一份演示脚本（契约 §4），有没有后端，界面行为都一样。
 
 ---
 
 ## 4. 核心机制
 
-### 4.1 技能树生成与原理方块
+### 4.1 课程图
 
-学习内容不预设范围。用户输入一个主题或一个想完成的大任务，**分解规划官（Architect）**
-把它拆解成 4~7 个节点、不超过三层的浅层树，追加挂到技能树上（多次生成的树彼此独立并存，
-形成一片森林，不互相覆盖）。
+用户输入一个主题，流水线是：Clarifier（可选追问）→ Syllabus Finder → Planner → Structure Validator。结果是一张有向无环图：
 
-节点状态机：`locked → available → (审计通过) → mastered`。
+- **两种边**：`contains`（包含，决定位置和解锁）与 `requires`（软前置，只影响推荐顺序，不锁节点）。
+- **多父节点**：一个节点最多 3 个 contains 父节点，其中一个标 `is_primary`，决定它在地图上画在哪里。
+- **位置**：root / branch / leaf，由 contains 边算出，不由 LLM 声明。
+- **解锁规则**：任一 contains 父节点 mastered，该节点即 available。生成时只有 root 是 available。
+- **节点类型**：`concept`（要讲清为什么）与 `task`（只确认做法具体），决定审计协议和轮次上限。
 
-- 生成规则：每批生成的根节点直接 available，其余节点 locked。
-- 解锁规则：父节点 mastered 后，子节点变为 available。
-- mastered 节点渲染为合成完毕的像素「原理方块」，附掌握分数。
-- Slug 全局唯一：同名主题重复生成、多批次节点标题重复时，服务端自动去重编号，不由
-  Architect 自己保证。
+Planner 只决定结构，不生成教学内容。内容质量由审计把关：拆得再合理，讲不清照样不过。
 
-**为什么这是"分解"而不是"内容生成"**：Architect 只负责拆解结构（给出节点标题/描述/父子关系），
-不生成教学内容本身——它不解释"B 树是什么"，只决定"理解 B 树需要先搞懂哪几块"。真正的内容
-质量把关仍然在 §4.2 的验证协议——拆得再合理，用户讲不清楚/做不到照样过不了关。这也是为什么
-Architect 不需要比 Auditor 更强的能力：拆解是结构性任务，验证才是理解性/执行性任务。
+### 4.2 费曼审计
 
-**节点分两种类型，Architect 逐个节点判断**，这不是可选的元数据，而是决定用哪套验证协议：
+开场问题按节点位置选择（契约 §3.7）：leaf 要求从零讲给外行听；branch 要求说清子节点为什么是一组、何时用哪个；root 要求说清哪些问题该用它、哪些不该。task 节点只问具体怎么做。
 
-| node_type | 含义 | 验证方式 |
-|---|---|---|
-| `concept` | 需要理解"为什么成立"的知识点（原理、机制、权衡） | §4.2 费曼审计：初学者视角多轮追问，动态收敛 |
-| `task` | 一个可执行的具体步骤，做没做到一目了然 | §4.2 任务核验：只确认做法具体，不深挖原理，从宽裁决 |
+**提问阶段：初学者人设。** 审计官只知道用户在本次对话里说过的话，只在"用了没解释的词"或"前后接不上"时追问，不主动引入外部概念带节奏。早期的"故意埋错"规则已移除：它要求审计官动用超出对话的专业知识，违背费曼法"听众必须无知"的设定。
 
-这个区分不是事后补丁，而是修正了一个真实踩过的坑：把"把大象放进冰箱"这种纯步骤类任务，
-当成需要讲清楚第一性原理的知识点来审——用户会被问"为什么打开门这个方法在任何情况下都成立、
-没有例外"，答案不管怎么说都会被判定为"停留在复述层面"，因为这个问题本身对一个操作步骤就是
-无意义的。task 类型存在的意义就是不让这种审判发生。
+**裁决阶段：完整专业知识。** 裁决时切回专家视角，提问阶段没问到的错误也要写进 gaps。宁 fail 不放水。
 
-### 4.2 两套验证协议：费曼审计 / 任务核验
+**轮次上限**：concept 8、task 4，夜间模式翻倍。上限只存在服务端，不写进 prompt，避免模型把它当配额。超限仍在追问 → 强制裁决 fail、score 0。
 
-用户对 available 节点发起审计，Auditor 根据节点的 `node_type` 选择协议和开场问题。
+**Challenger**：Auditor 判通过时，Challenger 复核一次。推翻则把它的问题作为追问返回（每个会话最多一次）；维持或出错则最终通过。
 
-**concept 节点 → 费曼审计协议（Feynman Audit Protocol，2026-07-19 改版）**：开场挑战"假设我
-完全没听说过它，从零开始，讲给我听"。追问策略（固化在 system prompt 中，作为协议而非临场
-发挥）：
-
-1. 每轮只问一个问题；
-2. 审计官被要求扮演一个**真正的初学者**——只知道用户在这段对话里已经说过的内容，提问只能
-   来自"用户用了一个还没解释过的词/步骤，听不懂"或"用户前后说的话接不上、看起来矛盾"这
-   两种情况，不能主动引入用户没提过的概念/术语/类比/假设场景来发问或暗示方向；
-3. 不设埋错试探——早期版本有"故意提出看似合理但含细微错误的理解"的规则（deliberate error
-   injection），2026-07-19 应用户反馈移除：这条规则要求审计官动用超出对话内容的专业知识去
-   编造一个似是而非的说法，这本质上是专家在带领对话方向，违背了费曼学习法"听众必须无知、
-   只能靠讲述者讲清楚"的核心设定，用户明确指出"这不是费曼学习法"；
-4. 审计官不教学、不给答案、不安慰——这条不变；
-5. **没有固定追问轮数**：审计官自行判断"作为这个初学者，我是不是已经能复述一遍、想不出
-   任何没听懂的地方了"，够了就直接裁决，不为了凑轮次硬问，也不因为"差不多了"就提前放行。
-   服务端仍保留一道安全阀（`audit_max_turns`，见 §9 M2 行），防止模型异常时无限 probe，
-   但这个数字不会写进 prompt 里当"配额"讲给模型听，正常对话几乎不会真的触发它。
-
-裁决维度：提问阶段保持"初学者"人设，但到了裁决（action=verdict）这一步，审计官被要求切回
-**完整专业知识**去判断解释是否真的站得住脚——即使某个错误在提问阶段没有被问到，裁决时发现
-了也要如实标进 gaps、判定不通过。这样"对话过程克制、不带节奏"和"裁决必须严格、不放水"
-两者不冲突。基线原则不变：宁 fail 不放水（由校准集验证，见 §8）。
-
-**task 节点 → 任务核验协议（Task Verification Protocol）**：开场问题"这一步你打算具体怎么做？"
-
-1. 不追问"为什么"，不设埋错陷阱，也不主动引入用户没提过的方案来带节奏——验证的是"有没有
-   做到/知道怎么做"，不是"能不能讲清楚原理"；
-2. 同样没有固定追问轮数：问清楚"具体怎么做"就直接裁决，不为了凑轮次继续追问；
-3. 裁决从宽：回答具体、不是空话套话（"随便弄弄""应该可以吧"）就通过。
-
-两套协议共用同一个输出契约（二选一，严格 JSON），Auditor 只是根据 node_type 换 system prompt，
-不是两套独立实现：
+**컨디션 只影响节奏**：最近打卡显示睡眠不足或压力高时，审计问题更短。不改轮次上限，不改通过标准。
 
 ```json
-{"action": "probe",   "question": "<下一个问题>"}
-{"action": "verdict", "pass": true, "score": 87, "gaps": ["<未掌握/未说清的点>"], "comment": "<裁决理由>"}
+{"action": "probe",   "question": "..."}
+{"action": "verdict", "pass": true, "score": 87, "gaps": ["..."], "comment": "..."}
 ```
 
-**V1.1 多模态扩展**：讲解输入从文本升级为语音（MediaRecorder 录音直传多模态模型）。协议不变，只换输入模态——这是把多模态能力接进来成本最低、收益最直接的位置。
-
-### 4.3 原则回放（Principle Loop）
+### 4.3 原则回放
 
 ```
-审计 fail → 前端强制反思输入 → Scribe 蒸馏 → 原则卷轴入库
-                                                │
-              V2: 按 skill 语义检索相关原则 ────┘
-                  注入下一次审计的 Auditor 上下文
+审计 fail → 用户写反思 → Recorder → 原则卡（title / body / misconception）入库
+                                      ├─ Linker（后台）：related / contradicts 边
+                                      └─ 下次审计：Memory Retriever 取 ≤3 张 → Auditor 追问
 ```
 
-- Scribe 输入 =（审计暴露的 gaps + 用户自由反思），输出一条 Dalio 式行为规则：title ≤ 20 字，body 为"当…时，我将…"形式，≤ 80 字，禁止空话。
-- 审计开始时检索该 skill 相关的历史原则注入 Auditor 上下文（"该用户历史上在 X 类问题上栽过"）——已实现（`app/agents/retrieval.py` 的 `find_relevant_principles`），但用的是字符 2-gram/词重叠启发式，不是向量语义检索，见该文件顶部注释里对这个取舍的说明。
+- 原则卡 body 是"当…时，我会…"形式的行为规则；`misconception` 是这次失败背后那个错误心智模型，一句话。
+- Profile Builder 把相似的 misconception 聚成簇；跨 ≥2 个不同技能复发的簇最有说服力，简报会点名。
+- Memory Retriever 用字符 bigram + 词重叠打分，不是向量检索：单用户数据量下够用，且无需向量库。
 
-**已实现（2026-07-23）：误诊-归因式失败处理（借鉴 teach-me 式导师系统的 misconception tracking）**——Scribe 的蒸馏不再只输出"title/body"这条行为规则，还多输出一个 `misconception` 字段：这次失败背后那个"用户以为对、但其实错了"的心智模型本身（一句话，≤40 字），单独存进 `Principle.misconception`。`app/agents/retrieval.py` 的 `find_recurring_misconception` 在每次反思提交时，把新诊断出的 misconception 和历史上所有原则的 misconception 做同样的字符重叠打分（阈值比 `find_relevant_principles` 更高，因为比对的是一句话而不是一整段），命中就说明用户在完全不相关的技能点上又栽进了同一类错误的心智模型——`POST /api/audits/{id}/reflection` 会把命中的那条历史原则一并返回（`recurring_of_id`/`recurring_of_title`），前端在反思提交后用红色面板提示"这不是第一次了"。范围声明：这是同一次 Scribe LLM 调用多输出一个字段，没有新增 LLM 调用，也没有引入向量检索或独立的"学习者画像"表——检测复用的仍是 `relevance_score` 这个 V1 启发式。
+### 4.4 激励引擎与难度推荐
 
-**已实现（2026-07-20）：Librarian 语义关联 + 矛盾检测**——参考 Andrej Karpathy 2026-04 提出的 "LLM wiki" 思路（不是"检索完就忘"的 RAG，而是让 LLM 把新内容和已有知识库的关系在写入时就判断清楚，产生真正的交叉引用）落地的一版：新原则蒸馏出来后，`app/agents/librarian.py`（新增的 Librarian agent，一次 LLM 调用）判断它和已有原则/技能节点里哪些是真正语义相关的（`related`）、哪些和已有原则在做法上直接冲突（`contradicts`），结果持久化为 `PrincipleLink` 表（`app/services/linking.py`），不再是 `/api/graph` 每次请求时现算的字符重叠打分。`POST /api/graph/relink` 是手动触发的"linting pass"：对全库原则重新跑一遍判断，既是新功能上线前的历史数据回填，也是唯一会把"矛盾"暴露出来的地方（对称去重后展示）。前端 Knowledge Graph 页新增红色 `contradicts` 边和"Rebuild Links"按钮 + 矛盾列表面板。范围声明：`find_relevant_principles`（审计时注入上下文那条路径）没有改，仍是关键词重叠——只有 `/api/graph` 的 `related` 边这一条路径换成了 LLM 判断。
+**奖励**：`reward = 10 × difficulty × 1.1^level`，只在审计最终通过时结算。difficulty = 节点类型权重（concept 2、task 1）+ 深度加成；level = 已掌握节点数 / 5。这是确定性规则，不是学习算法。
 
-### 4.4 激励引擎（V1.5 → V2.1）
+**bandit**：上下文压成一个就绪度分桶（low / mid / high，来自近期通过率、搁置会话数、会话时长），动作是难度档位（easy / medium / hard），共 9 个 Beta-Bernoulli 臂，Thompson Sampling。选它而不是 LinUCB：单用户数据量喂不饱线性模型。
 
-**V1.5（确定性规则系统）**：`reward = base × difficulty × level_multiplier^k`，只在审计通过时结算。等级越高、完成同等杠杆任务的奖励系数越大（复利式放大）。明确声明：这是确定性规则，不是学习算法。已实现：`base=10`；`difficulty` 由 node_type（concept 2x / task 1x）与树深度共同决定；`level` 由全局已 mastered 节点数推出（单用户应用不存在账号体系，无法按用户维度分层）；`level_multiplier=1.1`。
+**已知漏洞**：奖励信号是"通过 = 1"，策略会学到推简单题——通过率高、学习为零。设计目标是**挑战–技能平衡**：把用户维持在能力边缘。挑战–技能平衡是心流最稳健的前因之一 [Fong et al., 2015]，但该关联在教育情境下明显更弱，而且"平衡点 ≈ 50% 通过率"是本项目的推断，不是文献结论。因此用户评估要同时记录难度档位、结果和一条 1–5 分的主观投入度，用数据检验，而不是默认它成立。目标通过带尚未实现，落点在 `services/bandit.py`。
 
-**关于 focus score（力场可视化的数据来源）**：§7 的力场设计假设有一个 0-100 的专注度评分驱动视觉状态，原稿设想由桌面端屏幕监控写入（`FocusSession.source`）；但 ADR-2 已明确不做屏幕监控。实现改为从审计追问的时间间隔推导 focus_score 的工程代理指标（答题节奏落在合理区间给高分，过快疑似瞎蒙、过慢疑似分心都会降分），`FocusSession.source` 字段因此保留为通用字符串（如 `"audit_engagement"`）而非绑定屏幕捕获语义。这是诚实的替代方案，不是真实专注力测量——如果未来真的接入屏幕监控，只需换一个 source 值和对应的采集逻辑，不需要改数据模型或前端可视化。
+### 4.5 每日打卡与 컨디션
 
-**V2.1（可学习组件）· 已实现（2026-07-20）**：contextual bandit，选的是 Thompson Sampling，不是 LinUCB——原因见下。
+用户可以填结构化字段（睡眠、压力等），也可以写一段自由文本，由 Check-in Converter 转成字段；文本里没提到的字段留空，不猜。最近 3 次打卡的平均睡眠 < 6 小时或平均压力 ≥ 4 → `low`；没有打卡 → `unknown`。
 
-- 上下文特征：用户近期审计通过率、放弃率（没有显式"放弃"操作可采集，用超过
-  `STALE_ACTIVE_HOURS` 还卡在 active 状态的会话数近似）、平均会话时长；
-- 动作空间：推荐任务的难度档位（`easy`/`medium`/`hard`，由 node_type + 树深度算出，
-  复用 `app/services/incentive.py` 的 `node_difficulty_score`）；
-- 奖励信号：任务被完成且审计通过（`app/routers/audits.py` 的 `submit_turn` 出裁决那一刻）。
-
-实现在 `app/services/bandit.py`。工程取舍：三个原始上下文特征没有各自单独分桶做笛卡尔积
-（3×3×3=27 格），那样单用户的数据量会把每格都饿死；而是先压成一个综合"就绪度"分桶
-（low/mid/high），再和三档难度组合，一共 9 个 Beta-Bernoulli 臂，单用户数据量下勉强够用。
-这也是为什么选 Thompson Sampling 而非 LinUCB——后者对连续上下文做线性回归，需要的数据量
-比单用户能产生的多得多，白皮书原文强调的"单用户、小样本、冷启动场景下 bandit 是统计上诚实
-的选择"这条原则，具体化到算法选型上就是离散化 context + Thompson Sampling，而不是上更复杂
-的线性模型。`GET /api/skills/recommendation` 暴露 `context_bucket`/`suggested_tier`/
-`skill_tiers`，前端 Skills 页把匹配建议难度档的节点浮到"Recommended Next"列表最前面并打
-`Suggested` 标签——是稳定排序的调整，不是重新打分替换掉原本按真实子节点数（解锁杠杆）的
-排序。
-
-**关于 bandit 的定位，需要明确一个容易混淆的点**：它不是"让 agent 更懂用户"的语义升级，不改变 Auditor 对用户解释的理解能力——那是 LLM 本身和 §4.3 原则检索注入的工作。bandit 只是一个独立的难度分发策略层，输入用户状态特征，输出任务难度，靠"是否完成+审计通过"这个奖励信号自我修正，与推荐系统"该给用户推哪篇内容"是同一类问题。两者互补，不要在叙事里混为一谈。
-
-### 4.5 体力系统（Vitality System）· V2
-
-游戏化的落点不止在学习本身，还在支撑学习的身体与精神状态——这是把赛博分身做"真"的关键一环：分身的状态应该真实反映用户本人的状态，而不是一套自娱自乐的独立数值。
-
-参考《饥荒》的 Health / Sanity 互锁设计，但**刻意不做真实数据追踪**（记账、健身、饮食三个方向若做成完整追踪，每一个单独复杂度都超过费曼审计本体，参见 §10 风险与对策中的范围蔓延教训）。改用**每日签到**：三道轻量自评题（今天开销如何 / 今天动了吗 / 今天吃得规律吗），10 秒填完，滚动平均驱动数值：
-
-```
-health      = f(签到滚动平均, 窗口 7 天)
-sanity_cap  = base + k  × health      # 健康越好，精神值上限越高
-sanity_regen= rate0 × (1 + k' × health)  # 健康越好，精神值恢复越快
-sanity      = 审计通过 → 加值 / 审计失败或长期空档 → 衰减，封顶 sanity_cap
-```
-
-- Sanity 是**审计行为的资源化表现**：通过审计涨、逃避审计或连续失败跌，直接对应"是否真的在推进理解"，不是单纯的活跃度刷分。
-- Health 不产生直接奖励，只影响 Sanity 的**上限和恢复曲线**——身体状态差时，即使审计通过，精神值涨幅也打折；这是刻意的设计约束，呼应"学习需要身体基础"这个朴素事实，而不需要編造神经科学机制来自证。
-- 明确不做的事：不算卡路里、不接 HealthKit/Strava、不做记账分类。这条线一旦往"真实追踪"方向走，就会长成三个独立 App，偏离费曼审计这个核心差异化——技术含量在审计协议里，不在这里。
+刻意不做：卡路里、记账、HealthKit。这条线往"真实追踪"走就会长成三个独立 App，偏离核心。
 
 ---
 
 ## 5. 数据模型
 
-| 表 | 字段 | 说明 |
-|---|---|---|
-| SkillNode | id, slug, title, description, parent_id, status, node_type, mastery_score | status: locked / available / mastered；node_type: concept / task |
-| AuditSession | id, skill_id, status, score, gaps_json, created_at | status: active / passed / failed |
-| AuditTurn | id, session_id, role, content, created_at | role: user / auditor |
-| Principle | id, title, body, source_session_id, created_at | V2 增加 embedding 列 |
-| FocusSession *(V2)* | id, started_at, ended_at, focus_score, source | 桌面端监控写入 |
-| RewardEvent *(V1.5)* | id, session_id, amount, multiplier, created_at | 激励引擎结算流水 |
-| DailyCheckIn *(V2)* | id, date, spending_rating, activity_rating, eating_rating | 每日签到三项自评，1–3 分 |
-| VitalityState *(V2)* | id, health, sanity, sanity_cap, updated_at | 滚动计算得出的单行当前状态 |
+| 表 | 说明 |
+|---|---|
+| Course | 一次生成的课程，含来源大纲（如有） |
+| SkillNode | status：locked / available / mastered；node_type：concept / task；mastery_score |
+| SkillEdge | kind：contains / requires；contains 边带 `is_primary`；requires 边带理由 |
+| AuditSession / AuditTurn | 会话状态 active / passed / failed，score、gaps、max_turns、challenged |
+| Principle / PrincipleLink | 原则卡；related / contradicts 关系 |
+| RewardEvent | 奖励流水 |
+| BanditArm | 9 个臂的 Beta 参数 |
+| DailyCheckIn | 打卡字段，全部可空 |
+| NarratorBriefing / StudyPlan / SearchPlan | 简报、今日任务、补充材料的缓存，避免重复调用 LLM |
 
-SQLite 起步（零运维、单用户够用），schema 不依赖 SQLite 特性，V2 平移 Postgres。
-
----
-
-## 6. API 设计
-
-| Method | Path | 作用 |
-|---|---|---|
-| GET | `/api/skills` | 技能树全量（多批次生成的树以森林形式并存） |
-| POST | `/api/skills/generate` | 提交主题/大任务，Architect 拆解并追加一批节点 |
-| POST | `/api/skills/{id}/audits` | 发起审计，返回开场挑战 |
-| POST | `/api/audits/{id}/turns` | 提交解释，返回追问或裁决 |
-| POST | `/api/audits/{id}/reflection` | 失败后提交反思，返回蒸馏出的原则 |
-| GET | `/api/principles` | 原则卷轴列表 |
-| POST | `/api/checkins` | 提交每日签到，返回更新后的 Vitality 状态 |
-| GET | `/api/vitality` | 当前 health / sanity / sanity_cap（首次访问自动创建默认状态） |
-| GET | `/api/focus/latest` | 最近一次审计的 focus_score（本文档原定由桌面监控写入，实际改为审计追问间隔的工程代理指标，见 §4.4 附注） |
-| GET | `/api/health` | 健康检查 + 当前 LLM provider |
+SQLite 起步，schema 不依赖 SQLite 特性。启动时检测到旧（DAG 之前）的库会拒绝加载并报错。
 
 ---
 
-## 7. 视觉规范（Notion 风）
+## 6. API
 
-> **2026-07-19 改版历史**：Pixel Minimalism → Apple Liquid Glass → **Notion 风**（当前）。Liquid Glass 版本实测后被用户直接否决（"简直是屎"）——根因是背景过于素净、玻璃面板没有可透视的内容，模糊效果形同虚设，视觉上就是一堆灰卡片，加上力场光晕/发光动效整体观感浮夸，与产品"低视觉熵"的功能性诉求相悖。最终定型为 Notion 的真实生产环境配色与规则：浅色 `#37352F` 字 / `#ffffff` 底，深色 `#E9E9E7` 字 / `#191919` 底；边框极淡（1px，`rgba` alpha 0.09–0.16），面板背景等于页面背景，仅靠这条发丝边框分隔——不叠加阴影、不叠加渐变、不叠加模糊/半透明，圆角收敛到 4–6px；按钮默认无边框无背景，hover 才出现浅灰底。力场光环同步从"发光脉冲"简化为纯色实心环，用颜色（红/琥珀/青）而非辉光强度表达 idle/low/mid/high 四档专注度。本节两次改版都未经真实截图验证（环境无浏览器/截图工具），Liquid Glass 版本的失败恰恰证明了"只算对比度、不看渲染效果"这条验收方式的局限——Notion 版本上线后仍建议实际跑一遍界面确认。
-
-- V1 三个核心可视化：分层技能树、原理方块合成动画、原则卷轴架——组件不变，视觉语言按上述 Notion 扁平规则重做。
-- V2 力场：环绕角色的纯色圆环，颜色（非辉光）绑定专注度评分四档——不使用动画/模糊/光晕，符合 Notion 语言的"零装饰"要求。
-- V2 体力条：赛博分身头顶叠加 Health / Sanity 双条，Sanity 条的实际上限随 Health 变化可视化伸缩，让"健康影响精神值上限"这条规则不需要文字说明也能被看懂。
+以 [`api-contract.md`](api-contract.md) 为准：24 个端点、共享类型、错误文案、离线演示脚本。§5（端点 18–24）是舞台式主界面新增的接口，含文件上传。
 
 ---
 
-## 8. 评估计划
+## 7. 界面
 
-没有 evaluation 的系统项目不完整。两个维度：
+- 视觉：白底、Notion 式暖灰与发丝边框，参考 ChatGPT / Gemini / NotebookLM；绿 = 通过/掌握，红 = 失败。见 [`DESIGN.md`](DESIGN.md)。
+- 页面与验收测试映射：[`ui-spec.md`](ui-spec.md)。
+- 主界面：[`ux-chat.md`](ux-chat.md)，严格按手绘稿：左栏角色属性与今日摘要，中间 avatar 与当前场景，节点和对话场景右侧加 history。打卡和建课程都在对话里完成，可上传 PDF/TXT/MD 作为课程大纲。每个 agent 一个形象，目前是线条小人占位，3D 由김수민负责。
+
+---
+
+## 8. 评估
 
 **工程维度**
-- **审计协议一致性**：构建 30 条校准集（正确解释 / 含错解释 / 背诵式复述三类），测裁决准确率与放水率（假阳性率）。校准集同时充当回归测试，模型或 prompt 每次变更都要重跑。
-- **成本与延迟**：单次审计 token 预算、裁决延迟 P95。
-- **测试**：agents 与 engine 单元测试（MockProvider 使其完全确定性）、API 集成测试。
+- **审计一致性**：30 条校准集（正确解释 / 含错解释 / 背诵式复述），测准确率与放水率（应 fail 却判 pass 的比例）。门槛：准确率 ≥ 80%，放水率 ≤ 10%。脚本：`backend/eval/run_calibration.py`，用 LLM 扮演学生续答，避免固定台词接不住深追问。
+- **测试**：后端 pytest 528 个，客户端 flutter test 273 个，全部在 Mock 下确定性运行；CI 每次 push 跑两边。
+- **成本与延迟**：单次审计 token 数、裁决延迟 P95。
 
-**用户维度**（轻量实验，n = 5~10，两周）
-- 自评掌握度 vs 审计通过率的差值。预期存在显著差值——这个差值本身就是产品的存在性证明。
-- 一周后复测：审计通过的节点 vs 未经审计的自学内容，对比保留率（自身对照）。
+**用户维度**（n = 5–10，两周）
+- 自评掌握度 vs 审计通过率的差值——这个差值本身就是产品的存在性证明。
+- 一周后复测：审计通过的节点 vs 未经审计的自学内容的保留率。
+- 每次审计记录难度档位、结果、主观投入度（检验 §4.4 的假设）。
 
----
-
-## 9. 里程碑
-
-| 里程碑 | 周期 | 内容 | 验收标准（Definition of Done） | 状态 |
-|---|---|---|---|---|
-| M1 | 第 1–2 周 | 审计闭环骨架 + 动态技能树生成 | MockProvider 下全流程离线可演示：给主题 → Architect 拆解 → 选节点 → 审计 → 裁决 → 方块/卷轴 | 已完成 |
-| M2 | 第 3–4 周 | 接入 DeepSeek/Gemini + 校准集 | 30 条校准集裁决准确率 ≥ 80%，放水率 ≤ 10% | 未通过（真实跑分）。DeepSeekProvider 已接入。三次跑分演进：①2026-07-19 旧版 Auditor 提示词，准确率 70.0%/放水率 6.7%（已过期）；②2026-07-19 晚些时候 `CONCEPT_SYSTEM_PROMPT` 大改后（去掉埋错试探、去掉固定轮数配额，见 §4.2），准确率 73.3%/放水率 0%——但两次跑分 concept 部分数字完全一致（46.7%），定位到是评估脚本的锅：脚本用固定 `student_turns` 台词重放，真实模型的追问链比台词预设得深，台词答完就复读最后一句接不住新问题，全部 8 条 concept `-pass` 场景被迫判 fail，不是 Auditor 判错。③2026-07-20 给脚本配了个"LLM 扮演学生"（脚本台词答完后由 LLM 继续扮演同一人设作答，而不是复读），修复后 concept 准确率从卡死的 46.7% 升到 73–80%（两次独立跑分），证实了根因诊断；但同时也让 task 侧的放水率首次暴露出来——之前脚本台词短、只够撑 1-2 轮，根本没机会触发 task 场景的追问，"补" 出来的追问轮次里，task 协议本来就"从宽"的裁决规则（§4.2）接受了几个不够精确但看似像样的回答，两次跑分 task 放水率 37.5%/12.5%，均值约 16.7%，超过 ≤10% 的门槛；准确率均值约 81.7%，达标。这是第一次跑出真正能代表 Auditor 真实行为、不被评估脚本本身的缺陷污染的数字，细节和单次追踪（`home-wifi-setup-fail`）见 `backend/eval/README.md`"Adaptive student"节。**结论：M2 仍未通过**——不是因为方法论有问题了（这轮解决了），是真的测出了 task 协议在追问场景下偏松，下一步要收紧 task 协议对多轮追问答案的裁决尺度 |
-| M3 | 第 5–6 周 | 语音讲解 + 原则检索注入 | 语音审计可用；历史原则出现在审计上下文并影响追问 | 已完成（语音讲解用浏览器原生 Web Speech API 转写接入已有文本审计流程，而非直传多模态模型——MockProvider 无法处理音频，这样才能离线可跑；原则检索用字符 bigram + 词元重叠代替向量检索，因为项目里没有向量库基础设施） |
-| M4 | 第 7–8 周 | 激励引擎 + 力场可视化 + 体力系统 | 奖励结算入库；力场与 focus score 实时绑定；每日签到驱动 Health/Sanity 且可视化联动 | 已完成（focus score 来源见 §4.4 附注：审计追问间隔代替屏幕监控） |
-| M5 | 第 9 周起 | 评估与报告 | §8 用户维度两项数据成文 | 未开始 |
-
-本文档不再是"V1=M1-M2"的范围冻结——M3/M4 已应用户要求提前实现（详见各节内正文标注的范围决策）。M5（用户维度评估）待真实使用数据积累后进行，无法靠离线开发产出。
+**当前状态**：2026-07 的真实跑分（DeepSeek）准确率约 81.7%、task 放水率约 16.7%，未过门槛；之后 Auditor prompt 随 2026-10 重构整体重写，旧数字作废，需要重跑。重跑会产生真实 API 费用。
 
 ---
 
-## 10. 风险与对策
+## 9. 风险与对策
 
 | 风险 | 对策 |
 |---|---|
-| LLM 审计放水或过严 | 校准集回归（§8）+ 裁决 prompt 固化为协议 + 安全阀轮次兜底强制裁决；仍不稳则引入第二模型交叉裁决 |
-| 用户照着材料念，骗过审计 | 协议规定复述不得分；裁决阶段审计官动用完整专业知识判断是否站得住脚（§4.2）；V1.1 语音输入提高即时性成本 |
-| 审计 token 成本失控 | 轮次不再固定但有安全阀上限（`audit_max_turns`，§4.2/§9）、上下文裁剪、单日审计次数预算 |
-| 模型破坏 JSON 协议 | `response_mime_type` 强约束 + 解析失败兜底为 probe + 超限强制 fail 裁决 |
-| 平台能力误判 | 已前置处理：iOS 截图监控从设计中移除（ADR-2），不存在"做到一半发现做不了" |
-| 范围蔓延 | 本文档冻结 V1 范围；新想法一律进 backlog 排队 |
-| 体力系统膨胀成三个独立追踪 App | 明确约束：Vitality System 只用每日签到自评，不做记账分类/HealthKit 集成/卡路里估算（§4.5） |
-| Architect 拆解质量差（节点太大/太空/parent 引用错误） | 服务端不信任 LLM 的 parent_slug 一定合法：解析失败或引用不存在的父节点一律挂回根节点，保证树结构永远合法；slug 唯一性由服务端而非 LLM 保证（§4.1） |
-| Architect 把 node_type 判断错（该判 task 判成了 concept，反之亦然） | 已发生过的真实案例：把"把大象放进冰箱"整批判成 concept，导致每一步都被追问"为什么在任何情况下都成立"。校准集（§8）需要覆盖 task/concept 混合的拆解样本，不能只测概念型主题；用户也可以在生成结果里看到 node_type 标签，发现判错能重新生成 |
+| 审计放水或过严 | 校准集回归 + Challenger 复核 + 轮次上限兜底；仍不稳则引入第二模型交叉裁决 |
+| 照着材料念骗过审计 | 复述不得分；裁决用专家视角；原则卡追问历史误解 |
+| 模型破坏 JSON 协议 | 解析失败按 probe 处理；超限强制 fail |
+| LLM 生成的图不合法 | Structure Validator 11 条规则；服务端保证 slug 唯一、无环、父节点数 ≤3 |
+| node_type 判错（步骤被当成概念追问"为什么"） | 校准集覆盖 task/concept 混合样本；地图上显示类型标签 |
+| LLM 编造链接 | URL 只取自搜索结果 |
+| 范围蔓延 | 打卡不做真实追踪；新想法进 backlog |
+| 误用真实 key 产生费用 | run.sh 与测试默认 `LLM_PROVIDER=mock`；测试有网络防护 |
 
 ---
 
-## 附录 A · 审计裁决 JSON Schema
-
-```json
-{
-  "oneOf": [
-    {
-      "type": "object",
-      "properties": {
-        "action":   {"const": "probe"},
-        "question": {"type": "string"}
-      },
-      "required": ["action", "question"]
-    },
-    {
-      "type": "object",
-      "properties": {
-        "action":  {"const": "verdict"},
-        "pass":    {"type": "boolean"},
-        "score":   {"type": "integer", "minimum": 0, "maximum": 100},
-        "gaps":    {"type": "array", "items": {"type": "string"}},
-        "comment": {"type": "string"}
-      },
-      "required": ["action", "pass", "score", "gaps"]
-    }
-  ]
-}
-```
-
-## 附录 B · 术语表
+## 附录 A · 术语表
 
 | 术语 | 定义 |
 |---|---|
-| 分解规划官（Architect） | 把用户输入的主题/大任务拆解成技能节点树的角色，只负责结构不负责内容，同时给每个节点标注 node_type |
-| node_type | 节点类型，concept（需要讲清楚原理，走费曼审计）或 task（只需确认做到了，走任务核验），决定用哪套验证协议 |
-| 费曼审计 | LLM 按固定协议对用户解释进行多轮压力测试并输出结构化裁决的过程 |
-| 原理方块 | 通过审计后技能节点的视觉形态，携带掌握分数 |
-| 原则卷轴 | 由失败反思蒸馏出的单条可执行行为规则（"当…时，我将…"） |
-| 激励引擎 | 确定性奖励结算规则系统（RL-inspired，非 RL） |
-| 初学者人设 | 2026-07-19 起费曼审计协议的核心设定：提问阶段审计官只能基于用户已说过的内容发问，不引入外部知识带节奏；裁决阶段仍用完整专业知识判断对错。取代了早期"埋错检测"（审计官故意提出含细微错误的理解）——后者需要审计官动用超出对话内容的知识来构造陷阱，被用户指出这违背了费曼学习法"听众必须无知"的设定，已移除 |
-| 专注度评分 | V2 桌面端由前台应用/屏幕内容推断的连续专注量化值 |
-| 赛博分身 | 用户在系统内的可视化形象，其技能树/方块/卷轴/体力值均为真实能力与状态的镜像，不是独立于用户的养成对象 |
-| 体力系统 | V2 引入的 Health/Sanity 双资源系统：Health 由每日签到滚动驱动，决定 Sanity 的上限与恢复速度；Sanity 由审计通过/失败直接结算 |
+| 퀘스트 라인 / 课程 | 一次生成得到的课程图 |
+| 월드맵 | 课程图的地图视图 |
+| contains / requires | 包含边（决定位置与解锁）/ 软前置边（只影响顺序） |
+| 费曼审计 | 按固定协议多轮追问并输出结构化裁决的过程 |
+| 初学者人设 | 提问阶段只基于用户说过的话发问；裁决阶段用完整专业知识 |
+| 교훈 카드 / 原则卡 | 失败反思整理出的行为规则，附带误解（misconception） |
+| 컨디션 | 由最近打卡算出的 normal / low / unknown 标记，只影响审计节奏 |
+| 激励引擎 | 确定性奖励规则（RL-inspired，非 RL） |
+
+## 附录 B · 参考文献
+
+- Fong, C. J., Zaleski, D. J., & Leach, J. K. (2015). The challenge–skill balance and antecedents of flow: A meta-analytic investigation. *The Journal of Positive Psychology, 10*(5), 425–446. https://doi.org/10.1080/17439760.2014.967799
+
+## 版本记录
+
+- **v0.2（2026-10-01）**：课程从树/森林改为带两种边的 DAG；agent 重组为 16 个（之后加入 Front Desk，共 17 个）（Architect → Planner + Structure Validator，Scribe → Recorder，Librarian → Linker，新增 Clarifier、Syllabus Finder、Material Finder、Challenger、Narrator、Recommender、Check-in Converter、Profile Builder）；体力系统与专注度评分移除，改为 컨디션；前端 React → Flutter。
+- **v0.1（2026-07-17）**：初版，树状技能树 + Architect / Auditor / Scribe。

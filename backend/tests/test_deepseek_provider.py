@@ -70,7 +70,7 @@ def test_complete_raises_on_non_2xx_status():
 
 
 def test_complete_passes_configured_timeout(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(settings, "deepseek_timeout_seconds", 12.5)
+    monkeypatch.setattr(settings, "llm_timeout_seconds", 12.5)
     provider, fake_client = _make_provider(_content_response('{"title": "t", "body": "b"}'))
     provider.complete([{"role": "system", "content": "sys"}, {"role": "user", "content": "hi"}])
     assert fake_client.last_kwargs["timeout"] == 12.5

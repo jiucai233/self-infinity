@@ -2,10 +2,31 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "self-infinity-frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
-      "port": 5173
+      "name": "backend-mock",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd backend && LLM_PROVIDER=mock exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "app-web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd app && exec flutter run -d web-server --release --web-hostname 127.0.0.1 --web-port 8090 --dart-define=API_BASE_URL=http://127.0.0.1:8000/api"
+      ],
+      "port": 8090
+    },
+    {
+      "name": "app-web-offline",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd app && exec flutter run -d web-server --release --web-hostname 127.0.0.1 --web-port 8091 --dart-define=USE_FAKE_API=true"
+      ],
+      "port": 8091
     }
   ]
 }

@@ -1,0 +1,1856 @@
+/// An in-memory [SelfInfinityApi] that needs no backend.
+///
+/// It follows the offline demo script of `docs/api-contract.md` Section 4 and
+/// the state rules of the real backend, so the UI behaves the same with or
+/// without a server. Select it at run time with `--dart-define=USE_FAKE_API=true`.
+library;
+
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'api.dart';
+import 'api_exception.dart';
+import 'graph_utils.dart';
+import 'models.dart';
+import 'reflection_prompts.dart';
+
+/// Deterministic in-memory backend.
+///
+/// ```dart
+/// final api = FakeApiClient(latency: Duration.zero); // tests
+/// final demo = FakeApiClient();                       // 300 ms per call
+/// ```
+///
+/// ### Behaviour (contract Section 4 and the state rules)
+/// * **Courses**: a topic containing `math` (case-insensitive; Korean `수학` is
+///   still accepted as a fallback) yields the 12-node math course (any
+///   settings); with `searchSyllabus` it is based on
+///   `High School Mathematics Curriculum (Ministry of Education)`. Any other topic yields a generic
+///   10-node course. Only the root is `available`; the rest is `locked`.
+///   Settings are validated like the server does (422).
+/// * **Unlocking**: passing a node marks it `mastered` and unlocks every
+///   `locked` node that has it as a contains parent (so a node with two
+///   parents opens when either is mastered). `requires` edges never block.
+/// * **Audits**: the first answer gets a probe (it names the most recent
+///   lesson from the Memory Retriever if there is one); later answers get a
+///   verdict. Pass needs ≥ 80 characters in total and no `don't know` / `not sure`
+///   (or Korean `모르`) in the latest answer. The Challenger overturns a pass with a total below 160
+///   characters, at most once per session. Turn limit: concept 8, task 4,
+///   doubled at night; a probe at the limit becomes a failing verdict with
+///   score 0.
+/// * **Memory Retriever**: up to 3 lessons, most recent first, taken from the
+///   audited node itself, its direct contains/requires neighbours, or
+///   principles linked (by the Linker) to those.
+/// * **Reflection**: only for a failed session, only once. The Recorder and
+///   Linker follow Section 4.4. Extra for demos: a reflection containing `contradict`
+///   (or Korean `모순`)
+///   also gets a `contradicts` link to the previous lesson, so that all five
+///   graph edge kinds can be seen.
+/// * **Check-ins**: only through the chat. Transcripts are parsed per Section
+///   4.5; a second check-in on the same KST day replaces the first.
+///   [checkInVoice], [narrate] and [generatePlan] are the pipelines behind the
+///   chat; they are not part of the client API any more.
+/// * **Briefing / search**: Section 4.6, computed from the state.
+/// * **Stage UI** (contract Section 5): `sendChat` runs the Mock front desk
+///   (keyword rules, first match wins; `teach me` also counts as a learn request) and the same pipelines as the other
+///   calls; a failing pipeline is explained in a message, a failing front
+///   desk throws (the user message stays in the history). With `uploadIds`
+///   a `generate_course` / `none` intent builds the course from the files
+///   (`source_course` = the file names, no URL). There are at most two
+///   suggestions (how was today / continue learning). `uploadFile` accepts
+///   `.pdf` / `.txt` / `.md` up to 4 MB. `ProfileFacts.xp` sums the rewards and
+///   levels up every 5 cleared nodes (starts at level 1).
+/// * **Life as a game** (contract Section 6): the profile (limits are 422s),
+///   the journal, and the reflection suggestion — once checked in today, the
+///   first suggestion is the reflection prompt of the current KST time window
+///   (by the injected clock) until a journal entry with that prompt exists
+///   today. `sendChat(reflectionPrompt: …)` runs no front desk: it saves the
+///   prompt, the answer, a journal entry and `Noted. It's in your journal.`
+///
+/// ### Failure injection
+/// [failNext] makes upcoming calls throw an [ApiException] **before** any
+/// state changes (a failed call has no effect).
+///
+/// ### Test hooks
+/// [debugMaxTurns], [debugSetMaxTurns] and [debugSetNodeType] expose or tweak
+/// details the API hides.
+class FakeApiClient implements SelfInfinityApi {
+  /// Creates the fake.
+  ///
+  /// [latency] is awaited at the start of every call so that loading states
+  /// are visible (default 300 ms). With `Duration.zero` no timer is used at
+  /// all, which is what widget tests want. [clock] provides "now" (UTC);
+  /// the default is the system clock.
+  ///
+  /// [onboarded] is the profile's tutorial flag at the start: `true` (the
+  /// default, what most tests want) skips the first-run tutorial.
+  FakeApiClient({
+    this.latency = const Duration(milliseconds: 300),
+    DateTime Function()? clock,
+    bool onboarded = true,
+  }) : _clock = clock ?? (() => DateTime.now().toUtc()),
+       _profile = Profile(onboarded: onboarded);
+
+  /// Delay before every call.
+  final Duration latency;
+
+  final DateTime Function() _clock;
+
+  /// The method names accepted by [failNext]'s `method` argument.
+  static const Set<String> methodNames = {
+    'generateCourse',
+    'listCourses',
+    'getCourseMap',
+    'listSkills',
+    'startAudit',
+    'submitTurn',
+    'submitReflection',
+    'checkInVoice',
+    'getBriefing',
+    'narrate',
+    'generatePlan',
+    'createSearchPlan',
+    'sendChat',
+    'getChatHistory',
+    'getChatSuggestions',
+    'getTodayCheckIn',
+    'getSkillOverview',
+    'listAudits',
+    'uploadFile',
+    'getCurrentPlan',
+    'getProfile',
+    'updateProfile',
+    'listJournal',
+    'listPrinciples',
+    'listGoals',
+    'createGoal',
+    'updateGoal',
+    'deleteGoal',
+  };
+
+  // -- state ------------------------------------------------------------------
+
+  final List<Course> _courses = [];
+  final Map<int, SkillNode> _nodes = {}; // insertion order == id order
+  final List<SkillEdge> _edges = []; // per course: contains edges, then requires
+  final Map<int, _FakeAudit> _audits = {};
+  final List<Principle> _principles = []; // creation order
+  final List<_Link> _links = [];
+  final Map<String, DailyCheckIn> _checkIns = {}; // by KST date
+  final List<StudyPlan> _plans = [];
+  final List<SearchPlan> _searchPlans = []; // creation order
+  final List<ChatMessage> _chat = []; // creation order
+  final Map<int, _FakeUpload> _uploads = {};
+  Profile _profile;
+  final List<JournalEntry> _journal = []; // creation order
+  final List<Goal> _goals = []; // creation order
+  String? _narrative;
+  DateTime? _narrativeAt;
+
+  int _nextCourseId = 1;
+  int _nextNodeId = 1;
+  int _nextAuditId = 1;
+  int _nextPrincipleId = 1;
+  int _nextPlanId = 1;
+  int _nextSearchPlanId = 1;
+  int _nextChatId = 1;
+  int _nextUploadId = 1;
+  int _nextJournalId = 1;
+  int _nextGoalId = 1;
+
+  // -- failure injection ------------------------------------------------------
+
+  final List<_InjectedFailure> _failures = [];
+
+  /// Makes the next [times] call(s) fail with an [ApiException].
+  ///
+  /// * [statusCode] defaults to 502; `null` simulates "no response"
+  ///   (a network failure).
+  /// * [message] is the server `detail`; it defaults to the contract message
+  ///   of the endpoint. Pass e.g. `'skill is locked'` with `statusCode: 400`
+  ///   to exercise the Korean translations.
+  /// * [method] restricts the failure to one API method (see [methodNames]),
+  ///   e.g. `failNext(method: 'submitTurn')`; `null` hits whatever is called
+  ///   next. Calls to other methods pass through and leave the failure queued.
+  ///
+  /// The latency is still awaited before the failure is thrown.
+  void failNext({int? statusCode = 502, String? message, String? method, int times = 1}) {
+    assert(method == null || methodNames.contains(method), 'Unknown method "$method"');
+    assert(times > 0);
+    for (var i = 0; i < times; i++) {
+      _failures.add(_InjectedFailure(method, statusCode, message));
+    }
+  }
+
+  /// Removes every queued failure.
+  void clearFailures() => _failures.clear();
+
+  // -- test hooks -------------------------------------------------------------
+
+  /// The turn limit stored for an audit session (concept 8, task 4, doubled
+  /// for `night`). The API never exposes it.
+  int debugMaxTurns(int sessionId) =>
+      (_audits[sessionId] ?? (throw StateError('No audit session $sessionId'))).maxTurns;
+
+  /// Overrides the turn limit of an audit session, so that the forced failing
+  /// verdict at the limit (`passed: false`, `score: 0`) can be reached: with
+  /// a limit of 2, a Challenger probe on the second answer becomes that
+  /// verdict. The scripted Auditor never probes more than once on its own.
+  void debugSetMaxTurns(int sessionId, int maxTurns) {
+    final audit = _audits[sessionId] ?? (throw StateError('No audit session $sessionId'));
+    audit.maxTurns = maxTurns;
+  }
+
+  /// Turns a node into a `task` (or back into a `concept`) so that task
+  /// audits can be tested; the generated courses contain concept nodes only.
+  void debugSetNodeType(int skillId, NodeType type) {
+    final node = _nodes[skillId] ?? (throw StateError('No skill node $skillId'));
+    _nodes[skillId] = node.copyWith(nodeType: type);
+  }
+
+  // ===========================================================================
+  // course creation (only the chat uses it; tests seed with it)
+  // ===========================================================================
+
+  @override
+  Future<CourseMap> generateCourse(GenerateRequest request) =>
+      _generateCourse(request, sourceFiles: const []);
+
+  /// [sourceFiles]: names of uploaded files the outline is taken from (a
+  /// course from files has no URL; several names are joined with `, `).
+  Future<CourseMap> _generateCourse(
+    GenerateRequest request, {
+    required List<String> sourceFiles,
+  }) async {
+    await _begin('generateCourse');
+    _require(request.topic.trim().isNotEmpty, 'topic must not be blank');
+    _require(request.nodeCount >= 4 && request.nodeCount <= 30, 'node_count must be 4-30');
+    _require(request.maxDepth >= 2 && request.maxDepth <= 6, 'max_depth must be 2-6');
+
+    // `수학` is a Korean fallback; the English demo uses `math`.
+    final isMath = request.topic.toLowerCase().contains('math') || request.topic.contains('수학');
+    final List<_NodeSpec> specs;
+    final List<_RequiresSpec> requires;
+    if (isMath) {
+      specs = _mathNodes;
+      requires = _mathRequires;
+    } else {
+      final firstLine = request.topic.split('\n').first.trim();
+      final rootTitle = firstLine.isEmpty ? 'New Topic' : _shortTitle(firstLine);
+      specs = _genericNodes(rootTitle);
+      requires = _genericRequires;
+    }
+
+    final foundSyllabus = sourceFiles.isEmpty && isMath && request.searchSyllabus;
+    final course = Course(
+      id: _nextCourseId++,
+      topic: request.topic,
+      sourceCourse: sourceFiles.isNotEmpty
+          ? sourceFiles.join(', ')
+          : foundSyllabus
+          ? 'High School Mathematics Curriculum (Ministry of Education)'
+          : null,
+      sourceUrl: foundSyllabus ? _mockSearch('High School Mathematics Curriculum').first.url : null,
+      createdAt: _clock(),
+    );
+    _courses.add(course);
+
+    final firstId = _nextNodeId;
+    _nextNodeId += specs.length;
+    final ids = [for (var i = 0; i < specs.length; i++) firstId + i];
+
+    final nodes = <SkillNode>[
+      for (var i = 0; i < specs.length; i++)
+        SkillNode(
+          id: ids[i],
+          courseId: course.id,
+          slug: specs[i].slug,
+          title: specs[i].title,
+          description: specs[i].description,
+          status: i == 0 ? SkillStatus.available : SkillStatus.locked,
+          nodeType: NodeType.concept,
+        ),
+    ];
+    final edges = <SkillEdge>[
+      for (var i = 0; i < specs.length; i++)
+        for (var p = 0; p < specs[i].parents.length; p++)
+          SkillEdge(
+            fromId: ids[specs[i].parents[p] - 1],
+            toId: ids[i],
+            kind: SkillEdgeKind.contains,
+            isPrimary: p == 0,
+          ),
+      for (final r in requires)
+        SkillEdge(
+          fromId: ids[r.from - 1],
+          toId: ids[r.to - 1],
+          kind: SkillEdgeKind.requires,
+          reason: r.reason,
+        ),
+    ];
+
+    for (final n in nodes) {
+      _nodes[n.id] = n;
+    }
+    _edges.addAll(edges);
+    return CourseMap(course: course, nodes: nodes, edges: edges);
+  }
+
+  // ===========================================================================
+  // 3–6: courses and skills
+  // ===========================================================================
+
+  @override
+  Future<List<Course>> listCourses() async {
+    await _begin('listCourses');
+    return _courses.reversed.toList();
+  }
+
+  @override
+  Future<CourseMap> getCourseMap(int courseId) async {
+    await _begin('getCourseMap');
+    final course = _courses.where((c) => c.id == courseId).firstOrNull;
+    if (course == null) throw const ApiException(404, 'course not found');
+    final nodes = _nodes.values.where((n) => n.courseId == courseId).toList();
+    final ids = {for (final n in nodes) n.id};
+    final edges = _edges.where((e) => ids.contains(e.fromId)).toList();
+    return CourseMap(course: course, nodes: nodes, edges: edges);
+  }
+
+  @override
+  Future<List<SkillNode>> listSkills({int? courseId}) async {
+    await _begin('listSkills');
+    return [
+      for (final n in _nodes.values)
+        if (courseId == null || n.courseId == courseId) n,
+    ];
+  }
+
+  // ===========================================================================
+  // 7–9: audits
+  // ===========================================================================
+
+  @override
+  Future<AuditStart> startAudit(int skillId, {String mode = 'day'}) async {
+    await _begin('startAudit');
+    _require(mode == 'day' || mode == 'night', 'mode must be "day" or "night"');
+    final node = _nodes[skillId];
+    if (node == null) throw const ApiException(404, 'skill not found');
+    if (node.isLocked) throw const ApiException(400, 'skill is locked');
+
+    final position = positionOf(skillId, _edges);
+    final opening = _openingQuestion(node, position);
+    final base = node.nodeType == NodeType.concept ? 8 : 4;
+    final audit = _FakeAudit(
+      id: _nextAuditId++,
+      skillId: skillId,
+      position: position,
+      maxTurns: mode == 'night' ? base * 2 : base,
+      createdAt: _clock(),
+    )..turns.add(AuditTurn(role: AuditRole.auditor, content: opening));
+    _audits[audit.id] = audit;
+    return AuditStart(session: audit.toModel(), openingQuestion: opening);
+  }
+
+  @override
+  Future<TurnResult> submitTurn(int sessionId, String content) async {
+    await _begin('submitTurn');
+    _require(content.trim().isNotEmpty, 'content must not be blank');
+    final audit = _audits[sessionId];
+    if (audit == null) throw const ApiException(404, 'audit session not found');
+    if (audit.status != AuditStatus.active) {
+      throw const ApiException(400, 'audit session is already closed');
+    }
+
+    audit.turns.add(AuditTurn(role: AuditRole.user, content: content));
+    final userTurns = audit.turns.where((t) => t.isUser).map((t) => t.content).toList();
+
+    // First answer: always a probe.
+    if (userTurns.length == 1) {
+      final lessons = _retrieveLessons(audit.skillId);
+      final withMisconception = lessons.where((p) => p.hasMisconception);
+      final question = withMisconception.isEmpty
+          ? _genericProbe
+          : 'You once thought “${withMisconception.first.misconception}”. '
+                'How is this explanation different?';
+      return _probeOrForcedFail(audit, question, userTurns.length);
+    }
+
+    // Later answers: verdict.
+    final n = userTurns.join(' ').runes.length;
+    final latest = userTurns.last.toLowerCase().replaceAll('\u2019', "'");
+    // `모르` is a Korean fallback for "don't know".
+    final passed =
+        n >= 80 &&
+        !latest.contains("don't know") &&
+        !latest.contains('not sure') &&
+        !latest.contains('모르');
+    if (!passed) {
+      return _finishFail(
+        audit,
+        score: 45,
+        gaps: const [
+          'You stated the definition but not why it works.',
+          "You didn't cover the exceptions.",
+        ],
+        comment: 'The answer stops at the conclusion and lacks reasons.',
+      );
+    }
+    if (!audit.challenged && n < 160) {
+      audit.challenged = true;
+      return _probeOrForcedFail(audit, _challengerQuestion, userTurns.length);
+    }
+    return _finishPass(audit, n);
+  }
+
+  @override
+  Future<Principle> submitReflection(int sessionId, String reflection) async {
+    await _begin('submitReflection');
+    _require(reflection.trim().isNotEmpty, 'reflection must not be blank');
+    final audit = _audits[sessionId];
+    if (audit == null) throw const ApiException(404, 'audit session not found');
+    if (audit.status != AuditStatus.failed) {
+      throw const ApiException(400, 'reflection is only accepted for a failed audit');
+    }
+    if (audit.principleId != null) {
+      throw const ApiException(400, 'reflection already submitted for this audit');
+    }
+
+    // Recorder (Section 4.4).
+    final skill = _nodes[audit.skillId]!;
+    final principle = Principle(
+      id: _nextPrincipleId++,
+      title: _cut('Revisit “${skill.title}”', 40),
+      body: _cut('When I explain “${skill.title}”, I give the reason before the conclusion.', 120),
+      misconception: _cut(reflection.trim(), 60),
+      sourceSessionId: audit.id,
+      skillId: skill.id,
+      skillTitle: skill.title,
+      createdAt: _clock(),
+    );
+    audit.principleId = principle.id;
+
+    // Linker: one `related` link to the most recent other principle.
+    if (_principles.isNotEmpty) {
+      final previous = _principles.last;
+      _links.add(
+        _Link(
+          principle.id,
+          previous.id,
+          GraphEdgeKind.related,
+          'Same concept, similar misconception',
+        ),
+      );
+      if (reflection.toLowerCase().contains('contradict') || reflection.contains('모순')) {
+        _links.add(
+          _Link(
+            principle.id,
+            previous.id,
+            GraphEdgeKind.contradicts,
+            'Conflicts with the earlier lesson',
+          ),
+        );
+      }
+    }
+    _principles.add(principle);
+    return principle;
+  }
+
+  // ===========================================================================
+  // 12: check-in
+  // ===========================================================================
+
+  /// The Check-in Converter behind the chat (no longer part of the client API).
+  Future<CheckInResult> checkInVoice(String transcript) async {
+    await _begin('checkInVoice');
+    _require(transcript.trim().isNotEmpty, 'transcript must not be blank');
+    final parsed = _parseTranscript(transcript);
+    return _saveCheckIn(
+      DailyCheckIn(
+        date: formatKstDate(_clock()),
+        sleepHours: parsed.sleepHours,
+        exercised: parsed.exercised,
+        dietNote: parsed.dietNote,
+        focus: parsed.focus,
+        stress: parsed.stress,
+        transcript: transcript,
+        source: CheckInSource.voice,
+      ),
+    );
+  }
+
+  CheckInResult _saveCheckIn(DailyCheckIn checkIn) {
+    _checkIns[checkIn.date] = checkIn; // same KST day replaces the record
+    return CheckInResult(
+      checkin: checkIn,
+      missingFields: [
+        if (checkIn.sleepHours == null) CheckInField.sleepHours,
+        if (checkIn.exercised == null) CheckInField.exercised,
+        if (checkIn.dietNote == null) CheckInField.dietNote,
+        if (checkIn.focus == null) CheckInField.focus,
+        if (checkIn.stress == null) CheckInField.stress,
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // 13–16: briefing and plan
+  // ===========================================================================
+
+  @override
+  Future<Briefing> getBriefing() async {
+    await _begin('getBriefing');
+    return _briefing();
+  }
+
+  /// The Narrator behind the chat (no longer part of the client API).
+  Future<Briefing> narrate() async {
+    await _begin('narrate');
+    final facts = _facts();
+    final sentences = <String>[
+      "You've cleared ${facts.nodes.mastered} of ${facts.nodes.total} nodes.",
+      for (final c in facts.misconceptionClusters)
+        'The misconception “${c.label}” showed up ${c.occurrences} ${c.occurrences == 1 ? 'time' : 'times'} in ${c.skills.join(', ')}.',
+      if (facts.condition.avgSleepHours != null)
+        'Average sleep over the last ${facts.condition.days == 1 ? 'day' : '${facts.condition.days} days'}: ${_num(facts.condition.avgSleepHours!)} h.',
+    ];
+    _narrative = _cut(sentences.join(' '), 400);
+    _narrativeAt = _clock();
+    return _briefing();
+  }
+
+  /// The Planner behind the chat (no longer part of the client API).
+  Future<StudyPlan> generatePlan() async {
+    await _begin('generatePlan');
+    final available = _nodes.values.where((n) => n.isAvailable).toList();
+    if (available.isEmpty) {
+      throw const ApiException(
+        400,
+        'No node is available yet. Generate a course or pass an existing node first.',
+      );
+    }
+    final condition = _conditionFacts();
+    final low = condition.flag == ConditionFlag.low;
+    // Leaves first when the condition is low (a short, easy session), else by id.
+    final ordered = low
+        ? [
+            ...available.where((n) => positionOf(n.id, _edges) == NodePosition.leaf),
+            ...available.where((n) => positionOf(n.id, _edges) != NodePosition.leaf),
+          ]
+        : available;
+    final bucket = _contextBucket(condition);
+    final plan = StudyPlan(
+      id: _nextPlanId++,
+      suggestedTier: _suggestedTier(bucket),
+      contextBucket: bucket,
+      createdAt: _clock(),
+      steps: [
+        for (final n in ordered.take(low ? 3 : 5))
+          PlanStep(
+            skillId: n.id,
+            courseId: n.courseId,
+            skillTitle: n.title,
+            nodeType: n.nodeType,
+            rationale: 'Prerequisites checked — you can take this on now.',
+            focusHint: 'Explain the why before the definition.',
+          ),
+      ],
+    );
+    _plans.add(plan);
+    return plan;
+  }
+
+  // ===========================================================================
+  // 17: material search
+  // ===========================================================================
+
+  @override
+  Future<SearchPlan> createSearchPlan(int skillId, {String? gap, int? misconceptionId}) async {
+    await _begin('createSearchPlan');
+    final trimmedGap = gap?.trim() ?? '';
+    if (trimmedGap.isEmpty && misconceptionId == null) {
+      throw const ApiException(
+        400,
+        'A gap or misconception id is required. Search targets a specific gap only.',
+      );
+    }
+    final skill = _nodes[skillId];
+    if (skill == null) throw const ApiException(404, 'skill not found');
+
+    final String target;
+    if (trimmedGap.isNotEmpty) {
+      target = trimmedGap;
+    } else {
+      final principle = _principles.where((p) => p.id == misconceptionId).firstOrNull;
+      if (principle == null || !principle.hasMisconception) {
+        throw const ApiException(404, 'misconception not found');
+      }
+      target = principle.misconception!;
+    }
+
+    final queries = ['${skill.title} ${_cut(target, 30)}', '${skill.title} explained'];
+    final plan = SearchPlan(
+      id: _nextSearchPlanId++,
+      skillId: skillId,
+      gap: target,
+      queries: queries,
+      items: _mockSearch(queries.first, reason: 'Covers this gap directly.'),
+      createdAt: _clock(),
+    );
+    _searchPlans.add(plan);
+    return plan;
+  }
+
+  // ===========================================================================
+  // 18–23: stage UI (contract Section 5)
+  // ===========================================================================
+
+  /// Unlike the other calls, a failing front desk still keeps the user's
+  /// message in the history (contract endpoint 18). An unknown upload id is a
+  /// 404 and nothing is saved.
+  @override
+  Future<List<ChatMessage>> sendChat(
+    String message, {
+    List<int> uploadIds = const [],
+    String? reflectionPrompt,
+    String? courseTopic,
+  }) async {
+    _require(message.trim().isNotEmpty, 'message must not be blank');
+    _require(
+      courseTopic == null || courseTopic.trim().isNotEmpty || uploadIds.isNotEmpty,
+      'course_topic must not be blank without upload_ids',
+    );
+    if (reflectionPrompt != null) return _answerReflection(message, reflectionPrompt);
+    final files = <_FakeUpload>[];
+    for (final id in uploadIds) {
+      final upload = _uploads[id];
+      if (upload == null) throw const ApiException(404, 'upload not found');
+      files.add(upload);
+    }
+    final user = ChatMessage(
+      id: _nextChatId++,
+      role: ChatRole.user,
+      content: message,
+      createdAt: _clock(),
+    );
+    _chat.add(user);
+    await _begin('sendChat');
+
+    // A course topic skips the front desk (the tutorial).
+    var intent = courseTopic != null && courseTopic.trim().isNotEmpty
+        ? _GenerateCourse(courseTopic.trim())
+        : courseTopic != null
+        ? const _None('')
+        : _frontDesk(message);
+    // With files, `generate_course` and `none` both build a course from them.
+    if (files.isNotEmpty && (intent is _GenerateCourse || intent is _None)) {
+      // "I want to learn this" names no topic: the file does.
+      final current = intent;
+      final named = current is _GenerateCourse && !_demonstrative.hasMatch(current.topic);
+      final topic = current is _GenerateCourse && named
+          ? current.topic
+          : _stem(files.first.filename);
+      intent = _GenerateCourse(topic, files: [for (final f in files) f.filename]);
+    }
+    final out = <ChatMessage>[user];
+    ChatMessage assistant(String agent, String content, [ChatAction? action]) => ChatMessage(
+      id: _nextChatId++,
+      role: ChatRole.assistant,
+      content: content,
+      agent: agent,
+      action: action,
+      createdAt: _clock(),
+    );
+
+    try {
+      switch (intent) {
+        case _None(:final reply):
+          out.add(assistant('front_desk', reply));
+        case _GenerateCourse(:final topic, :final files):
+          out.add(assistant('front_desk', "I'll build a world for “$topic”."));
+          final map = await _generateCourse(GenerateRequest(topic: topic), sourceFiles: files);
+          final root = rootNodes(map.nodes, map.edges).first;
+          out.add(
+            assistant(
+              'planner',
+              'Your world “${root.title}” is ready — ${map.nodes.length} nodes.',
+              CourseAction(course: map.course, nodeCount: map.nodes.length),
+            ),
+          );
+        case _OpenSkill(:final skill):
+          out.add(
+            assistant(
+              'front_desk',
+              'Taking you to “${skill.title}”.',
+              NavigateAction(scene: NavScene.skill, skillId: skill.id),
+            ),
+          );
+        case _CheckIn():
+          out.add(assistant('front_desk', 'Got it, logging that.'));
+          final result = await checkInVoice(message);
+          out.add(
+            assistant('checkin_converter', _checkInSummary(result.checkin), CheckInAction(result)),
+          );
+        case _Plan():
+          out.add(assistant('front_desk', "Let me pick today's quests."));
+          final plan = await generatePlan();
+          final titles = plan.steps.map((s) => '“${s.skillTitle}”').join(', ');
+          out.add(assistant('recommender', "Today's quests: $titles.", PlanAction(plan)));
+        case _Briefing():
+          out.add(assistant('front_desk', 'Let me sum up where you are.'));
+          final briefing = await narrate();
+          out.add(assistant('narrator', briefing.narrative ?? '', BriefingAction(briefing)));
+        case _OpenMap():
+          out.add(
+            assistant(
+              'front_desk',
+              'Opening your life tree.',
+              const NavigateAction(scene: NavScene.map),
+            ),
+          );
+      }
+    } on ApiException catch (e) {
+      out.add(assistant('front_desk', _pipelineFailure(intent, e)));
+    }
+    _chat.addAll(out.skip(1));
+    return out;
+  }
+
+  /// Chat with a `reflection_prompt`: no front desk, nothing generated.
+  Future<List<ChatMessage>> _answerReflection(String message, String prompt) async {
+    _require(reflectionPrompts.contains(prompt), 'unknown reflection prompt');
+    await _begin('sendChat');
+    ChatMessage line(ChatRole role, String content, {String? agent}) => ChatMessage(
+      id: _nextChatId++,
+      role: role,
+      content: content,
+      agent: agent,
+      createdAt: _clock(),
+    );
+    final out = [
+      line(ChatRole.assistant, prompt, agent: 'front_desk'),
+      line(ChatRole.user, message),
+      line(ChatRole.assistant, "Noted. It's in your journal.", agent: 'front_desk'),
+    ];
+    _journal.add(
+      JournalEntry(
+        id: _nextJournalId++,
+        prompt: prompt,
+        answer: message.trim(),
+        createdAt: _clock(),
+      ),
+    );
+    _chat.addAll(out);
+    return out;
+  }
+
+  static final RegExp _demonstrative = RegExp(
+    r'^(?:this|this file|these|these files)$',
+    caseSensitive: false,
+  );
+
+  /// A file name without its extension.
+  static String _stem(String filename) {
+    final dot = filename.lastIndexOf('.');
+    return dot > 0 ? filename.substring(0, dot) : filename;
+  }
+
+  @override
+  Future<UploadedFile> uploadFile({required String filename, required List<int> bytes}) async {
+    await _begin('uploadFile');
+    final lower = filename.toLowerCase();
+    final allowed = lower.endsWith('.pdf') || lower.endsWith('.txt') || lower.endsWith('.md');
+    if (!allowed || bytes.length > 4 * 1024 * 1024) {
+      throw const ApiException(400, 'Only PDF, TXT or MD files up to 4 MB.');
+    }
+    // PDFs are not parsed here: any non-empty PDF counts as readable text.
+    final text = lower.endsWith('.pdf')
+        ? String.fromCharCodes(bytes)
+        : String.fromCharCodes(utf8.decode(bytes, allowMalformed: true).runes);
+    if (text.trim().isEmpty) {
+      throw const ApiException(400, 'No text could be read from this file.');
+    }
+    final upload = _FakeUpload(
+      id: _nextUploadId++,
+      filename: filename,
+      chars: math.min(text.runes.length, 100000),
+      createdAt: _clock(),
+    );
+    _uploads[upload.id] = upload;
+    return UploadedFile(
+      id: upload.id,
+      filename: upload.filename,
+      chars: upload.chars,
+      createdAt: upload.createdAt,
+    );
+  }
+
+  /// Pipeline failures are explained in a message, not thrown (endpoint 18).
+  String _pipelineFailure(_Intent intent, ApiException e) {
+    if (e.statusCode == 400 && intent is _Plan) {
+      return 'No node is ready yet. Make a world first.';
+    }
+    return switch (intent) {
+      _GenerateCourse() => "I couldn't build that world. Please try again in a moment.",
+      _CheckIn() => "I couldn't log that. Please try again in a moment.",
+      _Plan() => "I couldn't pick today's quests. Please try again.",
+      _Briefing() => "I couldn't put your status together. Please try again.",
+      _ => "I couldn't do that right now. Please try again in a moment.",
+    };
+  }
+
+  String _checkInSummary(DailyCheckIn c) {
+    final parts = <String>[
+      if (c.sleepHours != null) 'sleep ${_num(c.sleepHours!)} h',
+      if (c.exercised != null) 'exercise ${c.exercised! ? 'yes' : 'no'}',
+      if (c.dietNote != null) 'meals ${c.dietNote}',
+      if (c.focus != null) 'focus ${c.focus}/5',
+      if (c.stress != null) 'stress ${c.stress}/5',
+    ];
+    return parts.isEmpty
+        ? "I couldn't find anything to log. Tell me about sleep, exercise or meals."
+        : 'Logged: ${parts.join(' · ')}';
+  }
+
+  static String _num(double v) => v == v.roundToDouble() ? '${v.toInt()}' : '$v';
+
+  /// The Mock front desk (contract Section 5): keyword rules, first match wins; `teach me` also counts as a learn request.
+  _Intent _frontDesk(String message) {
+    final skill = _titleInMessage(message);
+    if (skill != null &&
+        RegExp('challenge|audit|try|open|continue|start', caseSensitive: false).hasMatch(message)) {
+      return _OpenSkill(skill);
+    }
+    if (RegExp(
+      r'\b(?:sleep|slept|tired|exercis|worked out|ate\b|had .* for (?:breakfast|lunch|dinner)|log my day|my day)',
+      caseSensitive: false,
+    ).hasMatch(message)) {
+      return const _CheckIn();
+    }
+    if (RegExp(r'learn|study|build|make|create|teach me', caseSensitive: false).hasMatch(message)) {
+      var topic = message.trim().replaceFirst(
+        RegExp(
+          r"^(?:i want to learn|i['\u2019]d like to learn|i want to study|teach me|"
+          r'build me a world (?:for|about)|make a world (?:for|about))\s*',
+          caseSensitive: false,
+        ),
+        '',
+      );
+      topic = topic.replaceFirst(RegExp(r'[\s.!?]+$'), '').trim();
+      if (topic.isEmpty) return const _None('What topic should I build?');
+      return _GenerateCourse(topic);
+    }
+    if (RegExp('quest|what should i|recommend', caseSensitive: false).hasMatch(message)) {
+      return const _Plan();
+    }
+    if (RegExp('status|report|how am i doing', caseSensitive: false).hasMatch(message)) {
+      return const _Briefing();
+    }
+    if (RegExp('map|world', caseSensitive: false).hasMatch(message)) return const _OpenMap();
+    return const _None('Sure. What would you like to do today?');
+  }
+
+  /// The node whose title is contained in [message]: the longest title wins,
+  /// a tie goes to the newest course.
+  SkillNode? _titleInMessage(String message) {
+    SkillNode? best;
+    final lower = message.toLowerCase();
+    for (final n in _nodes.values) {
+      if (!lower.contains(n.title.toLowerCase())) continue;
+      if (best == null ||
+          n.title.length > best.title.length ||
+          (n.title.length == best.title.length && n.courseId >= best.courseId)) {
+        best = n;
+      }
+    }
+    return best;
+  }
+
+  @override
+  Future<List<ChatMessage>> getChatHistory({int limit = 50}) async {
+    await _begin('getChatHistory');
+    _require(limit >= 1 && limit <= 200, 'limit must be 1-200');
+    return _chat.length <= limit ? List.of(_chat) : _chat.sublist(_chat.length - limit);
+  }
+
+  @override
+  Future<List<ChatSuggestion>> getChatSuggestions() async {
+    await _begin('getChatSuggestions');
+    final out = <ChatSuggestion>[];
+    // 1. no check-in today; once checked in, this window's reflection prompt
+    // (unless it was answered today).
+    final now = _clock();
+    if (!_checkIns.containsKey(formatKstDate(now))) {
+      out.add(const ChatSuggestion(label: 'How was your day?', message: 'Let me log my day'));
+    } else {
+      final kst = toKst(now);
+      final prompt = reflectionPromptAt(kst.hour * 60 + kst.minute);
+      final today = formatKstDate(now);
+      final answered = _journal.any(
+        (e) => e.prompt == prompt && formatKstDate(e.createdAt) == today,
+      );
+      if (!answered) {
+        out.add(ChatSuggestion(label: prompt, message: '', reflection: true));
+      }
+    }
+    // 2. continue learning.
+    final last = _audits.values.isEmpty ? null : _audits.values.last; // newest, any status
+    final lastNode = last == null ? null : _nodes[last.skillId];
+    if (lastNode != null && !lastNode.isMastered) {
+      out.add(
+        ChatSuggestion(
+          label: 'Continue “${lastNode.title}”',
+          message: 'Continue “${lastNode.title}”',
+          skillId: lastNode.id,
+        ),
+      );
+    } else {
+      final available = _courses.isEmpty
+          ? null
+          : _nodes.values.where((n) => n.courseId == _courses.last.id && n.isAvailable).firstOrNull;
+      if (available != null) {
+        out.add(
+          ChatSuggestion(
+            label: 'Start with “${available.title}”',
+            message: 'Start with “${available.title}”',
+            skillId: available.id,
+          ),
+        );
+      } else {
+        out.add(const ChatSuggestion(label: 'Tell me what you want to learn', message: ''));
+      }
+    }
+    return out;
+  }
+
+  @override
+  Future<DailyCheckIn?> getTodayCheckIn() async {
+    await _begin('getTodayCheckIn');
+    return _checkIns[formatKstDate(_clock())];
+  }
+
+  @override
+  Future<SkillOverview> getSkillOverview(int skillId) async {
+    await _begin('getSkillOverview');
+    final skill = _nodes[skillId];
+    if (skill == null) throw const ApiException(404, 'skill not found');
+    final course = _courses.firstWhere((c) => c.id == skill.courseId);
+    return SkillOverview(
+      skill: skill,
+      course: course,
+      containsParents: [for (final id in containsParentsOf(skillId, _edges)) _nodes[id]!],
+      requires: [
+        for (final e in requiresIn(skillId, _edges))
+          RequiredSkill(skill: _nodes[e.fromId]!, reason: e.reason),
+      ],
+      audits: [
+        for (final a in _audits.values.toList().reversed)
+          if (a.skillId == skillId) _summaryOf(a),
+      ],
+      materials: [
+        for (final p in _searchPlans.reversed)
+          if (p.skillId == skillId) p,
+      ],
+    );
+  }
+
+  @override
+  Future<List<AuditSummary>> listAudits({int limit = 20}) async {
+    await _begin('listAudits');
+    _require(limit >= 1 && limit <= 100, 'limit must be 1-100');
+    return [for (final a in _audits.values.toList().reversed.take(limit)) _summaryOf(a)];
+  }
+
+  AuditSummary _summaryOf(_FakeAudit a) => AuditSummary(
+    id: a.id,
+    skillId: a.skillId,
+    skillTitle: _nodes[a.skillId]!.title,
+    status: a.status,
+    score: a.score,
+    createdAt: a.createdAt,
+  );
+
+  // ===========================================================================
+  // 16, 25–27: life as a game (contract Section 6)
+  // ===========================================================================
+
+  @override
+  Future<StudyPlan?> getCurrentPlan() async {
+    await _begin('getCurrentPlan');
+    return _plans.lastOrNull;
+  }
+
+  @override
+  Future<Profile> getProfile() async {
+    await _begin('getProfile');
+    return _profile;
+  }
+
+  @override
+  Future<Profile> updateProfile({
+    String? identity,
+    String? vision,
+    String? antiVision,
+    List<String>? rules,
+    bool? onboarded,
+  }) async {
+    await _begin('updateProfile');
+    for (final text in [identity, vision, antiVision]) {
+      _require((text?.trim().length ?? 0) <= Profile.maxTextLength, 'text is too long');
+    }
+    List<String>? cleaned;
+    if (rules != null) {
+      cleaned = [
+        for (final r in rules)
+          if (r.trim().isNotEmpty) r.trim(),
+      ];
+      _require(cleaned.length <= Profile.maxRules, 'too many rules');
+      _require(cleaned.every((r) => r.length <= Profile.maxRuleLength), 'a rule is too long');
+    }
+    _profile = Profile(
+      identity: identity?.trim() ?? _profile.identity,
+      vision: vision?.trim() ?? _profile.vision,
+      antiVision: antiVision?.trim() ?? _profile.antiVision,
+      rules: cleaned == null ? _profile.rules : List.unmodifiable(cleaned),
+      updatedAt: _clock(),
+      onboarded: onboarded ?? _profile.onboarded,
+    );
+    return _profile;
+  }
+
+  @override
+  Future<List<JournalEntry>> listJournal({int limit = 20}) async {
+    await _begin('listJournal');
+    _require(limit >= 1 && limit <= 100, 'limit must be 1-100');
+    return _journal.reversed.take(limit).toList();
+  }
+
+  @override
+  Future<List<Principle>> listPrinciples() async {
+    await _begin('listPrinciples');
+    return _principles.reversed.toList();
+  }
+
+  // -- 28–31: main quests --------------------------------------------------------
+
+  @override
+  Future<List<Goal>> listGoals() async {
+    await _begin('listGoals');
+    return List.unmodifiable(_goals);
+  }
+
+  @override
+  Future<Goal> createGoal(String title) async {
+    await _begin('createGoal');
+    final t = _goalTitle(title);
+    if (_goals.length >= Goal.maxGoals) {
+      throw const ApiException(409, 'at most ${Goal.maxGoals} main quests');
+    }
+    final goal = Goal(id: _nextGoalId++, title: t, createdAt: _clock());
+    _goals.add(goal);
+    return goal;
+  }
+
+  @override
+  Future<Goal> updateGoal(int goalId, {String? title, List<int>? courseIds}) async {
+    await _begin('updateGoal');
+    final index = _goals.indexWhere((g) => g.id == goalId);
+    if (index < 0) throw const ApiException(404, 'goal not found');
+    final t = title == null ? null : _goalTitle(title);
+    List<int>? ids;
+    if (courseIds != null) {
+      ids = courseIds.toSet().toList();
+      for (final id in ids) {
+        if (!_courses.any((c) => c.id == id)) throw const ApiException(404, 'course not found');
+      }
+      for (var i = 0; i < _goals.length; i++) {
+        if (i == index) continue;
+        final g = _goals[i];
+        final kept = [
+          for (final c in g.courseIds)
+            if (!ids.contains(c)) c,
+        ];
+        if (kept.length != g.courseIds.length) {
+          _goals[i] = Goal(id: g.id, title: g.title, courseIds: kept, createdAt: g.createdAt);
+        }
+      }
+    }
+    final g = _goals[index];
+    return _goals[index] = Goal(
+      id: g.id,
+      title: t ?? g.title,
+      courseIds: List.unmodifiable(ids ?? g.courseIds),
+      createdAt: g.createdAt,
+    );
+  }
+
+  @override
+  Future<void> deleteGoal(int goalId) async {
+    await _begin('deleteGoal');
+    final before = _goals.length;
+    _goals.removeWhere((g) => g.id == goalId);
+    if (_goals.length == before) throw const ApiException(404, 'goal not found');
+  }
+
+  String _goalTitle(String title) {
+    final t = title.trim();
+    _require(t.isNotEmpty, 'title must not be blank');
+    _require(t.length <= Goal.maxTitleLength, 'title is too long');
+    return t;
+  }
+
+  // ===========================================================================
+  // internals
+  // ===========================================================================
+
+  /// Latency, then an injected failure if one matches [method].
+  Future<void> _begin(String method) async {
+    if (latency > Duration.zero) await Future<void>.delayed(latency);
+    final index = _failures.indexWhere((f) => f.method == null || f.method == method);
+    if (index < 0) return;
+    final failure = _failures.removeAt(index);
+    final code = failure.statusCode;
+    final message = failure.message ?? _defaultFailureMessage(method, code);
+    throw code == null ? ApiException.network(message) : ApiException(code, message);
+  }
+
+  static String _defaultFailureMessage(String method, int? code) {
+    if (code == 502) {
+      switch (method) {
+        case 'generateCourse':
+          return 'Course generation failed. Please try again.';
+        case 'submitTurn':
+          return 'The auditor is temporarily unavailable. Please try again.';
+        case 'submitReflection':
+          return 'Principle extraction failed. Please try again.';
+        case 'narrate':
+          return 'Briefing generation failed. Please try again.';
+        case 'generatePlan':
+          return 'Plan generation failed. Please try again.';
+        case 'createSearchPlan':
+          return 'Material search failed. Please try again.';
+        default:
+          return 'Bad gateway';
+      }
+    }
+    if (code == 404) return 'not found';
+    if (code == 422) return 'validation error';
+    return 'injected failure';
+  }
+
+  /// Request validation (FastAPI answers 422).
+  static void _require(bool condition, String message) {
+    if (!condition) throw ApiException(422, message);
+  }
+
+  // -- audits -----------------------------------------------------------------
+
+  String _openingQuestion(SkillNode node, NodePosition position) {
+    final title = node.title;
+    if (node.nodeType == NodeType.task) return 'How exactly will you do “$title”?';
+    switch (position) {
+      case NodePosition.leaf:
+        return 'Explain “$title” from scratch to someone who has never heard of it.';
+      case NodePosition.branch:
+        final children = containsChildren(
+          node.id,
+          _edges,
+        ).map((id) => _nodes[id]!.title).join(', ');
+        return '“$title” covers $children. '
+            'Why do these belong together, and when do you use which?';
+      case NodePosition.root:
+        return 'Which problems call for “$title”, and which don\'t? '
+            'How do you decide?';
+    }
+  }
+
+  static const String _genericProbe =
+      'Pick the most important term in your explanation and tell me what it means and why it matters.';
+  static const String _challengerQuestion =
+      'Before I pass this: give one case where this idea does not hold, and explain why.';
+
+  /// Returns the probe, or — if the turn limit is reached — a failing verdict.
+  TurnResult _probeOrForcedFail(_FakeAudit audit, String question, int userTurns) {
+    if (userTurns >= audit.maxTurns) {
+      return _finishFail(
+        audit,
+        score: 0,
+        gaps: const ["You couldn't explain the core idea within the turn limit."],
+        comment: 'The turns ran out before the explanation was complete.',
+      );
+    }
+    audit.turns.add(AuditTurn(role: AuditRole.auditor, content: question));
+    return ProbeResult(question: question);
+  }
+
+  VerdictResult _finishFail(
+    _FakeAudit audit, {
+    required int score,
+    required List<String> gaps,
+    required String comment,
+  }) {
+    audit
+      ..status = AuditStatus.failed
+      ..score = score
+      ..gaps = gaps
+      ..comment = comment;
+    return VerdictResult(passed: false, score: score, gaps: gaps, comment: comment);
+  }
+
+  VerdictResult _finishPass(_FakeAudit audit, int characters) {
+    final score = math.min(95, 70 + characters ~/ 10);
+    const comment = 'You explained the core idea and why it holds.';
+    audit
+      ..status = AuditStatus.passed
+      ..score = score
+      ..gaps = const []
+      ..comment = comment;
+
+    final mastered = _nodes[audit.skillId]!.copyWith(
+      status: SkillStatus.mastered,
+      masteryScore: score,
+    );
+    _nodes[mastered.id] = mastered;
+
+    // Every locked contains-child becomes available.
+    final unlocked = <int>[];
+    for (final childId in containsChildren(mastered.id, _edges)) {
+      final child = _nodes[childId]!;
+      if (child.isLocked) {
+        _nodes[childId] = child.copyWith(status: SkillStatus.available);
+        unlocked.add(childId);
+      }
+    }
+
+    // Reward: base 10 × difficulty × 1.1^level (level = mastered nodes ~/ 5 + 1).
+    final typeWeight = mastered.nodeType == NodeType.concept ? 2.0 : 1.0;
+    final difficulty = typeWeight * (1 + 0.5 * depthOf(mastered.id, _edges));
+    final level = _nodes.values.where((n) => n.isMastered).length ~/ 5 + 1;
+    final multiplier = (math.pow(1.1, level) * 10000).round() / 10000;
+
+    final reward = (10 * difficulty * multiplier).round();
+    audit.reward = reward;
+    return VerdictResult(
+      passed: true,
+      score: score,
+      comment: comment,
+      unlockedSkillIds: unlocked,
+      rewardAmount: reward,
+      rewardMultiplier: multiplier,
+    );
+  }
+
+  /// Memory Retriever: up to 3 lessons, most recent first, from the node
+  /// itself, its direct contains/requires neighbours, or principles linked to
+  /// those.
+  List<Principle> _retrieveLessons(int skillId) {
+    final scope = <int>{skillId};
+    for (final e in _edges) {
+      if (e.fromId == skillId) scope.add(e.toId);
+      if (e.toId == skillId) scope.add(e.fromId);
+    }
+    final hits = {
+      for (final p in _principles)
+        if (scope.contains(p.skillId)) p.id,
+    };
+    final linked = <int>{};
+    for (final l in _links) {
+      if (hits.contains(l.fromId)) linked.add(l.toId);
+      if (hits.contains(l.toId)) linked.add(l.fromId);
+    }
+    final ids = {...hits, ...linked};
+    final lessons = [
+      for (final p in _principles)
+        if (ids.contains(p.id)) p,
+    ]..sort((a, b) => b.id.compareTo(a.id));
+    return lessons.take(3).toList();
+  }
+
+  // -- facts, tiers, briefing ---------------------------------------------------
+
+  Briefing _briefing() =>
+      Briefing(facts: _facts(), narrative: _narrative, narrativeGeneratedAt: _narrativeAt);
+
+  ProfileFacts _facts() {
+    final nodes = _nodes.values.toList();
+    final mastered = nodes.where((n) => n.isMastered).length;
+    final passed = _audits.values.where((a) => a.status == AuditStatus.passed).length;
+    final failed = _audits.values.where((a) => a.status == AuditStatus.failed).length;
+    return ProfileFacts(
+      nodes: NodeCounts(
+        total: nodes.length,
+        mastered: nodes.where((n) => n.isMastered).length,
+        available: nodes.where((n) => n.isAvailable).length,
+        locked: nodes.where((n) => n.isLocked).length,
+      ),
+      // Completed audits only (a session abandoned mid-dialogue is not counted).
+      audits: AuditCounts(total: passed + failed, passed: passed, failed: failed),
+      misconceptionClusters: _clusters(),
+      condition: _conditionFacts(),
+      xp: XpFacts(
+        total: _audits.values.fold(0, (sum, a) => sum + a.reward),
+        level: mastered ~/ 5 + 1,
+        levelProgress: (mastered % 5) / 5,
+      ),
+    );
+  }
+
+  /// Groups principles whose misconceptions overlap (single linkage over
+  /// [_relevance] ≥ 6) into clusters; cross-skill clusters first.
+  List<MisconceptionCluster> _clusters() {
+    final items = _principles.where((p) => p.hasMisconception).toList();
+    final parent = List<int>.generate(items.length, (i) => i);
+    int find(int x) {
+      while (parent[x] != x) {
+        parent[x] = parent[parent[x]];
+        x = parent[x];
+      }
+      return x;
+    }
+
+    for (var i = 0; i < items.length; i++) {
+      for (var j = i + 1; j < items.length; j++) {
+        if (_relevance(items[i].misconception!, items[j].misconception!) >= 6) {
+          final a = find(i);
+          final b = find(j);
+          if (a != b) parent[math.max(a, b)] = math.min(a, b);
+        }
+      }
+    }
+
+    final groups = <int, List<Principle>>{};
+    for (var i = 0; i < items.length; i++) {
+      groups.putIfAbsent(find(i), () => []).add(items[i]);
+    }
+    final clusters = [
+      for (final members in groups.values)
+        MisconceptionCluster(
+          label: members.first.misconception!,
+          occurrences: members.length,
+          skills: {for (final m in members) m.skillTitle}.toList(),
+          crossSkill: {for (final m in members) m.skillId}.length >= 2,
+          principleIds: [for (final m in members) m.id],
+        ),
+    ];
+    clusters.sort((a, b) {
+      if (a.crossSkill != b.crossSkill) return a.crossSkill ? -1 : 1;
+      if (a.occurrences != b.occurrences) return b.occurrences.compareTo(a.occurrences);
+      return b.principleIds.last.compareTo(a.principleIds.last);
+    });
+    return clusters;
+  }
+
+  /// Character-bigram overlap plus twice the number of shared latin words.
+  static int _relevance(String a, String b) {
+    Map<String, int> bigrams(String s) {
+      final t = s.replaceAll(RegExp(r'\s+'), '');
+      final counts = <String, int>{};
+      for (var i = 0; i + 1 < t.length; i++) {
+        counts.update(t.substring(i, i + 2), (v) => v + 1, ifAbsent: () => 1);
+      }
+      return counts;
+    }
+
+    Set<String> words(String s) => {
+      for (final m in RegExp(r'[A-Za-z0-9]{2,}').allMatches(s)) m.group(0)!.toLowerCase(),
+    };
+
+    final ba = bigrams(a);
+    final bb = bigrams(b);
+    var overlap = 0;
+    ba.forEach((k, v) {
+      final other = bb[k];
+      if (other != null) overlap += math.min(v, other);
+    });
+    return overlap + 2 * words(a).intersection(words(b)).length;
+  }
+
+  /// Condition over the last three check-ins (contract: `ProfileFacts.condition`).
+  ConditionFacts _conditionFacts() {
+    final recent = (_checkIns.values.toList()..sort((a, b) => b.date.compareTo(a.date)))
+        .take(3)
+        .toList();
+    final sleeps = [
+      for (final c in recent)
+        if (c.sleepHours != null) c.sleepHours!,
+    ];
+    final stresses = [
+      for (final c in recent)
+        if (c.stress != null) c.stress!.toDouble(),
+    ];
+    double? mean(List<double> v) => v.isEmpty ? null : v.reduce((a, b) => a + b) / v.length;
+    double? round1(double? v) => v == null ? null : (v * 10).round() / 10;
+
+    final avgSleep = mean(sleeps);
+    final avgStress = mean(stresses);
+    final ConditionFlag flag;
+    if (recent.isEmpty) {
+      flag = ConditionFlag.unknown;
+    } else if ((avgSleep != null && avgSleep < 6) || (avgStress != null && avgStress >= 4)) {
+      flag = ConditionFlag.low;
+    } else {
+      flag = ConditionFlag.normal;
+    }
+    return ConditionFacts(
+      days: recent.length,
+      avgSleepHours: round1(avgSleep),
+      avgStress: round1(avgStress),
+      flag: flag,
+    );
+  }
+
+  // Not part of the contract's offline script: a simple deterministic heuristic.
+  ContextBucket _contextBucket(ConditionFacts c) {
+    if (c.flag == ConditionFlag.low) return ContextBucket.low;
+    final sleepy = c.avgSleepHours ?? 0;
+    if (c.days > 0 && sleepy >= 7.5 && (c.avgStress ?? 0) < 3) return ContextBucket.high;
+    return ContextBucket.mid;
+  }
+
+  Tier _suggestedTier(ContextBucket bucket) => switch (bucket) {
+    ContextBucket.low => Tier.easy,
+    ContextBucket.mid => Tier.medium,
+    ContextBucket.high => Tier.hard,
+  };
+}
+
+// =============================================================================
+// Mock search, generic helpers
+// =============================================================================
+
+/// The first three results of the mock search provider.
+List<SearchItem> _mockSearch(String query, {String reason = ''}) => [
+  for (var i = 1; i <= 3; i++)
+    SearchItem(
+      title: '“$query” — resource $i',
+      url: 'https://example.org/$i',
+      snippet: 'Mock search result $i for “$query”. Offline demo text.',
+      reason: reason,
+    ),
+];
+
+/// Cuts [text] to at most [max] characters (code points).
+/// The Planner's title cap (backend `short_title`): at most 48 characters,
+/// cut at a word boundary, without a trailing connector or punctuation.
+String _shortTitle(String title) {
+  const max = 48;
+  const connectors = {'and', 'or', 'of', 'the', 'a', 'an', 'to', 'in', 'for', 'with', '&'};
+  const trailing = ' ,:;-–—/&';
+  String trimEnd(String t) {
+    var end = t.length;
+    while (end > 0 && trailing.contains(t[end - 1])) {
+      end--;
+    }
+    return t.substring(0, end);
+  }
+
+  final text = title.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).join(' ');
+  if (text.length <= max) return text;
+  final head = text.substring(0, max + 1);
+  final cut = head.lastIndexOf(' ');
+  final short = cut > 0 ? head.substring(0, cut) : text.substring(0, max);
+  final words = trimEnd(short).split(' ');
+  while (words.length > 1 && connectors.contains(words.last.toLowerCase())) {
+    words.removeLast();
+  }
+  return trimEnd(words.join(' '));
+}
+
+String _cut(String text, int max) {
+  final runes = text.runes;
+  return runes.length <= max ? text : String.fromCharCodes(runes.take(max));
+}
+
+// =============================================================================
+// Internal records
+// =============================================================================
+
+class _FakeAudit {
+  _FakeAudit({
+    required this.id,
+    required this.skillId,
+    required this.position,
+    required this.maxTurns,
+    required this.createdAt,
+  });
+
+  final int id;
+  final DateTime createdAt;
+  int reward = 0;
+  final int skillId;
+  final NodePosition position;
+  int maxTurns;
+  final List<AuditTurn> turns = [];
+  AuditStatus status = AuditStatus.active;
+  int? score;
+  List<String> gaps = const [];
+  String? comment;
+  bool challenged = false;
+  int? principleId;
+
+  AuditSession toModel() => AuditSession(
+    id: id,
+    skillId: skillId,
+    nodePosition: position,
+    status: status,
+    score: score,
+    gaps: List.unmodifiable(gaps),
+    comment: comment,
+    turns: List.unmodifiable(turns),
+  );
+}
+
+/// The intents of the Mock front desk.
+sealed class _Intent {
+  const _Intent();
+}
+
+class _None extends _Intent {
+  const _None(this.reply);
+  final String reply;
+}
+
+class _GenerateCourse extends _Intent {
+  const _GenerateCourse(this.topic, {this.files = const []});
+  final String topic;
+
+  /// Names of the uploaded files the course is built from.
+  final List<String> files;
+}
+
+class _OpenSkill extends _Intent {
+  const _OpenSkill(this.skill);
+  final SkillNode skill;
+}
+
+class _CheckIn extends _Intent {
+  const _CheckIn();
+}
+
+class _Plan extends _Intent {
+  const _Plan();
+}
+
+class _Briefing extends _Intent {
+  const _Briefing();
+}
+
+class _OpenMap extends _Intent {
+  const _OpenMap();
+}
+
+class _FakeUpload {
+  const _FakeUpload({
+    required this.id,
+    required this.filename,
+    required this.chars,
+    required this.createdAt,
+  });
+
+  final int id;
+  final String filename;
+  final int chars;
+  final DateTime createdAt;
+}
+
+class _Link {
+  const _Link(this.fromId, this.toId, this.kind, this.reason);
+  final int fromId;
+  final int toId;
+  final GraphEdgeKind kind;
+  final String reason;
+}
+
+class _InjectedFailure {
+  const _InjectedFailure(this.method, this.statusCode, this.message);
+  final String? method;
+  final int? statusCode;
+  final String? message;
+}
+
+// =============================================================================
+// Course scripts (contract Section 4.2)
+// =============================================================================
+
+class _NodeSpec {
+  const _NodeSpec(this.slug, this.title, this.parents, this.description);
+
+  final String slug;
+  final String title;
+
+  /// 1-based positions (in the course's node list) of the contains parents;
+  /// the first is the main parent. Empty for the root.
+  final List<int> parents;
+  final String description;
+}
+
+class _RequiresSpec {
+  const _RequiresSpec(this.from, this.to, this.reason);
+
+  /// 1-based positions in the course's node list.
+  final int from;
+  final int to;
+  final String reason;
+}
+
+const List<_NodeSpec> _mathNodes = [
+  _NodeSpec(
+    'high-school-math',
+    'High School Math',
+    [],
+    'The backbone of high school math: knowing which tool solves which problem.',
+  ),
+  _NodeSpec('algebra', 'Algebra', [
+    1,
+  ], 'Working with numbers and expressions: equations, inequalities, sequences.'),
+  _NodeSpec('functions', 'Functions', [
+    1,
+  ], 'Describing how two variables relate, with formulas and graphs.'),
+  _NodeSpec('calculus', 'Calculus', [
+    1,
+  ], 'Using limits and rates of change to handle slopes and areas.'),
+  _NodeSpec('quadratic-equation', 'Quadratic Equations', [
+    2,
+  ], 'How to solve equations of the form ax²+bx+c=0 and what the roots mean.'),
+  _NodeSpec('discriminant', 'Discriminant', [
+    5,
+  ], 'A tool that tells you the kind of roots from the coefficients alone.'),
+  _NodeSpec('root-coefficient', 'Roots and Coefficients', [
+    5,
+  ], 'The link between the sum and product of the roots and the coefficients.'),
+  _NodeSpec('sequences', 'Sequences', [
+    2,
+  ], 'Numbers listed by a rule, including arithmetic and geometric sequences.'),
+  _NodeSpec('linear-function', 'Linear Functions', [
+    3,
+  ], 'The slope and intercept of the straight line y=ax+b.'),
+  _NodeSpec('quadratic-function', 'Quadratic Functions', [
+    3,
+  ], 'The vertex, axis and x-intercepts of a parabola.'),
+  _NodeSpec('sequence-limit', 'Limits of Sequences', [
+    4,
+    8,
+  ], 'The value a sequence approaches as its terms go on forever.'),
+  _NodeSpec('derivative', 'Derivatives', [
+    4,
+  ], 'The instantaneous rate of change at a point, defined as a limit.'),
+];
+
+const List<_RequiresSpec> _mathRequires = [
+  _RequiresSpec(
+    5,
+    10,
+    'The x-intercepts of a quadratic function are the roots of a quadratic equation.',
+  ),
+  _RequiresSpec(9, 10, 'You need the graph of a linear function first.'),
+  _RequiresSpec(11, 12, 'The derivative is defined as a limit.'),
+];
+
+/// Generic course: root = topic, branches `Core Concepts` / `Key Methods` / `Applications`,
+/// two leaves each.
+List<_NodeSpec> _genericNodes(String rootTitle) => [
+  _NodeSpec('root', rootTitle, const [], 'The starting point that covers all of “$rootTitle”.'),
+  const _NodeSpec('core-concepts', 'Core Concepts', [
+    1,
+  ], 'The basic ideas that hold this field up.'),
+  const _NodeSpec('main-methods', 'Key Methods', [1], 'The standard ways to solve problems.'),
+  const _NodeSpec('applications', 'Applications', [
+    1,
+  ], 'Applying what you learned to real problems.'),
+  const _NodeSpec('core-concept-1', 'Core Concepts 1', [2], 'The first core concept.'),
+  const _NodeSpec('core-concept-2', 'Core Concepts 2', [2], 'The second core concept.'),
+  const _NodeSpec('main-method-1', 'Key Methods 1', [3], 'The first key method.'),
+  const _NodeSpec('main-method-2', 'Key Methods 2', [3], 'The second key method.'),
+  const _NodeSpec('application-1', 'Applications 1', [4], 'The first application.'),
+  const _NodeSpec('application-2', 'Applications 2', [4], 'The second application.'),
+];
+
+const List<_RequiresSpec> _genericRequires = [
+  _RequiresSpec(5, 7, 'You need the core concepts before using this method.'),
+  _RequiresSpec(7, 9, 'You need the method before you can apply it.'),
+];
+
+// =============================================================================
+// Check-in parsing (contract Section 4.5)
+// =============================================================================
+
+typedef _Parsed = ({
+  double? sleepHours,
+  bool? exercised,
+  String? dietNote,
+  int? focus,
+  int? stress,
+});
+
+_Parsed _parseTranscript(String text) {
+  // English rules first; the Korean rules below stay as a fallback because
+  // user content may still be Korean.
+  final t = text.replaceAll('\u2019', "'");
+  return (
+    sleepHours: _parseSleepEn(t) ?? _parseSleep(text),
+    exercised: _parseExerciseEn(t) ?? _parseExercise(text),
+    dietNote: _parseDietEn(t) ?? _parseDiet(text),
+    focus: _parseFocusEn(t) ?? _parseFocus(text),
+    stress: _parseStressEn(t) ?? _parseStress(text),
+  );
+}
+
+const Map<String, double> _englishNumbers = {
+  'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6,
+  'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10, 'eleven': 11, 'twelve': 12, //
+};
+
+final RegExp _sleepPatternEn = RegExp(
+  r'(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(?:hours?|hrs?|h)\b',
+  caseSensitive: false,
+);
+
+/// A number (digits or `one`…`twelve`) followed by `hour(s)` / `h`, in a
+/// sentence that mentions `sleep` / `slept`.
+double? _parseSleepEn(String text) {
+  for (final sentence in text.split(RegExp(r'[.!?\n](?!\d)'))) {
+    if (!RegExp(r'sleep|slept', caseSensitive: false).hasMatch(sentence)) continue;
+    for (final m in _sleepPatternEn.allMatches(sentence)) {
+      final token = m.group(1)!.toLowerCase();
+      final value = _englishNumbers[token] ?? double.tryParse(token);
+      if (value != null && value >= 0 && value <= 14) return value;
+    }
+  }
+  return null;
+}
+
+/// `didn't exercise` / `no exercise` / `skipped the gym` / `didn't work out`
+/// → false; `exercised` / `worked out` / `went to the gym` / `went for a run`
+/// → true.
+bool? _parseExerciseEn(String text) {
+  final lower = text.toLowerCase();
+  if (RegExp(
+    r"didn't exercise|did not exercise|no exercise|skipped (?:the )?gym|didn't work out|did not work out",
+  ).hasMatch(lower)) {
+    return false;
+  }
+  if (RegExp(r'exercised|worked out|went to the gym|went for a run').hasMatch(lower)) return true;
+  return null;
+}
+
+/// `had ramen for lunch` → `lunch: ramen`; also `for lunch I had ramen`.
+String? _parseDietEn(String text) {
+  const food = r'((?:(?!\b(?:had|ate)\b)[^.!?,\n])+?)';
+  const meal = r'(breakfast|lunch|dinner)';
+  RegExpMatch? m = RegExp(
+    '\\b(?:had|ate)\\s+$food\\s+for\\s+$meal\\b',
+    caseSensitive: false,
+  ).firstMatch(text);
+  var mealName = m?.group(2);
+  var what = m?.group(1);
+  if (m == null) {
+    m = RegExp(
+      '\\bfor\\s+$meal\\b[^.!?\\n]*?\\b(?:had|ate)\\s+([^.!?,\\n]+?)(?=\\s+(?:and|but)\\b|[.!?,\\n]|\$)',
+      caseSensitive: false,
+    ).firstMatch(text);
+    mealName = m?.group(1);
+    what = m?.group(2);
+  }
+  if (m == null || mealName == null || what == null) return null;
+  what = what.trim().replaceFirst(RegExp(r'^(?:a|an|the|some)\s+', caseSensitive: false), '');
+  if (what.isEmpty) return null;
+  return '${mealName.toLowerCase()}: $what';
+}
+
+/// `focused well` → 4; `couldn't focus` → 2.
+int? _parseFocusEn(String text) {
+  final lower = text.toLowerCase();
+  if (RegExp(r"couldn't focus|could not focus").hasMatch(lower)) return 2;
+  if (lower.contains('focused well')) return 4;
+  return null;
+}
+
+/// `stressed` / `a lot of stress` → 4; `relaxed` / `no stress` → 2.
+int? _parseStressEn(String text) {
+  final lower = text.toLowerCase();
+  if (RegExp(r"relaxed|no stress|not stressed|wasn't stressed").hasMatch(lower)) return 2;
+  if (RegExp(r'stressed|a lot of stress').hasMatch(lower)) return 4;
+  return null;
+}
+
+const Map<String, double> _koreanNumbers = {
+  '한': 1, '두': 2, '세': 3, '네': 4, '다섯': 5, '여섯': 6, '일곱': 7, '여덟': 8, '아홉': 9, //
+  '열': 10, '열한': 11, '열두': 12, '열세': 13, '열네': 14,
+};
+
+final RegExp _sleepPattern = RegExp(r'(\d+(?:\.\d+)?|열한|열두|열세|열네|다섯|여섯|일곱|여덟|아홉|열|한|두|세|네)\s*시간');
+
+/// Korean fallback: a number (digits or `한 두 세 …`) followed by `시간`.
+double? _parseSleep(String text) {
+  for (final m in _sleepPattern.allMatches(text)) {
+    final token = m.group(1)!;
+    final value = _koreanNumbers[token] ?? double.tryParse(token);
+    if (value != null && value >= 0 && value <= 14) return value;
+  }
+  return null;
+}
+
+/// `운동` + `안 했/안했/못 했/못했/쉬었` → false; `운동` + `했/갔` → true.
+bool? _parseExercise(String text) {
+  final i = text.indexOf('운동');
+  if (i < 0) return null;
+  final m = RegExp(r'안\s*했|못\s*했|쉬었|했|갔').firstMatch(text.substring(i + 2));
+  if (m == null) return null;
+  final hit = m.group(0)!;
+  return !(hit.startsWith('안') || hit.startsWith('못') || hit.startsWith('쉬'));
+}
+
+/// `(아침|점심|저녁)` + the word before `먹` → e.g. `점심 라면`.
+String? _parseDiet(String text) {
+  final m = RegExp(r'(아침|점심|저녁)[^.!?\n]*?\s([^\s먹.!?,]+)\s*먹').firstMatch(text);
+  if (m == null) return null;
+  var food = m.group(2)!;
+  if (food.length > 1 && (food.endsWith('을') || food.endsWith('를'))) {
+    food = food.substring(0, food.length - 1);
+  }
+  if (food == '안' || food == '못') return null; // "점심은 안 먹었어요" names no food
+  return '${m.group(1)} $food';
+}
+
+const List<String> _topicWords = ['집중', '스트레스', '운동', '아침', '점심', '저녁', '시간', '수면'];
+
+/// The text after [keyword] up to the end of that thought: a sentence end,
+/// comma, connective (`…고 `, `는데`, `지만`) or another topic word.
+String? _clauseAfter(String text, String keyword) {
+  final i = text.indexOf(keyword);
+  if (i < 0) return null;
+  final rest = text.substring(i + keyword.length);
+  final others = _topicWords.where((w) => w != keyword).join('|');
+  final stop = RegExp('[.!?,\\n]|고\\s|고\$|는데|지만|$others').firstMatch(rest);
+  return stop == null ? rest : rest.substring(0, stop.start);
+}
+
+final RegExp _negation = RegExp(r'(?:^|\s)(?:안|못)(?:\s|[됐되돼했하])|지\s*(?:는\s*)?(?:않|못)');
+
+/// `집중` with `잘` → 4; with `안` / `못` → 2.
+int? _parseFocus(String text) {
+  final clause = _clauseAfter(text, '집중');
+  if (clause == null) return null;
+  if (_negation.hasMatch(clause)) return 2;
+  return clause.contains('잘') ? 4 : null;
+}
+
+/// `스트레스` with `많` / `심` / `높` → 4; with `없` / `적` / `낮` → 2.
+/// A negation (`많지 않아요`) flips the result.
+int? _parseStress(String text) {
+  final clause = _clauseAfter(text, '스트레스');
+  if (clause == null) return null;
+  final high = RegExp('많|심|높').firstMatch(clause);
+  final low = RegExp('없|적|낮').firstMatch(clause);
+  int? value;
+  if (high != null && (low == null || high.start < low.start)) {
+    value = 4;
+  } else if (low != null) {
+    value = 2;
+  }
+  if (value == null) return null;
+  if (RegExp(r'지\s*(?:는\s*)?않|(?:^|\s)안\s*(?:많|심|높|적|낮|없)').hasMatch(clause)) {
+    value = value == 4 ? 2 : 4;
+  }
+  return value;
+}

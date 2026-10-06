@@ -28,32 +28,28 @@ jobs:
         working-directory: backend
         run: pytest
 
-  frontend:
-    name: Frontend (typecheck, test, lint)
+  app:
+    name: App (Flutter analyze, test)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          node-version: "24"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          channel: stable
+          flutter-version: 3.47.5
+          cache: true
 
       - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
+        working-directory: app
+        run: flutter pub get
 
-      - name: Typecheck
-        working-directory: frontend
-        run: npx tsc -b
+      - name: Analyze
+        working-directory: app
+        run: flutter analyze
 
       - name: Test
-        working-directory: frontend
-        run: npm test
-
-      - name: Lint
-        working-directory: frontend
-        run: npm run lint
+        working-directory: app
+        run: flutter test

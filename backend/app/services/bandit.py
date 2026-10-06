@@ -37,8 +37,8 @@ RECENT_WINDOW = 10  # how many recent resolved/active sessions feed the context 
 STALE_ACTIVE_HOURS = 2
 
 
-def difficulty_tier(session: Session, skill: SkillNode) -> str:
-    score = node_difficulty_score(session, skill)
+def difficulty_tier(session: Session, skill: SkillNode, depth: int | None = None) -> str:
+    score = node_difficulty_score(session, skill, depth)
     if score <= 1.5:
         return "easy"
     if score <= 3.0:

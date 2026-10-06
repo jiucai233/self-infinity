@@ -1,8 +1,15 @@
-from datetime import date, datetime
+"""请求/响应的 JSON 形状，严格对应 docs/api-contract.md 第 2、3 节。
 
-from pydantic import BaseModel, Field, field_validator
+字段名和枚举值是和 Flutter 客户端的约定，改动要先改契约。
+"""
 
-from app.models import AuditStatus, NodeType, SkillStatus
+from datetime import date as date_
+from datetime import datetime
+from typing import Annotated, Any, Literal, Union
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.models import AuditStatus, CheckInSource, EdgeKind, NodePosition, NodeType, SkillStatus
 
 
 def _not_blank(value: str) -> str:
@@ -12,25 +19,11 @@ def _not_blank(value: str) -> str:
     return stripped
 
 
-def _validate_difficulty(value: str) -> str:
-    if value not in ("intro", "standard", "deep"):
-        raise ValueError('difficulty must be "intro", "standard" or "deep"')
-    return value
+class _Out(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
 
-class GenerateTreeRequest(BaseModel):
-    topic: str
-    # 课程规模的超参数。上下界是防呆而非性能考虑：少于 4 个节点不成课程，
-    # 多于 30 个则单次生成的质量明显下降、开始出现凑数的空节点。
-    node_count: int = Field(default=12, ge=4, le=30)
-    max_depth: int = Field(default=4, ge=2, le=6)
-    difficulty: str = "standard"
-    # 关掉可以省一次搜索加一次 LLM 调用；离线演示和不想联网时用。
-    search_syllabus: bool = True
-
-    _validate_topic = field_validator("topic")(_not_blank)
-    _validate_difficulty = field_validator("difficulty")(_validate_difficulty)
-
+# ---------------------------------------------------------------- 课程
 
 class ClarifyRequest(BaseModel):
     topic: str
@@ -43,43 +36,76 @@ class ClarifyResponse(BaseModel):
     questions: list[str]
 
 
-def _validate_audit_mode(value: str) -> str:
-    if value not in ("day", "night"):
-        raise ValueError('mode must be "day" or "night"')
-    return value
+class GenerateCourseRequest(BaseModel):
+    topic: str
+    # 上下界是防呆而非性能考虑：少于 4 个节点不成课程，多于 30 个则单次生成的质量明显
+    # 下降、开始出现凑数的空节点。
+    node_count: int = Field(default=12, ge=4, le=30)
+    max_depth: int = Field(default=4, ge=2, le=6)
+    difficulty: Literal["intro", "standard", "deep"] = "standard"
+    # 关掉可以省一次搜索加一次 LLM 调用；离线演示和不想联网时用。
+    search_syllabus: bool = True
+
+    _validate_topic = field_validator("topic")(_not_blank)
 
 
-class StartAuditRequest(BaseModel):
-    mode: str = "day"
-
-    _validate_mode = field_validator("mode")(_validate_audit_mode)
-
-
-class SkillNodeOut(BaseModel):
+class CourseOut(_Out):
     id: int
+    topic: str
+    source_course: str | None
+    source_url: str | None
+    created_at: datetime
+
+
+class SkillNodeOut(_Out):
+    id: int
+    course_id: int
     slug: str
     title: str
     description: str
-    parent_id: int | None
     status: SkillStatus
     node_type: NodeType
     mastery_score: int | None
 
 
+class SkillEdgeOut(_Out):
+    from_id: int
+    to_id: int
+    kind: EdgeKind
+    is_primary: bool | None
+    reason: str | None
+
+
+class CourseGraphOut(BaseModel):
+    """Used by both POST /skills/generate and GET /courses/{id}/map."""
+
+    course: CourseOut
+    nodes: list[SkillNodeOut]
+    edges: list[SkillEdgeOut]
+
+
 class RecommendationOut(BaseModel):
     context_bucket: str
     suggested_tier: str
+    # JSON 对象的键只能是字符串；序列化时 int 键会变成 "5" 这样的字符串。
     skill_tiers: dict[int, str]
 
 
+# ---------------------------------------------------------------- 审计
+
+class StartAuditRequest(BaseModel):
+    mode: Literal["day", "night"] = "day"
+
+
 class AuditTurnOut(BaseModel):
-    role: str
+    role: Literal["user", "auditor"]
     content: str
 
 
 class AuditSessionOut(BaseModel):
     id: int
     skill_id: int
+    node_position: NodePosition
     status: AuditStatus
     score: int | None
     gaps: list[str]
@@ -98,16 +124,26 @@ class SubmitTurnRequest(BaseModel):
     _validate_content = field_validator("content")(_not_blank)
 
 
-class TurnResultResponse(BaseModel):
-    type: str  # "probe" | "verdict"
-    question: str | None = None
-    passed: bool | None = None
-    score: int | None = None
-    gaps: list[str] | None = None
-    comment: str | None = None
-    unlocked_skill_ids: list[int] = []
-    reward_amount: int | None = None
-    reward_multiplier: float | None = None
+class ProbeResult(BaseModel):
+    """A probe carries only `type` and `question`; a Challenger overturn looks the same."""
+
+    type: Literal["probe"] = "probe"
+    question: str
+
+
+class VerdictResult(BaseModel):
+    type: Literal["verdict"] = "verdict"
+    passed: bool
+    score: int
+    gaps: list[str]
+    comment: str
+    unlocked_skill_ids: list[int]
+    # 通过时有值，失败时为 null。
+    reward_amount: int | None
+    reward_multiplier: float | None
+
+
+TurnResult = Annotated[Union[ProbeResult, VerdictResult], Field(discriminator="type")]
 
 
 class ReflectionRequest(BaseModel):
@@ -116,18 +152,33 @@ class ReflectionRequest(BaseModel):
     _validate_reflection = field_validator("reflection")(_not_blank)
 
 
+class PrincipleOut(BaseModel):
+    id: int
+    title: str
+    body: str
+    misconception: str | None
+    source_session_id: int
+    # 来源审计所针对的节点。
+    skill_id: int
+    skill_title: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------- 知识图谱
+
 class GraphNodeOut(BaseModel):
-    id: str
-    kind: str  # "skill" | "principle"
+    id: str  # "skill:5" | "principle:7"
+    kind: Literal["skill", "principle"]
     title: str
     status: SkillStatus | None = None
     node_type: NodeType | None = None
+    course_id: int | None = None
 
 
 class GraphEdgeOut(BaseModel):
     source: str
     target: str
-    kind: str  # "parent" | "prerequisite" | "origin" | "related" | "contradicts"
+    kind: Literal["contains", "requires", "origin", "related", "contradicts"]
     reason: str | None = None
 
 
@@ -136,109 +187,108 @@ class GraphResponse(BaseModel):
     edges: list[GraphEdgeOut]
 
 
-class ContradictionOut(BaseModel):
-    principle_a_id: int
-    principle_a_title: str
-    principle_b_id: int
-    principle_b_title: str
-    reason: str
+# ---------------------------------------------------------------- 签到、画像、简报、学习计划
 
-
-class RelinkResponse(BaseModel):
-    principles_processed: int
-    related_links_created: int
-    contradictions: list[ContradictionOut]
-
-
-class PrincipleOut(BaseModel):
-    id: int
-    title: str
-    body: str
-    misconception: str | None
-    source_session_id: int
-    recurring_of_id: int | None = None
-    recurring_of_title: str | None = None
-
-
-class RewardEventOut(BaseModel):
-    id: int
-    session_id: int
-    amount: int
-    multiplier: float
-    created_at: datetime
-
-
-class DailyCheckInOut(BaseModel):
-    id: int
-    date: date
-    spending_rating: int
-    activity_rating: int
-    eating_rating: int
-
-
-class VitalityStateOut(BaseModel):
-    id: int
-    health: float
-    sanity: float
-    sanity_cap: float
-    updated_at: datetime
-
-
-class FocusSessionOut(BaseModel):
-    id: int
-    started_at: datetime
-    ended_at: datetime | None
-    focus_score: int | None
-    source: str
-
-
-def _validate_rating(value: int) -> int:
-    if not 1 <= value <= 3:
-        raise ValueError("must be between 1 and 3")
-    return value
+CHECKIN_FIELDS = ("sleep_hours", "exercised", "diet_note", "focus", "stress")
 
 
 class CheckInRequest(BaseModel):
-    spending_rating: int
-    activity_rating: int
-    eating_rating: int
+    """Voice (`transcript`) or manual (any subset of the five fields). A transcript wins."""
 
-    _validate_spending_rating = field_validator("spending_rating")(_validate_rating)
-    _validate_activity_rating = field_validator("activity_rating")(_validate_rating)
-    _validate_eating_rating = field_validator("eating_rating")(_validate_rating)
+    transcript: str | None = None
+    sleep_hours: int | None = Field(default=None, ge=0, le=14)
+    exercised: bool | None = None
+    diet_note: str | None = None
+    focus: int | None = Field(default=None, ge=1, le=5)
+    stress: int | None = Field(default=None, ge=1, le=5)
+
+    @field_validator("transcript")
+    @classmethod
+    def _transcript_not_blank(cls, value: str | None) -> str | None:
+        return None if value is None else _not_blank(value)
+
+    @field_validator("diet_note")
+    @classmethod
+    def _clean_diet_note(cls, value: str | None) -> str | None:
+        return (value.strip() or None) if value is not None else None
+
+    @model_validator(mode="after")
+    def _needs_something(self):
+        if self.transcript is None and all(getattr(self, f) is None for f in CHECKIN_FIELDS):
+            raise ValueError("a transcript or at least one field is required")
+        return self
+
+
+class DailyCheckInOut(_Out):
+    date: date_
+    sleep_hours: int | None
+    exercised: bool | None
+    diet_note: str | None
+    focus: int | None
+    stress: int | None
+    transcript: str | None
+    source: CheckInSource
+
+
+class CheckInResponse(BaseModel):
+    checkin: DailyCheckInOut
+    missing_fields: list[str]
+
+
+class NodeCounts(BaseModel):
+    total: int
+    mastered: int
+    available: int
+    locked: int
+
+
+class AuditCounts(BaseModel):
+    total: int
+    passed: int
+    failed: int
 
 
 class MisconceptionClusterOut(BaseModel):
     label: str
     occurrences: int
     skills: list[str]
-    cross_domain: bool
-    first_seen: datetime
-    last_seen: datetime
+    cross_skill: bool
     principle_ids: list[int]
 
 
-class NarratorBriefingOut(BaseModel):
-    total_skills: int
-    mastered_skills: int
-    available_skills: int
-    total_audits: int
-    passed_audits: int
-    failed_audits: int
-    pass_rate: float | None
-    clusters: list[MisconceptionClusterOut]
-    health: float | None
-    sanity: float | None
-    focus_score: int | None
-    # 叙述与画像分开返回：画像永远是新鲜的（纯 DB 现算），叙述可能是上一次生成的
-    # 快照，甚至为 None（从没生成过）。前端要能区分这两者，否则会把陈旧的叙述当成
-    # 对当前状态的描述。
+class ConditionOut(BaseModel):
+    days: int
+    avg_sleep_hours: float | None
+    avg_stress: float | None
+    flag: Literal["low", "normal", "unknown"]
+
+
+class XpOut(BaseModel):
+    """total = sum of all rewards; level and progress come from the mastered-node count."""
+
+    total: int
+    level: int
+    level_progress: float
+
+
+class ProfileFacts(BaseModel):
+    nodes: NodeCounts
+    audits: AuditCounts
+    misconception_clusters: list[MisconceptionClusterOut]
+    condition: ConditionOut
+    # 契约第 5 节新增；给默认值是为了不带 xp 手工构造 ProfileFacts 的调用方（Narrator 测试等）不用改。
+    xp: XpOut = XpOut(total=0, level=1, level_progress=0.0)
+
+
+class Briefing(BaseModel):
+    facts: ProfileFacts
     narrative: str | None
     narrative_generated_at: datetime | None
 
 
 class PlanStepOut(BaseModel):
     skill_id: int
+    course_id: int
     skill_title: str
     node_type: NodeType
     rationale: str
@@ -247,18 +297,16 @@ class PlanStepOut(BaseModel):
 
 class StudyPlanOut(BaseModel):
     id: int
-    steps: list[PlanStepOut]
     suggested_tier: str
     context_bucket: str
     created_at: datetime
+    steps: list[PlanStepOut]
 
+
+# ---------------------------------------------------------------- 资料检索（Material Finder）
 
 class SearchPlanRequest(BaseModel):
-    """检索入口强制要求上下文。
-
-    只接受"针对某个缺口/某个错误心智模型去找材料"，不接受"给我找这个主题的资料"——
-    后者会让系统退化成资料推荐器，而本系统的立论是验证而非供给（白皮书 §1）。
-    """
+    """Search needs context: a gap or a misconception id, never a bare topic (AD-5)."""
 
     gap: str | None = None
     misconception_id: int | None = None
@@ -280,20 +328,215 @@ class SearchPlanOut(BaseModel):
     created_at: datetime
 
 
-class SkillPrerequisiteOut(BaseModel):
+# ---------------------------------------------------------------- 舞台 UI（契约第 5 节）
+
+class ChatRequest(BaseModel):
+    message: str
+    # Ids from POST /api/uploads; every one must exist (404 `upload not found`).
+    upload_ids: list[int] | None = None
+    # Answering one of the seven reflection prompts (contract section 6): no LLM runs.
+    reflection_prompt: str | None = None
+    # Build a course on this topic right away (the tutorial): the front desk is skipped, so
+    # nothing depends on how it would classify the message. Blank is allowed with uploads
+    # (the topic is then the first file's name).
+    course_topic: str | None = Field(default=None, max_length=120)
+
+    _validate_message = field_validator("message")(_not_blank)
+
+    @model_validator(mode="after")
+    def _course_needs_a_topic_or_a_file(self) -> "ChatRequest":
+        if self.course_topic is not None and not self.course_topic.strip() and not self.upload_ids:
+            raise ValueError("course_topic must not be blank without upload_ids")
+        return self
+
+    @field_validator("reflection_prompt")
+    @classmethod
+    def _known_prompt(cls, value: str | None) -> str | None:
+        if value is not None and value not in REFLECTION_PROMPTS:
+            raise ValueError("must be one of the reflection prompts")
+        return value
+
+
+class UploadOut(_Out):
+    id: int
+    filename: str
+    chars: int
+    created_at: datetime
+
+
+class ChatMessageOut(BaseModel):
+    id: int
+    role: Literal["user", "assistant"]
+    content: str
+    agent: str | None
+    # null 或 {"type": "course" | "checkin" | "plan" | "briefing" | "navigate", ...}，形状见契约。
+    action: dict[str, Any] | None
+    created_at: datetime
+
+
+class ChatResponse(BaseModel):
+    messages: list[ChatMessageOut]
+
+
+class ChatSuggestionOut(BaseModel):
+    label: str
+    message: str
+    skill_id: int | None
+    reflection: bool = False
+
+
+class ChatSuggestionsResponse(BaseModel):
+    suggestions: list[ChatSuggestionOut]
+
+
+class AuditSummaryOut(BaseModel):
+    id: int
     skill_id: int
-    prerequisite_id: int
-    reason: str
+    skill_title: str
+    status: AuditStatus
+    score: int | None
+    created_at: datetime
 
 
-class CourseSourceOut(BaseModel):
-    course: str
-    url: str
+class RequiredSkillOut(BaseModel):
+    skill: SkillNodeOut
+    reason: str | None
 
 
-class GenerateTreeResponse(BaseModel):
-    nodes: list[SkillNodeOut]
-    prerequisites: list[SkillPrerequisiteOut]
-    # None 表示没找到可信课纲，这棵树是凭模型自身知识编排的 —— 界面据此决定
-    # 显不显示来源，不要用含糊措辞暗示有出处。
-    source: CourseSourceOut | None = None
+class SkillOverviewOut(BaseModel):
+    skill: SkillNodeOut
+    course: CourseOut
+    contains_parents: list[SkillNodeOut]
+    requires: list[RequiredSkillOut]
+    audits: list[AuditSummaryOut]
+    materials: list[SearchPlanOut]
+
+
+# ---------------------------------------------------------------- life-as-a-game layer (contract section 6)
+
+# One per KST time window, in window order starting at 03:00. The strings are binding.
+REFLECTION_PROMPTS: tuple[str, ...] = (
+    "Who are you becoming this week? One sentence.",
+    "What are you putting off right now?",
+    "Looking at the last two hours, what were you really after?",
+    "Is today pulling you toward your vision or your anti-vision?",
+    "What matters most that you've been ignoring?",
+    "Today, were you guarding an image of yourself or going after what you want?",
+    "When did you feel most alive today, and when least?",
+)
+
+PROFILE_TEXT_MAX = 280
+PROFILE_RULES_MAX = 5
+PROFILE_RULE_MAX = 120
+
+
+def _profile_text(value: str) -> str:
+    value = value.strip()
+    if len(value) > PROFILE_TEXT_MAX:
+        raise ValueError(f"must be at most {PROFILE_TEXT_MAX} characters")
+    return value
+
+
+def _profile_rules(value: list[str]) -> list[str]:
+    rules = [r.strip() for r in value if r.strip()]  # blank items are dropped, then the limits apply
+    if len(rules) > PROFILE_RULES_MAX:
+        raise ValueError(f"at most {PROFILE_RULES_MAX} rules")
+    if any(len(r) > PROFILE_RULE_MAX for r in rules):
+        raise ValueError(f"each rule must be at most {PROFILE_RULE_MAX} characters")
+    return rules
+
+
+class ProfileOut(BaseModel):
+    identity: str
+    vision: str
+    anti_vision: str
+    rules: list[str]
+    updated_at: datetime | None
+    # The first-run tutorial is done (or skipped); the client shows it until then.
+    onboarded: bool = False
+
+
+class ProfileUpdate(BaseModel):
+    """Any subset of the fields; omitted ones are kept (so no defaults, and null is a 422)."""
+
+    identity: str | None = None
+    vision: str | None = None
+    anti_vision: str | None = None
+    rules: list[str] | None = None
+    # true: the tutorial is done (stamps the time); false: show it again.
+    onboarded: bool | None = None
+
+    @model_validator(mode="after")
+    def _no_nulls_and_limits(self):
+        # `null` is not "clear it": an explicitly sent null is rejected, an omitted field is kept.
+        for name in self.model_fields_set:
+            if getattr(self, name) is None:
+                raise ValueError(f"{name} must not be null")
+        for name in ("identity", "vision", "anti_vision"):
+            if name in self.model_fields_set:
+                setattr(self, name, _profile_text(getattr(self, name)))
+        if "rules" in self.model_fields_set:
+            self.rules = _profile_rules(self.rules)
+        return self
+
+
+GOALS_MAX = 3
+GOAL_TITLE_MAX = 80
+
+
+def _goal_title(value: str) -> str:
+    value = value.strip()
+    if not value:
+        raise ValueError("title must not be blank")
+    if len(value) > GOAL_TITLE_MAX:
+        raise ValueError(f"title must be at most {GOAL_TITLE_MAX} characters")
+    return value
+
+
+class MeOut(BaseModel):
+    """GET /api/me (contract #32)."""
+
+    id: str
+    email: str | None
+    auth_mode: str
+
+
+class GoalOut(BaseModel):
+    id: int
+    title: str
+    course_ids: list[int]
+    created_at: datetime
+
+
+class GoalCreate(BaseModel):
+    title: str
+
+    @model_validator(mode="after")
+    def _title(self):
+        self.title = _goal_title(self.title)
+        return self
+
+
+class GoalUpdate(BaseModel):
+    """Any subset; omitted fields are kept, an explicit null is a 422."""
+
+    title: str | None = None
+    course_ids: list[int] | None = None
+
+    @model_validator(mode="after")
+    def _no_nulls(self):
+        for name in self.model_fields_set:
+            if getattr(self, name) is None:
+                raise ValueError(f"{name} must not be null")
+        if "title" in self.model_fields_set:
+            self.title = _goal_title(self.title)
+        if "course_ids" in self.model_fields_set:
+            self.course_ids = list(dict.fromkeys(self.course_ids))  # duplicates collapse, order kept
+        return self
+
+
+class JournalEntryOut(_Out):
+    id: int
+    prompt: str
+    answer: str
+    created_at: datetime

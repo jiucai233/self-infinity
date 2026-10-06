@@ -1,375 +1,574 @@
+"""确定性的 LLM 替身：不调用任何外部模型，用于离线演示与 CI 测试。
+
+行为严格按 docs/api-contract.md 第 4 节的演示脚本，Flutter 的 FakeApiClient 也遵循同一份，
+所以有没有后端，界面表现一致。脚本只认字面规则（长度、关键词），真 provider 判的是语义——
+这是有意的妥协：离线可测，但不能拿 Mock 的准确率说明任何关于模型的事。
+
+路由靠 system prompt 第一行的 "[agent: xxx]"（见 app/llm/base.py）。
+"""
+
 import json
 import logging
 import re
 import time
 
-from app.llm.base import Message
+from app.llm.base import JSON_RETRY_NOTICE, Message, agent_of
 
 logger = logging.getLogger(__name__)
 
-# Deterministic stand-in for "the LLM decided these two principles conflict"
-# — a real provider judges this from meaning, but a scripted mock has no
-# meaning to judge, so tests that want a contradiction fixture just put this
-# literal marker in a principle's body.
-_CONTRADICTS_MARKER = "刻意矛盾"
-_CANDIDATE_LINE_RE = re.compile(r"^\[(\d+)\] \((\w+)\) (.+?) —— (.*)$")
-_MISCONCEPTION_LINE_RE = re.compile(r"^- (.+)$")
-# Challenger 的替身判据：用户这轮说的话和某条历史 misconception 文本重叠到这个
-# 程度就算"又落进去了"。真 provider 判的是语义，脚本只能判重叠——和 _link 同样的
-# 妥协。阈值比 retrieval 的复发检测更高：那边比的是两条同为一句话的 misconception，
-# 这边拿整段回答去比，偶然重合的机会大得多。
-_CHALLENGE_THRESHOLD = 8
-# Narrator 的替身从事实清单里认这两个标记：跨领域簇的前缀，以及簇行的起始符号。
-_CROSS_DOMAIN_MARKER = "【跨领域】"
-_CLUSTER_LINE_RE = re.compile(r"^·\s*(?:【跨领域】)?「(.+?)」发作 (\d+) 次，出现在这些技能点上：(.+)$")
-_PLAN_NODE_RE = re.compile(r"^- skill_id=(\d+) 「(.+?)」（(\w+)，难度 (\w+)）")
-_SUGGESTED_TIER_RE = re.compile(r"难度调度器建议的档位：(\w+)")
-_SEARCH_SKILL_RE = re.compile(r"讲解「(.+?)」")
-_CANDIDATE_INDEX_RE = re.compile(r"^\[(\d+)\] ")
-# 课纲甄别的替身判据：候选标题里出现"机构 + 课程编号"的形状（CS285、6.006）才算数。
-# 真 provider 判的是内容可信度，脚本只能判字面模式——但把"必须有课程编号"这条
-# 硬标准保留下来，离线测试才测得到"宁可判定没找到"的行为。
-_COURSE_CODE_RE = re.compile(r"\b([A-Z]{2,}\s?\d{2,}|\d+\.\d+)\b")
+# ---------------------------------------------------------------- demo script constants (English)
 
-_FIRST_PROBE = "为什么这个方法能生效？如果去掉关键的那一步，会发生什么？"
-_ERROR_INJECTION_PROBE = (
-    "听你这么说，这东西好像在任何情况下都成立、没有例外——这样理解对吗？"
+_STATS_QUESTION = "Do you mean high-school probability and statistics, or university-level statistics?"
+
+_DEFAULT_PROBE = "Pick the most important term in your explanation and tell me what it means and why it matters."
+_LESSON_PROBE = "You once thought “{misconception}”. How is this explanation different?"
+_PASS_MIN_CHARS = 80
+# The latest answer fails the script if it admits not knowing. "모르" is the Korean fallback
+# (kept so Korean transcripts still work).
+_FAIL_MARKERS = ("don't know", "not sure", "모르")
+_PASS_COMMENT = "You explained the core idea and why it holds."
+_FAIL_SCORE = 45
+_FAIL_GAPS = [
+    "You stated the definition but not why it works.",
+    "You didn't cover the exceptions.",
+]
+_FAIL_COMMENT = "The answer stops at the conclusion and lacks reasons."
+
+_CHALLENGE_BELOW_CHARS = 160
+_CHALLENGE_QUESTION = "Before I pass this: give one case where this idea does not hold, and explain why."
+
+_LINK_REASON = "Same concept, similar misconception"
+
+_SYLLABUS_COURSE = "High School Mathematics Curriculum (Ministry of Education)"
+_SYLLABUS_OUTLINE = [
+    "Algebra",
+    "Quadratic Equations",
+    "Sequences",
+    "Functions",
+    "Linear and Quadratic Functions",
+    "Calculus",
+    "Limits of Sequences",
+    "Derivatives",
+]
+
+# slug, title, description, parents (first = main parent)
+_MATH_NODES = [
+    (
+        "high-school-math",
+        "High School Math",
+        "The whole of high school math: which problems call for algebra, functions or calculus.",
+        [],
+    ),
+    ("algebra", "Algebra", "Expressions and equations; groups quadratic equations and sequences.", ["high-school-math"]),
+    (
+        "functions",
+        "Functions",
+        "Relationships between variables; groups linear and quadratic functions.",
+        ["high-school-math"],
+    ),
+    (
+        "calculus",
+        "Calculus",
+        "Limits and rates of change; groups limits of sequences and derivatives.",
+        ["high-school-math"],
+    ),
+    (
+        "quadratic-equation",
+        "Quadratic Equations",
+        "Use the discriminant to tell the kind of roots (two distinct real, one repeated, two complex) "
+        "and explain how roots relate to coefficients.",
+        ["algebra"],
+    ),
+    (
+        "discriminant",
+        "Discriminant",
+        "Use the sign of the discriminant D = b² − 4ac to tell how many roots a quadratic equation has and of what kind.",
+        ["quadratic-equation"],
+    ),
+    (
+        "root-coefficient",
+        "Roots and Coefficients",
+        "Find the sum and product of the two roots from the coefficients without solving the equation.",
+        ["quadratic-equation"],
+    ),
+    ("sequences", "Sequences", "Find the general term and the sum of arithmetic and geometric sequences.", ["algebra"]),
+    (
+        "linear-function",
+        "Linear Functions",
+        "Draw and interpret the graph of a linear function from its slope and y-intercept.",
+        ["functions"],
+    ),
+    (
+        "quadratic-function",
+        "Quadratic Functions",
+        "Find the vertex, axis, x-intercepts and the maximum or minimum of a quadratic function's graph.",
+        ["functions"],
+    ),
+    (
+        "sequence-limit",
+        "Limits of Sequences",
+        "Explain when a sequence converges and how to find its limit.",
+        ["calculus", "sequences"],
+    ),
+    (
+        "derivative",
+        "Derivatives",
+        "Define the instantaneous rate of change at a point as a limit and compute it.",
+        ["calculus"],
+    ),
+]
+_MATH_REQUIRES = [
+    ("quadratic-equation", "quadratic-function", "The x-intercepts of a quadratic function are the roots of a quadratic equation."),
+    ("linear-function", "quadratic-function", "You need the graph of a linear function first."),
+    ("sequence-limit", "derivative", "The derivative is defined as a limit."),
+]
+_ROOT_TITLE_CHARS = 24
+
+# Generic topic: a root, 3 branches and 6 leaves.
+_GENERIC_BRANCHES = [("core-concepts", "Core Concepts"), ("main-methods", "Key Methods"), ("applications", "Applications")]
+
+# ---------------------------------------------------------------- parsing helpers
+
+_LESSONS_BLOCK_RE = re.compile(r"<lessons>\n(.*?)\n</lessons>", re.S)
+_LESSON_LINE_RE = re.compile(r"^- .*\(misconception: (.*)\)\s*$")
+_RESULT_LINE_RE = re.compile(r"^\[(\d+)\] ")
+_LINK_PRINCIPLE_RE = re.compile(r"^\[(\d+)\] P\b")
+_NODE_LINE_RE = re.compile(r"^Node: (.*)$", re.M)
+_TOPIC_BLOCK_RE = re.compile(r"Topic:(.*?)\nResults:", re.S)
+
+
+def _system(messages: list[Message]) -> str:
+    return next((m["content"] for m in messages if m["role"] == "system"), "")
+
+
+def _first_user(messages: list[Message]) -> str:
+    return next((m["content"] for m in messages if m["role"] == "user"), "")
+
+
+def _user_turns(messages: list[Message]) -> list[str]:
+    # complete_with_json_retry 重试时会追加一条纠错用的 user 消息，那不是用户的话。
+    return [m["content"] for m in messages if m["role"] == "user" and m["content"] != JSON_RETRY_NOTICE]
+
+
+def _dump(data: dict) -> str:
+    return json.dumps(data, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------- 各子 agent 的脚本
+
+
+def _is_math(topic: str) -> bool:
+    # "수학" (Korean for math) is still accepted as a fallback.
+    return "math" in topic.casefold() or "수학" in topic
+
+
+def _clarify(messages: list[Message]) -> str:
+    topic = _first_user(messages)
+    # "통계" (Korean for statistics) is still accepted as a fallback.
+    if "statistics" in topic.casefold() or "통계" in topic:
+        return _dump({"needs_clarification": True, "questions": [_STATS_QUESTION]})
+    return _dump({"needs_clarification": False, "questions": []})
+
+
+def _syllabus(messages: list[Message]) -> str:
+    system = _system(messages)
+    topic_match = _TOPIC_BLOCK_RE.search(system)
+    topic = topic_match.group(1) if topic_match else ""
+    first_index = next(
+        (int(m.group(1)) for line in system.splitlines() if (m := _RESULT_LINE_RE.match(line.strip()))),
+        None,
+    )
+    if not _is_math(topic) or first_index is None:
+        return _dump({"found": False})
+    return _dump(
+        {"found": True, "index": first_index, "course": _SYLLABUS_COURSE, "outline": _SYLLABUS_OUTLINE}
+    )
+
+
+def _plan(messages: list[Message]) -> str:
+    topic = _first_user(messages).strip()
+    if _is_math(topic):
+        nodes = [
+            {"slug": slug, "title": title, "description": desc, "parents": parents, "node_type": "concept"}
+            for slug, title, desc, parents in _MATH_NODES
+        ]
+        requires = [{"from": a, "to": b, "reason": reason} for a, b, reason in _MATH_REQUIRES]
+        return _dump({"nodes": nodes, "requires": requires})
+
+    root_title = (topic.splitlines()[0].strip() if topic else "")[:_ROOT_TITLE_CHARS].strip() or "New Topic"
+    nodes = [
+        {
+            "slug": "root",
+            "title": root_title,
+            "description": f"Everything about “{root_title}”, grouping the three areas below.",
+            "parents": [],
+            "node_type": "concept",
+        }
+    ]
+    for slug, title in _GENERIC_BRANCHES:
+        nodes.append(
+            {
+                "slug": slug,
+                "title": title,
+                "description": f"The {title.lower()} of “{root_title}”, grouped as one category.",
+                "parents": ["root"],
+                "node_type": "concept",
+            }
+        )
+    for slug, title in _GENERIC_BRANCHES:
+        for i in (1, 2):
+            nodes.append(
+                {
+                    "slug": f"{slug}-{i}",
+                    "title": f"{title} {i}",
+                    "description": f"Explain the definition of {title} {i} and why it holds.",
+                    "parents": [slug],
+                    "node_type": "concept",
+                }
+            )
+    requires = [
+        {
+            "from": "core-concepts-1",
+            "to": "main-methods-1",
+            "reason": "You need the core concepts before you can follow the key methods.",
+        },
+        {
+            "from": "main-methods-1",
+            "to": "applications-1",
+            "reason": "You need the key methods before you can apply them.",
+        },
+    ]
+    return _dump({"nodes": nodes, "requires": requires})
+
+
+def _audit(messages: list[Message]) -> str:
+    user_turns = _user_turns(messages)
+    if len(user_turns) <= 1:
+        lessons = _LESSONS_BLOCK_RE.search(_system(messages))
+        if lessons:
+            for line in lessons.group(1).splitlines():
+                match = _LESSON_LINE_RE.match(line.strip())
+                if match:
+                    # Memory Retriever 最近的在前，取第一条带 misconception 的。
+                    return _dump({"action": "probe", "question": _LESSON_PROBE.format(misconception=match.group(1))})
+        return _dump({"action": "probe", "question": _DEFAULT_PROBE})
+
+    n = len("".join(user_turns))
+    latest = user_turns[-1].replace("’", "'").casefold()
+    if n >= _PASS_MIN_CHARS and not any(marker in latest for marker in _FAIL_MARKERS):
+        return _dump(
+            {
+                "action": "verdict",
+                "pass": True,
+                "score": min(95, 70 + n // 10),
+                "gaps": [],
+                "comment": _PASS_COMMENT,
+            }
+        )
+    return _dump(
+        {"action": "verdict", "pass": False, "score": _FAIL_SCORE, "gaps": _FAIL_GAPS, "comment": _FAIL_COMMENT}
+    )
+
+
+def _challenge(messages: list[Message]) -> str:
+    n = len("".join(_user_turns(messages)))
+    if n < _CHALLENGE_BELOW_CHARS:
+        return _dump({"action": "overturn", "question": _CHALLENGE_QUESTION, "reason": "mock: the answer is short"})
+    return _dump({"action": "uphold", "reason": "mock: the answer is long enough"})
+
+
+def _record(messages: list[Message]) -> str:
+    match = _NODE_LINE_RE.search(_system(messages))
+    skill_title = match.group(1).strip() if match else ""
+    reflection = _first_user(messages).strip()
+    return _dump(
+        {
+            "title": f"Revisit “{skill_title}”"[:40],
+            "body": f"When I explain “{skill_title}”, I give the reason before the conclusion."[:120],
+            "misconception": reflection[:60],
+        }
+    )
+
+
+def _link(messages: list[Message]) -> str:
+    # 候选按"最近的在前"编号，所以第一个 P 就是最近的另一条原则。
+    for line in _system(messages).splitlines():
+        match = _LINK_PRINCIPLE_RE.match(line.strip())
+        if match:
+            return _dump(
+                {"related": [{"ref": int(match.group(1)), "reason": _LINK_REASON}], "contradicts": []}
+            )
+    return _dump({"related": [], "contradicts": []})
+
+
+# ---------------------------------------------------------------- 4.5 Check-in Converter
+
+_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+}  # fmt: skip
+_NUMBER = r"\d+(?:\.\d+)?|" + "|".join(_NUMBER_WORDS)
+_SLEEP_HOURS_RE = re.compile(rf"\b({_NUMBER})\s*(?:hours?|hrs?|h)\b", re.I)
+_SLEEP_WORD_RE = re.compile(r"\bsleep|\bslept", re.I)
+_NOT_EXERCISED_RE = re.compile(
+    r"\b(?:didn't exercise|did not exercise|no exercise|skipped (?:the )?gym|didn't work out|did not work out)\b", re.I
 )
-_PASS_KEYWORDS = ("因为", "如果", "边界", "条件", "例外", "不对", "不是")
+_EXERCISED_RE = re.compile(r"\b(?:exercised|worked out|went to the gym|went for a run)\b", re.I)
+_MEALS = r"(breakfast|lunch|dinner)"
+# "had ramen for lunch" (the food may not itself contain another had/ate)
+_MEAL_FOR_RE = re.compile(
+    rf"\b(?:had|ate)\s+((?:(?!\b(?:had|ate)\b)[^.!?\n,;])+?)\s+for\s+{_MEALS}\b", re.I
+)
+# "for lunch I had ramen" / "lunch: I ate ramen"
+_MEAL_FIRST_RE = re.compile(rf"\b{_MEALS}\b[^.!?\n]*?\b(?:had|ate)\s+([^.!?\n,;]+)", re.I)
+_FOCUS_GOOD_RE = re.compile(r"\bfocused well\b", re.I)
+_FOCUS_BAD_RE = re.compile(r"\b(?:couldn't|could not|can't|cannot) focus\b", re.I)
+_STRESS_LOW_RE = re.compile(r"\b(?:relaxed|no stress|not stressed|wasn't stressed)\b", re.I)
+_STRESS_HIGH_RE = re.compile(r"\b(?:stressed|a lot of stress)\b", re.I)
+_SENTENCE_SPLIT_RE = re.compile(r"(?:\.(?!\d)|[!?;\n])+")  # a "." inside 5.5 is not a sentence end
 
-_TASK_PROBE = "具体打算怎么做？说清楚步骤。"
-_TASK_HOLLOW_PHRASES = ("随便", "应该可以", "大概", "反正", "不知道")
 
-_TASK_ORIENTED_KEYWORDS = ("把", "怎么", "如何", "部署", "搭建", "实现", "写一个", "做一个", "上线", "完成")
+def _convert_checkin_english(text: str) -> dict:
+    text = text.replace("’", "'")
+    out: dict = {"sleep_hours": None, "exercised": None, "diet_note": None, "focus": None, "stress": None}
 
-_KNOWN_VAGUE_TOPICS = ("做饭", "强化学习", "我要学编程", "编程", "学习")
-_CLARIFY_QUESTIONS = ("你想深入哪个具体方向/菜系/流派？", "你希望学到什么深度——入门认知还是能实际动手做？")
+    # sleep_hours: a number followed by hours/h in a sentence that mentions sleep. Nothing else is inferred.
+    for sentence in _SENTENCE_SPLIT_RE.split(text):
+        if not _SLEEP_WORD_RE.search(sentence):
+            continue
+        m = _SLEEP_HOURS_RE.search(sentence)
+        if m:
+            raw = m.group(1).lower()
+            hours = _NUMBER_WORDS[raw] if raw in _NUMBER_WORDS else round(float(raw))
+            out["sleep_hours"] = hours if 0 <= hours <= 14 else None
+            break
+
+    if _NOT_EXERCISED_RE.search(text):
+        out["exercised"] = False
+    elif _EXERCISED_RE.search(text):
+        out["exercised"] = True
+
+    m = _MEAL_FOR_RE.search(text)
+    if m:
+        out["diet_note"] = f"{m.group(2).lower()}: {m.group(1).strip()}"
+    else:
+        m = _MEAL_FIRST_RE.search(text)
+        if m:
+            out["diet_note"] = f"{m.group(1).lower()}: {m.group(2).strip()}"
+
+    if _FOCUS_BAD_RE.search(text):
+        out["focus"] = 2
+    elif _FOCUS_GOOD_RE.search(text):
+        out["focus"] = 4
+    if _STRESS_LOW_RE.search(text):
+        out["stress"] = 2
+    elif _STRESS_HIGH_RE.search(text):
+        out["stress"] = 4
+    return out
+
+
+# Korean fallback: the original Korean rules, applied only to fields the English rules left empty.
+_KOREAN_NUMBERS = {"한": 1, "두": 2, "세": 3, "네": 4, "다섯": 5, "여섯": 6, "일곱": 7, "여덟": 8, "아홉": 9, "열": 10}
+_KO_SLEEP_RE = re.compile(r"(\d+(?:\.\d+)?|다섯|여섯|일곱|여덟|아홉|한|두|세|네|열)\s*시간")
+_KO_NOT_EXERCISED_RE = re.compile(r"안\s*했|못\s*했|쉬었")
+_KO_EXERCISED_RE = re.compile(r"했|갔")
+_KO_MEAL_RE = re.compile(r"(아침|점심|저녁)(\S*)\s+([^.!?\n]*?)먹")
+
+
+def _convert_checkin_korean(text: str, out: dict) -> None:
+    if out["sleep_hours"] is None:
+        m = _KO_SLEEP_RE.search(text)
+        if m:
+            raw = m.group(1)
+            hours = _KOREAN_NUMBERS[raw] if raw in _KOREAN_NUMBERS else round(float(raw))
+            out["sleep_hours"] = hours if 0 <= hours <= 14 else None
+    if out["exercised"] is None and "운동" in text:
+        if _KO_NOT_EXERCISED_RE.search(text):
+            out["exercised"] = False
+        elif _KO_EXERCISED_RE.search(text):
+            out["exercised"] = True
+    if out["diet_note"] is None:
+        m = _KO_MEAL_RE.search(text)
+        if m:
+            # The word right before 먹, minus its object particle: "점심은 라면을 먹었고" -> "점심 라면".
+            words = m.group(3).split()
+            if words:
+                word = re.sub(r"(을|를)$", "", words[-1])
+                if word and word not in ("안", "못"):
+                    out["diet_note"] = f"{m.group(1)} {word}"
+    if out["focus"] is None:
+        for sentence in [s for s in _SENTENCE_SPLIT_RE.split(text) if "집중" in s]:
+            if "안" in sentence or "못" in sentence:
+                out["focus"] = 2
+            elif "잘" in sentence:
+                out["focus"] = 4
+            if out["focus"]:
+                break
+    if out["stress"] is None:
+        for sentence in [s for s in _SENTENCE_SPLIT_RE.split(text) if "스트레스" in s]:
+            if any(w in sentence for w in "많심높"):
+                out["stress"] = 4
+            elif any(w in sentence for w in "없적낮"):
+                out["stress"] = 2
+            if out["stress"]:
+                break
+
+
+def _convert_checkin(messages: list[Message]) -> str:
+    text = _first_user(messages)
+    out = _convert_checkin_english(text)
+    _convert_checkin_korean(text, out)
+    return _dump(out)
+
+
+# ---------------------------------------------------------------- 4.6 Narrator / Recommender / Material Finder
+
+_FACTS_RE = re.compile(r"<facts>\n(.*?)\n</facts>", re.S)
+_NODES_RE = re.compile(r"<available_nodes>\n(.*?)\n</available_nodes>", re.S)
+_CONDITION_RE = re.compile(r"^Condition: (\w+)", re.M)
+_NODE_TITLE_RE = re.compile(r"^Node: (.*?) — ", re.M)
+_GAP_RE = re.compile(r"^Gap: (.*)$", re.M)
+_RESULT_INDEX_RE = re.compile(r"^\[(\d+)\] ", re.M)
+
+_RECOMMEND_RATIONALE = "Prerequisites checked — you can take this on now."
+_RECOMMEND_HINT = "Explain the why before the definition."
+_FINDER_REASON = "Covers this gap directly."
+
+
+def _times(n: int) -> str:
+    return "1 time" if n == 1 else f"{n} times"
+
+
+def _narrate(messages: list[Message]) -> str:
+    match = _FACTS_RE.search(_system(messages))
+    facts = json.loads(match.group(1)) if match else {}
+    nodes = facts.get("nodes", {})
+    sentences = [f"You've cleared {nodes.get('mastered', 0)} of {nodes.get('total', 0)} nodes."]
+    for cluster in facts.get("misconception_clusters", []):
+        sentences.append(
+            f"The misconception “{cluster['label']}” showed up {_times(cluster['occurrences'])} "
+            f"in {', '.join(cluster['skills'])}."
+        )
+    condition = facts.get("condition", {})
+    if condition.get("avg_sleep_hours") is not None:
+        days = condition["days"]
+        span = "day" if days == 1 else f"{days} days"
+        sentences.append(f"Average sleep over the last {span}: {condition['avg_sleep_hours']} h.")
+    return _dump({"narrative": " ".join(sentences)[:400]})
+
+
+def _recommend(messages: list[Message]) -> str:
+    system = _system(messages)
+    match = _NODES_RE.search(system)
+    nodes = sorted(json.loads(match.group(1)) if match else [], key=lambda n: n["skill_id"])
+    condition = _CONDITION_RE.search(system)
+    if condition and condition.group(1) == "low":
+        nodes.sort(key=lambda n: n["position"] != "leaf")  # stable: leaves first, ids within each group
+    steps = [
+        {"skill_id": n["skill_id"], "rationale": _RECOMMEND_RATIONALE, "focus_hint": _RECOMMEND_HINT}
+        for n in nodes[:5]
+    ]
+    return _dump({"steps": steps})
+
+
+def _find_material(messages: list[Message]) -> str:
+    system = _system(messages)
+    if "<results>" in system:  # step 2: pick
+        indices = [int(i) for i in _RESULT_INDEX_RE.findall(system)]
+        return _dump({"picks": [{"index": i, "reason": _FINDER_REASON} for i in indices[:3]]})
+    title = _NODE_TITLE_RE.search(system)
+    gap = _GAP_RE.search(system)
+    title_text = title.group(1) if title else ""
+    gap_text = gap.group(1).strip() if gap else ""
+    return _dump({"queries": [f"{title_text} {gap_text[:30]}", f"{title_text} explained"]})
+
+
+# ---------------------------------------------------------------- 契约第 5 节：前台
+
+_NODES_BLOCK_RE = re.compile(r"<nodes>\n(.*?)\n</nodes>", re.S)
+_OPEN_WORDS_RE = re.compile(r"\b(?:challenge|audit|try|open|continue|start)", re.I)
+_CHECKIN_WORDS_RE = re.compile(
+    r"\b(?:sleep|slept|exercis|worked out)|\b(?:tired|ate)\b|\bhad .* for (?:breakfast|lunch|dinner)\b|\blog my day\b|\bmy day\b",
+    re.I,
+)
+_COURSE_WORDS_RE = re.compile(r"\b(?:learn|study|build|make|create|teach me)", re.I)
+_PLAN_WORDS_RE = re.compile(r"\bquest|\bwhat should i\b|\brecommend", re.I)
+_BRIEFING_WORDS_RE = re.compile(r"\bstatus\b|\breport\b|\bhow am i doing\b", re.I)
+_MAP_WORDS_RE = re.compile(r"\bmap\b|\bworld\b", re.I)
+_TOPIC_HEAD_RE = re.compile(
+    r"^\s*(?:i want to learn|i'd like to learn|i want to study|teach me|build me a world (?:for|about)|make a world (?:for|about))(?:\s+|$)",
+    re.I,
+)
+_TOPIC_TAIL_RE = re.compile(r"[\s.!?]+$")
+_NO_TOPIC = {"this", "this file", "these"}  # with an upload these mean "use the file", not a topic
+
+_FRONT_REPLIES = {
+    "none": "Sure. What would you like to do today?",
+    "checkin": "Got it, logging that.",
+    "plan": "Let me pick today's quests.",
+    "briefing": "Let me sum up where you are.",
+    "open_map": "Opening your life tree.",
+}
+_ASK_TOPIC = "What topic should I build?"
+
+
+def _front_desk(messages: list[Message]) -> str:
+    message = _first_user(messages).strip().replace("’", "'")
+    block = _NODES_BLOCK_RE.search(_system(messages))
+    titles = [line[2:].strip() for line in (block.group(1).splitlines() if block else []) if line.startswith("- ")]
+    # The longest matching title wins, so "Quadratic Equations" beats a shorter title inside it.
+    lowered = message.casefold()
+    matched = sorted(
+        (t for t in titles if t and t != "(none)" and t.casefold() in lowered), key=len, reverse=True
+    )
+
+    def out(intent: str, reply: str, args: dict | None = None) -> str:
+        return _dump({"intent": intent, "args": args or {}, "reply": reply})
+
+    if matched and _OPEN_WORDS_RE.search(message):
+        return out("open_skill", f"Taking you to “{matched[0]}”.", {"skill": matched[0]})
+    if _CHECKIN_WORDS_RE.search(message):
+        return out("checkin", _FRONT_REPLIES["checkin"])
+    if _COURSE_WORDS_RE.search(message):
+        topic = _TOPIC_HEAD_RE.sub("", _TOPIC_TAIL_RE.sub("", message)).strip()
+        if not topic or topic.casefold() in _NO_TOPIC:
+            return out("none", _ASK_TOPIC)
+        return out("generate_course", f"I'll build a world for “{topic}”.", {"topic": topic})
+    if _PLAN_WORDS_RE.search(message):
+        return out("plan", _FRONT_REPLIES["plan"])
+    if _BRIEFING_WORDS_RE.search(message):
+        return out("briefing", _FRONT_REPLIES["briefing"])
+    if _MAP_WORDS_RE.search(message):
+        return out("open_map", _FRONT_REPLIES["open_map"])
+    return out("none", _FRONT_REPLIES["none"])
+
+
+_SCRIPTS = {
+    "clarifier": _clarify,
+    "syllabus_finder": _syllabus,
+    "planner": _plan,
+    "auditor": _audit,
+    "challenger": _challenge,
+    "recorder": _record,
+    "linker": _link,
+    "checkin_converter": _convert_checkin,
+    "narrator": _narrate,
+    "recommender": _recommend,
+    "material_finder": _find_material,
+    "front_desk": _front_desk,
+}
 
 
 class MockProvider:
-    """确定性脚本化审计：不调用任何外部模型，用于离线演示与 CI 测试。
-
-    概念型（concept）协议：第一轮追问"为什么"，第二轮埋错试探，第三轮起强制裁决。
-    任务型（task）协议：只问一次"具体怎么做"，答案不空洞就从宽通过，不做埋错试探——
-    这是因为任务型节点验证的是"有没有做到"，不是"能不能讲清楚原理"。
-    """
-
     name = "mock"
 
     def complete(self, messages: list[Message]) -> str:
         start = time.perf_counter()
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        if "课纲甄别官" in system:
-            result = self._judge_syllabus(messages)
-        elif "检索规划官" in system:
-            result = self._search_queries(messages)
-        elif "资料筛选官" in system:
-            result = self._search_select(messages)
-        elif "下一步推荐官" in system:
-            result = self._recommend(messages)
-        elif "叙述官" in system:
-            result = self._narrate(messages)
-        elif "审计复核官" in system:
-            result = self._challenge(messages)
-        elif "原则蒸馏官" in system:
-            result = self._distill(messages)
-        elif "关联图书管理员" in system:
-            result = self._link(messages)
-        elif "澄清官" in system:
-            result = self._clarify(messages)
-        elif "课程编排官" in system:
-            result = self._generate_tree(messages)
-        elif "任务核验官" in system:
-            result = self._audit_task(messages)
-        else:
-            result = self._audit_concept(messages)
+        agent = agent_of(messages)
+        script = _SCRIPTS.get(agent) if agent else None
+        if script is None:
+            raise ValueError(f"MockProvider has no script for agent {agent!r}")
+        result = script(messages)
         elapsed_ms = (time.perf_counter() - start) * 1000
-        logger.info("mock complete() success elapsed_ms=%.0f", elapsed_ms)
+        logger.info("mock complete() success agent=%s elapsed_ms=%.0f", agent or "-", elapsed_ms)
         return result
-
-    @staticmethod
-    def _clarify(messages: list[Message]) -> str:
-        topic = next((m["content"] for m in messages if m["role"] == "user"), "").strip()
-        is_vague = any(kw in topic for kw in _KNOWN_VAGUE_TOPICS)
-        if is_vague:
-            return json.dumps({"needs_clarification": True, "questions": list(_CLARIFY_QUESTIONS)})
-        return json.dumps({"needs_clarification": False, "questions": []})
-
-    @staticmethod
-    def _generate_tree(messages: list[Message]) -> str:
-        """确定性课程编排。
-
-        树的形状刻意做成"根是容器、叶子才具体"，并且给出一条**兄弟之间**的先修边
-        （基础 → 进阶）。兄弟先修是树结构表达不了、只能靠先修图承载的那种关系，
-        离线测试必须覆盖到它，否则先修和父子的区别在测试里就看不出来。
-        """
-        topic = next((m["content"] for m in messages if m["role"] == "user"), "").strip() or "新主题"
-        is_task_oriented = any(kw in topic for kw in _TASK_ORIENTED_KEYWORDS)
-        node_type = "task" if is_task_oriented else "concept"
-        nodes = [
-            {
-                "slug": "root",
-                "title": topic[:16],
-                "description": f"「{topic}」这门课覆盖的范围",
-                "parent_slug": None,
-                "node_type": node_type,
-            },
-            {
-                "slug": "basics",
-                "title": f"{topic[:12]}·基础",
-                "description": f"{topic}里最先要会的那个具体东西",
-                "parent_slug": "root",
-                "node_type": node_type,
-            },
-            {
-                "slug": "advanced",
-                "title": f"{topic[:12]}·进阶",
-                "description": f"{topic}里建立在基础之上的具体方法",
-                "parent_slug": "root",
-                "node_type": node_type,
-            },
-            {
-                "slug": "applied",
-                "title": f"{topic[:12]}·应用",
-                "description": f"把{topic}用到一个具体问题里",
-                "parent_slug": "advanced",
-                "node_type": node_type,
-            },
-        ]
-        prerequisites = [
-            {"from": "basics", "to": "advanced", "reason": "mock: 进阶建立在基础之上（树上是兄弟）"}
-        ]
-        return json.dumps({"nodes": nodes, "prerequisites": prerequisites})
-
-    @staticmethod
-    def _link(messages: list[Message]) -> str:
-        # Deterministic stand-in for the Librarian: reuses the same
-        # word/bigram overlap heuristic app/agents/retrieval.py uses
-        # elsewhere, purely so offline tests have *something* non-trivial to
-        # assert on — a real provider judges this from meaning, not overlap.
-        from app.agents.retrieval import relevance_score
-
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        title_match = re.search(r"标题：(.*)", system)
-        body_match = re.search(r"内容：(.*)", system)
-        new_text = f"{title_match.group(1) if title_match else ''} {body_match.group(1) if body_match else ''}"
-
-        related = []
-        contradicts = []
-        for line in system.splitlines():
-            m = _CANDIDATE_LINE_RE.match(line.strip())
-            if not m:
-                continue
-            ref, kind, ctitle, ctext = int(m.group(1)), m.group(2), m.group(3), m.group(4)
-            if kind == "principle" and _CONTRADICTS_MARKER in ctext:
-                contradicts.append({"ref": ref, "reason": "mock: 检测到刻意矛盾标记"})
-                continue
-            if relevance_score(new_text, f"{ctitle} {ctext}") > 0:
-                related.append({"ref": ref, "reason": "mock: 关键词重叠"})
-
-        return json.dumps({"related": related[:4], "contradicts": contradicts})
-
-    @staticmethod
-    def _judge_syllabus(messages: list[Message]) -> str:
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        for line in system.splitlines():
-            stripped = line.strip()
-            m = _CANDIDATE_INDEX_RE.match(stripped)
-            if not m:
-                continue
-            code = _COURSE_CODE_RE.search(stripped)
-            if not code:
-                continue
-            return json.dumps(
-                {
-                    "found": True,
-                    "index": int(m.group(1)),
-                    "course": f"mock: {code.group(1)}",
-                    "outline": ["mock 主题一", "mock 主题二", "mock 主题三"],
-                }
-            )
-        # 默认走这条：MockSearchProvider 返回的假结果里没有课程编号，正确的行为
-        # 就是判定没找到，而不是把一条假结果当成课纲。
-        return json.dumps({"found": False})
-
-    @staticmethod
-    def _search_queries(messages: list[Message]) -> str:
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        m = _SEARCH_SKILL_RE.search(system)
-        skill = m.group(1) if m else "未知主题"
-        return json.dumps({"queries": [f"{skill} 原理", f"{skill} 常见误区"]})
-
-    @staticmethod
-    def _search_select(messages: list[Message]) -> str:
-        """挑前两条候选。真 provider 判的是"这条能不能补上缺口"，脚本只能按位置挑。"""
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        indices = [
-            int(m.group(1))
-            for line in system.splitlines()
-            if (m := _CANDIDATE_INDEX_RE.match(line.strip()))
-        ]
-        return json.dumps(
-            {"picks": [{"index": i, "reason": f"mock: 第 {i} 条候选与缺口相关。"} for i in indices[:2]]}
-        )
-
-    @staticmethod
-    def _recommend(messages: list[Message]) -> str:
-        """确定性排序：建议档位匹配的节点优先，其余按原顺序补齐，最多 3 步。
-
-        这个"优先匹配 bandit 建议档位"的行为刻意和 SkillTree 页的推荐排序保持一致
-        （见 app/routers/skills.py 的 get_recommendation），这样离线演示里两处给出的
-        建议不会互相打架。
-        """
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        tier_match = _SUGGESTED_TIER_RE.search(system)
-        suggested = tier_match.group(1) if tier_match else ""
-
-        matched: list[tuple[int, str, str]] = []
-        others: list[tuple[int, str, str]] = []
-        for line in system.splitlines():
-            m = _PLAN_NODE_RE.match(line.strip())
-            if not m:
-                continue
-            entry = (int(m.group(1)), m.group(2), m.group(4))
-            (matched if m.group(4) == suggested else others).append(entry)
-
-        ordered = (matched + others)[:3]
-        steps = [
-            {
-                "skill_id": skill_id,
-                "rationale": f"mock: 难度 {tier} 与当前建议档位 {suggested or '未知'} 的匹配结果，排在第 {i + 1} 位。",
-                "focus_hint": f"mock: 讲「{title}」时先说清楚它为什么成立。",
-            }
-            for i, (skill_id, title, tier) in enumerate(ordered)
-        ]
-        return json.dumps({"steps": steps})
-
-    @staticmethod
-    def _narrate(messages: list[Message]) -> str:
-        """确定性叙述：真 provider 写的是人话，脚本只能按模板填空。
-
-        刻意保留"点名跨领域涉及哪些技能"这一条行为——那是 Narrator 存在的核心理由，
-        离线演示和测试都需要它可见，其余措辞则不必模仿。
-        """
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-
-        cross_domain: list[tuple[str, str]] = []
-        total_clusters = 0
-        for line in system.splitlines():
-            m = _CLUSTER_LINE_RE.match(line.strip())
-            if not m:
-                continue
-            total_clusters += 1
-            if _CROSS_DOMAIN_MARKER in line:
-                cross_domain.append((m.group(1), m.group(3)))
-
-        if not total_clusters:
-            return json.dumps({"narrative": "还没有足够的失败记录可供分析。先完成一次审计。"})
-
-        if cross_domain:
-            label, skills = cross_domain[0]
-            narrative = (
-                f"你有 {total_clusters} 个反复出现的错误心智模型，"
-                f"其中「{label}」横跨了{skills}——问题不在某个知识点上。"
-            )
-        else:
-            narrative = f"你有 {total_clusters} 个反复出现的错误心智模型，目前都集中在单个技能点上。"
-        return json.dumps({"narrative": narrative})
-
-    @staticmethod
-    def _challenge(messages: list[Message]) -> str:
-        from app.agents.retrieval import relevance_score
-
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        answers = " ".join(m["content"] for m in messages if m["role"] == "user")
-
-        for line in system.splitlines():
-            m = _MISCONCEPTION_LINE_RE.match(line.strip())
-            if not m:
-                continue
-            misconception = m.group(1)
-            if relevance_score(answers, misconception) >= _CHALLENGE_THRESHOLD:
-                return json.dumps(
-                    {
-                        "action": "overturn",
-                        "question": f"你刚才的说法里，是不是又假定了「{misconception}」？说说这里为什么不是。",
-                        "reason": f"mock: 与历史 misconception 文本重叠 —— {misconception}",
-                    }
-                )
-
-        return json.dumps({"action": "uphold", "reason": "mock: 未命中任何历史 misconception"})
-
-    @staticmethod
-    def _distill(messages: list[Message]) -> str:
-        reflection = next((m["content"] for m in messages if m["role"] == "user"), "").strip()
-        if reflection:
-            body = f"当我再次面对同类问题时，我将记住这次的教训：{reflection[:40]}"
-        else:
-            body = "当我再次面对同类问题时，我将先讲清楚为什么，再给结论。"
-        return json.dumps(
-            {
-                "title": "先讲机制，再讲结论",
-                "body": body,
-                "misconception": "以为记住结论就等于理解了机制",
-            }
-        )
-
-    def _audit_concept(self, messages: list[Message]) -> str:
-        user_turns = [m for m in messages if m["role"] == "user"]
-        turn_index = len(user_turns)
-
-        if turn_index == 1:
-            return json.dumps({"action": "probe", "question": _FIRST_PROBE})
-        if turn_index == 2:
-            return json.dumps({"action": "probe", "question": _ERROR_INJECTION_PROBE})
-
-        combined = " ".join(m["content"] for m in user_turns)
-        hit_keywords = sum(1 for kw in _PASS_KEYWORDS if kw in combined)
-        passed = len(combined) >= 60 and hit_keywords >= 2
-
-        if passed:
-            verdict = {
-                "action": "verdict",
-                "pass": True,
-                "score": 82,
-                "gaps": [],
-                "comment": "能抓住核心机制，也顶住了埋错追问，边界条件说清楚了。",
-            }
-        else:
-            verdict = {
-                "action": "verdict",
-                "pass": False,
-                "score": 42,
-                "gaps": ["未能清晰指出适用边界与例外情况", "面对故意错误的说法没有纠正"],
-                "comment": "解释停留在复述层面，还没有触及第一性原理。",
-            }
-        return json.dumps(verdict)
-
-    def _audit_task(self, messages: list[Message]) -> str:
-        user_turns = [m for m in messages if m["role"] == "user"]
-        turn_index = len(user_turns)
-
-        if turn_index == 1:
-            return json.dumps({"action": "probe", "question": _TASK_PROBE})
-
-        combined = " ".join(m["content"] for m in user_turns)
-        is_hollow = any(kw in combined for kw in _TASK_HOLLOW_PHRASES)
-        passed = len(combined) >= 6 and not is_hollow
-
-        if passed:
-            verdict = {
-                "action": "verdict",
-                "pass": True,
-                "score": 90,
-                "gaps": [],
-                "comment": "说清楚了具体怎么做，可以打勾了。",
-            }
-        else:
-            verdict = {
-                "action": "verdict",
-                "pass": False,
-                "score": 30,
-                "gaps": ["还没说清楚具体打算怎么做"],
-                "comment": "回答太空泛，说说具体步骤就行，不用讲原理。",
-            }
-        return json.dumps(verdict)

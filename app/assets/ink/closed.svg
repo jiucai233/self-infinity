@@ -1,0 +1,5 @@
+<!-- A closed bud, small: not yet. Anchor: the foot of the stalk; it points up. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" data-anchor="50 100">
+  <path data-role="dim" d="M50 100 C 50 94, 50 89, 50 84"/>
+  <path data-role="paper dim" d="M50 85 C 44 81, 44 71, 50 62 C 56 71, 56 81, 50 85 Z"/>
+</svg>

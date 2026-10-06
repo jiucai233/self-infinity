@@ -1,0 +1,7 @@
+<!-- An open bud on its stalk, line art. Anchor: the foot of the stalk; it points up. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" data-anchor="50 100">
+  <path data-role="line" d="M50 100 C 51 92, 50 84, 50 76"/>
+  <path data-role="paper line" d="M50 76 C 37 69, 37 46, 50 28 C 63 46, 63 69, 50 76 Z"/>
+  <path data-role="hair" d="M50 72 C 46 60, 46 46, 50 34"/>
+  <path data-role="line" d="M50 78 C 44 77, 39 72, 37 64 M50 78 C 56 77, 61 72, 63 64"/>
+</svg>

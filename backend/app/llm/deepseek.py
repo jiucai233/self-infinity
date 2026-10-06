@@ -14,11 +14,8 @@ DeepSeekEmptyResponseError = OpenAICompatibleEmptyResponseError
 class DeepSeekProvider(OpenAICompatibleProvider):
     name = "deepseek"
     api_url = "https://api.deepseek.com/chat/completions"
+    default_model = "deepseek-chat"
 
     @property
     def _api_key(self) -> str:
         return settings.deepseek_api_key
-
-    @property
-    def _timeout(self) -> float:
-        return settings.deepseek_timeout_seconds

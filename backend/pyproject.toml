@@ -1,0 +1,9 @@
+# Only read by Vercel (deployment, docs/deploy.md); local runs use requirements.txt and .venv.
+[project]
+name = "self-infinity-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.vercel.scripts]
+# The Flutter web app goes to public/ (served by the CDN); skipped when it is already there.
+build = "bash build_web.sh"

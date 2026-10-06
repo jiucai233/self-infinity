@@ -1,0 +1,14 @@
+<!-- A cherry blossom, line art. Anchor: the center. Roles: line = ink stroke,
+     petal = pale ember fill, accent = ember fill, paper = background fill.
+     Drawn for Self-Infinity (docs/DESIGN.md §4). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" data-anchor="50 50">
+  <g>
+    <path data-role="petal line" d="M50 50 C 41 43, 36 31, 41 20 Q 45 14, 50 21 Q 55 14, 59 20 C 64 31, 59 43, 50 50 Z"/>
+    <path data-role="petal line" transform="rotate(72 50 50)" d="M50 50 C 41 43, 36 31, 41 20 Q 45 14, 50 21 Q 55 14, 59 20 C 64 31, 59 43, 50 50 Z"/>
+    <path data-role="petal line" transform="rotate(144 50 50)" d="M50 50 C 41 43, 36 31, 41 20 Q 45 14, 50 21 Q 55 14, 59 20 C 64 31, 59 43, 50 50 Z"/>
+    <path data-role="petal line" transform="rotate(216 50 50)" d="M50 50 C 41 43, 36 31, 41 20 Q 45 14, 50 21 Q 55 14, 59 20 C 64 31, 59 43, 50 50 Z"/>
+    <path data-role="petal line" transform="rotate(288 50 50)" d="M50 50 C 41 43, 36 31, 41 20 Q 45 14, 50 21 Q 55 14, 59 20 C 64 31, 59 43, 50 50 Z"/>
+  </g>
+  <path data-role="hair" d="M50 50 L 50 37 M50 50 L 61 44 M50 50 L 58 59 M50 50 L 42 59 M50 50 L 39 44"/>
+  <path data-role="accent" d="M45 50 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0 Z"/>
+</svg>

@@ -1,167 +1,132 @@
-"""课纲甄别：找一份真实课程大纲当编排参考。
+"""Syllabus Finder：找一份真实课纲当参考，URL 只来自搜索结果（UT-24、UT-25）。
 
-最重要的性质是**宁可判定没找到**。编造一个来源比没有来源糟糕得多——用户会去核对，
-一旦发现引用的课程里根本没有那节课，整个系统的可信度就没了。
+最重要的性质是宁可判定没找到：编造一个来源比没有来源糟糕得多。
 """
 
-from unittest.mock import patch
-
-from sqlmodel import Session, select
+import json
 
 from app.agents.syllabus import SyllabusFinder
-from app.llm.mock import MockProvider
-from app.models import CourseSource
 from app.search.base import SearchHit
+from tests.helpers import BrokenProvider, ScriptedProvider
 
 
-class _FakeSearch:
+class FakeSearch:
     name = "fake"
 
     def __init__(self, hits: list[SearchHit] | None = None, fail: bool = False):
-        self._hits = hits or []
-        self._fail = fail
+        self.hits = hits if hits is not None else HITS
+        self.fail = fail
         self.queries: list[str] = []
 
     def search(self, query: str, limit: int = 5) -> list[SearchHit]:
         self.queries.append(query)
-        if self._fail:
+        if self.fail:
             raise RuntimeError("search down")
-        return self._hits
+        return self.hits
 
 
-def _course_hits() -> list[SearchHit]:
-    return [
-        SearchHit(
-            title="UC Berkeley CS285: Deep Reinforcement Learning",
-            url="https://real.invalid/cs285",
-            snippet="Lecture topics: MDPs, policy gradients, actor-critic, model-based RL.",
-        )
-    ]
+HITS = [
+    SearchHit(title="Linear algebra summary blog", url="https://blog.example/la", snippet="A short, easy write-up of linear algebra"),
+    SearchHit(
+        title="MATH 2210 Linear Algebra",
+        url="https://math.example.edu/2210",
+        snippet="Week 1 systems of equations. Week 2 matrices. Week 3 determinants.",
+    ),
+    SearchHit(title="Lecture playlist", url="https://video.example/list", snippet="A collection of videos"),
+]
 
 
-def _blog_hits() -> list[SearchHit]:
-    return [
-        SearchHit(
-            title="强化学习入门指南：从零开始",
-            url="https://blog.invalid/rl",
-            snippet="这篇文章带你了解强化学习的基本概念。",
-        )
-    ]
+def found(index: int, course: str = "Example Univ. MATH 2210", outline=("Systems of equations", "Matrices", "Determinants")) -> str:
+    return json.dumps({"found": True, "index": index, "course": course, "outline": list(outline)}, ensure_ascii=False)
 
 
-def test_a_real_course_is_accepted():
-    ref = SyllabusFinder(MockProvider(), _FakeSearch(_course_hits())).find("强化学习")
+def test_ut24_found_gives_course_outline_and_the_url_of_the_indexed_result():
+    ref = SyllabusFinder(ScriptedProvider(syllabus_finder=found(1)), FakeSearch()).find("Linear Algebra")
 
     assert ref is not None
-    assert ref.url == "https://real.invalid/cs285"
-    assert ref.outline
+    assert ref.course == "Example Univ. MATH 2210"
+    assert ref.outline == ["Systems of equations", "Matrices", "Determinants"]
+    assert ref.url == "https://math.example.edu/2210"
 
 
-def test_a_blog_post_is_not_a_syllabus():
-    """没有机构 + 课程编号就不算 —— 这是那条"宁可没有"的底线。"""
-    assert SyllabusFinder(MockProvider(), _FakeSearch(_blog_hits())).find("强化学习") is None
+def test_ut25_index_outside_the_result_list_is_treated_as_not_found():
+    for index in (3, 99, -1):
+        assert SyllabusFinder(ScriptedProvider(syllabus_finder=found(index)), FakeSearch()).find("Linear Algebra") is None
 
 
-def test_no_search_results_means_no_reference():
-    assert SyllabusFinder(MockProvider(), _FakeSearch([])).find("强化学习") is None
+def test_url_never_comes_from_the_model():
+    forged = json.dumps(
+        {"found": True, "index": 1, "course": "X", "outline": ["a", "b", "c"], "url": "https://forged.invalid/evil"}
+    )
+
+    ref = SyllabusFinder(ScriptedProvider(syllabus_finder=forged), FakeSearch()).find("Linear Algebra")
+
+    assert ref.url == "https://math.example.edu/2210"
 
 
-def test_search_failure_degrades_quietly():
-    """检索挂了只是拿不到参考，不该抛出来打断整次编排。"""
-    assert SyllabusFinder(MockProvider(), _FakeSearch(fail=True)).find("强化学习") is None
+def test_not_found_is_a_normal_answer():
+    provider = ScriptedProvider(syllabus_finder='{"found": false}')
+
+    assert SyllabusFinder(provider, FakeSearch()).find("Linear Algebra") is None
 
 
-def test_it_searches_in_both_chinese_and_english():
-    """权威课程基本只出现在英文结果里，中文结果又几乎不重叠，所以两边都要搜。"""
-    search = _FakeSearch(_course_hits())
-    SyllabusFinder(MockProvider(), search).find("强化学习")
+def test_outline_must_have_three_to_thirty_items():
+    for outline in ([], ["a"], ["a", "b"], [f"t{i}" for i in range(31)]):
+        provider = ScriptedProvider(syllabus_finder=found(1, outline=outline))
+        assert SyllabusFinder(provider, FakeSearch()).find("Linear Algebra") is None, len(outline)
 
-    assert len(search.queries) == 2
-    assert any("syllabus" in q for q in search.queries)
-    assert any("课程大纲" in q for q in search.queries)
-
-
-def test_url_comes_from_the_search_result_not_the_model():
-    class ForgingProvider(MockProvider):
-        def complete(self, messages):
-            system = next((m["content"] for m in messages if m["role"] == "system"), "")
-            if "课纲甄别官" in system:
-                return (
-                    '{"found": true, "index": 0, "course": "CS285", '
-                    '"outline": ["a"], "url": "https://forged.invalid/evil"}'
-                )
-            return super().complete(messages)
-
-    ref = SyllabusFinder(ForgingProvider(), _FakeSearch(_course_hits())).find("强化学习")
-
-    assert ref is not None
-    assert ref.url == "https://real.invalid/cs285"
+    for outline in (["a", "b", "c"], [f"t{i}" for i in range(30)]):
+        provider = ScriptedProvider(syllabus_finder=found(1, outline=outline))
+        assert SyllabusFinder(provider, FakeSearch()).find("Linear Algebra") is not None, len(outline)
 
 
-def test_an_out_of_range_pick_is_rejected():
-    class BadIndexProvider(MockProvider):
-        def complete(self, messages):
-            system = next((m["content"] for m in messages if m["role"] == "system"), "")
-            if "课纲甄别官" in system:
-                return '{"found": true, "index": 99, "course": "CS285", "outline": ["a"]}'
-            return super().complete(messages)
+def test_a_reference_without_a_course_name_is_useless():
+    provider = ScriptedProvider(syllabus_finder=found(1, course="  "))
 
-    assert SyllabusFinder(BadIndexProvider(), _FakeSearch(_course_hits())).find("强化学习") is None
+    assert SyllabusFinder(provider, FakeSearch()).find("Linear Algebra") is None
 
 
-def test_a_reference_without_topics_is_useless():
-    class EmptyOutlineProvider(MockProvider):
-        def complete(self, messages):
-            system = next((m["content"] for m in messages if m["role"] == "system"), "")
-            if "课纲甄别官" in system:
-                return '{"found": true, "index": 0, "course": "CS285", "outline": []}'
-            return super().complete(messages)
-
-    assert SyllabusFinder(EmptyOutlineProvider(), _FakeSearch(_course_hits())).find("强化学习") is None
+def test_unusable_model_output_means_not_found():
+    for raw in ("not json", "[]", '{"found": true}', '{"found": true, "index": "x", "course": "c", "outline": []}'):
+        assert SyllabusFinder(ScriptedProvider(syllabus_finder=raw), FakeSearch()).find("Linear Algebra") is None, raw
 
 
-# ---------- 接入 /api/skills/generate ----------
+def test_no_search_results_means_no_llm_call():
+    provider = ScriptedProvider(syllabus_finder=found(0))
+
+    assert SyllabusFinder(provider, FakeSearch(hits=[])).find("Linear Algebra") is None
+    assert provider.calls == []
 
 
-def test_generate_records_the_source_when_one_is_found(client, client_engine):
-    with patch("app.routers.skills.get_search_provider", return_value=_FakeSearch(_course_hits())):
-        body = client.post("/api/skills/generate", json={"topic": "强化学习"}).json()
-
-    assert body["source"] is not None
-    assert body["source"]["url"] == "https://real.invalid/cs285"
-
-    with Session(client_engine) as session:
-        assert len(session.exec(select(CourseSource)).all()) == 1
+def test_a_failed_search_degrades_to_not_found():
+    assert SyllabusFinder(ScriptedProvider(syllabus_finder=found(0)), FakeSearch(fail=True)).find("Linear Algebra") is None
 
 
-def test_generate_reports_no_source_rather_than_a_vague_one(client, client_engine):
-    """没找到可信课纲时 source 是 null，界面据此什么都不显示。"""
-    with patch("app.routers.skills.get_search_provider", return_value=_FakeSearch(_blog_hits())):
-        body = client.post("/api/skills/generate", json={"topic": "强化学习"}).json()
+def test_searches_the_first_line_in_two_phrasings_and_numbers_the_results_with_their_domains():
+    provider = ScriptedProvider(syllabus_finder=found(1))
+    search = FakeSearch()
 
-    assert body["source"] is None
-    assert body["nodes"]  # 树照常生成，只是没有外部参考
+    SyllabusFinder(provider, search).find("Linear Algebra\n\nQ: Level?\nA: University")
 
-    with Session(client_engine) as session:
-        assert session.exec(select(CourseSource)).all() == []
-
-
-def test_syllabus_lookup_can_be_switched_off(client):
-    search = _FakeSearch(_course_hits())
-    with patch("app.routers.skills.get_search_provider", return_value=search):
-        body = client.post(
-            "/api/skills/generate", json={"topic": "强化学习", "search_syllabus": False}
-        ).json()
-
-    assert search.queries == []
-    assert body["source"] is None
+    assert sorted(search.queries) == ["Linear Algebra course syllabus", "Linear Algebra syllabus"]  # first line of the topic only
+    (prompt,) = provider.system_prompts("syllabus_finder")
+    assert "Topic: Linear Algebra\n\nQ: Level?\nA: University\nResults:" in prompt
+    assert "[1] MATH 2210 Linear Algebra | math.example.edu | Week 1" in prompt
 
 
-def test_a_broken_search_still_produces_a_tree(client):
-    """检索是加分项，不是前置条件。"""
-    with patch("app.routers.skills.get_search_provider", return_value=_FakeSearch(fail=True)):
-        resp = client.post("/api/skills/generate", json={"topic": "强化学习"})
+def test_results_from_both_queries_are_merged_without_duplicate_urls():
+    provider = ScriptedProvider(syllabus_finder=found(0))
+    search = FakeSearch()
 
-    assert resp.status_code == 200
-    assert resp.json()["nodes"]
-    assert resp.json()["source"] is None
+    SyllabusFinder(provider, search).find("Linear Algebra")  # both queries return the same three hits
+
+    (prompt,) = provider.system_prompts("syllabus_finder")
+    assert prompt.count("\n[") == 3
+
+
+def test_a_failing_provider_raises_for_the_caller_to_degrade():
+    # find() itself lets provider errors out; app.services.course_generation.find_syllabus turns them into "not found".
+    import pytest
+
+    with pytest.raises(RuntimeError):
+        SyllabusFinder(BrokenProvider(), FakeSearch()).find("Linear Algebra")

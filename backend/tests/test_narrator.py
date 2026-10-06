@@ -1,135 +1,180 @@
-"""Narrator：画像端点与叙述端点。
+"""Narrator (UT-28), GET /narrator/briefing (IT-26) and POST /narrator/narrate."""
 
-关键分界:GET /briefing 永远不花钱、永远返回最新画像;POST /narrate 是唯一会调 LLM 的
-地方。测试守住这条线,否则首屏会变成每次打开都烧一次额度。
-"""
-
-from unittest.mock import patch
+import json
+from datetime import date, timedelta
 
 import pytest
-from sqlmodel import Session, SQLModel, create_engine, select
-from sqlmodel.pool import StaticPool
+from sqlmodel import Session, select
 
-from app.agents.narrator import Narrator, format_facts
+from app.agents.narrator import MAX_NARRATIVE, Narrator, NarratorError
 from app.llm.mock import MockProvider
-from app.models import AuditSession, AuditStatus, NarratorBriefing, Principle, SkillNode, SkillStatus
-from app.services.profile import build_profile
+from app.models import DailyCheckIn, NarratorBriefing
+from app.schemas import ProfileFacts
+from tests.helpers import BrokenProvider, CountingProvider, ScriptedProvider, fail_node, generate, ids_by_slug, pass_node
 
-A = "以为相关性就是因果关系"
-B = "以为相关性就是因果，忽略了混淆变量"
-
-
-def _seed_cross_domain_failures(engine) -> None:
-    """在两个不相关技能点上各栽一次同一个心智模型 —— 跨领域复发的最小构造。"""
-    with Session(engine) as session:
-        for title, misconception in (("统计学", A), ("投资", B)):
-            skill = SkillNode(
-                slug=title, title=title, description=f"{title}的说明", status=SkillStatus.available
-            )
-            session.add(skill)
-            session.flush()
-            audit = AuditSession(skill_id=skill.id, status=AuditStatus.failed)
-            session.add(audit)
-            session.flush()
-            session.add(
-                Principle(
-                    title="原则",
-                    body="当我再遇到时，我将…",
-                    misconception=misconception,
-                    source_session_id=audit.id,
-                )
-            )
-        session.commit()
+EMPTY_FACTS = ProfileFacts.model_validate(
+    {
+        "nodes": {"total": 0, "mastered": 0, "available": 0, "locked": 0},
+        "audits": {"total": 0, "passed": 0, "failed": 0},
+        "misconception_clusters": [],
+        "condition": {"days": 0, "avg_sleep_hours": None, "avg_stress": None, "flag": "unknown"},
+    }
+)
+FACTS = ProfileFacts.model_validate(
+    {
+        "nodes": {"total": 12, "mastered": 4, "available": 3, "locked": 5},
+        "audits": {"total": 6, "passed": 4, "failed": 2},
+        "misconception_clusters": [
+            {"label": "No real roots means no solutions", "occurrences": 2, "skills": ["Quadratic Equations", "Quadratic Functions"],
+             "cross_skill": True, "principle_ids": [7, 9]}
+        ],
+        "condition": {"days": 3, "avg_sleep_hours": 5.3, "avg_stress": None, "flag": "low"},
+    }
+)
 
 
-def test_briefing_works_on_an_empty_database(client):
-    resp = client.get("/api/narrator/briefing")
-
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["clusters"] == []
-    assert body["narrative"] is None
-    assert body["pass_rate"] is None
+def narrator_reply(narrative) -> ScriptedProvider:
+    return ScriptedProvider(narrator=json.dumps({"narrative": narrative}, ensure_ascii=False))
 
 
-def test_briefing_does_not_call_the_llm(client):
-    """首屏不能花钱。"""
-    with patch.object(Narrator, "narrate", side_effect=AssertionError("briefing 不该调用 LLM")):
-        assert client.get("/api/narrator/briefing").status_code == 200
+def test_ut28_valid_output_returns_the_narrative():
+    assert Narrator(narrator_reply("  You've cleared 4 of 12 nodes. ")).narrate(FACTS) == "You've cleared 4 of 12 nodes."
 
 
-def test_briefing_surfaces_cross_domain_clusters(client, client_engine):
-    _seed_cross_domain_failures(client_engine)
+def test_the_prompt_carries_the_facts_as_json():
+    provider = narrator_reply("x")
+    Narrator(provider).narrate(FACTS)
 
-    body = client.get("/api/narrator/briefing").json()
-
-    assert len(body["clusters"]) == 1
-    cluster = body["clusters"][0]
-    assert cluster["cross_domain"] is True
-    assert cluster["occurrences"] == 2
-    assert set(cluster["skills"]) == {"统计学", "投资"}
+    (system,) = provider.system_prompts("narrator")
+    assert system.startswith("[agent: narrator]")
+    facts = system.split("<facts>\n")[1].split("\n</facts>")[0]
+    assert json.loads(facts) == FACTS.model_dump()
 
 
-def test_narrate_persists_and_is_served_back_by_briefing(client, client_engine):
-    _seed_cross_domain_failures(client_engine)
+@pytest.mark.parametrize("bad", ["", "   ", None, 5])
+def test_an_empty_or_non_text_narrative_is_an_error(bad):
+    with pytest.raises(NarratorError):
+        Narrator(narrator_reply(bad)).narrate(FACTS)
 
-    narrated = client.post("/api/narrator/narrate").json()
-    assert narrated["narrative"]
 
+def test_non_json_output_is_an_error():
+    with pytest.raises(NarratorError):
+        Narrator(ScriptedProvider(narrator="oops")).narrate(FACTS)
+
+
+def test_a_narrative_over_400_characters_is_cut():
+    narrative = Narrator(narrator_reply("Abcde fghij. " * 100)).narrate(FACTS)
+
+    assert 0 < len(narrative) <= MAX_NARRATIVE
+    assert narrative.endswith(".")
+
+
+# ---------------------------------------------------------------- the Mock script, contract 4.6
+
+
+def test_46_mock_narrator_full_sentence_set():
+    assert Narrator(MockProvider()).narrate(FACTS) == (
+        "You've cleared 4 of 12 nodes. "
+        "The misconception “No real roots means no solutions” showed up 2 times "
+        "in Quadratic Equations, Quadratic Functions. "
+        "Average sleep over the last 3 days: 5.3 h."
+    )
+
+
+def test_46_mock_narrator_without_sleep_data_leaves_that_sentence_out():
+    assert Narrator(MockProvider()).narrate(EMPTY_FACTS) == "You've cleared 0 of 0 nodes."
+
+
+def test_46_mock_narrator_is_cut_to_400():
+    many = FACTS.model_copy(deep=True)
+    many.misconception_clusters = many.misconception_clusters * 30
+
+    assert len(Narrator(MockProvider()).narrate(many)) <= 400
+
+
+# ---------------------------------------------------------------- endpoints
+
+
+def test_it26_briefing_before_any_narration_has_facts_and_a_null_narrative(client):
+    response = client.get("/api/narrator/briefing")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["narrative"] is None and body["narrative_generated_at"] is None
+    assert body["facts"]["nodes"] == {"total": 0, "mastered": 0, "available": 0, "locked": 0}
+    assert body["facts"]["condition"]["flag"] == "unknown"
+
+
+def test_narrate_saves_the_narrative_and_the_briefing_returns_it(client, client_engine):
+    ids = ids_by_slug(generate(client))
+    pass_node(client, ids["high-school-math"])
+
+    narrated = client.post("/api/narrator/narrate")
+
+    assert narrated.status_code == 200
+    body = narrated.json()
+    assert body["narrative"] == "You've cleared 1 of 12 nodes."
+    assert body["narrative_generated_at"].endswith(("Z", "+00:00"))
+    assert client.get("/api/narrator/briefing").json() == body
     with Session(client_engine) as session:
         assert len(session.exec(select(NarratorBriefing)).all()) == 1
 
-    # 之后的 briefing 拿到的是这份缓存，而不是重新生成。
-    reread = client.get("/api/narrator/briefing").json()
-    assert reread["narrative"] == narrated["narrative"]
-    assert reread["narrative_generated_at"] is not None
+
+def test_facts_are_fresh_while_the_narrative_stays_cached(client):
+    ids = ids_by_slug(generate(client))
+    first = client.post("/api/narrator/narrate").json()
+    pass_node(client, ids["high-school-math"])
+
+    briefing = client.get("/api/narrator/briefing").json()
+
+    assert briefing["facts"]["nodes"]["mastered"] == 1
+    assert briefing["narrative"] == first["narrative"] == "You've cleared 0 of 12 nodes."
 
 
-def test_narrative_names_the_domains_it_crosses(client, client_engine):
-    """跨领域必须点名具体哪几个领域 —— 这是这段叙述唯一不可替代的价值。"""
-    _seed_cross_domain_failures(client_engine)
+def test_the_latest_narrative_wins(client):
+    client.post("/api/narrator/narrate")
+    ids = ids_by_slug(generate(client))
+    pass_node(client, ids["high-school-math"])
 
-    narrative = client.post("/api/narrator/narrate").json()["narrative"]
-
-    assert "统计学" in narrative
-    assert "投资" in narrative
-
-
-def test_narrate_returns_502_when_the_provider_fails(client):
-    with patch.object(Narrator, "narrate", side_effect=RuntimeError("provider down")):
-        assert client.post("/api/narrator/narrate").status_code == 502
+    assert client.post("/api/narrator/narrate").json()["narrative"] == "You've cleared 1 of 12 nodes."
+    assert client.get("/api/narrator/briefing").json()["narrative"] == "You've cleared 1 of 12 nodes."
 
 
-def test_facts_carry_the_cross_domain_marker():
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    SQLModel.metadata.create_all(engine)
-    _seed_cross_domain_failures(engine)
+def test_narrate_failure_is_502_and_the_previous_narrative_survives(client, monkeypatch):
+    client.post("/api/narrator/narrate")
+    monkeypatch.setattr("app.routers.narrator.get_provider", lambda agent=None: BrokenProvider())
 
-    with Session(engine) as session:
-        facts = format_facts(build_profile(session))
+    response = client.post("/api/narrator/narrate")
 
-    assert "【跨领域】" in facts
-    assert "统计学" in facts and "投资" in facts
-
-
-def test_facts_say_so_when_there_is_nothing_to_report():
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
-        facts = format_facts(build_profile(session))
-
-    assert "暂无记录" in facts
+    assert response.status_code == 502
+    assert response.json() == {"detail": "Briefing generation failed. Please try again."}
+    assert client.get("/api/narrator/briefing").json()["narrative"] == "You've cleared 0 of 0 nodes."
 
 
-def test_blank_narrative_is_rejected():
-    class BlankProvider(MockProvider):
-        def complete(self, messages):
-            return '{"narrative": "   "}'
+def test_narrate_uses_the_narrator_provider_once(client, monkeypatch):
+    provider = CountingProvider()
+    requested = []
+    monkeypatch.setattr("app.routers.narrator.get_provider", lambda agent=None: (requested.append(agent), provider)[1])
 
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
-        profile = build_profile(session)
+    client.post("/api/narrator/narrate")
 
-    with pytest.raises(ValueError):
-        Narrator(BlankProvider()).narrate(profile)
+    assert requested == ["narrator"] and provider.counts == {"narrator": 1}
+
+
+def test_briefing_reports_the_condition_and_clusters(client, client_engine):
+    ids = ids_by_slug(generate(client))
+    pass_node(client, ids["high-school-math"])
+    pass_node(client, ids["algebra"])
+    audit_id = fail_node(client, ids["quadratic-equation"])
+    client.post(f"/api/audits/{audit_id}/reflection", json={"reflection": "I thought no real roots meant no solutions"})
+    with Session(client_engine) as session:
+        for day, sleep in enumerate((5, 5, 6)):
+            session.add(DailyCheckIn(date=date(2026, 10, 1) + timedelta(days=day), sleep_hours=sleep))
+        session.commit()
+
+    facts = client.get("/api/narrator/briefing").json()["facts"]
+
+    assert facts["condition"] == {"days": 3, "avg_sleep_hours": 5.3, "avg_stress": None, "flag": "low"}
+    (cluster,) = facts["misconception_clusters"]
+    assert cluster["skills"] == ["Quadratic Equations"] and cluster["cross_skill"] is False and len(cluster["principle_ids"]) == 1
+    assert facts["audits"] == {"total": 3, "passed": 2, "failed": 1}

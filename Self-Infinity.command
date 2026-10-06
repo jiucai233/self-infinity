@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-# Double-click launcher for personal daily use — builds the frontend once,
-# then runs a single backend process that serves both the API and the
-# built frontend (see backend/app/main.py's StaticFiles mount) on one port.
+# Double-click launcher for daily use: builds the Flutter web app once into
+# app/build/web, then runs a single backend process that serves both the API
+# and the built app (see backend/app/main.py's StaticFiles mount) on one port.
 # Opens the browser automatically. Close this window (or Ctrl+C) to stop.
 #
-# This is deliberately NOT run.sh: run.sh is the dev workflow (two
-# processes, Vite hot-reload on :5173, proxying to the backend on :8000).
-# This script is the "just use the app" path — no hot reload, one process,
-# one URL. If you've changed frontend code, delete frontend/dist (or just
-# re-run `npm run build` inside frontend/) before launching again to pick
-# up the changes — this script only builds when dist doesn't exist yet, to
-# keep normal daily launches fast.
+# This is deliberately NOT run.sh: run.sh is the dev workflow (backend on :8000
+# plus `flutter run` on :8090, Mock LLM by default). This script uses the
+# provider configured in backend/.env. It only builds when app/build/web does
+# not exist yet; delete that folder to pick up code changes.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,12 +20,9 @@ if [ ! -d "$ROOT/backend/.venv" ]; then
   exit 1
 fi
 
-if [ ! -d "$ROOT/frontend/dist" ]; then
-  echo "First run — building the frontend (only happens once; delete frontend/dist to force a rebuild later)..."
-  if [ ! -d "$ROOT/frontend/node_modules" ]; then
-    (cd "$ROOT/frontend" && npm install)
-  fi
-  (cd "$ROOT/frontend" && npm run build)
+if [ ! -d "$ROOT/app/build/web" ]; then
+  echo "First run — building the app (only happens once; delete app/build/web to force a rebuild later)..."
+  (cd "$ROOT/app" && flutter build web --release --dart-define=API_BASE_URL="$URL/api")
 fi
 
 cleanup() {
@@ -38,7 +32,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-(cd "$ROOT/backend" && exec .venv/bin/uvicorn app.main:app --port "$PORT") &
+(cd "$ROOT/backend" && exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$PORT") &
 SERVER_PID=$!
 
 echo "Starting Self-Infinity..."

@@ -10,41 +10,39 @@ rather than from a per-user account.
 from sqlmodel import Session, func, select
 
 from app.models import NodeType, SkillNode, SkillStatus
+from app.services.tree import node_depth
 
 BASE_REWARD = 10  # fixed constant per whitepaper's "base" term
 LEVEL_MULTIPLIER_BASE = 1.1  # compounding factor per level, per whitepaper wording
 NODES_PER_LEVEL = 5  # every 5 mastered nodes bumps the global level by 1
 
 
-def _node_depth(session: Session, node: SkillNode) -> int:
-    """Count parent_id hops to the tree root. Root nodes have depth 0."""
-    depth = 0
-    current = node
-    while current.parent_id is not None:
-        current = session.get(SkillNode, current.parent_id)
-        depth += 1
-    return depth
-
-
-def node_difficulty_score(session: Session, skill: SkillNode) -> float:
+def node_difficulty_score(session: Session, skill: SkillNode, depth: int | None = None) -> float:
     """Concept nodes survive the full Feynman protocol (harder) than task nodes,
     so they get a 2x base weight over 1x for tasks. Depth adds +0.5x per level,
-    since a node reached via a longer parent chain is harder-won than a root.
+    since a node reached via a longer contains chain is harder-won than a root.
+
+    `depth` is the number of contains hops to the root along the main parent
+    (see app/services/tree.py); pass it in when scoring many nodes at once.
     """
     type_weight = 2.0 if skill.node_type == NodeType.concept else 1.0
-    depth = _node_depth(session, skill)
+    if depth is None:
+        depth = node_depth(session, skill)
     return type_weight * (1 + 0.5 * depth)
 
 
-def _global_level(session: Session) -> int:
+def mastered_count(session: Session) -> int:
+    return session.exec(
+        select(func.count()).select_from(SkillNode).where(SkillNode.status == SkillStatus.mastered)
+    ).one()
+
+
+def global_level(session: Session) -> int:
     """Global "level" derived from total mastered nodes so far (this app has no
     per-user accounts). Every NODES_PER_LEVEL masteries bumps the level by 1,
     starting at level 1.
     """
-    mastered_count = session.exec(
-        select(func.count()).select_from(SkillNode).where(SkillNode.status == SkillStatus.mastered)
-    ).one()
-    return mastered_count // NODES_PER_LEVEL + 1
+    return mastered_count(session) // NODES_PER_LEVEL + 1
 
 
 def compute_reward(session: Session, skill: SkillNode) -> tuple[int, float]:
@@ -56,7 +54,7 @@ def compute_reward(session: Session, skill: SkillNode) -> tuple[int, float]:
     task at higher levels" from the whitepaper.
     """
     difficulty = node_difficulty_score(session, skill)
-    level = _global_level(session)
+    level = global_level(session)
     multiplier = LEVEL_MULTIPLIER_BASE**level
     amount = round(BASE_REWARD * difficulty * multiplier)
     return amount, multiplier

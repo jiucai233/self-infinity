@@ -1,0 +1,35 @@
+{
+    "name": "Self-Infinity",
+    "short_name": "Self-Infinity",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0F1222",
+    "theme_color": "#0F1222",
+    "description": "Self-Infinity — 인생을 게임처럼 키우는 학습 도전 앱",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

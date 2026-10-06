@@ -1,44 +1,75 @@
+import json
+import logging
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env")
+    """All settings come from environment variables / `.env` (plan section 9.1)."""
 
-    gemini_api_key: str = ""
+    # extra="ignore": 旧版 .env 里可能还留着已经删掉的变量，不该因此启动失败。
+    # env_ignore_empty: .env.example 里的值全是空的，直接复制成 .env 也要能用——空值等于
+    # "用默认值"，而不是把数字、布尔字段解析成空字符串。
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_ignore_empty=True)
+
+    # deepseek / openai / kimi / gemini / mock。留空则按 key 是否配置自动选择
+    # （第一个配了 key 的 provider），都没配就用 mock，见 app/llm/__init__.py。
+    llm_provider: str = ""
+    # 所选 provider 的默认模型；留空则用该 provider 自己的默认值。
+    llm_model: str = ""
+    # 按子 agent 单独指定模型，JSON，例如 {"clarifier": "deepseek-chat"}。
+    # 简单的 agent（Clarifier、Check-in Converter）可以用小模型，判断类的用最强的。
+    llm_model_overrides: str = ""
     deepseek_api_key: str = ""
+    gemini_api_key: str = ""
     openai_api_key: str = ""
     kimi_api_key: str = ""
-    # 显式指定用哪个 provider（"deepseek" / "openai" / "kimi" / "gemini" / "mock"）。
-    # 留空则按 key 是否配置自动选择，见 app/llm/__init__.py。配了多把 key 又想
-    # 临时切换时用它，比删 key 方便。
-    llm_provider: str = ""
-    # llm_model 被 Gemini 与 DeepSeek 共用同一个字段——两者不会同时启用（见
-    # get_provider() 的优先级选择），所以不需要各自独立的 model 字段，只需要
-    # 部署时按当前启用的 provider 把 LLM_MODEL 设成对应的值（如 "deepseek-chat"）。
-    llm_model: str = "gemini-2.5-flash"
+    # 留空则用离线搜索替身。搜索是独立于 LLM provider 的一层，互不影响。
+    tavily_api_key: str = ""
     database_url: str = "sqlite:///./self_infinity.db"
-    # 这两个数字不再是"审计官的额度"——2026-07-19 起 Auditor 的系统提示词里已经不
-    # 告诉模型有多少轮可用，真正"什么时候该收敛"完全由模型自己判断（听懂了/发现
-    # 讲不清楚的地方就裁决，不为了凑轮次硬问）。这两个值只是一道服务端安全阀，
-    # 防止模型异常时（比如顽固地一直 probe）无限问下去，正常对话几乎不会真的碰到
-    # 这个上限，所以数值定得比"预期轮数"宽松很多。night 模式在此基础上再翻倍
-    # （见 app/routers/audits.py 的 _resolve_max_turns）。
+    # dev：不登录，所有请求都是同一个本地用户（本地开发、测试、离线演示）。
+    # supabase：每个请求必须带 Supabase 的 access token（Authorization: Bearer ...），
+    # 每个账号的数据放在自己的 schema 里（见 app/db.py）。
+    auth_mode: str = "dev"
+    # Supabase 项目地址，例如 https://abcd.supabase.co；用它的 JWKS 验证 token。
+    supabase_url: str = ""
+    # 旧项目用 HS256 共享密钥签 token 时才需要（Project Settings → API → JWT Secret）。
+    supabase_jwt_secret: str = ""
+    # 显示时区，也是 DailyCheckIn.date 这类"一天一条"的日历日期的分界。
+    app_timezone: str = "Asia/Seoul"
+    # 这两个数字只是服务端的安全阀：prompt 里不告诉模型还剩几轮，"什么时候该收敛"
+    # 由模型自己判断。night 模式在此基础上翻倍（见 app/services/audit_flow.py）。
     audit_max_turns: int = 8
     task_max_turns: int = 4
-    # Challenger（审计复核官）总开关。留成配置项是为了 M2 校准能跑
-    # 单 Auditor vs Auditor+Challenger 的消融对比——见 eval/run_calibration.py。
+    # Challenger 总开关；留成配置项是为了评估时能做 Auditor 单独 vs Auditor+Challenger 的消融。
     challenger_enabled: bool = True
-    # 注入 Challenger 的历史 misconception 条数上限。取最近的若干条即可：
-    # 全量注入会让 prompt 随使用时长无限膨胀，而越久远的错误模型越可能已经被纠正。
+    # 注入 Challenger 的历史 misconception 条数上限，取最近的若干条。
     challenger_misconception_limit: int = 5
-    # 搜索是独立于 LLM provider 的一层（见 app/search/base.py 的模块注释）：
-    # 换裁决模型不影响检索，换检索服务也不影响裁决。留空则用离线替身。
-    tavily_api_key: str = ""
-    search_timeout_seconds: float = 15.0
-    # OpenAI / Kimi 共用；DeepSeek 沿用自己那个字段，避免改动既有部署的 .env。
     llm_timeout_seconds: float = 30.0
-    gemini_timeout_seconds: float = 30.0
-    deepseek_timeout_seconds: float = 30.0
+    search_timeout_seconds: float = 15.0
+
+    def parsed_model_overrides(self) -> dict[str, str]:
+        if not self.llm_model_overrides.strip():
+            return {}
+        try:
+            data = json.loads(self.llm_model_overrides)
+        except json.JSONDecodeError:
+            logger.warning("LLM_MODEL_OVERRIDES is not valid JSON, ignoring it")
+            return {}
+        if not isinstance(data, dict):
+            logger.warning("LLM_MODEL_OVERRIDES must be a JSON object, ignoring it")
+            return {}
+        return {str(k): str(v) for k, v in data.items() if v}
+
+    def model_name_for(self, agent: str | None) -> str:
+        """Model configured for a sub-agent; empty means "the provider's default"."""
+        if agent:
+            override = self.parsed_model_overrides().get(agent)
+            if override:
+                return override
+        return self.llm_model
 
 
 settings = Settings()

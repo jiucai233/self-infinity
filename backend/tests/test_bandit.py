@@ -3,8 +3,9 @@ import random
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
-from app.models import BanditArm, NodeType, SkillNode, SkillStatus
+from app.models import BanditArm, EdgeKind, NodeType, SkillNode, SkillStatus
 from app.services import bandit
+from tests.helpers import generate, ids_by_slug, link, make_course, make_skill, pass_node
 
 
 def _engine():
@@ -16,31 +17,18 @@ def _engine():
 
 
 def _skill(node_type: NodeType, depth: int, session: Session) -> SkillNode:
-    # Chains `depth` locked parents above a leaf so node_difficulty_score's
-    # parent_id-hop counting has something real to walk.
-    parent_id = None
-    for _ in range(depth):
-        parent = SkillNode(
-            slug=f"p-{random.random()}",
-            title="parent",
-            description="",
-            parent_id=parent_id,
-            status=SkillStatus.locked,
-            node_type=node_type,
-        )
-        session.add(parent)
-        session.flush()
-        parent_id = parent.id
-    leaf = SkillNode(
-        slug=f"leaf-{random.random()}",
-        title="leaf",
-        description="",
-        parent_id=parent_id,
-        status=SkillStatus.available,
-        node_type=node_type,
-    )
-    session.add(leaf)
-    session.flush()
+    # Chains `depth` contains-parents above a leaf so node_difficulty_score's
+    # contains-edge depth counting has something real to walk.
+    course = make_course(session)
+    parent = None
+    for i in range(depth):
+        node = make_skill(session, course, f"p{i}", node_type=node_type, status=SkillStatus.locked)
+        if parent is not None:
+            link(session, parent, node, EdgeKind.contains)
+        parent = node
+    leaf = make_skill(session, course, "leaf", node_type=node_type)
+    if parent is not None:
+        link(session, parent, leaf, EdgeKind.contains)
     return leaf
 
 
@@ -102,41 +90,44 @@ def test_choose_tier_favors_the_arm_with_a_strongly_skewed_posterior():
         assert picks.count("hard") >= 28
 
 
+def test_depth_is_counted_along_the_main_parent_not_the_second_parent():
+    engine = _engine()
+    with Session(engine) as session:
+        course = make_course(session)
+        root = make_skill(session, course, "root")
+        mid = make_skill(session, course, "mid")
+        deep = make_skill(session, course, "deep")
+        both = make_skill(session, course, "both")
+        link(session, root, mid, EdgeKind.contains)
+        link(session, mid, deep, EdgeKind.contains)
+        link(session, root, both, EdgeKind.contains, primary=True)  # depth 1 via the main parent
+        link(session, deep, both, EdgeKind.contains, primary=False)  # would be depth 3 via the other
+
+        # concept: 2.0 x (1 + 0.5 x depth): depth 1 -> 3.0 "medium", depth 3 -> 5.0 "hard"
+        assert bandit.difficulty_tier(session, both) == "medium"
+        assert bandit.difficulty_tier(session, deep) == "hard"
+        assert bandit.difficulty_tier(session, root) == "medium"
+
+
 def test_recommendation_endpoint_shape(client):
+    ids = ids_by_slug(generate(client, "Math"))
+
     resp = client.get("/api/skills/recommendation")
     assert resp.status_code == 200
     body = resp.json()
 
     assert body["context_bucket"] in bandit.CONTEXT_BUCKETS
     assert body["suggested_tier"] in bandit.TIERS
-
-    skills = client.get("/api/skills").json()
-    available_ids = {s["id"] for s in skills if s["status"] == "available"}
-    assert set(body["skill_tiers"].keys()) == {str(i) for i in available_ids}
-
-    # Seeded root ("Big-O 记号") is a depth-0 concept node -> difficulty
-    # score 2.0 -> "medium" per difficulty_tier's thresholds.
-    root_id = next(s["id"] for s in skills if s["slug"] == "big-o")
-    assert body["skill_tiers"][str(root_id)] == "medium"
+    # One entry per skill node, locked ones included, keyed by the id as a string.
+    assert set(body["skill_tiers"].keys()) == {str(i) for i in ids.values()}
+    # The root is a depth-0 concept node -> difficulty score 2.0 -> "medium".
+    assert body["skill_tiers"][str(ids["high-school-math"])] == "medium"
 
 
 def test_passing_an_audit_updates_the_bandit_arm(client, client_engine):
-    skills = client.get("/api/skills").json()
-    root_id = next(s["id"] for s in skills if s["slug"] == "big-o")
+    ids = ids_by_slug(generate(client, "Math"))
 
-    good_answer = (
-        "因为每次调用规模减半，所以是对数级；如果输入不满足有序这个前提条件，"
-        "这个方法就不成立，是有明确边界的，不是任何情况下都对。"
-    )
-    start = client.post(f"/api/skills/{root_id}/audits", json={"mode": "day"})
-    audit_id = start.json()["session"]["id"]
-    verdict = None
-    for _ in range(6):
-        result = client.post(f"/api/audits/{audit_id}/turns", json={"content": good_answer}).json()
-        if result["type"] != "probe":
-            verdict = result
-            break
-    assert verdict is not None
+    verdict = pass_node(client, ids["high-school-math"])
     assert verdict["passed"] is True
 
     # Root is a "medium" tier node — passing it should have grown the alpha
@@ -146,3 +137,16 @@ def test_passing_an_audit_updates_the_bandit_arm(client, client_engine):
         medium_arms = session.exec(select(BanditArm).where(BanditArm.tier == "medium")).all()
     assert len(medium_arms) >= 1
     assert any(arm.alpha > 1.0 for arm in medium_arms)
+
+
+def test_failing_an_audit_grows_the_beta_of_that_arm(client, client_engine):
+    from tests.helpers import fail_node
+
+    ids = ids_by_slug(generate(client, "Math"))
+
+    fail_node(client, ids["high-school-math"])
+
+    with Session(client_engine) as session:
+        medium_arms = session.exec(select(BanditArm).where(BanditArm.tier == "medium")).all()
+    assert any(arm.beta > 1.0 for arm in medium_arms)
+    assert not any(arm.alpha > 1.0 for arm in medium_arms)
