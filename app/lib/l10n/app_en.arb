@@ -530,5 +530,9 @@
   "delete": "Delete",
   "@delete": {
     "description": "Dialog button that deletes."
+  },
+  "more": "More",
+  "@more": {
+    "description": "Tooltip of a ⋯ menu button."
   }
 }

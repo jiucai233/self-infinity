@@ -12,6 +12,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
 import '../stage/profile_controller.dart';
 import '../stage/stage_controller.dart';
+import 'delete_course.dart';
 import 'stat_strip.dart';
 import '../../l10n/l10n.dart';
 
@@ -523,7 +524,14 @@ class _CourseProgress extends StatelessWidget {
                     minimumSize: const Size(0, 28),
                     foregroundColor: AppColors.danger,
                   ),
-                  onPressed: () => unawaited(_delete(context, skills.length)),
+                  onPressed: () => unawaited(
+                    confirmDeleteCourse(
+                      context,
+                      courseId: node.courseId!,
+                      courseName: node.label,
+                      nodeCount: skills.length,
+                    ),
+                  ),
                   child: Text(context.l10n.deleteCourse),
                 ),
               ],
@@ -532,61 +540,6 @@ class _CourseProgress extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  /// Asks first, with the choice to delete the course's nodes and their
-  /// history too (unchecked, they are kept with the course out of sight).
-  Future<void> _delete(BuildContext context, int nodeCount) async {
-    final api = context.read<SelfInfinityApi>();
-    final appState = context.read<AppState>();
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    final l = context.l10n;
-    var deleteNodes = false;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialog) => StatefulBuilder(
-        builder: (dialog, setDialog) => AlertDialog(
-          key: const Key('course-delete-dialog'),
-          title: Text(l.deleteCourseTitle(node.label)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l.deleteCourseBody),
-              const SizedBox(height: AppSpacing.md),
-              CheckboxListTile(
-                key: const Key('course-delete-nodes'),
-                value: deleteNodes,
-                onChanged: (v) => setDialog(() => deleteNodes = v ?? false),
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                title: Text(l.deleteCourseNodes(nodeCount)),
-                subtitle: Text(l.deleteCourseKeep),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialog).pop(false),
-              child: Text(l.cancel),
-            ),
-            TextButton(
-              key: const Key('course-delete-confirm'),
-              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-              onPressed: () => Navigator.of(dialog).pop(true),
-              child: Text(l.delete),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await api.deleteCourse(node.courseId!, deleteNodes: deleteNodes);
-      appState.markDataChanged();
-    } on ApiException catch (e) {
-      messenger?.showSnackBar(SnackBar(content: Text(e.userMessage)));
-    }
   }
 
   /// Moves the course under [goalId] (-1: no main quest).

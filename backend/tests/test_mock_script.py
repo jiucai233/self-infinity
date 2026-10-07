@@ -160,7 +160,7 @@ class FixedSearch:
         self._inner = MockSearchProvider()
         self.queries = []
 
-    def search(self, query, limit=5):
+    def search(self, query, limit=5, *, pages=False):
         self.queries.append(query)
         return self._inner.search(query, limit)
 

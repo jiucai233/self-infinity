@@ -46,6 +46,22 @@ void main() {
     api = await seededFakeApi();
   });
 
+  group('the ⋯ menu', () {
+    testWidgets('deletes the course after asking, then goes to the life tree', (tester) async {
+      await pumpSkill(tester, api, 5);
+      await tester.tap(find.byKey(const Key('skill-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('skill-delete-course')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('course-delete-dialog')), findsOneWidget);
+      expect(find.text('Delete “High School Math”?'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('course-delete-confirm')));
+      await tester.pumpAndSettle();
+      expect(await api.listCourses(), isEmpty);
+      expect(find.text('route:/map'), findsOneWidget);
+    });
+  });
+
   group('the page', () {
     testWidgets('the title bar shows the node name in the headline style, not node: …', (
       tester,

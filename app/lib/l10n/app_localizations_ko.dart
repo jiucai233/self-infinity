@@ -981,4 +981,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get delete => '삭제';
+
+  @override
+  String get more => '더 보기';
 }

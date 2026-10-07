@@ -64,7 +64,7 @@ backend/ (FastAPI + SQLModel + SQLite)
 | | Narrator | LLM | 把聚合好的事实讲成一段简报，只能引用传入的事实 |
 | | Recommender | LLM | 今日任务（3–5 步），输入含 bandit 建议难度 |
 | Planning | Clarifier | LLM | 主题太模糊时最多问 2 个问题 |
-| | Syllabus Finder | LLM + 搜索 | 找真实课程大纲作为生成依据 |
+| | Syllabus Finder | LLM + 搜索 | 找真实课程大纲或官方文档目录作为生成依据 |
 | | Planner | LLM | 生成课程图（节点 + contains / requires 边） |
 | | Structure Validator | 代码 | 11 条规则校验图结构，不合法则修正或拒绝 |
 | | Material Finder | LLM + 搜索 | 针对某个 gap 找补充材料；URL 只来自搜索结果，绝不由 LLM 生成 |
@@ -94,7 +94,7 @@ backend/ (FastAPI + SQLModel + SQLite)
 
 ### 4.1 课程图
 
-用户输入一个主题，流水线是：Clarifier（可选追问）→ Syllabus Finder → Planner → Structure Validator。结果是一张有向无环图：
+用户输入一个主题，流水线是：Clarifier（可选追问）→ Syllabus Finder → Planner → Structure Validator。Syllabus Finder 会用三条查询（两种“课纲”说法，加官方文档/教程）读取搜索结果的页面正文，只接受两类来源：学校课纲（机构 + 课程名或代码 + 主题列表），或项目维护者、出版方的官方文档、教程、教材目录；找到时 Planner 以它的主题和顺序为骨架编排，找不到就凭模型自身知识。结果是一张有向无环图：
 
 - **两种边**：`contains`（包含，决定位置和解锁）与 `requires`（软前置，只影响推荐顺序，不锁节点）。
 - **多父节点**：一个节点最多 3 个 contains 父节点，其中一个标 `is_primary`，决定它在地图上画在哪里。

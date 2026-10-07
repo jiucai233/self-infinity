@@ -90,7 +90,7 @@ class SpySearch:
         self.fail = fail
         self.queries: list[str] = []
 
-    def search(self, query, limit=5):
+    def search(self, query, limit=5, *, pages=False):
         self.queries.append(query)
         if self.fail:
             raise RuntimeError("search is down")
@@ -114,7 +114,7 @@ def test_it01_a_broken_search_still_produces_a_course_without_a_source(client, m
     response = client.post("/api/skills/generate", json={"topic": "Math"})
 
     assert response.status_code == 200
-    assert len(spy.queries) == 2  # two English phrasings
+    assert len(spy.queries) == 3  # two syllabus phrasings and the official docs
     assert response.json()["course"]["source_course"] is None
     assert len(response.json()["nodes"]) == 12
 
@@ -139,7 +139,7 @@ def test_it01_the_syllabus_found_is_handed_to_the_planner(client, monkeypatch):
     client.post("/api/skills/generate", json={"topic": "Math"})
 
     (prompt,) = spy.system_prompts("planner")
-    assert "Reference syllabus (High School Mathematics Curriculum (Ministry of Education))" in prompt
+    assert "Reference outline (High School Mathematics Curriculum (Ministry of Education))" in prompt
 
 
 def test_it01_a_generic_course_has_ten_nodes_and_one_root(client):

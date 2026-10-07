@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class MockSearchProvider:
     name = "mock"
 
-    def search(self, query: str, limit: int = 5) -> list[SearchHit]:
+    def search(self, query: str, limit: int = 5, *, pages: bool = False) -> list[SearchHit]:
         logger.info("mock search() query=%r limit=%d", query, limit)
         return [
             SearchHit(

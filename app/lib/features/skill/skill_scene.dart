@@ -16,6 +16,7 @@ import '../../voice/voice_service.dart';
 import '../../widgets/widgets.dart';
 import '../chat/chat_controller.dart';
 import '../chat/chat_navigation.dart';
+import '../map/delete_course.dart';
 import '../stage/last_said.dart';
 import '../stage/stage_input_bar.dart';
 import '../stage/stage_scaffold.dart';
@@ -49,6 +50,9 @@ class _SkillSceneState extends State<SkillScene> {
 
   SkillOverview? _overview;
   bool _boss = false;
+
+  /// The node's course, for the `⋯` menu's Delete course (name, node count).
+  CourseMap? _courseMap;
   Object? _error;
   bool _loading = true;
   int? _revision;
@@ -118,10 +122,23 @@ class _SkillSceneState extends State<SkillScene> {
     try {
       final map = await _api.getCourseMap(overview.skill.courseId);
       if (!mounted || token != _token) return;
-      setState(() => _boss = isBoss(overview.skill.id, map.edges));
+      setState(() {
+        _boss = isBoss(overview.skill.id, map.edges);
+        _courseMap = map;
+      });
     } on Object {
       // no chip
     }
+  }
+
+  Future<void> _deleteCourse(CourseMap map) async {
+    final deleted = await confirmDeleteCourse(
+      context,
+      courseId: map.course.id,
+      courseName: courseNameOf(map),
+      nodeCount: map.nodes.length,
+    );
+    if (deleted && mounted) context.go(AppRoutes.map);
   }
 
   // -- chat about the node ------------------------------------------------------
@@ -187,6 +204,27 @@ class _SkillSceneState extends State<SkillScene> {
                   const SizedBox(width: AppSpacing.xs + 2),
                 ],
                 _statusChip(overview),
+                if (_courseMap case final map?)
+                  PopupMenuButton<void>(
+                    key: const Key('skill-menu'),
+                    tooltip: context.l10n.more,
+                    icon: const Icon(Icons.more_horiz_rounded, size: 18),
+                    padding: EdgeInsets.zero,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(28, 28),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        key: const Key('skill-delete-course'),
+                        onTap: () => unawaited(_deleteCourse(map)),
+                        child: Text(
+                          context.l10n.deleteCourse,
+                          style: const TextStyle(color: AppColors.danger),
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
       historyTitle: context.l10n.attempts,

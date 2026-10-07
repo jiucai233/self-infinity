@@ -28,13 +28,17 @@ class TavilySearchProvider:
     def __init__(self) -> None:
         self._client = httpx.Client()
 
-    def search(self, query: str, limit: int = 5) -> list[SearchHit]:
+    def search(self, query: str, limit: int = 5, *, pages: bool = False) -> list[SearchHit]:
         start = time.perf_counter()
-        logger.info("tavily search() start query=%r limit=%d", query, limit)
+        logger.info("tavily search() start query=%r limit=%d pages=%s", query, limit, pages)
+        body = {"query": query, "max_results": limit, "search_depth": "basic"}
+        if pages:
+            # The page text comes with the results at no extra credit (as Markdown).
+            body["include_raw_content"] = True
         try:
             response = self._client.post(
                 _API_URL,
-                json={"query": query, "max_results": limit, "search_depth": "basic"},
+                json=body,
                 headers={"Authorization": f"Bearer {settings.tavily_api_key}"},
                 timeout=settings.search_timeout_seconds,
             )
@@ -54,6 +58,7 @@ class TavilySearchProvider:
                 title=str(item.get("title", "")).strip(),
                 url=str(item.get("url", "")).strip(),
                 snippet=str(item.get("content", "")).strip(),
+                content=str(item.get("raw_content") or "").strip(),
             )
             for item in results
         ]

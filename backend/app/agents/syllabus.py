@@ -16,6 +16,7 @@ Planner 自己的知识，那条路本来也不差。
 
 import json
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from urllib.parse import urlparse
@@ -28,33 +29,73 @@ logger = logging.getLogger(__name__)
 MIN_OUTLINE_ITEMS = 3
 MAX_OUTLINE_ITEMS = 30
 EXCERPT_CHARS = 300
+# How much of each page the judge reads: its start (who made it), then the stretch that
+# looks most like a schedule or a table of contents.
+PAGE_HEAD_CHARS = 600
+PAGE_LIST_CHARS = 2400
+MAX_CANDIDATES = 8
+_LIST_MARK = re.compile(
+    r"\b(week|lecture|lesson|unit|chapter|module|session|part|topic)s?\b|(?:^|\s)\d{1,2}[.)]\s",
+    re.IGNORECASE,
+)
+
+
+def page_excerpt(text: str) -> str:
+    """The start of a page and, for a long one, its most list-like stretch: a syllabus's topics
+    are often far below its header, past what a fixed prefix would show."""
+    text = " ".join(text.split())
+    if len(text) <= PAGE_HEAD_CHARS + PAGE_LIST_CHARS:
+        return text
+    head = text[:PAGE_HEAD_CHARS]
+    rest = text[PAGE_HEAD_CHARS:]
+    marks = [m.start() for m in _LIST_MARK.finditer(rest)]
+    if not marks:
+        return head + " … " + rest[:PAGE_LIST_CHARS]
+    # The window holding the most list marks; it starts a little before its first mark.
+    best, best_count, j = 0, 0, 0
+    for i, start in enumerate(marks):
+        while marks[j] < start - PAGE_LIST_CHARS + 200:
+            j += 1
+        if i - j + 1 > best_count:
+            best_count, best = i - j + 1, marks[j]
+    begin = max(0, best - 100)
+    return head + " … " + rest[begin : begin + PAGE_LIST_CHARS]
 
 SYSTEM_PROMPT = (
     agent_tag("syllabus_finder")
     + """
-You receive a topic and numbered web search results. Find one result that
-is a real course syllabus for this topic.
+You receive a topic and numbered web search results, each with its title,
+domain, a snippet and, when it could be read, the start of the page. Find
+one result that is a real, ordered outline for learning this topic.
 
 Topic: {topic}
 Results:
 {numbered_results}
 
-A result qualifies only if all three are visible in its title, domain
-or excerpt:
-1. an identifiable institution (university, school, or official
-   curriculum body);
-2. a course name or course code;
-3. a list of topics covered.
+Two kinds qualify:
+1. A course syllabus: an identifiable institution (university, school or
+   official curriculum body), a course name or code, and its list of topics.
+2. Official learning material: documentation, a tutorial series or a
+   textbook from the project's maintainers or a known publisher, with an
+   ordered table of contents.
+The source and at least 3 ordered topics must be readable in the result
+itself. A well-known source whose topics are not in the text does not
+qualify: pick another result whose topics you can read.
+For a school subject prefer a syllabus; for a tool, product or project,
+official documentation usually fits better.
 
 Rules:
 - Choose at most one result. If none qualifies, report not found.
   Not finding one is a normal outcome.
 - Never write a URL. Refer to the result only by its index.
-- outline: the topics in the syllabus order, as short phrases, copied or
-  lightly shortened from the result, written in English.
+- course: who made it and what it is (institution + course name or code,
+  or project/publisher + document name).
+- outline: its topics in its own order, as short phrases, copied or
+  lightly shortened from the result, written in English. Only topics
+  that are in the result; never add your own.
 
 Output only JSON, one of:
-{{"found": true, "index": 0, "course": "institution + course name or code", "outline": ["..."]}}
+{{"found": true, "index": 0, "course": "who + what", "outline": ["..."]}}
 {{"found": false}}
 """
 )
@@ -79,10 +120,10 @@ class SyllabusFinder:
         return self._judge(topic, hits)
 
     def _collect(self, topic: str) -> list[SearchHit]:
-        # 两次搜索（课纲 / syllabus 两种说法）互不依赖，
+        # 三次搜索（课纲两种说法 + 官方文档/教程）互不依赖，
         # 并行跑；结果按查询顺序合并，与谁先返回无关。
         subject = (topic.strip().splitlines() or [""])[0].strip()
-        queries = [f"{subject} syllabus", f"{subject} course syllabus"]
+        queries = [f"{subject} syllabus", f"{subject} course syllabus", f"{subject} official documentation tutorial"]
         with ThreadPoolExecutor(max_workers=len(queries)) as pool:
             batches = list(pool.map(self._search_one, queries))
 
@@ -94,20 +135,22 @@ class SyllabusFinder:
                     continue
                 seen.add(hit.url)
                 hits.append(hit)
-        return hits
+        return hits[:MAX_CANDIDATES]
 
     def _search_one(self, query: str) -> list[SearchHit]:
         try:
-            return self._search.search(query)
+            return self._search.search(query, pages=True)
         except Exception:
             logger.warning("syllabus search failed for query=%r", query, exc_info=True)
             return []
 
     def _judge(self, topic: str, hits: list[SearchHit]) -> SyllabusReference | None:
-        numbered = "\n".join(
-            f"[{i}] {hit.title} | {urlparse(hit.url).netloc} | {' '.join(hit.snippet.split())[:EXCERPT_CHARS]}"
-            for i, hit in enumerate(hits)
-        )
+        def entry(i: int, hit: SearchHit) -> str:
+            line = f"[{i}] {hit.title} | {urlparse(hit.url).netloc} | {' '.join(hit.snippet.split())[:EXCERPT_CHARS]}"
+            page = page_excerpt(hit.content)
+            return f"{line}\n    Page: {page}" if page else line
+
+        numbered = "\n".join(entry(i, hit) for i, hit in enumerate(hits))
         messages: list[Message] = [
             {"role": "system", "content": SYSTEM_PROMPT.format(topic=topic.strip(), numbered_results=numbered)},
             {"role": "user", "content": "Decide."},

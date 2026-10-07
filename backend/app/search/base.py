@@ -18,11 +18,17 @@ class SearchHit:
     title: str
     url: str
     snippet: str
+    # The page's text, only when asked for with `pages=True` (and the service could read it).
+    content: str = ""
 
 
 class SearchProvider(Protocol):
     name: str
 
-    def search(self, query: str, limit: int = 5) -> list[SearchHit]:
-        """返回搜索结果。失败时抛异常，由调用方决定降级策略。"""
+    def search(self, query: str, limit: int = 5, *, pages: bool = False) -> list[SearchHit]:
+        """返回搜索结果。失败时抛异常，由调用方决定降级策略。
+
+        `pages=True` also fetches each result's page text (`SearchHit.content`), for callers
+        that must read more than a snippet — a syllabus's topic list rarely fits in one.
+        """
         ...

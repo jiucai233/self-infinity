@@ -305,5 +305,6 @@
   "deleteCourseNodes": "노드 {count}개와 그 도전 기록, 교훈 카드도 함께 삭제",
   "deleteCourseKeep": "체크하지 않으면 도전 기록과 교훈 카드는 남아요.",
   "cancel": "취소",
-  "delete": "삭제"
+  "delete": "삭제",
+  "more": "더 보기"
 }

@@ -72,7 +72,7 @@ def test_ut03_syllabus_section_is_in_the_prompt_when_provided():
     Planner(provider).generate("Linear Algebra", syllabus=syllabus)
 
     (prompt,) = provider.system_prompts("planner")
-    assert "Reference syllabus (State Univ. Linear Algebra (MATH101))" in prompt
+    assert "Reference outline (State Univ. Linear Algebra (MATH101))" in prompt
     assert "1. Vectors" in prompt and "3. Determinants" in prompt
 
 
@@ -82,7 +82,7 @@ def test_ut03_no_syllabus_section_without_a_syllabus():
     Planner(provider).generate("Linear Algebra")
 
     (prompt,) = provider.system_prompts("planner")
-    assert "Reference syllabus" not in prompt
+    assert "Reference outline" not in prompt
 
 
 def test_prompt_carries_the_course_settings_and_the_topic_goes_in_the_user_message():

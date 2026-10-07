@@ -41,10 +41,12 @@ DEPTH_PROFILES = {
 }
 
 SYLLABUS_SECTION = """
-Reference syllabus ({course}), in order:
+Reference outline ({course}), in order:
 {outline}
-Follow its topic order. Merge or split topics to meet the node count and
-the rules below. Do not copy it item by item.
+Build the course from this outline: cover its topics in its order, and let
+most nodes correspond to its items. Merge or split items to meet the node
+count and the rules below rather than copying the list as it is. Add a node
+the outline lacks only when the structure needs it.
 """
 
 # Text of a file the user uploaded, standing in for the Syllabus Finder's result.

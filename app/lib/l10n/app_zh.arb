@@ -305,5 +305,6 @@
   "deleteCourseNodes": "同时删除它的 {count} 个节点，以及相关的挑战记录和教训卡",
   "deleteCourseKeep": "不勾选的话，挑战记录和教训卡都会保留。",
   "cancel": "取消",
-  "delete": "删除"
+  "delete": "删除",
+  "more": "更多"
 }
