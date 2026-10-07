@@ -451,6 +451,38 @@ void main() {
       expect((await api.listCourses()).single.topic, 'Sleep science');
     });
 
+    testWidgets('a vague topic gets courses from the quest to pick from', (tester) async {
+      final api = FakeApiClient(latency: Duration.zero, onboarded: false);
+      await pumpApp(tester, api: api);
+      await tapKey(tester, 'onboarding-continue');
+      for (var i = 0; i < 3; i++) {
+        await tapKey(tester, 'onboarding-skip');
+      }
+      await answer(tester, 'Complete SO-ARM101 project');
+      await answer(tester, 'idk, a lot of things');
+
+      expect(find.text('Where do you want to start?'), findsOneWidget);
+      expect(await api.listCourses(), isEmpty); // nothing built yet
+      expect(key('onboarding-option-2'), findsOneWidget);
+      await tapKey(tester, 'onboarding-option-0');
+
+      expect(find.text('Your world “SO-ARM101 project” is ready.'), findsOneWidget);
+      expect((await api.listCourses()).single.topic, 'SO-ARM101 project');
+      expect((await api.listGoals()).single.courseIds, hasLength(1));
+    });
+
+    testWidgets('the scout failing does not stop the build', (tester) async {
+      final api = FakeApiClient(latency: Duration.zero, onboarded: false);
+      await pumpApp(tester, api: api);
+      await tapKey(tester, 'onboarding-continue');
+      for (var i = 0; i < 4; i++) {
+        await tapKey(tester, 'onboarding-skip');
+      }
+      api.failNext(method: 'scoutCourse');
+      await answer(tester, 'idk');
+      expect(find.textContaining('is ready.'), findsOneWidget);
+    });
+
     testWidgets('the mic types what you say into the answer', (tester) async {
       final api = FakeApiClient(latency: Duration.zero, onboarded: false);
       final voice = FakeVoiceService();

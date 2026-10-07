@@ -183,7 +183,7 @@ Dan Koe 把人生当成一局游戏：赌注（anti-vision）、胜利条件（v
 
 1. **左栏「My character」顶部**：一句身份宣言（`I am the type of person who…`），下面两块可以直接点击编辑的卡片：`Win condition`（vision）和 `Stakes`（anti-vision），然后是 `Main quests`（最多 3 个一年目标，端点 28–31）和 `Rules`（最多 5 条约束）。空着时显示浅色提示语，点一下变输入框，回车或失焦保存（端点 25/26）。
 2. **人生树（scene 2，标题 `Life tree`）**：
-   - 结构：你在中心 → 一圈主线任务（一年目标）→ 服务它的课程 → 课程的节点。没挂在任何目标下的课程是支线，直接挂在你身上。课程挂到哪个目标，在课程节点的卡片里选（`Serves`）。
+   - 结构：你在中心 → 一圈主线任务（一年目标）→ 服务它的课程 → 课程的节点。没挂在任何目标下的课程是支线，直接挂在你身上。课程挂到哪个目标，在课程节点的卡片里选（`Serves`）。课程卡片底下有红色的 `Delete course`：弹窗确认，带一个勾选框“同时删除它的 N 个节点、挑战记录和教训卡”。不勾选时课程从人生树、主线和计划里消失，但节点、挑战记录和教训卡都留着（教训卡照常显示）；勾选则一起彻底删除。
    - 上方一排大数字：进度环 `3/22`、`Cleared`、`Progress %`、`Ready`、`Audits`、`Lessons`（手机上只留前三个）。
    - 深色面板里是缓慢 3D 旋转的星座（拖动可以转，悬停暂停并显示名字）。点任意一点，右侧浮出一叠纸卡片：节点的最高分、尝试次数、教训卡数、**审计历史**（日期、通过/失败、分数条）、教训卡、`Take it on`；目标卡显示它下面所有课程的进度；你自己的卡显示身份、胜利条件和赌注。
    - `Tree | Outline` 切换：Outline 是原来那张从左到右的分层图，一次一门课（上方 chip 选课）。
@@ -207,6 +207,7 @@ Dan Koe 把人生当成一局游戏：赌注（anti-vision）、胜利条件（v
 4. Identity：`Finish the sentence.`（输入框预填 `I am the type of person who `）
 5. Main quest：`What's one goal that moves you toward your win condition?`
 6. First course：`What do you need to learn first for “{quest}”?` 输入主题，或用课纲文件；在聊天里生成（所以对话从这里开始），生成后自动挂到这个 Main quest 下。
+   - 输入的主题先给 Course Scout 看（`POST /skills/scout`，带上前面填的 Main quest 和三问）：说得清楚的整理成规范课名直接生成（`so arm 101` → `SO-ARM101 robot arm`）；太模糊的（`idk, a lot of things`）不生成，换成 `Where do you want to start?` 加最多 3 张课程卡（课名 + 为什么对主线有用），点一张就生成那门；也可以改写输入框再试。Scout 失败就按原文生成。课纲文件不经过 Scout。
 7. 导览三页：水晶球（显示你刚长出来的树）→ Auditor 判定 → 失败变教训卡。最后 `Enter Self-Infinity`。
 
 第 2–6 步的输入框右侧有麦克风（`Speak your answer`）：点一下开始听写，说的话实时接在已有文字后面，停顿 3 秒或点停止键结束；听写时按钮变成小波形 + 停止键。识别语言和语音模式一样是 `en_US`。设备不支持时提示 `Voice input isn't available on this device.`

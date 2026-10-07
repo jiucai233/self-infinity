@@ -518,6 +518,18 @@ Request: any subset of `{"title", "course_ids"}`; omitted fields are kept, an ex
 ### 31. `DELETE /api/goals/{id}`
 204, no body; its courses become side quests. 404 `goal not found`.
 
+### 31a. `POST /api/skills/scout`  (LLM: course scout, added 2026-10-06)
+The tutorial's first course, read before anything is built. Request `{"answer": "idk, a lot of things"}` — not blank, at most 120 characters (422). The scout sees the answer with the main quests (endpoint 28) and the profile (endpoint 25).
+- Clear answer: `{"kind": "clear", "topic": "SO-ARM101 robot arm", "question": "", "options": []}` — `topic` is the answer tidied (typos, shorthand); the client builds it with endpoint 18's `course_topic`.
+- Vague answer: `{"kind": "choose", "topic": "", "question": "…", "options": [{"topic": "…", "why": "…"}]}` — at most 3 distinct options drawn from the main quest and win condition; the client shows them and builds the one picked.
+- Never 502: a scout that fails answers `clear` with the answer as typed.
+- Mock: an answer of 2 characters or less, or one with `idk`, `no idea`, `anything`, `a lot`, `不知道`, `随便`, `모르` and the like, is vague; the options are the main quests without a leading verb (`Complete SO-ARM101 project` → `SO-ARM101 project`), then `Python programming basics`, `Linear algebra`, `Clear technical writing`, three in all. Anything else is clear, unchanged.
+
+### 33. `DELETE /api/courses/{id}?delete_nodes=false`  (no LLM, added 2026-10-06)
+204, no body. 404 `course not found` for an unknown or already deleted course. Either way the course leaves every main quest's `course_ids` and the steps of every study plan.
+- `delete_nodes=false` (default): the course is archived (`Course.archived_at`). It leaves endpoints 3, 4 (404), 5, 6, 11, 15, 20 and the front desk's node list, and can no longer be put under a quest (endpoint 30: 404). Its nodes, audits and lesson cards stay: endpoints 10 and 23 still list them; endpoint 11 keeps the lessons but drops the hidden nodes and every edge to them.
+- `delete_nodes=true`: the course and its nodes, edges, audits (turns, rewards), the lesson cards those audits produced, every link to or from them and the nodes' search plans are deleted.
+
 ### Life tree (client, built from endpoints 4, 10, 23, 25, 28)
 You in the middle → main quests → the courses that serve them → each course's nodes (primary contains edges). Side-quest courses hang from you directly. Scene 2 shows it with progress over all courses (`Cleared` m / n, `Progress` %, `Ready`, `Audits`, `Lessons`); tapping a point shows its audit history (endpoint 22) and lesson cards (endpoint 10).
 

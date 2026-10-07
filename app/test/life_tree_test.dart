@@ -42,7 +42,10 @@ void main() {
       final writingNode = tree.bySkill(writing.nodes.first.id)!;
       expect(writingNode.parent, LifeTree.selfKey);
       // Every node of every course is in the tree, once.
-      expect(tree.nodes.where((n) => n.skillId != null).length, math.nodes.length + writing.nodes.length);
+      expect(
+        tree.nodes.where((n) => n.skillId != null).length,
+        math.nodes.length + writing.nodes.length,
+      );
       // Parents come before their children.
       final seen = <String>{};
       for (final n in tree.nodes) {
@@ -55,7 +58,10 @@ void main() {
       final (api, math, writing) = await twoCourses();
       await passAudit(api, 1);
       await failAudit(api, 2);
-      final maps = [await api.getCourseMap(math.course.id), await api.getCourseMap(writing.course.id)];
+      final maps = [
+        await api.getCourseMap(math.course.id),
+        await api.getCourseMap(writing.course.id),
+      ];
       final tree = LifeTree.build(maps: maps, audits: await api.listAudits(limit: 100), lessons: 2);
       expect(tree.stats.total, math.nodes.length + writing.nodes.length);
       expect(tree.stats.mastered, 1);
@@ -75,7 +81,10 @@ void main() {
       expect(a.title, 'A');
       final b = await api.createGoal('B');
       await api.createGoal('C');
-      await expectLater(api.createGoal('D'), throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 409)));
+      await expectLater(
+        api.createGoal('D'),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 409)),
+      );
       await api.updateGoal(a.id, courseIds: [math.course.id, writing.course.id]);
       await api.updateGoal(b.id, courseIds: [writing.course.id]);
       final goals = {for (final g in await api.listGoals()) g.id: g.courseIds};
@@ -89,7 +98,9 @@ void main() {
   });
 
   group('scene 2: the life tree', () {
-    testWidgets('numbers on top; tapping a node opens its card with the audit history', (tester) async {
+    testWidgets('numbers on top; tapping a node opens its card with the audit history', (
+      tester,
+    ) async {
       final (api, _, _) = await twoCourses();
       await passAudit(api, 1); // opens Functions (3)
       await failAudit(api, 3);
@@ -124,6 +135,55 @@ void main() {
       await tester.pumpAndSettle();
       expect((await api.listGoals()).single.courseIds, [math.course.id]);
       expect(tester.widget<Text>(find.byKey(const Key('course-goal'))).data, 'Teach calculus');
+    });
+
+    Future<void> openCourse(WidgetTester tester, CourseMap course) async {
+      final state = tester.state<LifeConstellationState>(find.byType(LifeConstellation));
+      final box = tester.renderObject<RenderBox>(find.byType(LifeConstellation));
+      await tester.tapAt(box.localToGlobal(state.positionOf('s${course.nodes.first.id}')!));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('deleting a course asks first; unchecked, its history is kept', (tester) async {
+      final (api, math, writing) = await twoCourses();
+      await failAudit(api, math.nodes.first.id);
+      await pumpScene(tester, const MapScene(), api: api);
+      await openCourse(tester, math);
+
+      await tester.tap(find.byKey(const Key('course-delete')));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete “High School Math”?'), findsOneWidget);
+      expect(
+        find.text('Also delete its ${math.nodes.length} nodes, their attempts and lesson cards'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(await api.listCourses(), hasLength(2));
+
+      await tester.tap(find.byKey(const Key('course-delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('course-delete-confirm')));
+      await tester.pumpAndSettle();
+      expect((await api.listCourses()).single.id, writing.course.id);
+      expect(find.byKey(Key('node-sheet-s${math.nodes.first.id}')), findsNothing);
+      expect(await api.listAudits(), hasLength(1)); // kept
+    });
+
+    testWidgets('checked, the nodes and their history go too', (tester) async {
+      final (api, math, _) = await twoCourses();
+      await failAudit(api, math.nodes.first.id);
+      await pumpScene(tester, const MapScene(), api: api);
+      await openCourse(tester, math);
+
+      await tester.tap(find.byKey(const Key('course-delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('course-delete-nodes')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('course-delete-confirm')));
+      await tester.pumpAndSettle();
+      expect(await api.listCourses(), hasLength(1));
+      expect(await api.listAudits(), isEmpty);
     });
   });
 }

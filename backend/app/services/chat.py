@@ -28,6 +28,7 @@ from app.schemas import (
     CourseOut,
 )
 from app.search.base import SearchProvider
+from app.services.courses import live_courses, live_nodes
 from app.services import briefing as briefing_service
 from app.services import checkin as checkin_service
 from app.services import course_generation, journal, planning
@@ -110,9 +111,7 @@ def history(session: Session, limit: int) -> list[ChatMessageOut]:
 def _nodes_newest_course_first(session: Session) -> list[SkillNode]:
     return list(
         session.exec(
-            select(SkillNode)
-            .join(Course, Course.id == SkillNode.course_id)
-            .order_by(col(Course.created_at).desc(), col(Course.id).desc(), SkillNode.id)
+            live_nodes().order_by(col(Course.created_at).desc(), col(Course.id).desc(), SkillNode.id)
         ).all()
     )
 
@@ -331,7 +330,7 @@ def suggestions(session: Session) -> list[ChatSuggestionOut]:
 
     # Continue the node of the most recent audit while it is not mastered ...
     last = session.exec(
-        select(SkillNode)
+        live_nodes()
         .join(AuditSession, AuditSession.skill_id == SkillNode.id)
         .order_by(col(AuditSession.created_at).desc(), col(AuditSession.id).desc())
     ).first()
@@ -341,7 +340,7 @@ def suggestions(session: Session) -> list[ChatSuggestionOut]:
         return items
 
     # ... otherwise start the newest course's lowest-id available node.
-    course = session.exec(select(Course).order_by(col(Course.created_at).desc(), col(Course.id).desc())).first()
+    course = session.exec(live_courses().order_by(col(Course.created_at).desc(), col(Course.id).desc())).first()
     node = None
     if course is not None:
         node = session.exec(

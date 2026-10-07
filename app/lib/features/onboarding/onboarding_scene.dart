@@ -31,8 +31,9 @@ class OnboardingScene extends StatefulWidget {
 
 enum _Step { welcome, stakes, win, identity, quest, course, tour }
 
-/// What the course step is doing.
-enum _Build { idle, building, done }
+/// What the course step is doing: [reading] is the scout looking at the
+/// typed topic before anything is built.
+enum _Build { idle, reading, building, done }
 
 class _OnboardingSceneState extends State<OnboardingScene> {
   static String get identityStem => l10nNow.identityStem;
@@ -51,6 +52,9 @@ class _OnboardingSceneState extends State<OnboardingScene> {
   Goal? _goal;
   PickedFile? _file;
   _Build _build = _Build.idle;
+
+  /// The scout found the typed topic too vague: courses to pick from.
+  CourseScout? _scouted;
   CourseMap? _course;
   int _tourPage = 0;
   LifeTree? _tree;
@@ -162,15 +166,43 @@ class _OnboardingSceneState extends State<OnboardingScene> {
   /// Builds the first course in the chat (so the conversation starts with
   /// it), then puts it under the main quest. `courseTopic` skips the front
   /// desk, so the build never hangs on how it would read the message.
-  Future<void> _buildCourse() async {
-    final topic = _text[_Step.course]!.text.trim();
-    if (topic.isEmpty && _file == null) {
+  ///
+  /// A typed topic is read by the scout first, next to the main quest: a
+  /// clear one is built under its tidied title, a vague one ("idk") stops
+  /// here with courses to [picked] from. A file is its own syllabus and is
+  /// built as it is.
+  Future<void> _buildCourse({String? picked}) async {
+    final typed = _text[_Step.course]!.text.trim();
+    if (picked == null && typed.isEmpty && _file == null) {
       setState(() => _error = context.l10n.onbNeedTopic);
       return;
     }
     final api = context.read<SelfInfinityApi>();
     final appState = context.read<AppState>();
     final l = context.l10n;
+    var topic = picked ?? typed;
+    if (picked == null && _file == null) {
+      setState(() {
+        _build = _Build.reading;
+        _error = null;
+      });
+      CourseScout scout;
+      try {
+        scout = await api.scoutCourse(typed);
+      } on ApiException {
+        // Reading the topic is a help, never a gate: build what was typed.
+        scout = CourseScout(isClear: true, topic: typed);
+      }
+      if (!mounted) return;
+      if (!scout.isClear && scout.options.isNotEmpty) {
+        setState(() {
+          _scouted = scout;
+          _build = _Build.idle;
+        });
+        return;
+      }
+      if (scout.topic.trim().isNotEmpty) topic = scout.topic.trim();
+    }
     setState(() {
       _build = _Build.building;
       _error = null;
@@ -204,9 +236,7 @@ class _OnboardingSceneState extends State<OnboardingScene> {
       if (!mounted) return;
       setState(() {
         _build = _Build.idle;
-        _error = e.statusCode == 502 || e.statusCode == null
-            ? l.onbBuildFailed
-            : e.userMessage;
+        _error = e.statusCode == 502 || e.statusCode == null ? l.onbBuildFailed : e.userMessage;
       });
     }
   }
@@ -381,10 +411,13 @@ class _OnboardingSceneState extends State<OnboardingScene> {
           guideLine: context.l10n.onbHiGuide,
           kicker: null,
           title: context.l10n.onbSetUpCharacter,
-          body:
-              context.l10n.onbWelcomeBody,
+          body: context.l10n.onbWelcomeBody,
           wide: wide,
-          actions: _actions(primary: context.l10n.onbBegin, onPrimary: () => _next(), showSkip: false),
+          actions: _actions(
+            primary: context.l10n.onbBegin,
+            onPrimary: () => _next(),
+            showSkip: false,
+          ),
         );
       case _Step.stakes:
         return _question(
@@ -488,17 +521,18 @@ class _OnboardingSceneState extends State<OnboardingScene> {
   Widget _courseStep(BuildContext context, bool wide) {
     final theme = Theme.of(context).textTheme;
     final quest = _goal?.title;
-    if (_build == _Build.building) {
+    if (_build == _Build.building || _build == _Build.reading) {
+      final reading = _build == _Build.reading;
       return _Page(
         guideLine: context.l10n.onbMomentGuide,
         kicker: context.l10n.onbCourseKicker,
-        title: context.l10n.onbBuildingTitle,
-        body: context.l10n.onbBuildingBody,
+        title: reading ? context.l10n.onbReadingTitle : context.l10n.onbBuildingTitle,
+        body: reading ? context.l10n.onbReadingBody : context.l10n.onbBuildingBody,
         wide: wide,
-        field: const Padding(
-          key: Key('onboarding-building'),
-          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-          child: ThinkingShimmer(),
+        field: Padding(
+          key: Key(reading ? 'onboarding-reading' : 'onboarding-building'),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child: const ThinkingShimmer(),
         ),
         actions: const SizedBox.shrink(),
       );
@@ -517,17 +551,33 @@ class _OnboardingSceneState extends State<OnboardingScene> {
       );
     }
     final file = _file;
+    final scouted = _scouted;
     return _Page(
       guideLine: context.l10n.onbSkillsGuide,
       kicker: context.l10n.onbCourseKicker,
-      title: quest == null
+      title: scouted != null
+          ? context.l10n.onbPickTitle
+          : quest == null
           ? context.l10n.onbLearnFirst
           : context.l10n.onbLearnFirstFor(quest),
-      body: context.l10n.onbTopicBody,
+      body: scouted == null
+          ? context.l10n.onbTopicBody
+          : scouted.question.isNotEmpty
+          ? scouted.question
+          : context.l10n.onbPickBody,
       wide: wide,
       field: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (scouted != null) ...[
+            for (final (i, option) in scouted.options.indexed)
+              _ScoutOptionTile(
+                key: Key('onboarding-option-$i'),
+                option: option,
+                onTap: () => _buildCourse(picked: option.topic),
+              ),
+            const SizedBox(height: AppSpacing.md),
+          ],
           TextField(
             key: const Key('onboarding-input'),
             controller: _text[_Step.course],
@@ -751,6 +801,54 @@ class _Page extends StatelessWidget {
         const SizedBox(height: AppSpacing.xl),
         actions,
       ],
+    );
+  }
+}
+
+/// One course the scout offers: its title, why it helps, tap to build it.
+class _ScoutOptionTile extends StatelessWidget {
+  const _ScoutOptionTile({super.key, required this.option, required this.onTap});
+
+  final ScoutOption option;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Material(
+        color: AppColors.surfaceHigh,
+        borderRadius: AppRadius.cardBorder,
+        child: InkWell(
+          borderRadius: AppRadius.cardBorder,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(option.topic, style: theme.titleSmall),
+                      if (option.why.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          option.why,
+                          style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                const Icon(Icons.arrow_forward, size: 18, color: AppColors.textSecondary),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

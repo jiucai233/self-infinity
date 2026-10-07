@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
 from app.db import get_session
+from app.services.courses import live_nodes
 from app.models import AuditSession, LinkTargetKind, Principle, PrincipleLink, SkillEdge, SkillNode
 from app.schemas import GraphEdgeOut, GraphNodeOut, GraphResponse
 
@@ -21,7 +22,10 @@ def get_graph(session: Session = Depends(get_session)):
     - related：教训 → 教训或节点；contradicts：教训 → 教训。这两种是 Linker 判断后
       存下来的 PrincipleLink，读取时不会触发任何 LLM 调用。
     """
-    skills = session.exec(select(SkillNode).order_by(SkillNode.id)).all()
+    # A course deleted keeping its nodes is hidden: its nodes and every edge to them leave the
+    # graph, its lesson cards stay.
+    skills = session.exec(live_nodes().order_by(SkillNode.id)).all()
+    shown = {s.id for s in skills}
     principles = session.exec(select(Principle).order_by(Principle.id)).all()
     origin_of = dict(
         session.exec(
@@ -49,14 +53,17 @@ def get_graph(session: Session = Depends(get_session)):
             reason=e.reason if e.kind.value == "requires" else None,
         )
         for e in session.exec(select(SkillEdge).order_by(SkillEdge.id)).all()
+        if e.from_id in shown and e.to_id in shown
     ]
 
     for p in principles:
-        if p.id in origin_of:
+        if origin_of.get(p.id) in shown:
             edges.append(GraphEdgeOut(source=f"principle:{p.id}", target=f"skill:{origin_of[p.id]}", kind="origin"))
 
     for link in session.exec(select(PrincipleLink).order_by(PrincipleLink.id)).all():
         target_kind = "skill" if link.target_kind == LinkTargetKind.skill else "principle"
+        if target_kind == "skill" and link.target_id not in shown:
+            continue
         edges.append(
             GraphEdgeOut(
                 source=f"principle:{link.principle_id}",

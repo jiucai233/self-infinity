@@ -957,4 +957,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get you => 'You';
+
+  @override
+  String get onbReadingTitle => 'Let me look at that…';
+
+  @override
+  String get onbReadingBody => 'Matching it to your main quest.';
+
+  @override
+  String get onbPickTitle => 'Where do you want to start?';
+
+  @override
+  String get onbPickBody => 'Pick one, or type something more specific.';
+
+  @override
+  String get deleteCourse => 'Delete course';
+
+  @override
+  String deleteCourseTitle(String course) {
+    return 'Delete “$course”?';
+  }
+
+  @override
+  String get deleteCourseBody => 'It leaves the life tree and its main quest.';
+
+  @override
+  String deleteCourseNodes(int count) {
+    return 'Also delete its $count nodes, their attempts and lesson cards';
+  }
+
+  @override
+  String get deleteCourseKeep => 'Left unchecked, your attempts and lesson cards are kept.';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get delete => 'Delete';
 }

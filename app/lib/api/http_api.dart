@@ -137,6 +137,13 @@ class HttpApi implements SelfInfinityApi {
     parse: (j) => SearchPlan.fromJson(_object(j)),
   );
 
+  @override
+  Future<CourseScout> scoutCourse(String answer) => _post(
+    '/skills/scout',
+    body: {'answer': answer},
+    parse: (j) => CourseScout.fromJson(_object(j)),
+  );
+
   // -- 18–23: stage UI -----------------------------------------------------------
 
   @override
@@ -264,6 +271,14 @@ class HttpApi implements SelfInfinityApi {
 
   @override
   Future<void> deleteGoal(int goalId) => _send('DELETE', '/goals/$goalId', parse: (_) {});
+
+  @override
+  Future<void> deleteCourse(int courseId, {bool deleteNodes = false}) => _send(
+    'DELETE',
+    '/courses/$courseId',
+    query: {'delete_nodes': '$deleteNodes'},
+    parse: (_) {},
+  );
 
   // -- transport --------------------------------------------------------------
 

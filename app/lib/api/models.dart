@@ -625,6 +625,45 @@ class ClarifyResult {
   final List<String> questions;
 }
 
+/// One course the scout offers for a vague answer.
+@immutable
+class ScoutOption {
+  const ScoutOption({required this.topic, required this.why});
+
+  factory ScoutOption.fromJson(Json json) =>
+      ScoutOption(topic: _str(json, 'topic'), why: _strN(json, 'why') ?? '');
+
+  final String topic;
+
+  /// One line on why it helps the main quest.
+  final String why;
+}
+
+/// Body of `POST /skills/scout`: how the tutorial reads the first course the
+/// player typed. [isClear]: build [topic]. Otherwise show [question] and the
+/// [options] to pick from.
+@immutable
+class CourseScout {
+  const CourseScout({
+    required this.isClear,
+    this.topic = '',
+    this.question = '',
+    this.options = const [],
+  });
+
+  factory CourseScout.fromJson(Json json) => CourseScout(
+    isClear: _str(json, 'kind') != 'choose',
+    topic: _strN(json, 'topic') ?? '',
+    question: _strN(json, 'question') ?? '',
+    options: _list(json, 'options', ScoutOption.fromJson),
+  );
+
+  final bool isClear;
+  final String topic;
+  final String question;
+  final List<ScoutOption> options;
+}
+
 /// Body of `GET /skills/recommendation`. Contract endpoint 6.
 @immutable
 class Recommendation {

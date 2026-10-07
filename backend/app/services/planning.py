@@ -9,6 +9,7 @@ from collections.abc import Callable
 
 from sqlmodel import Session, col, select
 
+from app.services.courses import live_nodes
 from app.agents.recommender import Candidate, Recommender
 from app.llm.base import LLMProvider
 from app.models import EdgeKind, SkillEdge, SkillNode, SkillStatus, StudyPlan
@@ -69,7 +70,7 @@ def current_plan(session: Session) -> StudyPlan | None:
 
 def generate_plan(session: Session, provider_for: Callable[[str], LLMProvider]) -> StudyPlanOut:
     available = list(
-        session.exec(select(SkillNode).where(SkillNode.status == SkillStatus.available).order_by(SkillNode.id)).all()
+        session.exec(live_nodes().where(SkillNode.status == SkillStatus.available).order_by(SkillNode.id)).all()
     )
     if not available:
         raise NoAvailableNode

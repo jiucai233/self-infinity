@@ -37,6 +37,26 @@ class ClarifyResponse(BaseModel):
     questions: list[str]
 
 
+class ScoutRequest(BaseModel):
+    answer: str = Field(max_length=120)
+
+    _validate_answer = field_validator("answer")(_not_blank)
+
+
+class ScoutOptionOut(BaseModel):
+    topic: str
+    why: str
+
+
+class ScoutResponse(BaseModel):
+    """`clear`: build `topic`. `choose`: show `question` and let the player pick one of `options`."""
+
+    kind: Literal["clear", "choose"]
+    topic: str = ""
+    question: str = ""
+    options: list[ScoutOptionOut] = []
+
+
 class GenerateCourseRequest(BaseModel):
     topic: str
     # 上下界是防呆而非性能考虑：少于 4 个节点不成课程，多于 30 个则单次生成的质量明显

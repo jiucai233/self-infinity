@@ -944,4 +944,41 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get you => '나';
+
+  @override
+  String get onbReadingTitle => '잠깐 살펴볼게요…';
+
+  @override
+  String get onbReadingBody => '메인 퀘스트와 맞춰 보는 중이에요.';
+
+  @override
+  String get onbPickTitle => '어디서부터 시작할까요?';
+
+  @override
+  String get onbPickBody => '하나 고르거나, 더 구체적으로 적어 주세요.';
+
+  @override
+  String get deleteCourse => '코스 삭제';
+
+  @override
+  String deleteCourseTitle(String course) {
+    return '“$course” 코스를 삭제할까요?';
+  }
+
+  @override
+  String get deleteCourseBody => '인생 나무와 메인 퀘스트에서 빠져요.';
+
+  @override
+  String deleteCourseNodes(int count) {
+    return '노드 $count개와 그 도전 기록, 교훈 카드도 함께 삭제';
+  }
+
+  @override
+  String get deleteCourseKeep => '체크하지 않으면 도전 기록과 교훈 카드는 남아요.';
+
+  @override
+  String get cancel => '취소';
+
+  @override
+  String get delete => '삭제';
 }

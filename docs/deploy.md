@@ -56,9 +56,11 @@
 
 | 变量 | 值 |
 |---|---|
-| `LLM_PROVIDER` | 不设 = 没配 key 时用 `mock`；要真模型就设 `deepseek` |
-| `DEEPSEEK_API_KEY` | 你的 key（用 `mock` 时不用） |
-| `TAVILY_API_KEY` | 可选，不填用离线搜索替身 |
+| `OPENAI_API_KEY` | 你的 key（现在线上用的是它，模型默认 `gpt-6-luna`） |
+| `LLM_PROVIDER` | 可选：不设就用第一个配了 key 的 provider，一个 key 都没有就是 `mock` |
+| `LLM_MODEL` | 可选：换模型时才设 |
+| `LLM_TIMEOUT_SECONDS` | 可选：默认 90（推理模型生成一门课约 25 秒） |
+| `TAVILY_API_KEY` | 可选，不填用离线搜索替身（没有网上课纲参考） |
 
    改了环境变量要 **Redeploy** 才生效。
 

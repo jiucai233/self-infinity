@@ -294,5 +294,16 @@
   "winCondition": "승리 조건",
   "winConditionPlaceholder": "이기면 어떤 모습일까?",
   "worthSecondLook": "다시 볼 만한 점",
-  "you": "나"
+  "you": "나",
+  "onbReadingTitle": "잠깐 살펴볼게요…",
+  "onbReadingBody": "메인 퀘스트와 맞춰 보는 중이에요.",
+  "onbPickTitle": "어디서부터 시작할까요?",
+  "onbPickBody": "하나 고르거나, 더 구체적으로 적어 주세요.",
+  "deleteCourse": "코스 삭제",
+  "deleteCourseTitle": "“{course}” 코스를 삭제할까요?",
+  "deleteCourseBody": "인생 나무와 메인 퀘스트에서 빠져요.",
+  "deleteCourseNodes": "노드 {count}개와 그 도전 기록, 교훈 카드도 함께 삭제",
+  "deleteCourseKeep": "체크하지 않으면 도전 기록과 교훈 카드는 남아요.",
+  "cancel": "취소",
+  "delete": "삭제"
 }

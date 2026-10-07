@@ -5,7 +5,8 @@ import json
 from fastapi import HTTPException
 from sqlmodel import Session, col, select
 
-from app.models import Course, Goal
+from app.services.courses import get_live_course
+from app.models import Goal
 from app.schemas import GOALS_MAX, GoalCreate, GoalOut, GoalUpdate
 
 
@@ -40,7 +41,7 @@ def update_goal(session: Session, goal_id: int, body: GoalUpdate) -> GoalOut:
         goal.title = body.title
     if "course_ids" in body.model_fields_set:
         for course_id in body.course_ids:
-            if session.get(Course, course_id) is None:
+            if get_live_course(session, course_id) is None:
                 raise HTTPException(404, "course not found")
         # A course belongs to one goal at most: attaching it here detaches it everywhere else.
         moved = set(body.course_ids)

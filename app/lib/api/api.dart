@@ -28,6 +28,13 @@ abstract class SelfInfinityApi {
   /// `locked`. 422 on invalid settings, 502 on generation failure.
   Future<CourseMap> generateCourse(GenerateRequest request);
 
+  /// `POST /skills/scout` (LLM). The tutorial's first course, read next to the
+  /// player's main quests and profile before anything is built: a clear
+  /// answer comes back as a tidy title, a vague one ("idk") as up to three
+  /// courses to pick from. Never 502: a scout that cannot run answers `clear`
+  /// with [answer]. 422 when blank or over 120 characters.
+  Future<CourseScout> scoutCourse(String answer);
+
   /// `GET /courses` — all courses, newest first.
   Future<List<Course>> listCourses();
 
@@ -174,4 +181,11 @@ abstract class SelfInfinityApi {
   /// `DELETE /goals/{goalId}` — its courses become side quests. 404 `goal not
   /// found`.
   Future<void> deleteGoal(int goalId);
+
+  /// `DELETE /courses/{id}?delete_nodes=` (no LLM). Deletes a course; it
+  /// leaves its main quest and the study plan either way. Without
+  /// [deleteNodes] its nodes, audits and lesson cards are kept (hidden with
+  /// the course; the lessons still show). With it they are deleted too. 404
+  /// for an unknown or already deleted course.
+  Future<void> deleteCourse(int courseId, {bool deleteNodes = false});
 }

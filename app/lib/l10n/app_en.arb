@@ -476,5 +476,59 @@
   "winCondition": "Win condition",
   "winConditionPlaceholder": "What does winning look like?",
   "worthSecondLook": "Worth a second look",
-  "you": "You"
+  "you": "You",
+  "onbReadingTitle": "Let me look at that…",
+  "@onbReadingTitle": {
+    "description": "Tutorial course step: shown while the scout reads the typed topic."
+  },
+  "onbReadingBody": "Matching it to your main quest.",
+  "@onbReadingBody": {
+    "description": "Tutorial course step: under onbReadingTitle."
+  },
+  "onbPickTitle": "Where do you want to start?",
+  "@onbPickTitle": {
+    "description": "Tutorial course step: the typed topic was vague; courses to pick from follow."
+  },
+  "onbPickBody": "Pick one, or type something more specific.",
+  "@onbPickBody": {
+    "description": "Tutorial course step: under onbPickTitle when the scout gave no question of its own."
+  },
+  "deleteCourse": "Delete course",
+  "@deleteCourse": {
+    "description": "Course card on the life tree: the button that deletes the course."
+  },
+  "deleteCourseTitle": "Delete “{course}”?",
+  "@deleteCourseTitle": {
+    "description": "Delete-course dialog title.",
+    "placeholders": {
+      "course": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteCourseBody": "It leaves the life tree and its main quest.",
+  "@deleteCourseBody": {
+    "description": "Delete-course dialog body."
+  },
+  "deleteCourseNodes": "Also delete its {count} nodes, their attempts and lesson cards",
+  "@deleteCourseNodes": {
+    "description": "Delete-course dialog checkbox: also delete the nodes and their history.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteCourseKeep": "Left unchecked, your attempts and lesson cards are kept.",
+  "@deleteCourseKeep": {
+    "description": "Delete-course dialog: under the checkbox."
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Dialog button."
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Dialog button that deletes."
+  }
 }

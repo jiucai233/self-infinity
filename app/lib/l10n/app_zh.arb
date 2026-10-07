@@ -294,5 +294,16 @@
   "winCondition": "胜利条件",
   "winConditionPlaceholder": "赢了是什么样子？",
   "worthSecondLook": "值得再看一眼",
-  "you": "你"
+  "you": "你",
+  "onbReadingTitle": "我看一下…",
+  "onbReadingBody": "对照你的主线任务想一想。",
+  "onbPickTitle": "从哪里开始？",
+  "onbPickBody": "选一个，或者写得更具体一点。",
+  "deleteCourse": "删除课程",
+  "deleteCourseTitle": "删除「{course}」？",
+  "deleteCourseBody": "它会从人生树和主线任务里移除。",
+  "deleteCourseNodes": "同时删除它的 {count} 个节点，以及相关的挑战记录和教训卡",
+  "deleteCourseKeep": "不勾选的话，挑战记录和教训卡都会保留。",
+  "cancel": "取消",
+  "delete": "删除"
 }

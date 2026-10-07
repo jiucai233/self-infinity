@@ -126,7 +126,12 @@ class _PaperStack extends StatelessWidget {
             boxShadow: AppShadows.float,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.md, AppSpacing.md, AppSpacing.xl),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.xl,
+            ),
             child: child,
           ),
         ),
@@ -280,11 +285,15 @@ class _SkillBodyState extends State<_SkillBody> {
       future: _overview,
       builder: (context, snap) {
         final overview = snap.data;
-        final audits = overview?.audits.where((a) => a.status != AuditStatus.active).toList() ?? const [];
-        final best = audits.map((a) => a.score).whereType<int>().fold<int?>(
-          null,
-          (m, s) => m == null || s > m ? s : m,
-        );
+        final audits =
+            overview?.audits.where((a) => a.status != AuditStatus.active).toList() ?? const [];
+        final best = audits
+            .map((a) => a.score)
+            .whereType<int>()
+            .fold<int?>(
+              null,
+              (m, s) => m == null || s > m ? s : m,
+            );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -298,10 +307,14 @@ class _SkillBodyState extends State<_SkillBody> {
                 if (n.boss && n.status != null) const _BossChip(),
                 _statusChip(n),
                 if (_courseName != null)
-                  Text(_courseName!, style: theme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+                  Text(
+                    _courseName!,
+                    style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                  ),
               ],
             ),
-            if (n.kind == LifeKind.course) _CourseProgress(node: n, tree: widget.tree, onOutline: widget.onOutline),
+            if (n.kind == LifeKind.course)
+              _CourseProgress(node: n, tree: widget.tree, onOutline: widget.onOutline),
             if (n.skillId != null)
               _Numbers([
                 (context.l10n.best, best == null ? '—' : '$best'),
@@ -351,8 +364,12 @@ class _BossChip extends StatelessWidget {
   const _BossChip();
 
   @override
-  Widget build(BuildContext context) =>
-      const StatusChip(label: 'Boss', color: AppColors.onAccent, fill: AppColors.primary, key: Key('node-sheet-boss'));
+  Widget build(BuildContext context) => const StatusChip(
+    label: 'Boss',
+    color: AppColors.onAccent,
+    fill: AppColors.primary,
+    key: Key('node-sheet-boss'),
+  );
 }
 
 /// One finished audit: date, verdict, score, and a bar as long as the score.
@@ -382,7 +399,10 @@ class _AuditRow extends StatelessWidget {
                   style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
                 ),
               ),
-              Text(passed ? context.l10n.auditPassed : context.l10n.auditFailed, style: theme.labelMedium?.copyWith(color: color)),
+              Text(
+                passed ? context.l10n.auditPassed : context.l10n.auditFailed,
+                style: theme.labelMedium?.copyWith(color: color),
+              ),
               const Spacer(),
               Text(score == null ? '—' : '$score', style: theme.labelLarge),
             ],
@@ -459,7 +479,10 @@ class _CourseProgress extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(context.l10n.serves, style: theme.labelSmall?.copyWith(color: AppColors.textTertiary)),
+                Text(
+                  context.l10n.serves,
+                  style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
+                ),
                 PopupMenuButton<int>(
                   key: const Key('course-goal-menu'),
                   tooltip: context.l10n.chooseMainQuest,
@@ -486,9 +509,22 @@ class _CourseProgress extends StatelessWidget {
                 ),
                 TextButton(
                   key: const Key('course-outline'),
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 28)),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 28),
+                  ),
                   onPressed: () => onOutline(node.courseId!),
                   child: Text(context.l10n.seeOutline),
+                ),
+                TextButton(
+                  key: const Key('course-delete'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 28),
+                    foregroundColor: AppColors.danger,
+                  ),
+                  onPressed: () => unawaited(_delete(context, skills.length)),
+                  child: Text(context.l10n.deleteCourse),
                 ),
               ],
             ),
@@ -496,6 +532,61 @@ class _CourseProgress extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Asks first, with the choice to delete the course's nodes and their
+  /// history too (unchecked, they are kept with the course out of sight).
+  Future<void> _delete(BuildContext context, int nodeCount) async {
+    final api = context.read<SelfInfinityApi>();
+    final appState = context.read<AppState>();
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final l = context.l10n;
+    var deleteNodes = false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => StatefulBuilder(
+        builder: (dialog, setDialog) => AlertDialog(
+          key: const Key('course-delete-dialog'),
+          title: Text(l.deleteCourseTitle(node.label)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l.deleteCourseBody),
+              const SizedBox(height: AppSpacing.md),
+              CheckboxListTile(
+                key: const Key('course-delete-nodes'),
+                value: deleteNodes,
+                onChanged: (v) => setDialog(() => deleteNodes = v ?? false),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: Text(l.deleteCourseNodes(nodeCount)),
+                subtitle: Text(l.deleteCourseKeep),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialog).pop(false),
+              child: Text(l.cancel),
+            ),
+            TextButton(
+              key: const Key('course-delete-confirm'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+              onPressed: () => Navigator.of(dialog).pop(true),
+              child: Text(l.delete),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await api.deleteCourse(node.courseId!, deleteNodes: deleteNodes);
+      appState.markDataChanged();
+    } on ApiException catch (e) {
+      messenger?.showSnackBar(SnackBar(content: Text(e.userMessage)));
+    }
   }
 
   /// Moves the course under [goalId] (-1: no main quest).
@@ -508,11 +599,20 @@ class _CourseProgress extends StatelessWidget {
       if (goalId == -1) {
         final owner = goals.where((g) => g.courseIds.contains(courseId)).firstOrNull;
         if (owner != null) {
-          await api.updateGoal(owner.id, courseIds: [for (final c in owner.courseIds) if (c != courseId) c]);
+          await api.updateGoal(
+            owner.id,
+            courseIds: [
+              for (final c in owner.courseIds)
+                if (c != courseId) c,
+            ],
+          );
         }
       } else {
         final goal = goals.firstWhere((g) => g.id == goalId);
-        await api.updateGoal(goalId, courseIds: [...goal.courseIds.where((c) => c != courseId), courseId]);
+        await api.updateGoal(
+          goalId,
+          courseIds: [...goal.courseIds.where((c) => c != courseId), courseId],
+        );
       }
       appState.markDataChanged();
     } on ApiException catch (e) {

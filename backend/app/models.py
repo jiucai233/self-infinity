@@ -103,6 +103,9 @@ class Course(SQLModel, table=True):
     source_course: str | None = None
     source_url: str | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    # Set when the course was deleted keeping its nodes (app/services/courses.py): it is hidden
+    # everywhere, its nodes and their history stay.
+    archived_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
 
 
 class SkillNode(SQLModel, table=True):

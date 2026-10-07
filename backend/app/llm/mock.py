@@ -170,6 +170,39 @@ def _clarify(messages: list[Message]) -> str:
     return _dump({"needs_clarification": False, "questions": []})
 
 
+# Answers that name nothing to learn: the scout offers courses instead.
+_VAGUE_RE = re.compile(
+    r"\b(idk|i don'?t know|dont know|no idea|not sure|anything|everything|whatever|a lot|many things"
+    r"|something|dunno)\b|不知道|随便|都行|什么都|모르|아무거나|다 좋",
+    re.IGNORECASE,
+)
+_QUEST_VERB_RE = re.compile(r"^(complete|finish|pass|get|learn|build|do|make|start)\s+", re.IGNORECASE)
+_STARTER_COURSES = [
+    ("Python programming basics", "A tool almost every other course leans on."),
+    ("Linear algebra", "The language of data, graphics and machine learning."),
+    ("Clear technical writing", "Explaining things well is how you prove them here."),
+]
+
+
+def _scout(messages: list[Message]) -> str:
+    fields = dict(
+        line.split(": ", 1) for line in _first_user(messages).splitlines() if ": " in line
+    )
+    answer = fields.get("Answer", "").strip()
+    if len(answer) > 2 and not _VAGUE_RE.search(answer):
+        return _dump({"kind": "clear", "topic": answer[:60]})
+    options = []
+    quests = [q.strip() for q in fields.get("Main quest", "").split(";") if q.strip() and q.strip() != "(none)"]
+    for quest in quests[:2]:
+        topic = _QUEST_VERB_RE.sub("", quest).strip() or quest
+        options.append({"topic": topic[:60], "why": f"It is what “{quest}” needs first."})
+    for topic, why in _STARTER_COURSES:
+        if len(options) == 3:
+            break
+        options.append({"topic": topic, "why": why})
+    return _dump({"kind": "choose", "question": "Here are a few places to start. Pick one:", "options": options})
+
+
 def _syllabus(messages: list[Message]) -> str:
     system = _system(messages)
     topic_match = _TOPIC_BLOCK_RE.search(system)
@@ -545,6 +578,7 @@ def _front_desk(messages: list[Message]) -> str:
 
 _SCRIPTS = {
     "clarifier": _clarify,
+    "course_scout": _scout,
     "syllabus_finder": _syllabus,
     "planner": _plan,
     "auditor": _audit,

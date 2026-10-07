@@ -55,7 +55,8 @@ class Settings(BaseSettings):
     challenger_enabled: bool = True
     # 注入 Challenger 的历史 misconception 条数上限，取最近的若干条。
     challenger_misconception_limit: int = 5
-    llm_timeout_seconds: float = 30.0
+    # A course plan from a reasoning model (gpt-6-luna) takes ~25 s; Vercel allows 300 s a request.
+    llm_timeout_seconds: float = 90.0
     search_timeout_seconds: float = 15.0
 
     @model_validator(mode="after")

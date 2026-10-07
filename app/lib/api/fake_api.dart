@@ -99,6 +99,7 @@ class FakeApiClient implements SelfInfinityApi {
   /// The method names accepted by [failNext]'s `method` argument.
   static const Set<String> methodNames = {
     'generateCourse',
+    'scoutCourse',
     'listCourses',
     'getCourseMap',
     'listSkills',
@@ -126,6 +127,7 @@ class FakeApiClient implements SelfInfinityApi {
     'createGoal',
     'updateGoal',
     'deleteGoal',
+    'deleteCourse',
   };
 
   // -- state ------------------------------------------------------------------
@@ -601,6 +603,48 @@ class FakeApiClient implements SelfInfinityApi {
     return plan;
   }
 
+  /// Like the backend's Mock script: an answer that names nothing ("idk", "a
+  /// lot of things") gets the main quests and two starter courses to pick
+  /// from; anything else passes through.
+  @override
+  Future<CourseScout> scoutCourse(String answer) async {
+    await _begin('scoutCourse');
+    final typed = answer.trim();
+    _require(typed.isNotEmpty, 'answer must not be blank');
+    _require(typed.length <= 120, 'answer must be at most 120 characters');
+    if (typed.length > 2 && !_vague.hasMatch(typed)) {
+      return CourseScout(isClear: true, topic: typed);
+    }
+    final options = [
+      for (final goal in _goals.take(2))
+        ScoutOption(
+          topic: goal.title.replaceFirst(_questVerb, ''),
+          why: 'It is what “${goal.title}” needs first.',
+        ),
+      for (final (topic, why) in _starterCourses) ScoutOption(topic: topic, why: why),
+    ].take(3).toList();
+    return CourseScout(
+      isClear: false,
+      question: 'Here are a few places to start. Pick one:',
+      options: options,
+    );
+  }
+
+  static final _vague = RegExp(
+    r"\b(idk|i don'?t know|dont know|no idea|not sure|anything|everything|whatever|a lot|many things"
+    r"|something|dunno)\b|不知道|随便|都行|什么都|모르|아무거나|다 좋",
+    caseSensitive: false,
+  );
+  static final _questVerb = RegExp(
+    r'^(complete|finish|pass|get|learn|build|do|make|start)\s+',
+    caseSensitive: false,
+  );
+  static const _starterCourses = [
+    ('Python programming basics', 'A tool almost every other course leans on.'),
+    ('Linear algebra', 'The language of data, graphics and machine learning.'),
+    ('Clear technical writing', 'Explaining things well is how you prove them here.'),
+  ];
+
   // ===========================================================================
   // 18–23: stage UI (contract Section 5)
   // ===========================================================================
@@ -964,7 +1008,7 @@ class FakeApiClient implements SelfInfinityApi {
   AuditSummary _summaryOf(_FakeAudit a) => AuditSummary(
     id: a.id,
     skillId: a.skillId,
-    skillTitle: _nodes[a.skillId]!.title,
+    skillTitle: (_nodes[a.skillId] ?? _hiddenNodes[a.skillId])!.title,
     status: a.status,
     score: a.score,
     createdAt: a.createdAt,
@@ -1091,6 +1135,50 @@ class FakeApiClient implements SelfInfinityApi {
     _goals.removeWhere((g) => g.id == goalId);
     if (_goals.length == before) throw const ApiException(404, 'goal not found');
   }
+
+  /// Keeping the nodes moves them out of sight with the course (the lessons
+  /// stay); deleting them takes their audits and lessons too.
+  @override
+  Future<void> deleteCourse(int courseId, {bool deleteNodes = false}) async {
+    await _begin('deleteCourse');
+    final before = _courses.length;
+    _courses.removeWhere((c) => c.id == courseId);
+    if (_courses.length == before) throw const ApiException(404, 'course not found');
+    for (var i = 0; i < _goals.length; i++) {
+      final g = _goals[i];
+      if (g.courseIds.contains(courseId)) {
+        _goals[i] = Goal(
+          id: g.id,
+          title: g.title,
+          courseIds: [
+            for (final c in g.courseIds)
+              if (c != courseId) c,
+          ],
+          createdAt: g.createdAt,
+        );
+      }
+    }
+    final nodes = {
+      for (final n in _nodes.values)
+        if (n.courseId == courseId) n.id,
+    };
+    for (final id in nodes) {
+      final node = _nodes.remove(id)!;
+      if (!deleteNodes) _hiddenNodes[id] = node;
+    }
+    _edges.removeWhere((e) => nodes.contains(e.fromId) || nodes.contains(e.toId));
+    if (deleteNodes) {
+      final audits = {
+        for (final a in _audits.values)
+          if (nodes.contains(a.skillId)) a.id,
+      };
+      _audits.removeWhere((id, _) => audits.contains(id));
+      _principles.removeWhere((p) => audits.contains(p.sourceSessionId));
+    }
+  }
+
+  /// Nodes of courses deleted keeping their nodes.
+  final Map<int, SkillNode> _hiddenNodes = {};
 
   String _goalTitle(String title) {
     final t = title.trim();

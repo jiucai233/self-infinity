@@ -5,7 +5,7 @@ from app.llm.openai_compatible import OpenAICompatibleProvider
 class OpenAIProvider(OpenAICompatibleProvider):
     name = "openai"
     api_url = "https://api.openai.com/v1/chat/completions"
-    default_model = "gpt-4o-mini"
+    default_model = "gpt-6-luna"
 
     @property
     def _api_key(self) -> str:

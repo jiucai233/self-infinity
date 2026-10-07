@@ -940,4 +940,41 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get you => '你';
+
+  @override
+  String get onbReadingTitle => '我看一下…';
+
+  @override
+  String get onbReadingBody => '对照你的主线任务想一想。';
+
+  @override
+  String get onbPickTitle => '从哪里开始？';
+
+  @override
+  String get onbPickBody => '选一个，或者写得更具体一点。';
+
+  @override
+  String get deleteCourse => '删除课程';
+
+  @override
+  String deleteCourseTitle(String course) {
+    return '删除「$course」？';
+  }
+
+  @override
+  String get deleteCourseBody => '它会从人生树和主线任务里移除。';
+
+  @override
+  String deleteCourseNodes(int count) {
+    return '同时删除它的 $count 个节点，以及相关的挑战记录和教训卡';
+  }
+
+  @override
+  String get deleteCourseKeep => '不勾选的话，挑战记录和教训卡都会保留。';
+
+  @override
+  String get cancel => '取消';
+
+  @override
+  String get delete => '删除';
 }

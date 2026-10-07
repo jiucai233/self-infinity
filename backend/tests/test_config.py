@@ -28,7 +28,7 @@ def test_defaults_match_the_plan(clean_env):
     assert (s.audit_max_turns, s.task_max_turns) == (8, 4)
     assert s.challenger_enabled is True
     assert s.challenger_misconception_limit == 5
-    assert (s.llm_timeout_seconds, s.search_timeout_seconds) == (30, 15)
+    assert (s.llm_timeout_seconds, s.search_timeout_seconds) == (90, 15)
     assert (s.auth_mode, s.supabase_url, s.supabase_jwt_secret) == ("dev", "", "")
 
 

@@ -13,6 +13,7 @@ from datetime import datetime
 
 from sqlmodel import Session, func, select
 
+from app.services.courses import live_nodes
 from app.models import AuditSession, AuditStatus, Principle, RewardEvent, SkillNode, SkillStatus, as_utc
 from app.schemas import (
     AuditCounts,
@@ -101,7 +102,7 @@ def _round(value: float | None) -> float | None:
 
 
 def build_profile(session: Session) -> ProfileFacts:
-    skills = session.exec(select(SkillNode)).all()
+    skills = session.exec(live_nodes()).all()
     audits = session.exec(select(AuditSession)).all()
     condition = current_condition(session)
 

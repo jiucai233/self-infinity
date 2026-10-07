@@ -5,10 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, col, select
 
 from app.agents.clarifier import Clarifier, ClarifyResult
+from app.agents.course_scout import CourseScout, PlayerContext
 from app.agents.material_finder import MaterialFinder
 from app.db import get_session
 from app.llm import get_provider
-from app.models import AuditSession, Course, EdgeKind, Principle, SearchPlan, SkillEdge, SkillNode
+from app.models import AuditSession, Course, EdgeKind, Goal, Principle, Profile, SearchPlan, SkillEdge, SkillNode
 from app.routers.audits import audit_summary
 from app.schemas import (
     ClarifyRequest,
@@ -18,6 +19,9 @@ from app.schemas import (
     GenerateCourseRequest,
     RecommendationOut,
     RequiredSkillOut,
+    ScoutOptionOut,
+    ScoutRequest,
+    ScoutResponse,
     SearchPlanItemOut,
     SearchPlanOut,
     SearchPlanRequest,
@@ -28,6 +32,7 @@ from app.schemas import (
 from app.search import get_search_provider
 from app.services import bandit, course_generation
 from app.services.course_generation import CourseGenerationError
+from app.services.courses import live_nodes
 from app.services.tree import contains_parents, depth_map
 
 logger = logging.getLogger(__name__)
@@ -49,7 +54,7 @@ def search_plan_out(plan: SearchPlan) -> SearchPlanOut:
 @router.get("", response_model=list[SkillNodeOut])
 def list_skills(course_id: int | None = None, session: Session = Depends(get_session)):
     """Nodes ordered by id; all courses unless `course_id` narrows it."""
-    query = select(SkillNode).order_by(SkillNode.id)
+    query = live_nodes().order_by(SkillNode.id)
     if course_id is not None:
         query = query.where(SkillNode.course_id == course_id)
     return session.exec(query).all()
@@ -66,7 +71,7 @@ def get_recommendation(session: Session = Depends(get_session)):
     bucket = bandit.context_bucket(session)
     tier = bandit.choose_tier(session, bucket)
     depths = depth_map(session)
-    nodes = session.exec(select(SkillNode).order_by(SkillNode.id)).all()
+    nodes = session.exec(live_nodes().order_by(SkillNode.id)).all()
     tiers = {n.id: bandit.difficulty_tier(session, n, depths.get(n.id, 0)) for n in nodes}
     session.commit()  # choose_tier may have created bandit arms
     return RecommendationOut(context_bucket=bucket, suggested_tier=tier, skill_tiers=tiers)
@@ -81,6 +86,28 @@ def clarify_topic(body: ClarifyRequest):
         logger.warning("clarifier could not run, skipping clarification", exc_info=True)
         result = ClarifyResult(needs_clarification=False, questions=[])
     return ClarifyResponse(needs_clarification=result.needs_clarification, questions=result.questions)
+
+
+@router.post("/scout", response_model=ScoutResponse)
+def scout_course(body: ScoutRequest, session: Session = Depends(get_session)):
+    """The tutorial's first course: reads the answer next to the player's main quests and profile.
+    A clear answer comes back tidied; a vague one comes back as options to pick from. Never fails:
+    a scout that cannot run answers `clear` with what was typed."""
+    profile = session.get(Profile, 1) or Profile()
+    quests = [g.title for g in session.exec(select(Goal).order_by(Goal.id)).all()]
+    context = PlayerContext(
+        main_quests=quests,
+        win_condition=profile.vision,
+        stakes=profile.anti_vision,
+        identity=profile.identity,
+    )
+    result = CourseScout(get_provider("course_scout")).scout(body.answer, context)
+    return ScoutResponse(
+        kind=result.kind,
+        topic=result.topic,
+        question=result.question,
+        options=[ScoutOptionOut(topic=o.topic, why=o.why) for o in result.options],
+    )
 
 
 @router.post("/generate", response_model=CourseGraphOut)

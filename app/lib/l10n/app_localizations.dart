@@ -1863,6 +1863,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You'**
   String get you;
+
+  /// Tutorial course step: shown while the scout reads the typed topic.
+  ///
+  /// In en, this message translates to:
+  /// **'Let me look at that…'**
+  String get onbReadingTitle;
+
+  /// Tutorial course step: under onbReadingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Matching it to your main quest.'**
+  String get onbReadingBody;
+
+  /// Tutorial course step: the typed topic was vague; courses to pick from follow.
+  ///
+  /// In en, this message translates to:
+  /// **'Where do you want to start?'**
+  String get onbPickTitle;
+
+  /// Tutorial course step: under onbPickTitle when the scout gave no question of its own.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick one, or type something more specific.'**
+  String get onbPickBody;
+
+  /// Course card on the life tree: the button that deletes the course.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete course'**
+  String get deleteCourse;
+
+  /// Delete-course dialog title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{course}”?'**
+  String deleteCourseTitle(String course);
+
+  /// Delete-course dialog body.
+  ///
+  /// In en, this message translates to:
+  /// **'It leaves the life tree and its main quest.'**
+  String get deleteCourseBody;
+
+  /// Delete-course dialog checkbox: also delete the nodes and their history.
+  ///
+  /// In en, this message translates to:
+  /// **'Also delete its {count} nodes, their attempts and lesson cards'**
+  String deleteCourseNodes(int count);
+
+  /// Delete-course dialog: under the checkbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Left unchecked, your attempts and lesson cards are kept.'**
+  String get deleteCourseKeep;
+
+  /// Dialog button.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// Dialog button that deletes.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
