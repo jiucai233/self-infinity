@@ -3,6 +3,7 @@ library;
 
 import 'dart:typed_data';
 
+import '../voice/live_link.dart';
 import 'models.dart';
 
 /// Everything the UI can ask of the backend.
@@ -219,4 +220,21 @@ abstract class SelfInfinityApi {
   /// `POST /voice/speech` (contract #35): [text] (1–4096 characters) read
   /// aloud, as MP3 bytes. 503 without a key, 502 when OpenAI fails.
   Future<Uint8List> speech(String text);
+
+  /// Where the browser opens a live voice request itself ([path] under the
+  /// API, e.g. `/voice/realtime/guide`), with the headers every request
+  /// carries. Null when there is no server (the offline fake).
+  LiveEndpoint? liveEndpoint(String path);
+
+  /// `POST /chat/act` (contract #36, LLM for most intents): a tool call of the
+  /// realtime Guide. Runs [intent] (`checkin`, `generate_course`,
+  /// `open_skill`, `open_map`, `plan`, `briefing`) with [args] and no front
+  /// desk; [said] (the user's words) is saved as their message. Returns
+  /// `[user?, result]` like [sendChat]. 400 for a missing topic, node or words.
+  Future<List<ChatMessage>> chatAct(String intent, {Map<String, Object?> args = const {}, String said = ''});
+
+  /// `POST /chat/log` (contract #36, no LLM): keeps a spoken exchange with the
+  /// realtime Guide in the history; blank lines are skipped. Returns what was
+  /// saved.
+  Future<List<ChatMessage>> chatLog(List<({ChatRole role, String content})> lines);
 }

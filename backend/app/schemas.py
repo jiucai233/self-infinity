@@ -399,6 +399,26 @@ class ChatResponse(BaseModel):
     messages: list[ChatMessageOut]
 
 
+class ChatActIn(BaseModel):
+    """A tool call of the realtime Guide (contract #36)."""
+
+    intent: Literal["generate_course", "open_skill", "checkin", "plan", "briefing", "open_map"]
+    args: dict[str, Any] = Field(default_factory=dict)
+    # What the user said, in their words; saved as their message.
+    said: str = Field("", max_length=4000)
+
+
+class ChatLine(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=4000)
+
+
+class ChatLogIn(BaseModel):
+    """A spoken exchange with the realtime Guide, kept in the history (contract #36)."""
+
+    messages: list[ChatLine] = Field(max_length=20)
+
+
 class ChatSuggestionOut(BaseModel):
     label: str
     message: str

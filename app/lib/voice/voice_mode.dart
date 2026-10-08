@@ -9,10 +9,35 @@ enum VoiceModeState { off, listening, thinking, speaking }
 /// loop goes on listening only if [keepGoing].
 typedef VoiceReply = ({String? speak, bool keepGoing});
 
+/// A spoken conversation in a scene: what the waveform bar and the avatar
+/// show. [VoiceModeController] takes turns over a [VoiceService]; the home
+/// page's realtime Guide (`realtime_guide.dart`) is one speech-to-speech model.
+abstract class VoiceMode extends ChangeNotifier {
+  VoiceModeState get state;
+
+  /// Whether voice mode is on.
+  bool get active => state != VoiceModeState.off;
+
+  /// Input loudness 0–1 while listening.
+  double get level;
+
+  /// The words heard in the current round.
+  String get heard;
+
+  /// Turns voice mode on; false when speech is not available here.
+  Future<bool> start();
+
+  /// Turns voice mode off and silences the microphone and the speaker.
+  Future<void> stop();
+
+  /// Cuts her speech short; the conversation goes on with listening.
+  Future<void> interrupt();
+}
+
 /// The voice mode loop of `docs/ux-chat.md` (3, scene 5): listen → on silence
 /// hand the words to [onHeard] → speak its answer → listen again, until
 /// [stop] is called.
-class VoiceModeController extends ChangeNotifier {
+class VoiceModeController extends VoiceMode {
   VoiceModeController({required this.voice, required this.onHeard, this.onUnavailable});
 
   final VoiceService voice;
@@ -33,19 +58,18 @@ class VoiceModeController extends ChangeNotifier {
   int _silentRounds = 0;
   bool _disposed = false;
 
+  @override
   VoiceModeState get state => _state;
 
-  /// Whether voice mode is on.
-  bool get active => _state != VoiceModeState.off;
-
-  /// Input loudness 0–1 while listening.
+  @override
   double get level => _level;
 
-  /// The words heard in the current round.
+  @override
   String get heard => _heard;
 
   /// Turns voice mode on. Returns false (after [onUnavailable]) when this
   /// platform has no speech support.
+  @override
   Future<bool> start() async {
     if (active) return true;
     final ok = await voice.init();
@@ -60,7 +84,7 @@ class VoiceModeController extends ChangeNotifier {
     return true;
   }
 
-  /// Turns voice mode off and silences the microphone and the speaker.
+  @override
   Future<void> stop() async {
     _generation++;
     _setState(VoiceModeState.off);
@@ -69,7 +93,7 @@ class VoiceModeController extends ChangeNotifier {
     await voice.stopSpeaking();
   }
 
-  /// Cuts her speech short; the loop goes on with listening.
+  @override
   Future<void> interrupt() async {
     if (_state == VoiceModeState.speaking) await voice.stopSpeaking();
   }

@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import '../voice/live_link.dart';
 import 'api.dart';
 import 'api_exception.dart';
 import 'graph_utils.dart';
@@ -137,6 +138,8 @@ class FakeApiClient implements SelfInfinityApi {
     'voiceAvailable',
     'transcribe',
     'speech',
+    'chatAct',
+    'chatLog',
   };
 
   // -- state ------------------------------------------------------------------
@@ -1098,6 +1101,41 @@ class FakeApiClient implements SelfInfinityApi {
   Future<Uint8List> speech(String text) async {
     await _begin('speech');
     throw const ApiException(503, 'voice is not configured');
+  }
+
+  // ===========================================================================
+  // 36: the realtime Guide (it needs the server, so never runs offline)
+  // ===========================================================================
+
+  @override
+  LiveEndpoint? liveEndpoint(String path) => null;
+
+  @override
+  Future<List<ChatMessage>> chatAct(
+    String intent, {
+    Map<String, Object?> args = const {},
+    String said = '',
+  }) async {
+    await _begin('chatAct');
+    throw const ApiException(503, 'voice is not configured');
+  }
+
+  @override
+  Future<List<ChatMessage>> chatLog(List<({ChatRole role, String content})> lines) async {
+    await _begin('chatLog');
+    final saved = [
+      for (final l in lines)
+        if (l.content.trim().isNotEmpty)
+          ChatMessage(
+            id: _nextChatId++,
+            role: l.role,
+            content: l.content.trim(),
+            agent: l.role == ChatRole.user ? null : 'front_desk',
+            createdAt: _clock(),
+          ),
+    ];
+    _chat.addAll(saved);
+    return saved;
   }
 
   DevAudit _devAuditOf(_FakeAudit a) => DevAudit(

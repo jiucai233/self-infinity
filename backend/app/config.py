@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     transcribe_model: str = "gpt-transcribe"
     speech_model: str = "gpt-4o-mini-tts"
     speech_voice: str = "marin"
+    # Live voice over WebRTC (app/services/realtime.py): the home page's Guide speaks with this
+    # speech-to-speech model; the audit transcribes live with the other.
+    realtime_model: str = "gpt-realtime-2.1"
+    live_transcribe_model: str = "gpt-live-transcribe"
     # 留空则用离线搜索替身。搜索是独立于 LLM provider 的一层，互不影响。
     tavily_api_key: str = ""
     # POSTGRES_URL is what the Vercel ↔ Supabase integration sets (the transaction pooler);

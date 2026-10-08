@@ -95,6 +95,8 @@ _TEXTS: dict[str, dict[str, str]] = {
         "zh": "没找到可以记录的内容。说说你的睡眠、运动或饮食吧。",
         "ko": "기록할 내용을 찾지 못했어요. 수면, 운동, 식사에 대해 말해 주세요.",
     },
+    "opening_node": {"en": "Opening {title}.", "zh": "打开{title}。", "ko": "{title}을 열게요."},
+    "opening_map": {"en": "Here is your life tree.", "zh": "这是你的人生树。", "ko": "인생 나무를 보여 줄게요."},
     "checkin_logged": {"en": "Logged: {parts}", "zh": "已记录：{parts}", "ko": "기록했어요: {parts}"},
     "checkin_sleep": {"en": "sleep {hours} h", "zh": "睡眠 {hours} 小时", "ko": "수면 {hours}시간"},
     "checkin_exercise_yes": {"en": "exercise yes", "zh": "运动 有", "ko": "운동 함"},

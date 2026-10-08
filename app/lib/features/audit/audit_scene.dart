@@ -12,6 +12,7 @@ import '../../app/app_state.dart';
 import '../../app/router.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
+import '../../voice/live_voice.dart';
 import '../../voice/voice_mode.dart';
 import '../../voice/voice_service.dart';
 import '../../widgets/widgets.dart';
@@ -123,7 +124,8 @@ class _AuditSceneState extends State<AuditScene> {
   void initState() {
     super.initState();
     _voiceMode = VoiceModeController(
-      voice: context.read<VoiceService>(),
+      // Live transcription and streamed speech where there is live voice.
+      voice: context.read<LiveVoice?>()?.conversation ?? context.read<VoiceService>(),
       onHeard: _onHeard,
       onUnavailable: () => showToast(context, context.l10n.voiceModeUnavailable),
     );

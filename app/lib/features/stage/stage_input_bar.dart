@@ -44,6 +44,7 @@ class StageInputBar extends StatefulWidget {
     this.uploadEnabled = true,
     this.voiceMode,
     this.onVoiceMode,
+    this.dictation = false,
     this.onChanged,
     this.attachments = const [],
     this.error,
@@ -60,8 +61,12 @@ class StageInputBar extends StatefulWidget {
   final bool search;
   final VoidCallback? onUpload;
   final bool uploadEnabled;
-  final VoiceModeController? voiceMode;
+  final VoiceMode? voiceMode;
   final VoidCallback? onVoiceMode;
+
+  /// A microphone in the field that types what is said (speech to text, no
+  /// conversation).
+  final bool dictation;
   final ValueChanged<String>? onChanged;
   final List<InputAttachment> attachments;
 
@@ -226,7 +231,7 @@ class _StageInputBarState extends State<StageInputBar> {
     border: Border.all(color: focused ? AppColors.primary : Colors.transparent),
   );
 
-  Widget _waveRow(BuildContext context, VoiceModeController mode) {
+  Widget _waveRow(BuildContext context, VoiceMode mode) {
     final theme = Theme.of(context).textTheme;
     final listening = mode.state == VoiceModeState.listening;
     final caption = mode.heard.trim();
@@ -342,7 +347,10 @@ class _StageInputBarState extends State<StageInputBar> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
+                  if (widget.dictation)
+                    DictationButton(controller: controller, enabled: enabled)
+                  else
+                    const SizedBox(width: AppSpacing.sm),
                   ListenableBuilder(
                     listenable: controller,
                     builder: (context, _) => _SendButton(

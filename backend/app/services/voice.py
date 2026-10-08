@@ -6,6 +6,7 @@ recognition and synthesis of the browser or the phone.
 
 import logging
 import time
+from collections.abc import Iterator
 
 import httpx
 
@@ -150,3 +151,58 @@ def speak(text: str) -> bytes:
         settings.speech_model, len(text), len(response.content), elapsed_ms,
     )
     return response.content
+
+
+# Streamed speech: raw 16-bit little-endian mono PCM at this rate, played as it arrives.
+PCM_RATE = 24000
+
+
+def speak_stream(text: str) -> Iterator[bytes]:
+    """[text] read aloud as PCM chunks while OpenAI is still making the rest.
+
+    The request is sent (and its status checked) before this returns, so a failure is an
+    exception here, not a broken stream.
+    """
+    key = _require_key()
+    text = text.strip()
+    if not text:
+        raise VoiceRejected("nothing to say")
+    if len(text) > MAX_SPEECH_CHARS:
+        raise VoiceRejected("text too long")
+    body = {
+        "model": settings.speech_model,
+        "voice": settings.speech_voice,
+        "input": text,
+        "response_format": "pcm",
+        "stream_format": "audio",
+    }
+    if not settings.speech_model.startswith("tts-1"):
+        body["instructions"] = _VOICE_STYLE
+    request = _client.build_request(
+        "POST", SPEECH_URL, headers={"Authorization": f"Bearer {key}"}, json=body, timeout=settings.llm_timeout_seconds
+    )
+    start = time.perf_counter()
+    try:
+        response = _client.send(request, stream=True)
+    except httpx.HTTPError as e:
+        raise VoiceFailed(f"could not reach OpenAI: {e}") from e
+    if not 200 <= response.status_code < 300:
+        response.read()
+        response.close()
+        logger.warning("speak_stream got status=%d", response.status_code)
+        raise VoiceFailed(f"speech failed status={response.status_code} body={response.text[:300]}")
+
+    def chunks() -> Iterator[bytes]:
+        first = True
+        try:
+            for chunk in response.iter_bytes():
+                if first:
+                    logger.info("speak_stream first audio after %.0fms", (time.perf_counter() - start) * 1000)
+                    first = False
+                yield chunk
+        except httpx.HTTPError:
+            logger.warning("speak_stream broke off", exc_info=True)
+        finally:
+            response.close()
+
+    return chunks()

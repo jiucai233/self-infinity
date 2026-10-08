@@ -153,6 +153,18 @@ class ChatController extends ChangeNotifier {
     }
   }
 
+  /// Messages the server saved outside [send] (the realtime Guide's tool calls
+  /// and spoken lines): shown in the history, with their side effects.
+  void addSaved(List<ChatMessage> saved) {
+    if (saved.isEmpty) return;
+    final ids = {for (final m in saved) m.id};
+    _messages
+      ..removeWhere((m) => ids.contains(m.id))
+      ..addAll(saved);
+    _applySideEffects(saved);
+    _notify();
+  }
+
   void _applySideEffects(List<ChatMessage> saved) {
     for (final m in saved) {
       switch (m.action) {

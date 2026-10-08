@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -11,8 +10,6 @@ import '../../api/models.dart';
 import '../../app/app_state.dart';
 import '../../app/router.dart';
 import '../../theme/tokens.dart';
-import '../../voice/voice_mode.dart';
-import '../../voice/voice_service.dart';
 import '../../widgets/widgets.dart';
 import '../chat/chat_controller.dart';
 import '../chat/chat_navigation.dart';
@@ -45,7 +42,6 @@ class _SkillSceneState extends State<SkillScene> {
   late final ChatController _chat = context.read<ChatController>();
   final TextEditingController _input = TextEditingController();
   final FocusNode _focus = FocusNode();
-  late final VoiceModeController _voiceMode;
   final LastSaid _lastSaid = LastSaid();
 
   SkillOverview? _overview;
@@ -65,11 +61,6 @@ class _SkillSceneState extends State<SkillScene> {
   @override
   void initState() {
     super.initState();
-    _voiceMode = VoiceModeController(
-      voice: context.read<VoiceService>(),
-      onHeard: _onHeard,
-      onUnavailable: () => showToast(context, context.l10n.voiceModeUnavailable),
-    );
     unawaited(_load());
   }
 
@@ -83,7 +74,6 @@ class _SkillSceneState extends State<SkillScene> {
 
   @override
   void dispose() {
-    _voiceMode.dispose();
     _lastSaid.dispose();
     _input.dispose();
     _focus.dispose();
@@ -143,7 +133,7 @@ class _SkillSceneState extends State<SkillScene> {
 
   // -- chat about the node ------------------------------------------------------
 
-  Future<void> _ask(String text, {bool fromVoice = false}) async {
+  Future<void> _ask(String text) async {
     final trimmed = text.trim();
     final overview = _overview;
     if (trimmed.isEmpty || _chat.sending || overview == null) return;
@@ -158,7 +148,7 @@ class _SkillSceneState extends State<SkillScene> {
     if (saved == null) {
       _lastSaid.clear();
       setState(() => _chatError = _chat.error);
-      if (!fromVoice) _input.text = trimmed;
+      _input.text = trimmed;
       return;
     }
     _lastSaid.fade();
@@ -168,11 +158,6 @@ class _SkillSceneState extends State<SkillScene> {
       _replyAgent = assistants.isEmpty ? 'front_desk' : (assistants.last.agent ?? 'front_desk');
     });
     followNavigation(context, assistants);
-  }
-
-  Future<VoiceReply> _onHeard(String heard) async {
-    await _ask(heard, fromVoice: true);
-    return (speak: _reply, keepGoing: true);
   }
 
   // -- build --------------------------------------------------------------------
@@ -229,27 +214,21 @@ class _SkillSceneState extends State<SkillScene> {
             ),
       historyTitle: context.l10n.attempts,
       history: overview == null ? const SizedBox.shrink() : _AuditHistory(audits: overview.audits),
-      stage: CallbackShortcuts(
-        bindings: {const SingleActivator(LogicalKeyboardKey.escape): () => _voiceMode.stop()},
-        child: Focus(
-          autofocus: true,
-          child: Column(
-            children: [
-              Expanded(child: _body(context, chat)),
-              LastSaidBubble(said: _lastSaid),
-              StageInputBar(
-                controller: _input,
-                focusNode: _focus,
-                hint: context.l10n.askAboutNodeHint,
-                enabled: overview != null && !chat.sending,
-                onSubmit: () => _ask(_input.text),
-                voiceMode: _voiceMode,
-                onVoiceMode: () => unawaited(_voiceMode.start()),
-                error: _chatError,
-              ),
-            ],
+      stage: Column(
+        children: [
+          Expanded(child: _body(context, chat)),
+          LastSaidBubble(said: _lastSaid),
+          // Typing by voice here; talking is for the Guide and the audits.
+          StageInputBar(
+            controller: _input,
+            focusNode: _focus,
+            hint: context.l10n.askAboutNodeHint,
+            enabled: overview != null && !chat.sending,
+            onSubmit: () => _ask(_input.text),
+            dictation: true,
+            error: _chatError,
           ),
-        ),
+        ],
       ),
     );
   }
@@ -280,7 +259,6 @@ class _SkillSceneState extends State<SkillScene> {
           reply: _reply,
           replyAgent: _replyAgent,
           thinking: chat.sending,
-          voiceMode: _voiceMode,
           size: (box.maxHeight * 0.3).clamp(120.0, 240.0),
           onStart: () => context.go(AppRoutes.audit(overview.skill.id)),
         );
@@ -524,7 +502,6 @@ class _AvatarColumn extends StatelessWidget {
     required this.reply,
     required this.replyAgent,
     required this.thinking,
-    required this.voiceMode,
     required this.size,
     required this.onStart,
   });
@@ -537,7 +514,6 @@ class _AvatarColumn extends StatelessWidget {
   final String? reply;
   final String replyAgent;
   final bool thinking;
-  final VoiceModeController voiceMode;
   final double size;
   final VoidCallback onStart;
 
@@ -556,69 +532,54 @@ class _AvatarColumn extends StatelessWidget {
     final node = overview.skill;
     final theme = Theme.of(context).textTheme;
     final agent = reply == null ? 'front_desk' : replyAgent;
-    return ListenableBuilder(
-      listenable: voiceMode,
-      builder: (context, _) {
-        final state = thinking
-            ? AvatarState.thinking
-            : switch (voiceMode.state) {
-                VoiceModeState.listening => AvatarState.listening,
-                VoiceModeState.thinking => AvatarState.thinking,
-                VoiceModeState.speaking => AvatarState.speaking,
-                VoiceModeState.off => AvatarState.idle,
-              };
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SpeechBubble(
-              key: const Key('skill-bubble'),
-              maxWidth: 320,
-              speaker: agent,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.md,
-              ),
-              child: thinking
-                  ? const ThinkingShimmer(width: 220)
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(child: Text(_line(context.l10n), style: theme.bodyLarge)),
-                        if (!node.isLocked) ...[
-                          const SizedBox(width: AppSpacing.md),
-                          IconButton(
-                            key: const Key('start-audit'),
-                            tooltip: context.l10n.startAudit,
-                            visualDensity: VisualDensity.compact,
-                            style: IconButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: AppColors.onAccent,
-                              fixedSize: const Size(36, 36),
-                              minimumSize: const Size(36, 36),
-                              padding: EdgeInsets.zero,
-                              shape: const CircleBorder(),
-                            ),
-                            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                            onPressed: onStart,
-                          ),
-                        ],
-                      ],
-                    ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            GestureDetector(
-              onTap: voiceMode.interrupt,
-              child: Avatar(
-                agent: agent,
-                mood: AvatarMood.smile,
-                state: state,
-                wave: !node.isLocked && reply == null,
-                size: size,
-              ),
-            ),
-          ],
-        );
-      },
+    final state = thinking ? AvatarState.thinking : AvatarState.idle;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SpeechBubble(
+          key: const Key('skill-bubble'),
+          maxWidth: 320,
+          speaker: agent,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
+          child: thinking
+              ? const ThinkingShimmer(width: 220)
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(child: Text(_line(context.l10n), style: theme.bodyLarge)),
+                    if (!node.isLocked) ...[
+                      const SizedBox(width: AppSpacing.md),
+                      IconButton(
+                        key: const Key('start-audit'),
+                        tooltip: context.l10n.startAudit,
+                        visualDensity: VisualDensity.compact,
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.onAccent,
+                          fixedSize: const Size(36, 36),
+                          minimumSize: const Size(36, 36),
+                          padding: EdgeInsets.zero,
+                          shape: const CircleBorder(),
+                        ),
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                        onPressed: onStart,
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Avatar(
+          agent: agent,
+          mood: AvatarMood.smile,
+          state: state,
+          wave: !node.isLocked && reply == null,
+          size: size,
+        ),
+      ],
     );
   }
 }

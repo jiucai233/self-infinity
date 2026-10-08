@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
 import '../api/api.dart';
 import '../api/api_exception.dart';
 import 'audio_io.dart';
+import 'pause_detector.dart';
 import 'voice_service.dart';
 
 /// [VoiceService] through the server (contract #35): the browser records an
@@ -18,8 +18,7 @@ import 'voice_service.dart';
 /// aloud is spoken by [device] instead.
 ///
 /// There are no partial results: the words arrive once, after the utterance.
-/// An utterance ends after `pauseFor` of quiet once speech was heard, after
-/// [waitForSpeech] without any, after [maxUtterance], or on [stopListening].
+/// An utterance ends on a pause ([PauseDetector]) or on [stopListening].
 class CloudVoiceService implements VoiceService {
   CloudVoiceService({required this.api, required this.device, AudioIo? io})
     : io = io ?? createAudioIo();
@@ -28,17 +27,8 @@ class CloudVoiceService implements VoiceService {
   final VoiceService device;
   final AudioIo io;
 
-  /// How often the loudness is checked against the pause.
-  static const Duration tick = Duration(milliseconds: 100);
-
-  /// The loudness (0–1) that counts as speech; a quiet room is far below it.
-  static const double speechLevel = 0.35;
-
-  /// No speech for this long ends the utterance with nothing heard.
-  static const Duration waitForSpeech = Duration(seconds: 8);
-
-  /// The longest utterance (the server takes up to ~4 MB, ~1 minute).
-  static const Duration maxUtterance = Duration(seconds: 60);
+  /// How often the loudness is checked against the pause ([PauseDetector]).
+  static const Duration tick = PauseDetector.tick;
 
   /// The longest text the server reads aloud.
   static const int maxSpeechChars = 4096;
@@ -47,13 +37,9 @@ class CloudVoiceService implements VoiceService {
   bool _listening = false;
   int _session = 0;
   int _utterance = 0;
-  Timer? _timer;
+  PauseDetector? _pause;
   VoiceResultCallback? _onResult;
   void Function()? _onEnd;
-  bool _heard = false;
-  int _ticks = 0;
-  int _quietTicks = 0;
-  double _loudest = 0;
 
   /// Whether speech goes through the server (decided by the first [init]).
   bool get usesServer => _cloud == true;
@@ -94,16 +80,17 @@ class CloudVoiceService implements VoiceService {
     final session = ++_session;
     _onResult = onResult;
     _onEnd = onEnd;
-    _heard = false;
-    _ticks = 0;
-    _quietTicks = 0;
-    _loudest = 0;
     _listening = true;
+    final pause = PauseDetector(
+      pauseFor: pauseFor,
+      onEnd: ({required heard}) => unawaited(_finish(session, transcribe: heard)),
+    );
+    _pause = pause;
     try {
       await io.startRecording(
         onLevel: (level) {
           if (session != _session) return;
-          _loudest = math.max(_loudest, level);
+          pause.level(level);
           onLevel?.call(level);
         },
       );
@@ -116,31 +103,13 @@ class CloudVoiceService implements VoiceService {
       unawaited(io.stopRecording());
       return;
     }
-    _timer = Timer.periodic(tick, (_) => _onTick(session, pauseFor));
-  }
-
-  void _onTick(int session, Duration pauseFor) {
-    if (session != _session) return;
-    _ticks++;
-    if (_loudest >= speechLevel) {
-      _heard = true;
-      _quietTicks = 0;
-    } else {
-      _quietTicks++;
-    }
-    _loudest = 0;
-    final elapsed = tick * _ticks;
-    if ((_heard && tick * _quietTicks >= pauseFor) ||
-        (!_heard && elapsed >= waitForSpeech) ||
-        elapsed >= maxUtterance) {
-      unawaited(_finish(session, transcribe: _heard));
-    }
+    pause.start();
   }
 
   /// Stops recording and, if [transcribe], has the server write it down.
   Future<void> _finish(int session, {required bool transcribe}) async {
-    _timer?.cancel();
-    _timer = null;
+    _pause?.stop();
+    _pause = null;
     final recording = await io.stopRecording();
     if (session != _session) return;
     if (transcribe && recording != null && recording.bytes.isNotEmpty) {
@@ -170,7 +139,7 @@ class CloudVoiceService implements VoiceService {
   @override
   Future<void> stopListening() async {
     if (!usesServer) return device.stopListening();
-    if (_timer == null) return; // not recording (or already writing it down)
+    if (_pause == null) return; // not recording (or already writing it down)
     await _finish(_session, transcribe: true);
   }
 
@@ -178,8 +147,8 @@ class CloudVoiceService implements VoiceService {
   Future<void> cancelListening() async {
     if (!usesServer) return device.cancelListening();
     if (!_listening) return;
-    _timer?.cancel();
-    _timer = null;
+    _pause?.stop();
+    _pause = null;
     final end = _onEnd;
     _onEnd = null;
     _onResult = null;

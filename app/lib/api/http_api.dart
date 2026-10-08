@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../voice/live_link.dart';
 import 'api.dart';
 import 'api_exception.dart';
 import 'models.dart';
@@ -321,6 +322,47 @@ class HttpApi implements SelfInfinityApi {
     bytes: true,
     parse: (b) => b! as Uint8List,
   );
+
+  // -- 36: the realtime Guide ---------------------------------------------------
+
+  @override
+  LiveEndpoint? liveEndpoint(String path) {
+    final base = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final bearer = token?.call();
+    final lang = language?.call();
+    return (
+      url: Uri.base.resolve('$base$path'),
+      headers: {
+        if (bearer != null) 'Authorization': 'Bearer $bearer',
+        'Accept-Language': ?lang,
+      },
+    );
+  }
+
+  @override
+  Future<List<ChatMessage>> chatAct(
+    String intent, {
+    Map<String, Object?> args = const {},
+    String said = '',
+  }) => _post(
+    '/chat/act',
+    body: {'intent': intent, 'args': args, 'said': said},
+    parse: _chatMessages,
+  );
+
+  @override
+  Future<List<ChatMessage>> chatLog(List<({ChatRole role, String content})> lines) => _post(
+    '/chat/log',
+    body: {
+      'messages': [
+        for (final l in lines) {'role': l.role == ChatRole.user ? 'user' : 'assistant', 'content': l.content},
+      ],
+    },
+    parse: _chatMessages,
+  );
+
+  static List<ChatMessage> _chatMessages(Object? j) =>
+      _array(_object(j)['messages']).map((e) => ChatMessage.fromJson(_object(e))).toList();
 
   // -- transport --------------------------------------------------------------
 

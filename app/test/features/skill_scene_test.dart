@@ -120,11 +120,12 @@ void main() {
       expect(find.text('Try again'), findsOneWidget);
     });
 
-    testWidgets('the input asks the chat: no ⊕, ∿ is there', (tester) async {
+    testWidgets('the input asks the chat: no ⊕, no ∿, a mic that types', (tester) async {
       await pumpSkill(tester, api, 6);
       expect(find.text('Ask about this node…'), findsOneWidget);
       expect(find.byKey(const Key('upload')), findsNothing);
-      expect(find.byKey(const Key('voice-mode')), findsOneWidget);
+      expect(find.byKey(const Key('voice-mode')), findsNothing);
+      expect(find.byKey(const Key('dictation-button')), findsOneWidget);
     });
   });
 
@@ -531,29 +532,28 @@ void main() {
   });
 
   group('voice', () {
-    testWidgets('∿ listens; what is heard is asked; her answer is spoken', (tester) async {
+    testWidgets('the mic types the question; sending it asks the chat', (tester) async {
       final voice = FakeVoiceService();
       await pumpSkill(tester, api, 6, voice: voice);
-      await tester.tap(find.byKey(const Key('voice-mode')));
+      await tester.tap(find.byKey(const Key('dictation-button')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('voice-wave-row')), findsOneWidget);
       voice.hear('explain it simply');
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('stage-input'))).controller!.text, 'explain it simply');
+      expect(voice.spoken, isEmpty);
+      await tester.tap(find.byKey(const Key('send')));
       await tester.pumpAndSettle();
       expect(
         (await api.getChatHistory()).first.content,
         'About “Discriminant”: explain it simply',
       );
-      expect(voice.spoken, ['Sure. What would you like to do today?']);
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('voice-wave-row')), findsNothing);
     });
 
-    testWidgets('without speech support: a short message', (tester) async {
+    testWidgets('without speech recognition: a short message', (tester) async {
       await pumpSkill(tester, api, 6, voice: FakeVoiceService(available: false));
-      await tester.tap(find.byKey(const Key('voice-mode')));
+      await tester.tap(find.byKey(const Key('dictation-button')));
       await tester.pumpAndSettle();
-      expect(find.text("Voice mode isn't available on this device."), findsOneWidget);
+      expect(find.text(DictationButton.unavailableText), findsOneWidget);
     });
   });
 

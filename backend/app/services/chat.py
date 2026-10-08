@@ -300,6 +300,70 @@ def handle_message(
     return [message_out(m) for m in result]
 
 
+# ---------------------------------------------------------------- the realtime Guide (contract #36)
+
+# The intents the realtime Guide runs as tools: the front desk's, minus "none" (it talks itself).
+ACTIONS = ("generate_course", "open_skill", "checkin", "plan", "briefing", "open_map")
+# The realtime Guide is the Guide: its lines are the front desk's in the history.
+VOICE_AGENT = "front_desk"
+
+
+def handle_action(
+    session: Session,
+    intent: str,
+    args: dict,
+    said: str,
+    provider_for: ProviderFor,
+    search_provider_for: Callable[[], SearchProvider],
+) -> list[ChatMessageOut]:
+    """One tool call of the realtime Guide: the intent is already chosen, so no front desk call.
+
+    Saves what the user said (when given), then runs the intent like a chat message would;
+    returns [user?, result...]. The Guide's own spoken reply is logged afterwards (log_voice).
+    """
+    if intent not in ACTIONS:
+        raise ValueError(f"unknown intent {intent!r}")
+    result: list[ChatMessage] = []
+    if said.strip():
+        result.append(_save(session, "user", said.strip()))
+    if intent == "generate_course":
+        topic = str(args.get("topic") or "").strip()
+        if not topic:
+            raise ValueError("generate_course needs a topic")
+        result.append(_run_generate_course(session, topic, provider_for, search_provider_for))
+    elif intent == "open_skill":
+        node = resolve_node(_nodes_newest_course_first(session), str(args.get("skill") or ""))
+        if node is None:
+            result.append(_save(session, "assistant", t("which_node"), VOICE_AGENT))
+        else:
+            result.append(_save(
+                session, "assistant", t("opening_node", title=quote(node.title)), VOICE_AGENT,
+                {"type": "navigate", "scene": "skill", "skill_id": node.id},
+            ))
+    elif intent == "open_map":
+        result.append(_save(session, "assistant", t("opening_map"), VOICE_AGENT, {"type": "navigate", "scene": "map"}))
+    elif intent == "checkin":
+        words = said.strip() or str(args.get("said") or "").strip()
+        if not words:
+            raise ValueError("checkin needs what the user said")
+        result.append(_run_checkin(session, words, provider_for))
+    elif intent == "plan":
+        result.append(_run_plan(session, provider_for))
+    elif intent == "briefing":
+        result.append(_run_briefing(session, provider_for))
+    return [message_out(m) for m in result]
+
+
+def log_voice(session: Session, lines: list[tuple[str, str]]) -> list[ChatMessageOut]:
+    """Keeps a spoken exchange with the realtime Guide in the history. No LLM."""
+    saved = [
+        _save(session, role, content.strip(), VOICE_AGENT if role == "assistant" else None)
+        for role, content in lines
+        if content.strip()
+    ]
+    return [message_out(m) for m in saved]
+
+
 REFLECTION_ACK = "Noted. It's in your journal."
 
 

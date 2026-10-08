@@ -11,6 +11,7 @@ import '../../api/models.dart';
 import '../../app/router.dart';
 import '../../theme/tokens.dart';
 import '../../upload/file_picker_service.dart';
+import '../../voice/live_voice.dart';
 import '../../voice/voice_mode.dart';
 import '../../voice/voice_service.dart';
 import '../../widgets/widgets.dart';
@@ -48,7 +49,7 @@ class _HomeSceneState extends State<HomeScene> {
     api: context.read<SelfInfinityApi>(),
     picker: context.read<FilePickerService>(),
   );
-  late final VoiceModeController _voiceMode;
+  late final VoiceMode _voiceMode;
 
   final LastSaid _lastSaid = LastSaid();
   bool _chatting = false;
@@ -67,11 +68,13 @@ class _HomeSceneState extends State<HomeScene> {
   @override
   void initState() {
     super.initState();
-    _voiceMode = VoiceModeController(
+    final turns = VoiceModeController(
       voice: context.read<VoiceService>(),
       onHeard: _onHeard,
       onUnavailable: _voiceUnavailable,
     );
+    // The Guide talks as one realtime model where it can; turns over the app's voice elsewhere.
+    _voiceMode = context.read<LiveVoice?>()?.guide(fallback: turns, onMessages: _onGuideSaved) ?? turns;
     _chat.addListener(_sendQueued);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -185,6 +188,20 @@ class _HomeSceneState extends State<HomeScene> {
     _spokenReply = null;
     await _send(heard, fromVoice: true);
     return (speak: _spokenReply, keepGoing: true);
+  }
+
+  /// What the realtime Guide did or said, saved by the server: into the chat,
+  /// and her last line into the bubble; a navigation is followed.
+  void _onGuideSaved(List<ChatMessage> saved) {
+    if (!mounted) return;
+    _chat.addSaved(saved);
+    final assistants = saved.where((m) => !m.isUser).toList();
+    if (assistants.isEmpty) return;
+    setState(() {
+      _chatting = true;
+      _reply = assistants.last;
+    });
+    followNavigation(context, assistants);
   }
 
   void _voiceUnavailable() {

@@ -7,6 +7,7 @@ import '../features/chat/chat_controller.dart';
 import '../features/stage/profile_controller.dart';
 import '../features/stage/stage_controller.dart';
 import '../upload/file_picker_service.dart';
+import '../voice/live_voice.dart';
 import '../voice/voice_service.dart';
 import 'app_state.dart';
 import 'panel_layout.dart';
@@ -27,7 +28,12 @@ class AppProviders extends StatelessWidget {
     this.layout,
     this.clock,
     this.auth,
+    this.live,
   });
+
+  /// The talking scenes' live voice (the realtime Guide, the audit's streamed
+  /// turns); null (tests) means they take turns over [voice].
+  final LiveVoice? live;
 
   /// Who is signed in; [LocalAuth] (no accounts) when null.
   final AuthService? auth;
@@ -57,6 +63,7 @@ class AppProviders extends StatelessWidget {
           ChangeNotifierProvider<AuthService>(create: (_) => LocalAuth()),
         ChangeNotifierProvider<AppState>.value(value: appState),
         Provider<VoiceService>.value(value: voice),
+        Provider<LiveVoice?>.value(value: live),
         Provider<FilePickerService>.value(value: filePicker),
         if (layout != null)
           ChangeNotifierProvider<PanelLayout>.value(value: layout!)

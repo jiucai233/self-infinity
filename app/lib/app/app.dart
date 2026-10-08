@@ -13,6 +13,7 @@ import '../l10n/l10n.dart';
 import '../theme/app_theme.dart';
 import '../upload/file_picker_service.dart';
 import '../voice/cloud_voice_service.dart';
+import '../voice/live_voice.dart';
 import '../voice/platform_voice_service.dart';
 import '../voice/voice_service.dart';
 import '../widgets/widgets.dart';
@@ -115,6 +116,8 @@ class _SelfInfinityAppState extends State<SelfInfinityApp> {
   late final AuthService _auth = widget.auth ?? LocalAuth();
   late final VoiceService _voice =
       widget.voice ?? CloudVoiceService(api: widget.api, device: PlatformVoiceService());
+  /// Only with the app's own voice: a [voice] passed in (tests) means no live voice.
+  late final LiveVoice? _live = widget.voice == null ? LiveVoice(api: widget.api, device: _voice) : null;
   late final FilePickerService _filePicker = widget.filePicker ?? PlatformFilePickerService();
 
   @override
@@ -146,6 +149,7 @@ class _SelfInfinityAppState extends State<SelfInfinityApp> {
               api: widget.api,
               appState: widget.appState,
               voice: _voice,
+              live: _live,
               filePicker: _filePicker,
               auth: _auth,
               child: _AccountShell(look: look, initialLocation: widget.initialLocation),
