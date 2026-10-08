@@ -517,5 +517,27 @@
   "more": "More",
   "@more": {
     "description": "Tooltip of a ⋯ menu button."
-  }
+  },
+  "devPanel": "Developer",
+  "devTitle": "Audit review",
+  "devHint": "Review each verdict below; the first row adds up your reviews.",
+  "devJudging": "How well it judges",
+  "devOverall": "How audits go",
+  "devAgreement": "Agreement",
+  "devKappa": "Kappa",
+  "devTooStrict": "Too strict",
+  "devTooLenient": "Too lenient",
+  "devLeaked": "Gave answers",
+  "devReviewed": "Reviewed",
+  "devAudits": "Audits",
+  "devPassRate": "Pass rate",
+  "devAvgScore": "Avg score",
+  "devGapsPerFail": "Gaps per fail",
+  "devAnswers": "Answers per audit",
+  "devChallenged": "Challenged",
+  "devRight": "Right",
+  "devGaveAnswer": "Gave the answer away",
+  "devNoAudits": "No finished audits yet.",
+  "devTranscript": "Transcript",
+  "devRefresh": "Refresh"
 }

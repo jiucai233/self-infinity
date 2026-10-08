@@ -966,4 +966,70 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get more => '更多';
+
+  @override
+  String get devPanel => '开发者';
+
+  @override
+  String get devTitle => '审计复核';
+
+  @override
+  String get devHint => '在下面逐个标注裁决；第一行由你的标注算出。';
+
+  @override
+  String get devJudging => '判得准不准';
+
+  @override
+  String get devOverall => '审计概况';
+
+  @override
+  String get devAgreement => '判对率';
+
+  @override
+  String get devKappa => 'Kappa';
+
+  @override
+  String get devTooStrict => '太严';
+
+  @override
+  String get devTooLenient => '太松';
+
+  @override
+  String get devLeaked => '泄露答案';
+
+  @override
+  String get devReviewed => '已标注';
+
+  @override
+  String get devAudits => '审计数';
+
+  @override
+  String get devPassRate => '通过率';
+
+  @override
+  String get devAvgScore => '平均分';
+
+  @override
+  String get devGapsPerFail => '每次未通过的缺口';
+
+  @override
+  String get devAnswers => '每场回答数';
+
+  @override
+  String get devChallenged => '被复核';
+
+  @override
+  String get devRight => '判对了';
+
+  @override
+  String get devGaveAnswer => '说出了答案';
+
+  @override
+  String get devNoAudits => '还没有结束的审计。';
+
+  @override
+  String get devTranscript => '对话记录';
+
+  @override
+  String get devRefresh => '刷新';
 }

@@ -280,6 +280,24 @@ class HttpApi implements SelfInfinityApi {
     parse: (_) {},
   );
 
+  @override
+  Future<Me> getMe() => _get('/me', parse: (j) => Me.fromJson(_object(j)));
+
+  @override
+  Future<DevAudits> getDevAudits({int limit = 50}) => _get(
+    '/dev/audits',
+    query: {'limit': '$limit'},
+    parse: (j) => DevAudits.fromJson(_object(j)),
+  );
+
+  @override
+  Future<DevAudit> reviewAudit(int auditId, AuditReview? review, {bool leaked = false}) => _send(
+    'PUT',
+    '/dev/audits/$auditId/review',
+    body: {'review': review?.json, 'leaked': leaked},
+    parse: (j) => DevAudit.fromJson(_object(j)),
+  );
+
   // -- transport --------------------------------------------------------------
 
   Future<T> _get<T>(

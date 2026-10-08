@@ -53,6 +53,9 @@ class StageInputBar extends StatefulWidget {
   final String hint;
   final VoidCallback onSubmit;
   final FocusNode? focusNode;
+
+  /// Whether sending (and uploading, and voice) is open. The field itself can
+  /// always be typed in.
   final bool enabled;
   final bool search;
   final VoidCallback? onUpload;
@@ -313,13 +316,17 @@ class _StageInputBarState extends State<StageInputBar> {
                       key: const Key('stage-input'),
                       controller: controller,
                       focusNode: focusNode,
-                      enabled: enabled,
+                      // Never disabled: on the web a disabled field drops its
+                      // browser input and, enabled again, keeps the focus without
+                      // taking keys until it is rebuilt. While her answer is on its
+                      // way the next one can be typed; only sending waits.
                       minLines: 1,
                       maxLines: 5,
                       keyboardType: TextInputType.text,
                       textInputAction: TextInputAction.send,
                       onChanged: onChanged,
-                      onSubmitted: (_) => _submit(),
+                      onSubmitted: (_) => enabled ? _submit() : focusNode?.requestFocus(),
+                      onEditingComplete: () {}, // Enter keeps the cursor here
                       style: theme.bodyLarge,
                       decoration: InputDecoration(
                         hintText: hint,

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../api/api.dart';
 import '../../api/models.dart';
 import '../../auth/auth_service.dart';
 import '../../app/panel_layout.dart';
@@ -9,6 +12,7 @@ import '../../app/router.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
 import '../chat/chat_controller.dart';
+import '../dev/dev_panel.dart';
 import 'character_sheet.dart';
 import 'profile_controller.dart';
 import 'stage_controller.dart';
@@ -291,7 +295,13 @@ class _TodaySummary extends StatelessWidget {
               c?.sleepHours == null ? _none : context.l10n.hoursShort(formatNumber(c!.sleepHours!)),
             ),
             _row(context, context.l10n.meals, (c?.dietNote ?? '').isEmpty ? _none : c!.dietNote!),
-            _row(context, context.l10n.journal, diary.isEmpty ? _none : diary, maxLines: 3, last: true),
+            _row(
+              context,
+              context.l10n.journal,
+              diary.isEmpty ? _none : diary,
+              maxLines: 3,
+              last: true,
+            ),
           ],
         ),
       ),
@@ -327,9 +337,32 @@ class _TodaySummary extends StatelessWidget {
 }
 
 /// ◎ at the bottom left: the account menu — who is signed in, `Replay the
-/// tutorial`, and `Sign out` (only with accounts).
-class _SettingsButton extends StatelessWidget {
+/// tutorial`, `Developer` (developers only, `GET /me`), and `Sign out` (only
+/// with accounts).
+class _SettingsButton extends StatefulWidget {
   const _SettingsButton();
+
+  @override
+  State<_SettingsButton> createState() => _SettingsButtonState();
+}
+
+class _SettingsButtonState extends State<_SettingsButton> {
+  bool _dev = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_checkDev());
+  }
+
+  Future<void> _checkDev() async {
+    try {
+      final me = await context.read<SelfInfinityApi>().getMe();
+      if (mounted && me.isDev) setState(() => _dev = true);
+    } on Object {
+      // not a developer, as far as we can tell
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -345,12 +378,16 @@ class _SettingsButton extends StatelessWidget {
         offset: const Offset(0, -8),
         onSelected: (value) async {
           if (value.startsWith('lang:')) {
-            await context.read<LocaleController>().setLanguage(AppLanguage.fromCode(value.substring(5)));
+            await context.read<LocaleController>().setLanguage(
+              AppLanguage.fromCode(value.substring(5)),
+            );
             return;
           }
           switch (value) {
             case 'tutorial':
               await context.read<ProfileController>().setOnboarded(false);
+            case 'dev':
+              await showDevPanel(context);
             case 'sign-out':
               await auth.signOut();
           }
@@ -361,7 +398,10 @@ class _SettingsButton extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(context.l10n.signedInAs, style: theme.labelSmall?.copyWith(color: AppColors.textTertiary)),
+                Text(
+                  context.l10n.signedInAs,
+                  style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
+                ),
                 Text(
                   auth.enabled ? (auth.email ?? '') : context.l10n.localModeNoAccount,
                   key: const Key('settings-account'),
@@ -397,6 +437,12 @@ class _SettingsButton extends StatelessWidget {
             value: 'tutorial',
             child: Text(context.l10n.replayTutorial),
           ),
+          if (_dev)
+            PopupMenuItem<String>(
+              key: const Key('settings-dev'),
+              value: 'dev',
+              child: Text(context.l10n.devPanel),
+            ),
           if (auth.enabled)
             PopupMenuItem<String>(
               key: const Key('settings-sign-out'),

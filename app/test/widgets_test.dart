@@ -286,12 +286,24 @@ void main() {
       expect(controller.text, 'hi');
     });
 
+    testWidgets('while sending waits the field still takes keys; Enter sends nothing', (
+      tester,
+    ) async {
+      var sent = 0;
+      final controller = await pumpBar(tester, enabled: false, onSubmit: () => sent++);
+      await tester.enterText(find.byKey(const Key('stage-input')), 'the next answer');
+      expect(controller.text, 'the next answer');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pump();
+      expect(sent, 0);
+      expect(controller.text, 'the next answer');
+    });
+
     testWidgets('disabled: nothing can be sent or uploaded', (tester) async {
       var uploads = 0;
       await pumpBar(tester, enabled: false, onUpload: () => uploads++, onVoice: () {});
       await tester.tap(find.byKey(const Key('upload')));
       expect(uploads, 0);
-      expect(tester.widget<TextField>(find.byKey(const Key('stage-input'))).enabled, isFalse);
       expect(tester.widget<IconButton>(find.byKey(const Key('voice-mode'))).onPressed, isNull);
     });
 

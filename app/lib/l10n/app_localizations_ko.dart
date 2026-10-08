@@ -970,4 +970,70 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get more => '더 보기';
+
+  @override
+  String get devPanel => '개발자';
+
+  @override
+  String get devTitle => '감사 검토';
+
+  @override
+  String get devHint => '아래 판정을 하나씩 검토하세요. 첫 줄은 검토 결과로 계산돼요.';
+
+  @override
+  String get devJudging => '판정 정확도';
+
+  @override
+  String get devOverall => '감사 개요';
+
+  @override
+  String get devAgreement => '일치율';
+
+  @override
+  String get devKappa => '카파';
+
+  @override
+  String get devTooStrict => '너무 엄격';
+
+  @override
+  String get devTooLenient => '너무 관대';
+
+  @override
+  String get devLeaked => '답 노출';
+
+  @override
+  String get devReviewed => '검토함';
+
+  @override
+  String get devAudits => '감사 수';
+
+  @override
+  String get devPassRate => '통과율';
+
+  @override
+  String get devAvgScore => '평균 점수';
+
+  @override
+  String get devGapsPerFail => '불통과당 빈틈';
+
+  @override
+  String get devAnswers => '감사당 답변 수';
+
+  @override
+  String get devChallenged => '재검토됨';
+
+  @override
+  String get devRight => '맞음';
+
+  @override
+  String get devGaveAnswer => '답을 알려줌';
+
+  @override
+  String get devNoAudits => '끝난 감사가 아직 없어요.';
+
+  @override
+  String get devTranscript => '대화 기록';
+
+  @override
+  String get devRefresh => '새로고침';
 }

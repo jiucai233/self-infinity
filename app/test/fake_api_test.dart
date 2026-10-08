@@ -1018,8 +1018,68 @@ void main() {
       for (final name in FakeApiClient.methodNames) {
         api.failNext(method: name); // asserts on unknown names
       }
-      expect(FakeApiClient.methodNames, hasLength(30));
+      expect(FakeApiClient.methodNames, hasLength(33));
       expect(() => api.failNext(method: 'nope'), throwsA(isA<AssertionError>()));
+    });
+  });
+
+  group('developer panel', () {
+    test('offline everyone is a developer', () async {
+      expect((await newApi().getMe()).isDev, isTrue);
+    });
+
+    test('finished audits newest first; reviews add up to the metrics', () async {
+      final api = await seededFakeApi();
+      final failed = await failAudit(api, 6);
+      await failAudit(api, 6);
+      await passAudit(api, 6);
+      await passAudit(api, 7);
+      await api.startAudit(5); // running: not listed
+
+      var data = await api.getDevAudits();
+      expect(data.audits.map((a) => a.status), [
+        AuditStatus.passed,
+        AuditStatus.passed,
+        AuditStatus.failed,
+        AuditStatus.failed,
+      ]);
+      expect(data.audits.last.id, failed.sessionId);
+      expect(data.audits.last.turns.map((t) => t.role), [
+        AuditRole.auditor,
+        AuditRole.user,
+        AuditRole.auditor,
+        AuditRole.user,
+      ]);
+      expect(data.metrics.finished, 4);
+      expect(data.metrics.passRate, 0.5);
+      expect(data.metrics.avgGapsWhenFailed, 2);
+      expect(data.metrics.agreement, isNull);
+
+      final [p1, p2, f1, f2] = data.audits;
+      await api.reviewAudit(f1.id, AuditReview.right);
+      await api.reviewAudit(f2.id, AuditReview.tooStrict);
+      await api.reviewAudit(p1.id, AuditReview.right, leaked: true);
+      await api.reviewAudit(p2.id, AuditReview.tooLenient);
+      data = await api.getDevAudits();
+      expect(data.metrics.reviewed, 4);
+      expect(data.metrics.agreement, 0.5);
+      expect(data.metrics.kappa, 0);
+      expect((data.metrics.tooStrict, data.metrics.tooLenient, data.metrics.leaked), (1, 1, 1));
+
+      // A review must fit the verdict; null clears it (and the leak).
+      expect(
+        (await failure(() => api.reviewAudit(f1.id, AuditReview.tooLenient))).serverMessage,
+        'too_lenient is for a passed audit',
+      );
+      final cleared = await api.reviewAudit(p1.id, null, leaked: true);
+      expect((cleared.review, cleared.leaked), (null, false));
+    });
+
+    test('kappa', () {
+      expect(cohensKappa([]), isNull);
+      expect(cohensKappa([(true, true), (false, false)]), 1);
+      expect(cohensKappa([(true, true), (true, true)]), isNull);
+      expect(cohensKappa([(true, false), (false, true)]), -1);
     });
   });
 

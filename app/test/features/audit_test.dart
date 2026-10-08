@@ -218,7 +218,8 @@ void main() {
           tester.getTopLeft(find.byKey(const Key('thinking-shimmer'))).dy,
           greaterThan(tester.getTopLeft(find.text('ans')).dy),
         );
-        expect(tester.widget<TextField>(find.byKey(const Key('stage-input'))).enabled, isFalse);
+        // The field stays open for the next answer; only sending waits.
+        expect(tester.widget<TextField>(find.byKey(const Key('stage-input'))).enabled, isNot(isFalse));
         expect(avatar(tester).state, AvatarState.thinking);
         await tester.pump(const Duration(milliseconds: 300));
         await tester.pumpAndSettle();
@@ -538,7 +539,7 @@ void main() {
       expect(avatar(tester).agent, 'recorder');
       expect(avatar(tester).mood, AvatarMood.neutral);
       expect(inputVisible(tester), isTrue);
-      expect(tester.widget<TextField>(find.byKey(const Key('stage-input'))).enabled, isTrue);
+      expect(tester.widget<TextField>(find.byKey(const Key('stage-input'))).enabled, isNot(isFalse));
       expect(find.text('What did you get wrong?…'), findsOneWidget);
     });
 

@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     # A course plan from a reasoning model (gpt-6-luna) takes ~25 s; Vercel allows 300 s a request.
     llm_timeout_seconds: float = 90.0
     search_timeout_seconds: float = 15.0
+    # Comma-separated emails that see the developer panel (audit metrics, app/routers/dev.py).
+    # In dev auth mode (local, no accounts) everyone is a developer.
+    dev_emails: str = ""
 
     @model_validator(mode="after")
     def _default_auth_mode(self) -> "Settings":

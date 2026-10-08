@@ -188,4 +188,19 @@ abstract class SelfInfinityApi {
   /// the course; the lessons still show). With it they are deleted too. 404
   /// for an unknown or already deleted course.
   Future<void> deleteCourse(int courseId, {bool deleteNodes = false});
+
+  /// `GET /me` (contract #32, no LLM): who is signed in; [Me.isDev] shows the
+  /// developer panel.
+  Future<Me> getMe();
+
+  /// `GET /dev/audits?limit=` (contract #34, no LLM; developers only, 403
+  /// `developers only` otherwise): the metrics over every finished audit and
+  /// the newest [limit] (1–200) with their transcripts.
+  Future<DevAudits> getDevAudits({int limit = 50});
+
+  /// `PUT /dev/audits/{id}/review` (contract #34): a developer's review of the
+  /// verdict; null [review] clears it. 400 when the audit is still running or
+  /// the review does not fit the verdict (`too_strict` is for a fail,
+  /// `too_lenient` for a pass); 404 for an unknown audit.
+  Future<DevAudit> reviewAudit(int auditId, AuditReview? review, {bool leaked = false});
 }

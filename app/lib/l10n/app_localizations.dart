@@ -1911,6 +1911,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More'**
   String get more;
+
+  /// No description provided for @devPanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer'**
+  String get devPanel;
+
+  /// No description provided for @devTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit review'**
+  String get devTitle;
+
+  /// No description provided for @devHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Review each verdict below; the first row adds up your reviews.'**
+  String get devHint;
+
+  /// No description provided for @devJudging.
+  ///
+  /// In en, this message translates to:
+  /// **'How well it judges'**
+  String get devJudging;
+
+  /// No description provided for @devOverall.
+  ///
+  /// In en, this message translates to:
+  /// **'How audits go'**
+  String get devOverall;
+
+  /// No description provided for @devAgreement.
+  ///
+  /// In en, this message translates to:
+  /// **'Agreement'**
+  String get devAgreement;
+
+  /// No description provided for @devKappa.
+  ///
+  /// In en, this message translates to:
+  /// **'Kappa'**
+  String get devKappa;
+
+  /// No description provided for @devTooStrict.
+  ///
+  /// In en, this message translates to:
+  /// **'Too strict'**
+  String get devTooStrict;
+
+  /// No description provided for @devTooLenient.
+  ///
+  /// In en, this message translates to:
+  /// **'Too lenient'**
+  String get devTooLenient;
+
+  /// No description provided for @devLeaked.
+  ///
+  /// In en, this message translates to:
+  /// **'Gave answers'**
+  String get devLeaked;
+
+  /// No description provided for @devReviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviewed'**
+  String get devReviewed;
+
+  /// No description provided for @devAudits.
+  ///
+  /// In en, this message translates to:
+  /// **'Audits'**
+  String get devAudits;
+
+  /// No description provided for @devPassRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Pass rate'**
+  String get devPassRate;
+
+  /// No description provided for @devAvgScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg score'**
+  String get devAvgScore;
+
+  /// No description provided for @devGapsPerFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Gaps per fail'**
+  String get devGapsPerFail;
+
+  /// No description provided for @devAnswers.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers per audit'**
+  String get devAnswers;
+
+  /// No description provided for @devChallenged.
+  ///
+  /// In en, this message translates to:
+  /// **'Challenged'**
+  String get devChallenged;
+
+  /// No description provided for @devRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get devRight;
+
+  /// No description provided for @devGaveAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'Gave the answer away'**
+  String get devGaveAnswer;
+
+  /// No description provided for @devNoAudits.
+  ///
+  /// In en, this message translates to:
+  /// **'No finished audits yet.'**
+  String get devNoAudits;
+
+  /// No description provided for @devTranscript.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript'**
+  String get devTranscript;
+
+  /// No description provided for @devRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get devRefresh;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

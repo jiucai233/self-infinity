@@ -6,6 +6,7 @@ from sqlmodel import Session
 from app.auth import CurrentUser, current_user
 from app.config import settings
 from app.db import get_session
+from app.routers.dev import is_dev
 from app.schemas import MeOut, ProfileOut, ProfileUpdate
 from app.services import game_profile
 
@@ -24,4 +25,4 @@ def put_profile(body: ProfileUpdate, session: Session = Depends(get_session)):
 
 @router.get("/me", response_model=MeOut)
 def get_me(user: CurrentUser = Depends(current_user)):
-    return MeOut(id=user.id, email=user.email, auth_mode=settings.auth_mode)
+    return MeOut(id=user.id, email=user.email, auth_mode=settings.auth_mode, is_dev=is_dev(user))

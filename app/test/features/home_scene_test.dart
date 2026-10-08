@@ -449,7 +449,8 @@ void main() {
       );
       expect(tester.state<ThinkingShimmerState>(find.byType(ThinkingShimmer)).flowing, isFalse);
       expect(avatar(tester).state, AvatarState.thinking);
-      expect(tester.widget<TextField>(find.byKey(const Key('stage-input'))).enabled, isFalse);
+      // The field stays open for the next line; only sending waits.
+      expect(tester.widget<TextField>(find.byKey(const Key('stage-input'))).enabled, isNot(isFalse));
       // The send arrow has morphed into a spinner, and morphs back after.
       MorphIcon sendIcon() => tester.widget<MorphIcon>(find.byKey(const Key('send-icon')));
       expect(sendIcon().morphed, isTrue);

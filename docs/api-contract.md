@@ -551,4 +551,9 @@ You in the middle → main quests → the courses that serve them → each cours
 `Profile` gains `"onboarded": false` until the first-run tutorial is finished or skipped. `PUT /api/profile` accepts `"onboarded": true` (done) or `false` (show it again); `null` is a 422.
 
 ### 32. `GET /api/me`  (no LLM)
-Response: `{"id": "<user id>", "email": "...", "auth_mode": "supabase"}`; in dev mode `{"id": "dev", "email": null, "auth_mode": "dev"}`.
+Response: `{"id": "<user id>", "email": "...", "auth_mode": "supabase", "is_dev": false}`; in dev mode `{"id": "dev", "email": null, "auth_mode": "dev", "is_dev": true}`. `is_dev`: the account sees the developer panel (endpoint 34): every account in dev mode, the emails in `DEV_EMAILS` otherwise.
+
+### 34. Developer panel  (no LLM, added 2026-10-08; developers only, 403 `developers only` otherwise)
+- `GET /api/dev/audits?limit=50` (1–200) → `{"metrics": DevMetrics, "audits": DevAudit[]}`. `audits`: the newest finished audits, `{"id", "skill_id", "skill_title", "status", "score", "gaps", "comment", "turns": [{"role", "content"}], "review", "leaked", "created_at"}`.
+- `PUT /api/dev/audits/{id}/review` `{"review": "right" | "too_strict" | "too_lenient" | null, "leaked": false}` → the DevAudit. A developer's review of the verdict: `too_strict` = failed but should have passed (only on a failed audit), `too_lenient` = passed but should have failed (only on a passed one), `leaked` = the Auditor gave the answer away; `null` clears both. 400 `audit is not finished` / `too_strict is for a failed audit` / `too_lenient is for a passed audit`; 404 `audit session not found`.
+- `DevMetrics` over every finished audit (rates 0–1, null when there is nothing to divide by): `finished`, `pass_rate`, `avg_score`, `avg_gaps_when_failed`, `avg_answers`, `challenged_rate`; and over the reviewed ones: `reviewed`, `agreement` (share reviewed `right`), `kappa` (Cohen's kappa between the Auditor's verdict and the reviewer's), `too_strict`, `too_lenient`, `leaked` (counts).

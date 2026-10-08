@@ -130,6 +130,9 @@ class FakeApiClient implements SelfInfinityApi {
     'updateGoal',
     'deleteGoal',
     'deleteCourse',
+    'getMe',
+    'getDevAudits',
+    'reviewAudit',
   };
 
   // -- state ------------------------------------------------------------------
@@ -1029,6 +1032,103 @@ class FakeApiClient implements SelfInfinityApi {
   );
 
   // ===========================================================================
+  // 32, 34: who is signed in; the developer panel
+  // ===========================================================================
+
+  /// Local and offline: always a developer.
+  @override
+  Future<Me> getMe() async {
+    await _begin('getMe');
+    return const Me(id: 'dev', isDev: true);
+  }
+
+  @override
+  Future<DevAudits> getDevAudits({int limit = 50}) async {
+    await _begin('getDevAudits');
+    _require(limit >= 1 && limit <= 200, 'limit must be 1-200');
+    final finished = [
+      for (final a in _audits.values.toList().reversed)
+        if (a.status != AuditStatus.active) a,
+    ];
+    return DevAudits(
+      metrics: _devMetrics(finished),
+      audits: [for (final a in finished.take(limit)) _devAuditOf(a)],
+    );
+  }
+
+  @override
+  Future<DevAudit> reviewAudit(int auditId, AuditReview? review, {bool leaked = false}) async {
+    await _begin('reviewAudit');
+    final a = _audits[auditId] ?? (throw const ApiException(404, 'audit session not found'));
+    if (a.status == AuditStatus.active) throw const ApiException(400, 'audit is not finished');
+    if (review == AuditReview.tooStrict && a.status != AuditStatus.failed) {
+      throw const ApiException(400, 'too_strict is for a failed audit');
+    }
+    if (review == AuditReview.tooLenient && a.status != AuditStatus.passed) {
+      throw const ApiException(400, 'too_lenient is for a passed audit');
+    }
+    a
+      ..review = review
+      ..leaked = review != null && leaked;
+    return _devAuditOf(a);
+  }
+
+  DevAudit _devAuditOf(_FakeAudit a) => DevAudit(
+    id: a.id,
+    skillId: a.skillId,
+    skillTitle: (_nodes[a.skillId] ?? _hiddenNodes[a.skillId])!.title,
+    status: a.status,
+    score: a.score,
+    gaps: a.gaps,
+    comment: a.comment,
+    turns: List.unmodifiable(a.turns),
+    review: a.review,
+    leaked: a.leaked,
+    createdAt: a.createdAt,
+  );
+
+  /// The same sums as the server's `services/audit_review.py`.
+  static DevMetrics _devMetrics(List<_FakeAudit> finished) {
+    double? rate(num part, int whole) =>
+        whole == 0 ? null : (part / whole * 10000).roundToDouble() / 10000;
+    final passed = finished.where((a) => a.status == AuditStatus.passed).length;
+    final failed = [
+      for (final a in finished)
+        if (a.status == AuditStatus.failed) a,
+    ];
+    final reviewed = [
+      for (final a in finished)
+        if (a.review != null) a,
+    ];
+    final pairs = [
+      for (final a in reviewed)
+        (
+          a.status == AuditStatus.passed,
+          a.review == AuditReview.right
+              ? a.status == AuditStatus.passed
+              : a.status != AuditStatus.passed,
+        ),
+    ];
+    return DevMetrics(
+      finished: finished.length,
+      passRate: rate(passed, finished.length),
+      avgScore: rate(finished.fold<int>(0, (s, a) => s + (a.score ?? 0)), finished.length),
+      avgGapsWhenFailed: rate(failed.fold<int>(0, (s, a) => s + a.gaps.length), failed.length),
+      avgAnswers: rate(
+        finished.fold<int>(0, (s, a) => s + a.turns.where((t) => t.isUser).length),
+        finished.length,
+      ),
+      challengedRate: rate(finished.where((a) => a.challenged).length, finished.length),
+      reviewed: reviewed.length,
+      agreement: rate(reviewed.where((a) => a.review == AuditReview.right).length, reviewed.length),
+      kappa: cohensKappa(pairs),
+      tooStrict: reviewed.where((a) => a.review == AuditReview.tooStrict).length,
+      tooLenient: reviewed.where((a) => a.review == AuditReview.tooLenient).length,
+      leaked: reviewed.where((a) => a.leaked).length,
+    );
+  }
+
+  // ===========================================================================
   // 16, 25–27: life as a game (contract Section 6)
   // ===========================================================================
 
@@ -1602,6 +1702,8 @@ class _FakeAudit {
   List<String> gaps = const [];
   String? comment;
   bool challenged = false;
+  AuditReview? review;
+  bool leaked = false;
   int? principleId;
 
   AuditSession toModel() => AuditSession(
@@ -1969,4 +2071,17 @@ int? _parseStress(String text) {
     value = value == 4 ? 2 : 4;
   }
   return value;
+}
+
+/// Cohen's kappa over (auditor passed, human passed) pairs; null when it is
+/// undefined (no pairs, or both always gave the same verdict).
+double? cohensKappa(List<(bool, bool)> pairs) {
+  if (pairs.isEmpty) return null;
+  final n = pairs.length;
+  final observed = pairs.where((p) => p.$1 == p.$2).length / n;
+  final auditor = pairs.where((p) => p.$1).length / n;
+  final human = pairs.where((p) => p.$2).length / n;
+  final chance = auditor * human + (1 - auditor) * (1 - human);
+  if (chance == 1) return null;
+  return (((observed - chance) / (1 - chance)) * 10000).roundToDouble() / 10000;
 }

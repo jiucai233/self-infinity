@@ -4,8 +4,12 @@
 
 - **提问时是一个完全的初学者。** 只问用户说过但没解释的东西，绝不引入用户没提过的概念
   或陷阱问题——真正的初学者做不到，而一个专家式的考官考的是考官自己的知识，不是用户的理解。
-- **裁决时是专家。** 用完整的领域知识，把所有实质性的错误都列出来，包括从没问到的。
-  提问时的克制不能变成裁决时的放水。
+- **只判，不教。** 问题、缺口、评语里都不说出答案：缺口只指出缺了什么、哪里错了，不写正确
+  版本——答案由用户自己想出来，否则审计就变成了讲课，用户也就不必真的理解。
+- **裁决时是专家，但考的是这个节点，不是整个领域。** 标准是节点的 Covers：说错的一律
+  算缺口（问没问到都算，提问时的克制不能变成对错误的放水）；漏掉的只有节点离了它就不成立
+  时才算——规格、数字、型号这类做的时候会去查的细节不算，除非 Covers 点了名。缺口最多三条。
+  只漏了一个关键步骤又不是最后一轮时，先问那一步，而不是直接判不通过。
 
 第一个问题不由模型生成，来自按节点位置选的模板（app/services/audit_flow.py）。轮数上限由
 代码强制，不告诉模型还剩几轮（它只是安全阀，不是配额）。pacing 只影响提问的长短，不影响
@@ -28,6 +32,8 @@ from app.models import NodePosition, NodeType
 logger = logging.getLogger(__name__)
 
 PACINGS = ("normal", "light")
+
+MAX_GAPS = 3
 
 GENERIC_PROBE = "Could you explain that part a bit more specifically?"
 FORCED_GAPS = ["Could not confirm a sufficient explanation within the question limit."]
@@ -54,28 +60,42 @@ Pacing: {pacing}
 
 Each turn, output either one question (probe) or the final verdict.
 
+You only judge; you never teach. Never give the answer anywhere, in a
+question, a gap or the comment: no correct fact, step, value, definition or
+explanation the user did not give. A question must not contain or hint at
+its own answer. A gap names what is missing or wrong ("how the board gets
+power"), never the right version of it.
+
 QUESTIONING: act as a complete beginner.
 - Ask one question per turn.
 - Ask only when (a) the user used a term or step they have not explained,
-  or (b) two things the user said do not connect or seem to contradict.
-- Never introduce a concept, term, example or hypothetical the user did
-  not mention. Never set traps.
+  (b) two things the user said do not connect or seem to contradict, or
+  (c) the user skipped something "Covers" names that the node cannot work
+  without: ask what happens there, rather than failing them for it.
+- Never introduce a concept, term, example or hypothetical that neither
+  the user nor "Covers" mentions. Never set traps.
 - If the user's explanation touches the situation of a past lesson above,
   you may ask about that point.
 - If you could repeat the explanation back without gaps, stop asking and
   give the verdict. Never ask questions just to fill turns.
 - Light pacing: keep each question to one short sentence.
 
-VERDICT: switch to an expert.
-- Judge with full domain knowledge whether the explanation holds.
-- List every substantive error, omission, or plausible-sounding but wrong
-  claim in "gaps", even if you never asked about it.
-- Restraint while questioning must not become leniency in the verdict.
-- pass is true only if there are no substantive gaps.
+VERDICT: switch to an expert, but grade this node, not the whole field.
+- The bar is "Covers": with what they said, could the user explain this
+  node to a beginner, or carry it out? Knowledge beyond it is not required.
+- A gap is (a) a claim that is wrong or plausible-sounding but wrong, even
+  if you never asked about it, or (b) an omission the node cannot work
+  without. Details one would look up while doing it (exact specs, numbers,
+  part names, every sub-step) are not gaps unless "Covers" names them.
+- Restraint while questioning must not become leniency about errors.
+- At most three gaps, the most important first.
+- pass is true when nothing stated is wrong and nothing essential is
+  missing. A correct, workable explanation passes even when it is brief.
 - Pacing never changes this standard.
 
 {position_block}
 {final_line}
+The comment explains the verdict in the same way, without the answer.
 score: 0 to 100, how much of the node the explanation got right. It is
 reported to the user; it does not decide pass, the gaps do.
 
@@ -89,8 +109,8 @@ Output only JSON, one of:
 
 POSITION_BLOCKS = {
     "leaf": (
-        "This is a specific topic. Judge the mechanism and details, including every case "
-        'named in "Covers".'
+        'This is a specific topic. Judge whether the mechanism is right, and the cases named in '
+        '"Covers".'
     ),
     "branch": (
         "This is a category. Ask the user to compare its parts: how they relate and when each "
@@ -103,7 +123,8 @@ POSITION_BLOCKS = {
     ),
     "task": (
         "This is an executable step. Judge whether the plan can be carried out: the order of "
-        "actions, what is needed, and how to tell it is done."
+        "actions, what is needed, and how to tell it is done. Specs and settings one would look "
+        "up while doing it are not required."
     ),
 }
 
@@ -266,7 +287,7 @@ class Auditor:
             "action": "verdict",
             "pass": passed,
             "score": max(0, min(100, score)),
-            "gaps": gaps,
+            "gaps": gaps[:MAX_GAPS],
             "comment": str(data.get("comment") or "").strip(),
         }
 

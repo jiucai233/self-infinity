@@ -977,4 +977,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get more => 'More';
+
+  @override
+  String get devPanel => 'Developer';
+
+  @override
+  String get devTitle => 'Audit review';
+
+  @override
+  String get devHint => 'Review each verdict below; the first row adds up your reviews.';
+
+  @override
+  String get devJudging => 'How well it judges';
+
+  @override
+  String get devOverall => 'How audits go';
+
+  @override
+  String get devAgreement => 'Agreement';
+
+  @override
+  String get devKappa => 'Kappa';
+
+  @override
+  String get devTooStrict => 'Too strict';
+
+  @override
+  String get devTooLenient => 'Too lenient';
+
+  @override
+  String get devLeaked => 'Gave answers';
+
+  @override
+  String get devReviewed => 'Reviewed';
+
+  @override
+  String get devAudits => 'Audits';
+
+  @override
+  String get devPassRate => 'Pass rate';
+
+  @override
+  String get devAvgScore => 'Avg score';
+
+  @override
+  String get devGapsPerFail => 'Gaps per fail';
+
+  @override
+  String get devAnswers => 'Answers per audit';
+
+  @override
+  String get devChallenged => 'Challenged';
+
+  @override
+  String get devRight => 'Right';
+
+  @override
+  String get devGaveAnswer => 'Gave the answer away';
+
+  @override
+  String get devNoAudits => 'No finished audits yet.';
+
+  @override
+  String get devTranscript => 'Transcript';
+
+  @override
+  String get devRefresh => 'Refresh';
 }

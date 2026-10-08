@@ -154,6 +154,11 @@ class AuditSession(SQLModel, table=True):
     max_turns: int = 8
     # 复核每场审计最多一次，这个标记就是那道收敛保证（见 app/agents/challenger.py）。
     challenged: bool = False
+    # A developer's review of the verdict in the developer panel (app/routers/dev.py):
+    # right / too_strict (failed, should have passed) / too_lenient (passed, should have failed).
+    review: str | None = None
+    # The developer saw the Auditor give the answer away.
+    review_leaked: bool | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 

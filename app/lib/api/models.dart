@@ -1667,3 +1667,152 @@ class Goal {
   /// UTC.
   final DateTime createdAt;
 }
+
+// ---------------------------------------------------------------------------
+// Developer panel (contract #34)
+// ---------------------------------------------------------------------------
+
+/// `GET /me` (contract #32): who is signed in, and whether they see the
+/// developer panel.
+@immutable
+class Me {
+  const Me({required this.id, this.email, required this.isDev});
+
+  factory Me.fromJson(Json json) => Me(
+    id: _str(json, 'id'),
+    email: _strN(json, 'email'),
+    isDev: _boolN(json, 'is_dev') ?? false,
+  );
+
+  final String id;
+  final String? email;
+  final bool isDev;
+}
+
+/// A developer's review of a verdict: the Auditor judged [right], failed an
+/// audit that should have passed ([tooStrict]), or passed one that should
+/// have failed ([tooLenient]).
+enum AuditReview {
+  right('right'),
+  tooStrict('too_strict'),
+  tooLenient('too_lenient');
+
+  const AuditReview(this.json);
+  final String json;
+
+  static AuditReview? fromJson(Object? value) => values.where((r) => r.json == value).firstOrNull;
+}
+
+/// A finished audit as the developer panel shows it.
+@immutable
+class DevAudit {
+  const DevAudit({
+    required this.id,
+    required this.skillId,
+    required this.skillTitle,
+    required this.status,
+    this.score,
+    this.gaps = const [],
+    this.comment,
+    this.turns = const [],
+    this.review,
+    this.leaked = false,
+    required this.createdAt,
+  });
+
+  factory DevAudit.fromJson(Json json) => DevAudit(
+    id: _int(json, 'id'),
+    skillId: _int(json, 'skill_id'),
+    skillTitle: _str(json, 'skill_title'),
+    status: AuditStatus.fromJson(json['status']),
+    score: _intN(json, 'score'),
+    gaps: _strList(json, 'gaps'),
+    comment: _strN(json, 'comment'),
+    turns: [
+      for (final t in (json['turns'] as List? ?? const [])) AuditTurn.fromJson(_asJson(t, 'turns')),
+    ],
+    review: AuditReview.fromJson(json['review']),
+    leaked: _boolN(json, 'leaked') ?? false,
+    createdAt: _time(json, 'created_at'),
+  );
+
+  final int id;
+  final int skillId;
+  final String skillTitle;
+  final AuditStatus status;
+  final int? score;
+  final List<String> gaps;
+  final String? comment;
+  final List<AuditTurn> turns;
+  final AuditReview? review;
+  final bool leaked;
+  final DateTime createdAt;
+
+  bool get passed => status == AuditStatus.passed;
+}
+
+/// What the developer panel adds up. Rates are 0..1, null when there is
+/// nothing to divide by.
+@immutable
+class DevMetrics {
+  const DevMetrics({
+    required this.finished,
+    this.passRate,
+    this.avgScore,
+    this.avgGapsWhenFailed,
+    this.avgAnswers,
+    this.challengedRate,
+    required this.reviewed,
+    this.agreement,
+    this.kappa,
+    required this.tooStrict,
+    required this.tooLenient,
+    required this.leaked,
+  });
+
+  factory DevMetrics.fromJson(Json json) => DevMetrics(
+    finished: _int(json, 'finished'),
+    passRate: _doubleN(json, 'pass_rate'),
+    avgScore: _doubleN(json, 'avg_score'),
+    avgGapsWhenFailed: _doubleN(json, 'avg_gaps_when_failed'),
+    avgAnswers: _doubleN(json, 'avg_answers'),
+    challengedRate: _doubleN(json, 'challenged_rate'),
+    reviewed: _int(json, 'reviewed'),
+    agreement: _doubleN(json, 'agreement'),
+    kappa: _doubleN(json, 'kappa'),
+    tooStrict: _int(json, 'too_strict'),
+    tooLenient: _int(json, 'too_lenient'),
+    leaked: _int(json, 'leaked'),
+  );
+
+  final int finished;
+  final double? passRate;
+  final double? avgScore;
+  final double? avgGapsWhenFailed;
+  final double? avgAnswers;
+  final double? challengedRate;
+  final int reviewed;
+  final double? agreement;
+  final double? kappa;
+  final int tooStrict;
+  final int tooLenient;
+  final int leaked;
+}
+
+/// `GET /dev/audits`: the metrics over every finished audit and the newest
+/// ones with their transcripts.
+@immutable
+class DevAudits {
+  const DevAudits({required this.metrics, required this.audits});
+
+  factory DevAudits.fromJson(Json json) => DevAudits(
+    metrics: DevMetrics.fromJson(_obj(json, 'metrics')),
+    audits: [
+      for (final a in (json['audits'] as List? ?? const []))
+        DevAudit.fromJson(_asJson(a, 'audits')),
+    ],
+  );
+
+  final DevMetrics metrics;
+  final List<DevAudit> audits;
+}

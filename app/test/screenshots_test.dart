@@ -61,13 +61,14 @@ final AppLanguage _language = AppLanguage.fromCode(Platform.environment['SHOTS_L
 Future<FakeApiClient> _seed() async {
   final api = FakeApiClient(latency: Duration.zero);
   await api.generateCourse(const GenerateRequest(topic: 'math'));
-  // Math: pass the root and Algebra, fail Functions, leave the rest.
-  await passAudit(api, 1);
-  await passAudit(api, 2);
-  final failed = await failAudit(api, 3);
-  await api.submitReflection(failed.sessionId, 'I just memorized Quadratic Functions');
-  await api.createSearchPlan(3, gap: 'the definition of a function');
-  await api.createSearchPlan(3, gap: 'reading graphs');
+  // Math, in its learning order: pass Discriminant (6) and Roots and
+  // Coefficients (7), fail Quadratic Equations (5), leave the rest.
+  await passAudit(api, 6);
+  await passAudit(api, 7);
+  final failed = await failAudit(api, 5);
+  await api.submitReflection(failed.sessionId, 'I just memorized the quadratic formula');
+  await api.createSearchPlan(5, gap: 'what the discriminant tells you');
+  await api.createSearchPlan(5, gap: 'reading graphs');
   await api.sendChat('I slept six hours and had ramen for lunch. I am a bit tired.');
   await api.updateProfile(
     identity: 'I am the type of person who explains it before I memorize it.',
@@ -348,7 +349,7 @@ void main() {
         size: size,
         name: '2-life-node-$tag',
         location: '/map',
-        act: (t) => tapLifeNode(t, 's3'),
+        act: (t) => tapLifeNode(t, 's5'),
       );
     });
     testWidgets(skip: dir == null, 'scene 2 outline ($tag)', (tester) async {
@@ -381,20 +382,20 @@ void main() {
       );
     });
     testWidgets(skip: dir == null, 'scene 4 node ($tag)', (tester) async {
-      await scene(tester, size: size, name: '4-node-$tag', location: '/skill/3');
+      await scene(tester, size: size, name: '4-node-$tag', location: '/skill/5');
     });
     testWidgets(skip: dir == null, 'scene 4 locked ($tag)', (tester) async {
       await scene(tester, size: size, name: '4-locked-$tag', location: '/skill/12');
     });
     testWidgets(skip: dir == null, 'scene 4-1 asking ($tag)', (tester) async {
-      await scene(tester, size: size, name: '41-asking-$tag', location: '/skill/4/audit');
+      await scene(tester, size: size, name: '41-asking-$tag', location: '/skill/9/audit');
     });
     testWidgets(skip: dir == null, 'scene 4-1 failed ($tag)', (tester) async {
       await scene(
         tester,
         size: size,
         name: '41-failed-$tag',
-        location: '/skill/4/audit',
+        location: '/skill/9/audit',
         act: (t) async {
           for (var i = 0; i < 2; i++) {
             await t.enterText(find.byKey(const Key('stage-input')), shortAnswer);
@@ -410,7 +411,7 @@ void main() {
         tester,
         size: size,
         name: '41-recorder-$tag',
-        location: '/skill/4/audit',
+        location: '/skill/9/audit',
         act: (t) async {
           for (var i = 0; i < 2; i++) {
             await t.enterText(find.byKey(const Key('stage-input')), shortAnswer);
@@ -428,7 +429,7 @@ void main() {
         tester,
         size: size,
         name: '41-passed-$tag',
-        location: '/skill/4/audit',
+        location: '/skill/9/audit',
         act: (t) async {
           for (var i = 0; i < 3; i++) {
             if (find.byKey(const Key('send')).evaluate().isEmpty) break;
@@ -540,14 +541,14 @@ void main() {
     testWidgets(skip: dir == null, 'scene 4-1 celebration with level up ($tag)', (tester) async {
       final api = FakeApiClient(latency: Duration.zero);
       await api.generateCourse(const GenerateRequest(topic: 'math'));
-      for (final id in [1, 2, 3, 4]) {
+      for (final id in [6, 7, 5, 9]) {
         await passAudit(api, id);
       }
       await scene(
         tester,
         size: size,
         name: '41-celebration-$tag',
-        location: '/skill/5/audit',
+        location: '/skill/10/audit',
         api: api,
         act: (t) async {
           for (var i = 0; i < 3; i++) {
@@ -644,9 +645,38 @@ void main() {
     testWidgets(skip: dir == null, 'scene 2 map with bosses ($tag)', (tester) async {
       final api = FakeApiClient(latency: Duration.zero);
       await api.generateCourse(const GenerateRequest(topic: 'math'));
-      await passAudit(api, 1);
-      await failAudit(api, 2);
+      await passAudit(api, 6);
+      await passAudit(api, 7);
+      await failAudit(api, 5); // a boss, failed
       await scene(tester, size: size, name: '2-map-bosses-$tag', location: '/map', api: api);
+    });
+    testWidgets(skip: dir == null, 'developer panel ($tag)', (tester) async {
+      final api = await _seed();
+      final audits = (await api.getDevAudits()).audits;
+      await api.reviewAudit(audits[0].id, AuditReview.right);
+      await api.reviewAudit(audits[1].id, AuditReview.tooStrict, leaked: true);
+      await scene(
+        tester,
+        size: size,
+        name: '9-dev-$tag',
+        location: '/map',
+        api: api,
+        act: (t) async {
+          if (find.byKey(const Key('open-left-drawer')).evaluate().isNotEmpty) {
+            await t.tap(find.byKey(const Key('open-left-drawer')));
+            await t.pumpAndSettle();
+          }
+          await t.tap(find.byKey(const Key('settings-button')));
+          await t.pumpAndSettle();
+          await t.tap(find.byKey(const Key('settings-dev')));
+          await t.pumpAndSettle();
+          final transcript = find.byKey(Key('dev-transcript-${audits[1].id}'));
+          if (transcript.evaluate().isNotEmpty) {
+            await t.tap(transcript); // below the fold on a phone
+            await t.pumpAndSettle();
+          }
+        },
+      );
     });
     testWidgets(skip: dir == null, 'scene 4 a boss node ($tag)', (tester) async {
       await scene(tester, size: size, name: '4-boss-$tag', location: '/skill/2');
@@ -654,12 +684,13 @@ void main() {
     testWidgets(skip: dir == null, 'scene 4-1 boss cleared ($tag)', (tester) async {
       final api = FakeApiClient(latency: Duration.zero);
       await api.generateCourse(const GenerateRequest(topic: 'math'));
-      await passAudit(api, 1);
+      await passAudit(api, 6);
+      await passAudit(api, 7);
       await scene(
         tester,
         size: size,
         name: '41-boss-cleared-$tag',
-        location: '/skill/2/audit',
+        location: '/skill/5/audit',
         api: api,
         act: (t) async {
           for (var i = 0; i < 3; i++) {
@@ -677,7 +708,7 @@ void main() {
         tester,
         size: size,
         name: '41-lesson-$tag',
-        location: '/skill/4/audit',
+        location: '/skill/9/audit',
         act: (t) async {
           for (var i = 0; i < 2; i++) {
             await t.enterText(find.byKey(const Key('stage-input')), shortAnswer);

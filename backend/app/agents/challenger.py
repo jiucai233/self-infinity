@@ -58,6 +58,7 @@ Rules:
 - If you challenge, write one question the user can answer in a few
   sentences. You are not failing the user; the question lets them show
   they understand.
+- Never give the answer: the question must not contain or hint at it.
 - Upholding is a normal result. When in doubt, uphold. Never invent a
   challenge.
 - Write the question in English.

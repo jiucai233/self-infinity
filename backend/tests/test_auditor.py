@@ -1,5 +1,6 @@
 """Auditor：追问 / 裁决的解析、位置块、pacing、轮数上限（UT-06 ~ UT-11）。"""
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -220,6 +221,31 @@ def test_gaps_are_normalised_to_a_list_of_strings():
     assert single.gaps == ["One"]
     assert mixed.gaps == ["a", "2"]
     assert missing.gaps == []
+
+
+def test_at_most_three_gaps_are_kept_the_first_ones():
+    gaps = ["most important", "second", "third", "a nitpick"]
+    result, _ = next_turn(json.dumps({"action": "verdict", "pass": False, "score": 40, "gaps": gaps, "comment": "c"}))
+
+    assert result.gaps == gaps[:3]
+
+
+def test_the_verdict_grades_the_node_against_covers_not_the_whole_field():
+    _, provider = next_turn(probe_json())
+    prompt = system_prompt(provider)
+
+    assert "grade this node, not the whole field" in prompt
+    assert "Details one would look up while doing it" in prompt
+    assert "At most three gaps" in prompt
+    assert "A correct, workable explanation passes even when it is brief." in prompt
+
+
+def test_the_auditor_only_judges_and_never_gives_the_answer():
+    _, provider = next_turn(probe_json())
+    prompt = system_prompt(provider)
+
+    assert "You only judge; you never teach. Never give the answer anywhere" in prompt
+    assert "never the right version of it" in prompt
 
 
 def test_pass_may_arrive_as_a_string():

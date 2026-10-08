@@ -40,7 +40,7 @@ def accounts_fixture(client_engine, monkeypatch):
 
 def test_dev_mode_needs_no_token(client):
     response = client.get("/api/me")
-    assert response.json() == {"id": "dev", "email": None, "auth_mode": "dev"}
+    assert response.json() == {"id": "dev", "email": None, "auth_mode": "dev", "is_dev": True}
 
 
 def test_without_a_valid_token_every_endpoint_is_401(accounts):
@@ -56,7 +56,7 @@ def test_without_a_valid_token_every_endpoint_is_401(accounts):
 
 def test_me_names_the_signed_in_account(accounts):
     response = accounts.get("/api/me", headers=auth(ALICE, email="alice@example.com"))
-    assert response.json() == {"id": ALICE, "email": "alice@example.com", "auth_mode": "supabase"}
+    assert response.json() == {"id": ALICE, "email": "alice@example.com", "auth_mode": "supabase", "is_dev": False}
 
 
 def test_each_account_sees_only_its_own_data(accounts):

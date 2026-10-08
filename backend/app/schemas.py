@@ -513,6 +513,60 @@ class MeOut(BaseModel):
     id: str
     email: str | None
     auth_mode: str
+    # Sees the developer panel (contract #34).
+    is_dev: bool = False
+
+
+# ---------------------------------------------------------------- developer panel (contract #34)
+
+AuditReview = Literal["right", "too_strict", "too_lenient"]
+
+
+class DevTurnOut(BaseModel):
+    role: str
+    content: str
+
+
+class DevAuditOut(BaseModel):
+    id: int
+    skill_id: int
+    skill_title: str
+    status: str
+    score: int | None
+    gaps: list[str]
+    comment: str | None
+    turns: list[DevTurnOut]
+    review: AuditReview | None
+    leaked: bool
+    created_at: datetime
+
+
+class DevMetricsOut(BaseModel):
+    """Rates are 0..1 and null when there is nothing to divide by."""
+
+    finished: int
+    pass_rate: float | None
+    avg_score: float | None
+    avg_gaps_when_failed: float | None
+    avg_answers: float | None
+    challenged_rate: float | None
+    reviewed: int
+    agreement: float | None
+    kappa: float | None
+    too_strict: int
+    too_lenient: int
+    leaked: int
+
+
+class DevAuditsOut(BaseModel):
+    metrics: DevMetricsOut
+    audits: list[DevAuditOut]
+
+
+class AuditReviewIn(BaseModel):
+    # null clears the review.
+    review: AuditReview | None
+    leaked: bool = False
 
 
 class GoalOut(BaseModel):
