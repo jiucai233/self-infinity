@@ -234,10 +234,18 @@ def test_the_verdict_grades_the_node_against_covers_not_the_whole_field():
     _, provider = next_turn(probe_json())
     prompt = system_prompt(provider)
 
-    assert "grade this node, not the whole field" in prompt
-    assert "Details one would look up while doing it" in prompt
+    assert "grade this node, not the field" in prompt
+    assert "would an expert mentor" in prompt and "Not:\n  could a stranger follow their words" in prompt
+    assert "Details one would look up\n  while doing it" in prompt
+    assert "Brevity is not a gap." in prompt
     assert "At most three gaps" in prompt
-    assert "A correct, workable explanation passes even when it is brief." in prompt
+    assert "on the final turn, give the benefit of the doubt" in prompt
+
+
+def test_a_reported_working_result_counts_as_the_check():
+    _, provider = next_turn(probe_json())
+
+    assert "a working result they\n  report" in system_prompt(provider)
 
 
 def test_the_auditor_only_judges_and_never_gives_the_answer():
