@@ -2121,6 +2121,318 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No live voice sessions yet.'**
   String get devNoVoice;
+
+  /// No description provided for @breakDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Break it down'**
+  String get breakDown;
+
+  /// No description provided for @breakingDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Breaking it down… this can take up to a minute.'**
+  String get breakingDown;
+
+  /// No description provided for @breakDownFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t break it down. Try again.'**
+  String get breakDownFailed;
+
+  /// No description provided for @unexpandedLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Not broken down yet. Break it down to see what\'s inside, or challenge it whole if you already know it.'**
+  String get unexpandedLine;
+
+  /// No description provided for @challengeWhole.
+  ///
+  /// In en, this message translates to:
+  /// **'Challenge it whole'**
+  String get challengeWhole;
+
+  /// No description provided for @challengeInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Challenge'**
+  String get challengeInProgress;
+
+  /// No description provided for @testedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleared by challenge'**
+  String get testedOut;
+
+  /// No description provided for @dotUnexpanded.
+  ///
+  /// In en, this message translates to:
+  /// **'Not broken down'**
+  String get dotUnexpanded;
+
+  /// No description provided for @lifeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My life'**
+  String get lifeTitle;
+
+  /// No description provided for @lifeOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'My life →'**
+  String get lifeOpen;
+
+  /// No description provided for @lifeDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} days'**
+  String lifeDays(int n);
+
+  /// No description provided for @lifeSleep.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep'**
+  String get lifeSleep;
+
+  /// No description provided for @lifeFocus.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus'**
+  String get lifeFocus;
+
+  /// No description provided for @lifeStress.
+  ///
+  /// In en, this message translates to:
+  /// **'Stress'**
+  String get lifeStress;
+
+  /// No description provided for @lifeExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercise'**
+  String get lifeExercise;
+
+  /// No description provided for @lifeWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight'**
+  String get lifeWeight;
+
+  /// No description provided for @lifeAudits.
+  ///
+  /// In en, this message translates to:
+  /// **'Audits'**
+  String get lifeAudits;
+
+  /// No description provided for @lifeOutOf5.
+  ///
+  /// In en, this message translates to:
+  /// **' / 5'**
+  String get lifeOutOf5;
+
+  /// No description provided for @lifeDaysSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **' days'**
+  String get lifeDaysSuffix;
+
+  /// No description provided for @lifeChartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Last {n} days'**
+  String lifeChartTitle(int n);
+
+  /// No description provided for @lifeNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing logged in these days yet.'**
+  String get lifeNoData;
+
+  /// No description provided for @lifePatterns.
+  ///
+  /// In en, this message translates to:
+  /// **'Your patterns'**
+  String get lifePatterns;
+
+  /// No description provided for @lifePatternsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Once you have {n} days on each side (say, {n} with 7 h+ of sleep and {n} under 6 h), your own patterns show up here.'**
+  String lifePatternsEmpty(int n);
+
+  /// No description provided for @lifePatternNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own days, not a cause: many things differ between them.'**
+  String get lifePatternNote;
+
+  /// No description provided for @lifeSleepBetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Slept 7 h+'**
+  String get lifeSleepBetter;
+
+  /// No description provided for @lifeSleepWorse.
+  ///
+  /// In en, this message translates to:
+  /// **'Under 6 h'**
+  String get lifeSleepWorse;
+
+  /// No description provided for @lifeExerciseBetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercised'**
+  String get lifeExerciseBetter;
+
+  /// No description provided for @lifeExerciseWorse.
+  ///
+  /// In en, this message translates to:
+  /// **'No exercise'**
+  String get lifeExerciseWorse;
+
+  /// No description provided for @lifeStressBetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Stress 1–2'**
+  String get lifeStressBetter;
+
+  /// No description provided for @lifeStressWorse.
+  ///
+  /// In en, this message translates to:
+  /// **'Stress 4–5'**
+  String get lifeStressWorse;
+
+  /// No description provided for @lifeGroupDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} days'**
+  String lifeGroupDays(int n);
+
+  /// No description provided for @lifeGroupPassed.
+  ///
+  /// In en, this message translates to:
+  /// **'passed {pct}% of {n}'**
+  String lifeGroupPassed(int pct, int n);
+
+  /// No description provided for @lifeGroupNoAudits.
+  ///
+  /// In en, this message translates to:
+  /// **'no audits'**
+  String get lifeGroupNoAudits;
+
+  /// No description provided for @lifeGroupFocus.
+  ///
+  /// In en, this message translates to:
+  /// **'focus {value}'**
+  String lifeGroupFocus(String value);
+
+  /// No description provided for @lifeAdvice.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get lifeAdvice;
+
+  /// No description provided for @lifeAdviceGet.
+  ///
+  /// In en, this message translates to:
+  /// **'Get advice'**
+  String get lifeAdviceGet;
+
+  /// No description provided for @lifeAdviceAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'New advice'**
+  String get lifeAdviceAgain;
+
+  /// No description provided for @lifeAdviceEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Three small things for the week, from your own numbers.'**
+  String get lifeAdviceEmpty;
+
+  /// No description provided for @lifeAdviceFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Advice isn\'t available right now. Try again.'**
+  String get lifeAdviceFailed;
+
+  /// No description provided for @lifeAdviceBasedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Based on: {fact}'**
+  String lifeAdviceBasedOn(String fact);
+
+  /// No description provided for @lifeLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get lifeLog;
+
+  /// No description provided for @lifeFillIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in a day'**
+  String get lifeFillIn;
+
+  /// No description provided for @lifeEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit {date}'**
+  String lifeEdit(String date);
+
+  /// No description provided for @lifeSleepHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep (h)'**
+  String get lifeSleepHours;
+
+  /// No description provided for @lifeSleepQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep quality'**
+  String get lifeSleepQuality;
+
+  /// No description provided for @lifeExerciseMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercise (min)'**
+  String get lifeExerciseMinutes;
+
+  /// No description provided for @lifeWeightKg.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight (kg)'**
+  String get lifeWeightKg;
+
+  /// No description provided for @lifeSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get lifeSave;
+
+  /// No description provided for @lifeMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} min'**
+  String lifeMinutes(int n);
+
+  /// No description provided for @lifeKg.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} kg'**
+  String lifeKg(String value);
+
+  /// No description provided for @lifeAuditsDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{passed}/{n} passed'**
+  String lifeAuditsDone(int passed, int n);
+
+  /// No description provided for @lifePrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored in our database. For advice the AI gets averages and patterns, never your days.'**
+  String get lifePrivacy;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

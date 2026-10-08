@@ -88,11 +88,12 @@ def test_ut03_no_syllabus_section_without_a_syllabus():
 def test_prompt_carries_the_course_settings_and_the_topic_goes_in_the_user_message():
     provider = ScriptedProvider(planner=OUTPUT)
 
-    Planner(provider).generate("Statistics\n\nQ: Level?\nA: University", node_count=20, max_depth=5, difficulty="deep")
+    Planner(provider).generate("Statistics\n\nQ: Level?\nA: University", difficulty="deep")
 
     (messages,) = provider.calls_for("planner")
     system = messages[0]["content"]
-    assert "about 20" in system and "Maximum levels: 5" in system and "derivations" in system
+    assert "Budget: at most 30 nodes" in system and "derivations" in system
+    assert "Plan a new course" in system and "Soft Actor-Critic" in system
     assert messages[1] == {"role": "user", "content": "Statistics\n\nQ: Level?\nA: University"}
 
 

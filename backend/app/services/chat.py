@@ -41,8 +41,6 @@ logger = logging.getLogger(__name__)
 
 ProviderFor = Callable[[str], LLMProvider]
 
-DEFAULT_NODE_COUNT = 12
-DEFAULT_MAX_DEPTH = 4
 DEFAULT_DIFFICULTY = "standard"
 
 
@@ -149,8 +147,6 @@ def _run_generate_course(
         generated = course_generation.generate_course(
             session,
             topic=topic,
-            node_count=DEFAULT_NODE_COUNT,
-            max_depth=DEFAULT_MAX_DEPTH,
             difficulty=DEFAULT_DIFFICULTY,
             search_syllabus=True,
             planner_provider=provider_for("planner"),

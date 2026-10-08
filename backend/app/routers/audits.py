@@ -40,6 +40,7 @@ def _session_out(session: Session, audit: AuditSession) -> AuditSessionOut:
         gaps=json.loads(audit.gaps_json) if audit.gaps_json else [],
         comment=audit.comment,
         turns=[AuditTurnOut(role=t.role.value, content=t.content) for t in audit_flow.audit_turns(session, audit.id)],
+        test_out=bool(audit.test_out),
     )
 
 
@@ -51,6 +52,7 @@ def audit_summary(audit: AuditSession, skill: SkillNode) -> AuditSummaryOut:
         status=audit.status,
         score=audit.score,
         created_at=audit.created_at,
+        test_out=bool(audit.test_out),
     )
 
 
@@ -75,11 +77,20 @@ def start_audit(
     skill = session.get(SkillNode, skill_id)
     if skill is None:
         raise HTTPException(404, "skill not found")
-    # 已通过的节点可以再审；requires 没满足也可以审（requires 只影响推荐顺序）。
-    if skill.status == SkillStatus.locked:
-        raise HTTPException(400, "skill is locked")
+    if body.test_out:
+        # A challenge skips what it covers, so it is open whether or not the node is.
+        if skill.status == SkillStatus.mastered:
+            raise HTTPException(400, "skill is already mastered")
+        if not audit_flow.can_test_out(session, skill):
+            raise HTTPException(400, "Only a branch or a whole course can be challenged.")
+    else:
+        # 已通过的节点可以再审；requires 没满足也可以审（requires 只影响推荐顺序）。
+        if skill.status == SkillStatus.locked:
+            raise HTTPException(400, "skill is locked")
+        if skill.unexpanded:
+            raise HTTPException(400, "Break this node down first, or challenge it as a whole.")
 
-    audit, question = audit_flow.start_audit(session, skill, body.mode)
+    audit, question = audit_flow.start_audit(session, skill, body.mode, test_out=body.test_out)
     return StartAuditResponse(session=_session_out(session, audit), opening_question=question)
 
 

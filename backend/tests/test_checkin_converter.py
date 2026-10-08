@@ -188,6 +188,9 @@ def test_it24_voice_check_in_returns_fields_transcript_and_missing(client):
             "stress": None,
             "transcript": EXAMPLE,
             "source": "voice",
+            "sleep_quality": None,
+            "exercise_minutes": None,
+            "weight_kg": None,
         },
         "missing_fields": ["focus", "stress"],
     }

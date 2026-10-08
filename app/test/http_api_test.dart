@@ -145,8 +145,6 @@ void main() {
       final r = await h.api.generateCourse(
         const GenerateRequest(
           topic: 'math',
-          nodeCount: 20,
-          maxDepth: 5,
           difficulty: Difficulty.deep,
           searchSyllabus: false,
         ),
@@ -155,8 +153,6 @@ void main() {
       expect(h.last.url.path, '/api/skills/generate');
       expect(h.lastBody, {
         'topic': 'math',
-        'node_count': 20,
-        'max_depth': 5,
         'difficulty': 'deep',
         'search_syllabus': false,
       });

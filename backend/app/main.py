@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app.db import init_db
 from app.i18n import parse_accept_language, reset_language, set_language
 from app.llm import get_provider
-from app.routers import audits, chat, checkins, courses, dev, goals, graph, journal, narrator, plan, principles, profile, skills, uploads, voice
+from app.routers import audits, chat, checkins, courses, dev, goals, graph, journal, life, narrator, plan, principles, profile, skills, uploads, voice
 
 logging.basicConfig(level=logging.INFO)
 
@@ -70,6 +70,7 @@ app.include_router(journal.router)
 app.include_router(goals.router)
 app.include_router(dev.router)
 app.include_router(voice.router)
+app.include_router(life.router)
 
 
 @app.get("/api/health")

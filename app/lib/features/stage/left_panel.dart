@@ -302,6 +302,18 @@ class _TodaySummary extends StatelessWidget {
               maxLines: 3,
               last: true,
             ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const Key('open-life'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 32),
+                ),
+                onPressed: () => context.go(AppRoutes.life),
+                child: Text(context.l10n.lifeOpen),
+              ),
+            ),
           ],
         ),
       ),

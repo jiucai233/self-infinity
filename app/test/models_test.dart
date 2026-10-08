@@ -479,23 +479,17 @@ void main() {
       const request = GenerateRequest(topic: 'Math');
       expect(request.toJson(), {
         'topic': 'Math',
-        'node_count': 12,
-        'max_depth': 4,
         'difficulty': 'standard',
         'search_syllabus': true,
       });
       expect(
         const GenerateRequest(
           topic: 'x',
-          nodeCount: 30,
-          maxDepth: 6,
           difficulty: Difficulty.deep,
           searchSyllabus: false,
         ).toJson(),
         {
           'topic': 'x',
-          'node_count': 30,
-          'max_depth': 6,
           'difficulty': 'deep',
           'search_syllabus': false,
         },

@@ -162,7 +162,8 @@ def test_the_session_response_matches_the_contract_shape(client, math):
     body = client.post(f"/api/skills/{math['discriminant']}/audits", json={"mode": "day"}).json()
 
     assert set(body) == {"session", "opening_question"}
-    assert set(body["session"]) == {"id", "skill_id", "node_position", "status", "score", "gaps", "comment", "turns"}
+    assert set(body["session"]) == {"id", "skill_id", "node_position", "status", "score", "gaps", "comment", "turns", "test_out"}
+    assert body["session"]["test_out"] is False
     assert body["session"]["skill_id"] == math["discriminant"]
     assert (body["session"]["status"], body["session"]["score"], body["session"]["gaps"], body["session"]["comment"]) == (
         "active", None, [], None,

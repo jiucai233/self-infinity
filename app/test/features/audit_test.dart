@@ -790,9 +790,9 @@ class _SlowStartApi extends FakeApiClient {
   _SlowStartApi() : super(latency: Duration.zero);
 
   @override
-  Future<AuditStart> startAudit(int skillId, {String mode = 'day'}) async {
+  Future<AuditStart> startAudit(int skillId, {String mode = 'day', bool testOut = false}) async {
     await Future<void>.delayed(const Duration(milliseconds: 200));
-    return super.startAudit(skillId, mode: mode);
+    return super.startAudit(skillId, mode: mode, testOut: testOut);
   }
 }
 

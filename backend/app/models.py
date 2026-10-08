@@ -121,6 +121,10 @@ class SkillNode(SQLModel, table=True):
     status: SkillStatus = SkillStatus.locked
     node_type: NodeType = NodeType.concept
     mastery_score: int | None = None
+    # A category the Planner left to break down later (POST /skills/{id}/expand); no children yet.
+    unexpanded: bool | None = None
+    # Mastered by passing a challenge on a node above it, not by its own audit.
+    tested_out: bool | None = None
 
 
 class SkillEdge(SQLModel, table=True):
@@ -159,6 +163,8 @@ class AuditSession(SQLModel, table=True):
     review: str | None = None
     # The developer saw the Auditor give the answer away.
     review_leaked: bool | None = None
+    # A challenge on a whole branch (or course): pass it and every node under it is mastered.
+    test_out: bool | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 
@@ -224,6 +230,20 @@ class DailyCheckIn(SQLModel, table=True):
     transcript: str | None = None
     source: CheckInSource = CheckInSource.manual
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    # For trends (the life overview); recorded when said or typed, never asked for.
+    sleep_quality: int | None = None  # 1-5
+    exercise_minutes: int | None = None
+    weight_kg: float | None = None
+
+
+class LifeAdvice(SQLModel, table=True):
+    """The Life Coach's latest advice (contract #39); history kept, the newest row is read."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    advice_json: str
+    # The summary the coach was given: what the advice is based on.
+    facts_json: str
+    generated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 
 class NarratorBriefing(SQLModel, table=True):

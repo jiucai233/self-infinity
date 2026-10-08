@@ -4,6 +4,11 @@ import 'dart:ui';
 import '../../api/graph_utils.dart';
 import '../../api/models.dart';
 
+/// The label of a node on the graph: its title, and ` +` while it is a
+/// category not broken down yet (there is more inside).
+String graphLabel(SkillNode node) =>
+    node.unexpanded && !node.isMastered ? '${node.title} +' : node.title;
+
 /// Where the dots and labels of the skill graph go (scene 2).
 ///
 /// A simple, deterministic layered layout: the column of a node is its depth
@@ -92,7 +97,7 @@ class GraphLayout {
     }
 
     final labelWidths = <int, double>{
-      for (final n in nodes) n.id: math.min(measure(n.title), maxLabelWidth),
+      for (final n in nodes) n.id: math.min(measure(graphLabel(n)), maxLabelWidth),
     };
     final columns = depth.values.fold<int>(0, math.max) + 1;
     final columnWidth = List<double>.filled(columns, 0);

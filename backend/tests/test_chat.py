@@ -388,8 +388,8 @@ def test_plan_runs_the_recommender(client):
     assert second["action"]["type"] == "plan"
     plan = second["action"]["plan"]
     assert plan["id"] == client.get("/api/plan/current").json()["id"]
-    assert [s["skill_title"] for s in plan["steps"]] == ["Discriminant"]
-    assert second["content"] == "Today's quests: “Discriminant”."
+    assert [s["skill_title"] for s in plan["steps"]] == ["Discriminant", "Linear Functions", "Limits of Sequences"]
+    assert second["content"] == "Today's quests: “Discriminant”, “Linear Functions”, “Limits of Sequences”."
 
 
 def test_plan_without_an_available_node_is_explained_with_200(client):

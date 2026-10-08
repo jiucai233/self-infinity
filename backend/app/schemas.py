@@ -59,10 +59,8 @@ class ScoutResponse(BaseModel):
 
 class GenerateCourseRequest(BaseModel):
     topic: str
-    # 上下界是防呆而非性能考虑：少于 4 个节点不成课程，多于 30 个则单次生成的质量明显
-    # 下降、开始出现凑数的空节点。
-    node_count: int = Field(default=12, ge=4, le=30)
-    max_depth: int = Field(default=4, ge=2, le=6)
+    # No node count or depth: a course is as big as its topic, down to one model / method /
+    # concept per leaf, and is generated in layers (POST /skills/{id}/expand).
     difficulty: Literal["intro", "standard", "deep"] = "standard"
     # 关掉可以省一次搜索加一次 LLM 调用；离线演示和不想联网时用。
     search_syllabus: bool = True
@@ -87,6 +85,13 @@ class SkillNodeOut(_Out):
     status: SkillStatus
     node_type: NodeType
     mastery_score: int | None
+    unexpanded: bool = False
+    tested_out: bool = False
+
+    @field_validator("unexpanded", "tested_out", mode="before")
+    @classmethod
+    def _null_is_false(cls, value):
+        return bool(value)
 
 
 class SkillEdgeOut(_Out):
@@ -116,6 +121,8 @@ class RecommendationOut(BaseModel):
 
 class StartAuditRequest(BaseModel):
     mode: Literal["day", "night"] = "day"
+    # Challenge a whole branch (or the course): pass it and everything under it is mastered.
+    test_out: bool = False
 
 
 class AuditTurnOut(BaseModel):
@@ -132,6 +139,7 @@ class AuditSessionOut(BaseModel):
     gaps: list[str]
     comment: str | None
     turns: list[AuditTurnOut]
+    test_out: bool = False
 
 
 class StartAuditResponse(BaseModel):
@@ -210,11 +218,15 @@ class GraphResponse(BaseModel):
 
 # ---------------------------------------------------------------- 签到、画像、简报、学习计划
 
+# The five a check-in asks about (a follow-up names the missing ones).
 CHECKIN_FIELDS = ("sleep_hours", "exercised", "diet_note", "focus", "stress")
+# Kept for trends when given, never asked for.
+EXTRA_CHECKIN_FIELDS = ("sleep_quality", "exercise_minutes", "weight_kg")
+ALL_CHECKIN_FIELDS = CHECKIN_FIELDS + EXTRA_CHECKIN_FIELDS
 
 
 class CheckInRequest(BaseModel):
-    """Voice (`transcript`) or manual (any subset of the five fields). A transcript wins."""
+    """Voice (`transcript`) or manual (any subset of the fields). A transcript wins."""
 
     transcript: str | None = None
     sleep_hours: int | None = Field(default=None, ge=0, le=14)
@@ -222,6 +234,9 @@ class CheckInRequest(BaseModel):
     diet_note: str | None = None
     focus: int | None = Field(default=None, ge=1, le=5)
     stress: int | None = Field(default=None, ge=1, le=5)
+    sleep_quality: int | None = Field(default=None, ge=1, le=5)
+    exercise_minutes: int | None = Field(default=None, ge=0, le=600)
+    weight_kg: float | None = Field(default=None, ge=20, le=400)
 
     @field_validator("transcript")
     @classmethod
@@ -235,7 +250,7 @@ class CheckInRequest(BaseModel):
 
     @model_validator(mode="after")
     def _needs_something(self):
-        if self.transcript is None and all(getattr(self, f) is None for f in CHECKIN_FIELDS):
+        if self.transcript is None and all(getattr(self, f) is None for f in ALL_CHECKIN_FIELDS):
             raise ValueError("a transcript or at least one field is required")
         return self
 
@@ -249,6 +264,94 @@ class DailyCheckInOut(_Out):
     stress: int | None
     transcript: str | None
     source: CheckInSource
+    sleep_quality: int | None = None
+    exercise_minutes: int | None = None
+    weight_kg: float | None = None
+
+
+class CheckInEdit(BaseModel):
+    """PUT /checkins/{date}: the fields sent replace the day's (null clears one); the others stay."""
+
+    sleep_hours: int | None = Field(default=None, ge=0, le=14)
+    exercised: bool | None = None
+    diet_note: str | None = Field(default=None, max_length=200)
+    focus: int | None = Field(default=None, ge=1, le=5)
+    stress: int | None = Field(default=None, ge=1, le=5)
+    sleep_quality: int | None = Field(default=None, ge=1, le=5)
+    exercise_minutes: int | None = Field(default=None, ge=0, le=600)
+    weight_kg: float | None = Field(default=None, ge=20, le=400)
+
+    @field_validator("diet_note")
+    @classmethod
+    def _clean_diet_note(cls, value: str | None) -> str | None:
+        return (value.strip() or None) if value is not None else None
+
+
+class LifeDayOut(BaseModel):
+    """One calendar day of the life overview: its check-in (nulls without one) and its audits."""
+
+    date: date_
+    checked_in: bool
+    sleep_hours: int | None = None
+    sleep_quality: int | None = None
+    exercised: bool | None = None
+    exercise_minutes: int | None = None
+    weight_kg: float | None = None
+    diet_note: str | None = None
+    focus: int | None = None
+    stress: int | None = None
+    audits: int = 0
+    passed: int = 0
+
+
+class LifeGroupOut(BaseModel):
+    days: int
+    audits: int
+    pass_rate: float | None
+    avg_focus: float | None
+
+
+class LifePatternOut(BaseModel):
+    """Two groups of the player's own days compared. Shown once each group has enough days."""
+
+    kind: Literal["sleep", "exercise", "stress"]
+    better: LifeGroupOut  # slept 7 h or more / exercised / stress 1-2
+    worse: LifeGroupOut  # under 6 h / did not exercise / stress 4-5
+
+
+class LifeSummaryOut(BaseModel):
+    days: int  # the window
+    days_logged: int
+    avg_sleep_hours: float | None
+    avg_sleep_quality: float | None
+    exercise_days: int
+    avg_exercise_minutes: float | None
+    avg_focus: float | None
+    avg_stress: float | None
+    weight_first: float | None
+    weight_last: float | None
+    audits: int
+    passed: int
+
+
+class LifeAdviceItemOut(BaseModel):
+    title: str
+    body: str
+    based_on: str
+
+
+class LifeAdviceOut(BaseModel):
+    items: list[LifeAdviceItemOut]
+    generated_at: datetime
+
+
+class LifeOut(BaseModel):
+    summary: LifeSummaryOut
+    days: list[LifeDayOut]  # every day of the window, oldest first
+    patterns: list[LifePatternOut]
+    # Days each group needs before a pattern is shown.
+    pattern_min_days: int
+    advice: LifeAdviceOut | None
 
 
 class CheckInResponse(BaseModel):
@@ -437,6 +540,7 @@ class AuditSummaryOut(BaseModel):
     status: AuditStatus
     score: int | None
     created_at: datetime
+    test_out: bool = False
 
 
 class RequiredSkillOut(BaseModel):

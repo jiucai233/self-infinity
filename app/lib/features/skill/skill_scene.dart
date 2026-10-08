@@ -56,6 +56,10 @@ class _SkillSceneState extends State<SkillScene> {
 
   String? _reply;
   String _replyAgent = 'front_desk';
+
+  /// Breaking an unexpanded node down (one Planner call, up to a minute).
+  bool _expanding = false;
+  bool _expandFailed = false;
   String? _chatError;
 
   @override
@@ -113,7 +117,7 @@ class _SkillSceneState extends State<SkillScene> {
       final map = await _api.getCourseMap(overview.skill.courseId);
       if (!mounted || token != _token) return;
       setState(() {
-        _boss = isBoss(overview.skill.id, map.edges);
+        _boss = isBoss(overview.skill, map.edges);
         _courseMap = map;
       });
     } on Object {
@@ -129,6 +133,29 @@ class _SkillSceneState extends State<SkillScene> {
       nodeCount: map.nodes.length,
     );
     if (deleted && mounted) context.go(AppRoutes.map);
+  }
+
+  /// Breaks the node down into its parts; the page and the map reload.
+  Future<void> _expand() async {
+    final overview = _overview;
+    if (overview == null || _expanding) return;
+    setState(() {
+      _expanding = true;
+      _expandFailed = false;
+      _reply = null;
+    });
+    try {
+      await _api.expandSkill(overview.skill.id);
+      if (!mounted) return;
+      setState(() => _expanding = false);
+      context.read<AppState>().markDataChanged();
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _expanding = false;
+        _expandFailed = true;
+      });
+    }
   }
 
   // -- chat about the node ------------------------------------------------------
@@ -237,7 +264,7 @@ class _SkillSceneState extends State<SkillScene> {
   Widget _statusChip(SkillOverview overview) {
     final node = overview.skill;
     final l = context.l10n;
-    if (node.isMastered) return StatusChip.success(l.dotCleared);
+    if (node.isMastered) return StatusChip.success(node.testedOut ? l.testedOut : l.dotCleared);
     if (node.isLocked) return StatusChip.neutral(l.dotLocked);
     final last = overview.audits.firstOrNull;
     if (last != null && last.status == AuditStatus.failed) return StatusChip.danger(l.auditFailed);
@@ -253,14 +280,25 @@ class _SkillSceneState extends State<SkillScene> {
     return LayoutBuilder(
       builder: (context, box) {
         final contents = _ContentsCard(overview: overview);
+        final node = overview.skill;
+        final map = _courseMap;
+        final chapter = map == null ? null : chapterOf(node.id, map.edges);
         final avatar = _AvatarColumn(
           overview: overview,
-          openNode: _courseMap?.nodes.where((n) => n.isAvailable).firstOrNull,
+          // The open node of this node's chapter (the root waits for them all).
+          openNode: map?.nodes
+              .where((n) => n.isAvailable && (chapter == null || chapterOf(n.id, map.edges) == chapter))
+              .firstOrNull,
           reply: _reply,
           replyAgent: _replyAgent,
           thinking: chat.sending,
+          expanding: _expanding,
+          expandFailed: _expandFailed,
+          canTestOut: !node.isMastered && (node.unexpanded || _boss),
           size: (box.maxHeight * 0.3).clamp(120.0, 240.0),
-          onStart: () => context.go(AppRoutes.audit(overview.skill.id)),
+          onStart: () => context.go(AppRoutes.audit(node.id)),
+          onExpand: () => unawaited(_expand()),
+          onTestOut: () => context.go(AppRoutes.challenge(node.id)),
         );
         final sideBySide = box.maxWidth >= 680;
         return SingleChildScrollView(
@@ -502,24 +540,42 @@ class _AvatarColumn extends StatelessWidget {
     required this.reply,
     required this.replyAgent,
     required this.thinking,
+    required this.expanding,
+    required this.expandFailed,
+    required this.canTestOut,
     required this.size,
     required this.onStart,
+    required this.onExpand,
+    required this.onTestOut,
   });
 
   final SkillOverview overview;
 
-  /// The node of the course that is open now (one at a time, in the learning
+  /// The open node of this node's chapter (one per chapter, in the learning
   /// order); null until the course map is read.
   final SkillNode? openNode;
   final String? reply;
   final String replyAgent;
   final bool thinking;
+  final bool expanding;
+  final bool expandFailed;
+
+  /// A branch, root or unexpanded node not cleared yet: it can be challenged
+  /// whole, locked or not.
+  final bool canTestOut;
   final double size;
   final VoidCallback onStart;
+  final VoidCallback onExpand;
+  final VoidCallback onTestOut;
+
+  bool get _unexpanded => overview.skill.unexpanded && !overview.skill.isMastered;
 
   String _line(AppLocalizations l) {
     final node = overview.skill;
+    if (expanding) return l.breakingDown;
+    if (expandFailed) return l.breakDownFailed;
     if (reply != null) return reply!;
+    if (_unexpanded) return l.unexpandedLine;
     if (node.isLocked) {
       final open = openNode;
       return open == null ? l.lockedClearParent : l.lockedClearNamed(open.title);
@@ -532,7 +588,8 @@ class _AvatarColumn extends StatelessWidget {
     final node = overview.skill;
     final theme = Theme.of(context).textTheme;
     final agent = reply == null ? 'front_desk' : replyAgent;
-    final state = thinking ? AvatarState.thinking : AvatarState.idle;
+    final state = thinking || expanding ? AvatarState.thinking : AvatarState.idle;
+    final busy = thinking || expanding;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -550,7 +607,7 @@ class _AvatarColumn extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Flexible(child: Text(_line(context.l10n), style: theme.bodyLarge)),
-                    if (!node.isLocked) ...[
+                    if (!node.isLocked && !_unexpanded && !expanding) ...[
                       const SizedBox(width: AppSpacing.md),
                       IconButton(
                         key: const Key('start-audit'),
@@ -571,12 +628,34 @@ class _AvatarColumn extends StatelessWidget {
                   ],
                 ),
         ),
+        if (!busy && (_unexpanded || canTestOut)) ...[
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            alignment: WrapAlignment.center,
+            children: [
+              if (_unexpanded)
+                FilledButton(
+                  key: const Key('expand-node'),
+                  onPressed: onExpand,
+                  child: Text(context.l10n.breakDown),
+                ),
+              if (canTestOut)
+                OutlinedButton(
+                  key: const Key('test-out'),
+                  onPressed: onTestOut,
+                  child: Text(context.l10n.challengeWhole),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: AppSpacing.sm),
         Avatar(
           agent: agent,
           mood: AvatarMood.smile,
           state: state,
-          wave: !node.isLocked && reply == null,
+          wave: !node.isLocked && !_unexpanded && reply == null,
           size: size,
         ),
       ],

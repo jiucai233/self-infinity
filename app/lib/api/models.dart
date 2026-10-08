@@ -444,6 +444,8 @@ class SkillNode {
     required this.status,
     required this.nodeType,
     this.masteryScore,
+    this.unexpanded = false,
+    this.testedOut = false,
   });
 
   factory SkillNode.fromJson(Json json) => SkillNode(
@@ -455,6 +457,8 @@ class SkillNode {
     status: SkillStatus.fromJson(json['status']),
     nodeType: NodeType.fromJson(json['node_type']),
     masteryScore: _intN(json, 'mastery_score'),
+    unexpanded: _boolN(json, 'unexpanded') ?? false,
+    testedOut: _boolN(json, 'tested_out') ?? false,
   );
 
   final int id;
@@ -468,11 +472,24 @@ class SkillNode {
   /// 0–100, written when an audit passes; otherwise null.
   final int? masteryScore;
 
+  /// A category not broken down yet: no children until `expandSkill`. It can
+  /// be broken down or challenged as a whole, not audited on its own.
+  final bool unexpanded;
+
+  /// Mastered by a challenge on a node above it, not by its own audit.
+  final bool testedOut;
+
   bool get isLocked => status == SkillStatus.locked;
   bool get isAvailable => status == SkillStatus.available;
   bool get isMastered => status == SkillStatus.mastered;
 
-  SkillNode copyWith({SkillStatus? status, NodeType? nodeType, int? masteryScore}) => SkillNode(
+  SkillNode copyWith({
+    SkillStatus? status,
+    NodeType? nodeType,
+    int? masteryScore,
+    bool? unexpanded,
+    bool? testedOut,
+  }) => SkillNode(
     id: id,
     courseId: courseId,
     slug: slug,
@@ -481,6 +498,8 @@ class SkillNode {
     status: status ?? this.status,
     nodeType: nodeType ?? this.nodeType,
     masteryScore: masteryScore ?? this.masteryScore,
+    unexpanded: unexpanded ?? this.unexpanded,
+    testedOut: testedOut ?? this.testedOut,
   );
 }
 
@@ -552,20 +571,13 @@ class CourseMap {
 class GenerateRequest {
   const GenerateRequest({
     required this.topic,
-    this.nodeCount = 12,
-    this.maxDepth = 4,
     this.difficulty = Difficulty.standard,
     this.searchSyllabus = true,
   });
 
   /// Topic text, optionally with clarification answers (see [composeTopic]).
+  /// A course is as big as its topic: no node count or depth.
   final String topic;
-
-  /// 4–30.
-  final int nodeCount;
-
-  /// 2–6 levels.
-  final int maxDepth;
   final Difficulty difficulty;
 
   /// Try to find a real syllabus (`Find a real syllabus`).
@@ -573,8 +585,6 @@ class GenerateRequest {
 
   Json toJson() => {
     'topic': topic,
-    'node_count': nodeCount,
-    'max_depth': maxDepth,
     'difficulty': difficulty.value,
     'search_syllabus': searchSyllabus,
   };
@@ -724,6 +734,7 @@ class AuditSession {
     this.gaps = const [],
     this.comment,
     this.turns = const [],
+    this.testOut = false,
   });
 
   factory AuditSession.fromJson(Json json) => AuditSession(
@@ -735,6 +746,7 @@ class AuditSession {
     gaps: _strList(json, 'gaps'),
     comment: _strN(json, 'comment'),
     turns: _list(json, 'turns', AuditTurn.fromJson),
+    testOut: _boolN(json, 'test_out') ?? false,
   );
 
   final int id;
@@ -747,6 +759,9 @@ class AuditSession {
 
   /// The opening question is the first auditor turn.
   final List<AuditTurn> turns;
+
+  /// A challenge on a whole branch: pass it and everything under it is mastered.
+  final bool testOut;
 }
 
 /// Body of `POST /skills/{id}/audits`. Contract endpoint 7.
@@ -971,6 +986,9 @@ class DailyCheckIn {
     this.stress,
     this.transcript,
     required this.source,
+    this.sleepQuality,
+    this.exerciseMinutes,
+    this.weightKg,
   });
 
   factory DailyCheckIn.fromJson(Json json) => DailyCheckIn(
@@ -982,6 +1000,9 @@ class DailyCheckIn {
     stress: _intN(json, 'stress'),
     transcript: _strN(json, 'transcript'),
     source: CheckInSource.fromJson(json['source']),
+    sleepQuality: _intN(json, 'sleep_quality'),
+    exerciseMinutes: _intN(json, 'exercise_minutes'),
+    weightKg: _doubleN(json, 'weight_kg'),
   );
 
   /// KST calendar date, `YYYY-MM-DD`.
@@ -993,6 +1014,213 @@ class DailyCheckIn {
   final int? stress;
   final String? transcript;
   final CheckInSource source;
+
+  /// 1–5; kept for trends, never asked for.
+  final int? sleepQuality;
+  final int? exerciseMinutes;
+  final double? weightKg;
+}
+
+/// One day of the life overview (contract #39): its check-in (nulls without
+/// one) and its finished audits.
+@immutable
+class LifeDay {
+  const LifeDay({
+    required this.date,
+    required this.checkedIn,
+    this.sleepHours,
+    this.sleepQuality,
+    this.exercised,
+    this.exerciseMinutes,
+    this.weightKg,
+    this.dietNote,
+    this.focus,
+    this.stress,
+    this.audits = 0,
+    this.passed = 0,
+  });
+
+  factory LifeDay.fromJson(Json json) => LifeDay(
+    date: _str(json, 'date'),
+    checkedIn: _bool(json, 'checked_in'),
+    sleepHours: _doubleN(json, 'sleep_hours'),
+    sleepQuality: _intN(json, 'sleep_quality'),
+    exercised: _boolN(json, 'exercised'),
+    exerciseMinutes: _intN(json, 'exercise_minutes'),
+    weightKg: _doubleN(json, 'weight_kg'),
+    dietNote: _strN(json, 'diet_note'),
+    focus: _intN(json, 'focus'),
+    stress: _intN(json, 'stress'),
+    audits: _intN(json, 'audits') ?? 0,
+    passed: _intN(json, 'passed') ?? 0,
+  );
+
+  /// `YYYY-MM-DD` (KST).
+  final String date;
+  final bool checkedIn;
+  final double? sleepHours;
+  final int? sleepQuality;
+  final bool? exercised;
+  final int? exerciseMinutes;
+  final double? weightKg;
+  final String? dietNote;
+  final int? focus;
+  final int? stress;
+  final int audits;
+  final int passed;
+}
+
+/// One side of a [LifePattern].
+@immutable
+class LifeGroup {
+  const LifeGroup({required this.days, required this.audits, this.passRate, this.avgFocus});
+
+  factory LifeGroup.fromJson(Json json) => LifeGroup(
+    days: _int(json, 'days'),
+    audits: _int(json, 'audits'),
+    passRate: _doubleN(json, 'pass_rate'),
+    avgFocus: _doubleN(json, 'avg_focus'),
+  );
+
+  final int days;
+  final int audits;
+
+  /// 0..1; null without audits.
+  final double? passRate;
+  final double? avgFocus;
+}
+
+enum LifePatternKind {
+  sleep,
+  exercise,
+  stress;
+
+  static LifePatternKind fromJson(Object? v) => values.firstWhere(
+    (k) => k.name == v,
+    orElse: () => throw FormatException('unknown pattern kind: $v'),
+  );
+}
+
+/// The player's own days in two groups (slept 7 h+ vs under 6 h, exercised vs
+/// not, stress 1–2 vs 4–5). Their own numbers, never a cause.
+@immutable
+class LifePattern {
+  const LifePattern({required this.kind, required this.better, required this.worse});
+
+  factory LifePattern.fromJson(Json json) => LifePattern(
+    kind: LifePatternKind.fromJson(json['kind']),
+    better: LifeGroup.fromJson(_obj(json, 'better')),
+    worse: LifeGroup.fromJson(_obj(json, 'worse')),
+  );
+
+  final LifePatternKind kind;
+  final LifeGroup better;
+  final LifeGroup worse;
+}
+
+@immutable
+class LifeSummary {
+  const LifeSummary({
+    required this.days,
+    required this.daysLogged,
+    this.avgSleepHours,
+    this.avgSleepQuality,
+    required this.exerciseDays,
+    this.avgExerciseMinutes,
+    this.avgFocus,
+    this.avgStress,
+    this.weightFirst,
+    this.weightLast,
+    required this.audits,
+    required this.passed,
+  });
+
+  factory LifeSummary.fromJson(Json json) => LifeSummary(
+    days: _int(json, 'days'),
+    daysLogged: _int(json, 'days_logged'),
+    avgSleepHours: _doubleN(json, 'avg_sleep_hours'),
+    avgSleepQuality: _doubleN(json, 'avg_sleep_quality'),
+    exerciseDays: _int(json, 'exercise_days'),
+    avgExerciseMinutes: _doubleN(json, 'avg_exercise_minutes'),
+    avgFocus: _doubleN(json, 'avg_focus'),
+    avgStress: _doubleN(json, 'avg_stress'),
+    weightFirst: _doubleN(json, 'weight_first'),
+    weightLast: _doubleN(json, 'weight_last'),
+    audits: _int(json, 'audits'),
+    passed: _int(json, 'passed'),
+  );
+
+  final int days;
+  final int daysLogged;
+  final double? avgSleepHours;
+  final double? avgSleepQuality;
+  final int exerciseDays;
+  final double? avgExerciseMinutes;
+  final double? avgFocus;
+  final double? avgStress;
+  final double? weightFirst;
+  final double? weightLast;
+  final int audits;
+  final int passed;
+}
+
+@immutable
+class LifeAdviceItem {
+  const LifeAdviceItem({required this.title, required this.body, required this.basedOn});
+
+  factory LifeAdviceItem.fromJson(Json json) => LifeAdviceItem(
+    title: _str(json, 'title'),
+    body: _str(json, 'body'),
+    basedOn: _strN(json, 'based_on') ?? '',
+  );
+
+  final String title;
+  final String body;
+
+  /// The fact of the player's own it rests on.
+  final String basedOn;
+}
+
+/// The Life Coach's three pieces of advice (contract #39).
+@immutable
+class LifeAdvice {
+  const LifeAdvice({required this.items, required this.generatedAt});
+
+  factory LifeAdvice.fromJson(Json json) => LifeAdvice(
+    items: _list(json, 'items', LifeAdviceItem.fromJson),
+    generatedAt: _time(json, 'generated_at'),
+  );
+
+  final List<LifeAdviceItem> items;
+  final DateTime generatedAt;
+}
+
+/// `GET /life` (contract #39): the player's own record.
+@immutable
+class Life {
+  const Life({
+    required this.summary,
+    required this.days,
+    this.patterns = const [],
+    this.patternMinDays = 5,
+    this.advice,
+  });
+
+  factory Life.fromJson(Json json) => Life(
+    summary: LifeSummary.fromJson(_obj(json, 'summary')),
+    days: _list(json, 'days', LifeDay.fromJson),
+    patterns: _list(json, 'patterns', LifePattern.fromJson),
+    patternMinDays: _intN(json, 'pattern_min_days') ?? 5,
+    advice: json['advice'] == null ? null : LifeAdvice.fromJson(_obj(json, 'advice')),
+  );
+
+  final LifeSummary summary;
+
+  /// Every day of the window, oldest first.
+  final List<LifeDay> days;
+  final List<LifePattern> patterns;
+  final int patternMinDays;
+  final LifeAdvice? advice;
 }
 
 /// Body of `POST /checkins`. Contract endpoint 12.
@@ -1468,6 +1696,7 @@ class AuditSummary {
     required this.status,
     this.score,
     required this.createdAt,
+    this.testOut = false,
   });
 
   factory AuditSummary.fromJson(Json json) => AuditSummary(
@@ -1477,6 +1706,7 @@ class AuditSummary {
     status: AuditStatus.fromJson(json['status']),
     score: _intN(json, 'score'),
     createdAt: _time(json, 'created_at'),
+    testOut: _boolN(json, 'test_out') ?? false,
   );
 
   final int id;
@@ -1485,6 +1715,9 @@ class AuditSummary {
   final AuditStatus status;
   final int? score;
   final DateTime createdAt;
+
+  /// A challenge on a whole branch.
+  final bool testOut;
 }
 
 /// A prerequisite of a node with the reason (`SkillOverview.requires`).

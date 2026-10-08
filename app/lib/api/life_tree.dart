@@ -30,6 +30,7 @@ class LifeNode {
     this.status,
     this.failed = false,
     this.boss = false,
+    this.unexpanded = false,
   });
 
   /// `me`, `c{id}` (a course with several roots), `s{id}`.
@@ -52,6 +53,9 @@ class LifeNode {
 
   /// A root or branch of its course (see [isBoss]).
   final bool boss;
+
+  /// A category not broken down yet ([SkillNode.unexpanded]).
+  final bool unexpanded;
 
   bool get isMastered => status == SkillStatus.mastered;
   bool get isAvailable => status == SkillStatus.available;
@@ -200,7 +204,8 @@ class LifeTree {
       skillId: n.id,
       status: n.status,
       failed: failed.contains(n.id),
-      boss: isBoss(n.id, map.edges),
+      boss: isBoss(n, map.edges),
+      unexpanded: n.unexpanded && !n.isMastered,
     );
 
     // Breadth first, along primary contains edges; a node with several

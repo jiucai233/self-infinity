@@ -28,8 +28,9 @@ Facts (JSON):
 Rules:
 - Use only these facts. Never mention an audit, skill or number that is not in them.
 - If a misconception cluster spans more than one skill, name those skills.
-- Describe condition data as observations only. Never link it to performance.
-  "Because you slept less, you failed" is not allowed.
+- Describe condition data as observations. You may state the user's own
+  comparison when the facts include one, with its number of days, but never
+  as a cause: "Because you slept less, you failed" is not allowed.
 - No motivational language, no reassurance, no advice.
 - 3 to 5 sentences, in English.
 

@@ -98,12 +98,18 @@ class HttpApi implements SelfInfinityApi {
     parse: (j) => _array(j).map((e) => SkillNode.fromJson(_object(e))).toList(),
   );
 
+  @override
+  Future<CourseMap> expandSkill(int skillId) => _post(
+    '/skills/$skillId/expand',
+    parse: (j) => CourseMap.fromJson(_object(j)),
+  );
+
   // -- 7–9: audits ------------------------------------------------------------
 
   @override
-  Future<AuditStart> startAudit(int skillId, {String mode = 'day'}) => _post(
+  Future<AuditStart> startAudit(int skillId, {String mode = 'day', bool testOut = false}) => _post(
     '/skills/$skillId/audits',
-    body: {'mode': mode},
+    body: {'mode': mode, if (testOut) 'test_out': true},
     parse: (j) => AuditStart.fromJson(_object(j)),
   );
 
@@ -180,6 +186,27 @@ class HttpApi implements SelfInfinityApi {
     '/chat/suggestions',
     parse: (j) =>
         _array(_object(j)['suggestions']).map((e) => ChatSuggestion.fromJson(_object(e))).toList(),
+  );
+
+  @override
+  Future<Life> getLife({int days = 30}) => _get(
+    '/life',
+    query: {'days': '$days'},
+    parse: (j) => Life.fromJson(_object(j)),
+  );
+
+  @override
+  Future<LifeAdvice> requestLifeAdvice() => _post(
+    '/life/advice',
+    parse: (j) => LifeAdvice.fromJson(_object(j)),
+  );
+
+  @override
+  Future<DailyCheckIn> editCheckIn(String date, Map<String, Object?> fields) => _send(
+    'PUT',
+    '/checkins/$date',
+    body: fields,
+    parse: (j) => DailyCheckIn.fromJson(_object(j)),
   );
 
   @override

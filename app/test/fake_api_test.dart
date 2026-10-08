@@ -55,8 +55,6 @@ void main() {
         final map = await api.generateCourse(
           const GenerateRequest(
             topic: 'math',
-            nodeCount: 4,
-            maxDepth: 2,
             difficulty: Difficulty.intro,
             searchSyllabus: false,
           ),
@@ -81,13 +79,13 @@ void main() {
       ]);
       expect(map.course.sourceCourse, isNull);
       expect(map.course.sourceUrl, isNull);
-      // Only the first node of the learning order is open: the first leaf.
+      // Each chapter opens its first node in the learning order: its first leaf.
       expect(
         [
           for (final n in map.nodes)
             if (n.isAvailable) n.title,
         ],
-        ['Core Concepts 1'],
+        ['Core Concepts 1', 'Key Methods 1', 'Applications 1'],
       );
       final byTitle = {for (final n in map.nodes) n.title: n.id};
       expect(
@@ -144,8 +142,8 @@ void main() {
           for (final n in second.nodes)
             if (n.isAvailable) n.id,
         ],
-        [18],
-      ); // its Discriminant
+        [18, 21, 23],
+      ); // its Discriminant, Linear Functions and Limits of Sequences
       expect(second.edges.every((e) => e.fromId >= 13 && e.toId >= 13), isTrue);
       expect(containsParentsOf(23, second.edges), [
         16,
@@ -159,25 +157,14 @@ void main() {
       await passAudit(api, 6);
       expect(
         (await api.listSkills(courseId: second.course.id)).where((n) => n.isAvailable),
-        hasLength(1),
+        hasLength(3),
       );
     });
 
     test('settings are validated like the server does (422)', () async {
       final api = newApi();
-      for (final bad in const [
-        GenerateRequest(topic: '   '),
-        GenerateRequest(topic: 'x', nodeCount: 3),
-        GenerateRequest(topic: 'x', nodeCount: 31),
-        GenerateRequest(topic: 'x', maxDepth: 1),
-        GenerateRequest(topic: 'x', maxDepth: 7),
-      ]) {
-        expect((await failure(() => api.generateCourse(bad))).statusCode, 422);
-      }
+      expect((await failure(() => api.generateCourse(const GenerateRequest(topic: '   ')))).statusCode, 422);
       expect(await api.listCourses(), isEmpty);
-      // The boundaries are fine.
-      await api.generateCourse(const GenerateRequest(topic: 'x', nodeCount: 4, maxDepth: 2));
-      await api.generateCourse(const GenerateRequest(topic: 'x', nodeCount: 30, maxDepth: 6));
     });
   });
 
@@ -379,15 +366,23 @@ void main() {
       expect(await api.submitTurn(s2.session.id, text(10)), isA<ProbeResult>());
     });
 
-    test('unlocking: one node at a time, in the learning order', () async {
+    test('unlocking: one node per chapter, in the learning order', () async {
       final api = await seededFakeApi();
       final map = await api.getCourseMap(1);
       // Parts before what contains them, prerequisites first, the root last.
       expect(learningOrder(map.nodes, map.edges), [6, 7, 5, 9, 10, 3, 11, 8, 2, 12, 4, 1]);
-      expect(await titlesWhere(api, SkillStatus.available), ['Discriminant']);
+      expect(await titlesWhere(api, SkillStatus.available), [
+        'Discriminant',
+        'Linear Functions',
+        'Limits of Sequences',
+      ]);
       expect((await passAudit(api, 6)).unlockedSkillIds, [7]);
       expect((await passAudit(api, 7)).unlockedSkillIds, [5]);
-      expect(await titlesWhere(api, SkillStatus.available), ['Quadratic Equations']);
+      expect(await titlesWhere(api, SkillStatus.available), [
+        'Quadratic Equations',
+        'Linear Functions',
+        'Limits of Sequences',
+      ]);
       // A failed audit opens nothing; passing a mastered node again neither.
       expect((await failAudit(api, 5)).verdict.unlockedSkillIds, isEmpty);
       expect((await passAudit(api, 6)).unlockedSkillIds, isEmpty);
@@ -706,8 +701,8 @@ void main() {
       expect(b.narrativeGeneratedAt, isNull);
       expect(b.facts.nodes.total, 12);
       expect(b.facts.nodes.mastered, 0);
-      expect(b.facts.nodes.available, 1);
-      expect(b.facts.nodes.locked, 11);
+      expect(b.facts.nodes.available, 3);
+      expect(b.facts.nodes.locked, 9);
       expect(b.facts.audits.total, 0);
       expect(b.facts.misconceptionClusters, isEmpty);
       expect(b.facts.condition.flag, ConditionFlag.unknown);
@@ -722,8 +717,8 @@ void main() {
       await api.startAudit(7); // an abandoned session is not counted
       final f = (await api.getBriefing()).facts;
       expect(f.nodes.mastered, 1);
-      expect(f.nodes.available, 1);
-      expect(f.nodes.locked, 10);
+      expect(f.nodes.available, 3);
+      expect(f.nodes.locked, 8);
       expect(f.audits.passed, 1);
       expect(f.audits.failed, 1);
       expect(f.audits.total, 2);
@@ -813,13 +808,17 @@ void main() {
     });
 
     test(
-      'the planner needs an available node; a fresh course offers its first node only',
+      'the planner needs an available node; a fresh course offers the first node of each chapter',
       () async {
         final api = newApi();
         expect((await failure(api.generatePlan)).statusCode, 400);
         await api.generateCourse(const GenerateRequest(topic: 'math'));
         final plan = await api.generatePlan();
-        expect(plan.steps.map((s) => s.skillTitle), ['Discriminant']);
+        expect(plan.steps.map((s) => s.skillTitle), [
+          'Discriminant',
+          'Linear Functions',
+          'Limits of Sequences',
+        ]);
         expect(plan.suggestedTier, Tier.medium);
       },
     );
@@ -1018,7 +1017,7 @@ void main() {
       for (final name in FakeApiClient.methodNames) {
         api.failNext(method: name); // asserts on unknown names
       }
-      expect(FakeApiClient.methodNames, hasLength(40));
+      expect(FakeApiClient.methodNames, hasLength(44));
       expect(() => api.failNext(method: 'nope'), throwsA(isA<AssertionError>()));
     });
   });

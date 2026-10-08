@@ -87,8 +87,8 @@ def ids_by_slug(generated: dict) -> dict[str, int]:
     return {n["slug"]: n["id"] for n in generated["nodes"]}
 
 
-# The Mock math course in learning order (services/tree.py): only the first node not yet
-# mastered is open, so a test passes them in this order.
+# The Mock math course in learning order (services/tree.py): each chapter opens its first node not
+# yet mastered, so passing them in this order always takes an open node.
 MATH_ORDER = [
     "discriminant",
     "root-coefficient",

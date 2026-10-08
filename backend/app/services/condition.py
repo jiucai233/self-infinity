@@ -1,7 +1,8 @@
 """Condition flag and audit pacing, from the most recent daily check-ins (plan 8.4 / 8.5).
 
-The flag looks at the last 3 check-ins: `low` if the average sleep is under 6 hours or the
-average stress is 4 or more, `unknown` when there is no check-in at all, otherwise `normal`.
+The flag looks at the last 3 check-ins: `low` if the average sleep is under 6 hours, the
+average stress is 4 or more or the average focus is 2 or less, `unknown` when there is no
+check-in at all, otherwise `normal`.
 Averages ignore the fields a check-in left empty (a missing value is never guessed).
 
 Pacing is the only thing the flag changes in an audit: `light` keeps the Auditor's questions
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 CHECKIN_WINDOW = 3
 LOW_SLEEP_HOURS = 6
 HIGH_STRESS = 4
+LOW_FOCUS = 2
 
 
 @dataclass
@@ -44,8 +46,11 @@ def current_condition(session: Session) -> Condition:
 
     avg_sleep = _mean([r.sleep_hours for r in rows])
     avg_stress = _mean([r.stress for r in rows])
-    low = (avg_sleep is not None and avg_sleep < LOW_SLEEP_HOURS) or (
-        avg_stress is not None and avg_stress >= HIGH_STRESS
+    avg_focus = _mean([r.focus for r in rows])
+    low = (
+        (avg_sleep is not None and avg_sleep < LOW_SLEEP_HOURS)
+        or (avg_stress is not None and avg_stress >= HIGH_STRESS)
+        or (avg_focus is not None and avg_focus <= LOW_FOCUS)
     )
     return Condition(days=len(rows), avg_sleep_hours=avg_sleep, avg_stress=avg_stress, flag="low" if low else "normal")
 

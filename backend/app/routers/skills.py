@@ -31,7 +31,7 @@ from app.schemas import (
 )
 from app.search import get_search_provider
 from app.services import bandit, course_generation
-from app.services.course_generation import CourseGenerationError
+from app.services.course_generation import CourseFull, CourseGenerationError, NotExpandable
 from app.services.courses import live_nodes
 from app.services.tree import contains_parents, depth_map
 
@@ -121,8 +121,6 @@ def generate_course(body: GenerateCourseRequest, session: Session = Depends(get_
         generated = course_generation.generate_course(
             session,
             topic=body.topic,
-            node_count=body.node_count,
-            max_depth=body.max_depth,
             difficulty=body.difficulty,
             search_syllabus=body.search_syllabus,
             planner_provider=get_provider("planner"),
@@ -136,6 +134,29 @@ def generate_course(body: GenerateCourseRequest, session: Session = Depends(get_
         course=CourseOut.model_validate(generated.course),
         nodes=[SkillNodeOut.model_validate(n) for n in generated.nodes],
         edges=[SkillEdgeOut.model_validate(e) for e in generated.edges],
+    )
+
+
+@router.post("/{skill_id}/expand", response_model=CourseGraphOut)
+def expand_skill(skill_id: int, session: Session = Depends(get_session)):
+    """Breaks a node the Planner left as a category (`unexpanded`) down into its parts; answers
+    the whole course map. Any node can be expanded, locked or not: looking inside is free."""
+    skill = session.get(SkillNode, skill_id)
+    if skill is None:
+        raise HTTPException(404, "skill not found")
+    try:
+        expanded = course_generation.expand_node(session, skill, get_provider("planner"))
+    except NotExpandable:
+        raise HTTPException(400, "This node is already broken down.") from None
+    except CourseFull:
+        raise HTTPException(409, "This course has reached its size limit.") from None
+    except CourseGenerationError:
+        logger.warning("expanding a node failed", exc_info=True)
+        raise HTTPException(502, "Breaking this node down failed. Please try again.") from None
+    return CourseGraphOut(
+        course=CourseOut.model_validate(expanded.course),
+        nodes=[SkillNodeOut.model_validate(n) for n in expanded.nodes],
+        edges=[SkillEdgeOut.model_validate(e) for e in expanded.edges],
     )
 
 

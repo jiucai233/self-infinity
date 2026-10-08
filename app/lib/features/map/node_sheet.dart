@@ -305,6 +305,8 @@ class _SkillBodyState extends State<_SkillBody> {
               children: [
                 if (n.boss && n.status != null) const _BossChip(),
                 _statusChip(n),
+                if (n.unexpanded)
+                  StatusChip.neutral(context.l10n.dotUnexpanded, key: const Key('node-sheet-unexpanded')),
                 if (_courseName != null)
                   Text(
                     _courseName!,

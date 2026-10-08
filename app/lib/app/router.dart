@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/audit/audit_scene.dart';
+import '../features/life/life_scene.dart';
 import '../features/chat/home_scene.dart';
 import '../features/map/map_scene.dart';
 import '../features/skill/skill_scene.dart';
@@ -25,11 +26,17 @@ abstract final class AppRoutes {
   static const String home = '/';
   static const String map = '/map';
 
+  /// The player's own record (contract #39).
+  static const String life = '/life';
+
   /// `/skill/<skillId>`.
   static String skill(int skillId) => '/skill/$skillId';
 
   /// `/skill/<skillId>/audit`.
   static String audit(int skillId) => '/skill/$skillId/audit';
+
+  /// `/skill/<skillId>/audit?challenge=1`: a challenge on the whole branch.
+  static String challenge(int skillId) => '/skill/$skillId/audit?challenge=1';
 }
 
 /// How deep a scene is: going to a deeper one (home -> map -> node -> audit)
@@ -37,7 +44,7 @@ abstract final class AppRoutes {
 int _depthOf(Uri uri) {
   final segments = uri.pathSegments;
   if (segments.isEmpty) return 0;
-  if (segments.first == 'map') return 1;
+  if (segments.first == 'map' || segments.first == 'life') return 1;
   return segments.length >= 3 ? 3 : 2;
 }
 
@@ -88,6 +95,10 @@ GoRouter createRouter({String? initialLocation}) {
         pageBuilder: (context, state) => page(state, const MapScene()),
       ),
       GoRoute(
+        path: AppRoutes.life,
+        pageBuilder: (context, state) => page(state, const LifeScene()),
+      ),
+      GoRoute(
         path: '/skill/:skillId',
         pageBuilder: (context, state) {
           final skillId = int.tryParse(state.pathParameters['skillId'] ?? '');
@@ -104,7 +115,15 @@ GoRouter createRouter({String? initialLocation}) {
           if (skillId == null) {
             return page(state, NotFoundScreen(location: state.uri.toString()));
           }
-          return page(state, AuditScene(key: ValueKey('audit-$skillId'), skillId: skillId));
+          final testOut = state.uri.queryParameters['challenge'] == '1';
+          return page(
+            state,
+            AuditScene(
+              key: ValueKey('audit-$skillId-$testOut'),
+              skillId: skillId,
+              testOut: testOut,
+            ),
+          );
         },
       ),
     ],

@@ -1072,4 +1072,182 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get devNoVoice => '还没有实时语音会话。';
+
+  @override
+  String get breakDown => '拆开看看';
+
+  @override
+  String get breakingDown => '正在拆开……可能要一分钟左右。';
+
+  @override
+  String get breakDownFailed => '没拆开，再试一次。';
+
+  @override
+  String get unexpandedLine => '这部分还没拆开。拆开看看里面有什么；已经会了就整块挑战。';
+
+  @override
+  String get challengeWhole => '整块挑战';
+
+  @override
+  String get challengeInProgress => '整块挑战';
+
+  @override
+  String get testedOut => '挑战通过';
+
+  @override
+  String get dotUnexpanded => '未拆开';
+
+  @override
+  String get lifeTitle => '我的生活';
+
+  @override
+  String get lifeOpen => '我的生活 →';
+
+  @override
+  String lifeDays(int n) {
+    return '$n 天';
+  }
+
+  @override
+  String get lifeSleep => '睡眠';
+
+  @override
+  String get lifeFocus => '专注';
+
+  @override
+  String get lifeStress => '压力';
+
+  @override
+  String get lifeExercise => '运动';
+
+  @override
+  String get lifeWeight => '体重';
+
+  @override
+  String get lifeAudits => '审计';
+
+  @override
+  String get lifeOutOf5 => ' / 5';
+
+  @override
+  String get lifeDaysSuffix => ' 天';
+
+  @override
+  String lifeChartTitle(int n) {
+    return '最近 $n 天';
+  }
+
+  @override
+  String get lifeNoData => '这段时间还没有记录。';
+
+  @override
+  String get lifePatterns => '你的规律';
+
+  @override
+  String lifePatternsEmpty(int n) {
+    return '两边各有 $n 天后（比如睡满 7 小时的 $n 天和不到 6 小时的 $n 天），你自己的规律会显示在这里。';
+  }
+
+  @override
+  String get lifePatternNote => '只是你自己的日子，不是原因：这些天之间还有很多别的不同。';
+
+  @override
+  String get lifeSleepBetter => '睡满 7 小时';
+
+  @override
+  String get lifeSleepWorse => '不到 6 小时';
+
+  @override
+  String get lifeExerciseBetter => '运动了';
+
+  @override
+  String get lifeExerciseWorse => '没运动';
+
+  @override
+  String get lifeStressBetter => '压力 1–2';
+
+  @override
+  String get lifeStressWorse => '压力 4–5';
+
+  @override
+  String lifeGroupDays(int n) {
+    return '$n 天';
+  }
+
+  @override
+  String lifeGroupPassed(int pct, int n) {
+    return '$n 次审计通过 $pct%';
+  }
+
+  @override
+  String get lifeGroupNoAudits => '没有审计';
+
+  @override
+  String lifeGroupFocus(String value) {
+    return '专注 $value';
+  }
+
+  @override
+  String get lifeAdvice => '本周建议';
+
+  @override
+  String get lifeAdviceGet => '生成建议';
+
+  @override
+  String get lifeAdviceAgain => '重新生成';
+
+  @override
+  String get lifeAdviceEmpty => '根据你自己的数据，给这周三件小事。';
+
+  @override
+  String get lifeAdviceFailed => '现在拿不到建议，请再试一次。';
+
+  @override
+  String lifeAdviceBasedOn(String fact) {
+    return '依据：$fact';
+  }
+
+  @override
+  String get lifeLog => '每天';
+
+  @override
+  String get lifeFillIn => '补一天';
+
+  @override
+  String lifeEdit(String date) {
+    return '编辑 $date';
+  }
+
+  @override
+  String get lifeSleepHours => '睡眠（小时）';
+
+  @override
+  String get lifeSleepQuality => '睡眠质量';
+
+  @override
+  String get lifeExerciseMinutes => '运动（分钟）';
+
+  @override
+  String get lifeWeightKg => '体重（公斤）';
+
+  @override
+  String get lifeSave => '保存';
+
+  @override
+  String lifeMinutes(int n) {
+    return '$n 分钟';
+  }
+
+  @override
+  String lifeKg(String value) {
+    return '$value 公斤';
+  }
+
+  @override
+  String lifeAuditsDone(int passed, int n) {
+    return '通过 $passed/$n';
+  }
+
+  @override
+  String get lifePrivacy => '保存在我们的数据库里。生成建议时，AI 只拿到平均值和规律，看不到你每天的记录。';
 }

@@ -203,7 +203,7 @@ class _GraphNode extends StatelessWidget {
                 const SizedBox(width: GraphLayout.labelGap),
                 Expanded(
                   child: Text(
-                    node.title,
+                    graphLabel(node),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
@@ -288,7 +288,10 @@ class _EdgePainter extends CustomPainter {
 /// names (`docs/ux-chat.md` 5.11) and, last, the double ring of a `Boss`
 /// (`docs/ux-chat.md` 6.2).
 class GraphLegend extends StatelessWidget {
-  const GraphLegend({super.key});
+  const GraphLegend({super.key, this.unexpanded = false});
+
+  /// The course has categories not broken down yet: explain their `+`.
+  final bool unexpanded;
 
   /// The legend's entries, in order.
   static List<(DotKind, String)> entries(AppLocalizations l) => [
@@ -315,6 +318,12 @@ class GraphLegend extends StatelessWidget {
         ),
         context.l10n.boss,
       ),
+      if (unexpanded)
+        _legendRow(
+          theme,
+          Text('+', key: const Key('legend-unexpanded'), style: theme.labelLarge),
+          context.l10n.dotUnexpanded,
+        ),
     ];
     return DecoratedBox(
       key: const Key('graph-legend'),

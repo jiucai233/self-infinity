@@ -43,7 +43,7 @@ import 'package:provider/provider.dart';
 /// * [language] is the UI language (English by default).
 /// * The avatar animations are switched off ([Avatar.animationsEnabled]).
 /// * [child] is mounted at an internal route. Navigating anywhere else —
-///   `/`, `/map`, `/skill/:id`, `/skill/:id/audit` — shows a placeholder whose
+///   `/`, `/map`, `/life`, `/skill/:id`, `/skill/:id/audit` — shows a placeholder whose
 ///   text is `route:<location>`, e.g. `find.text('route:/skill/5/audit')`
 ///   after tapping the → of scene 4. Use `route:` plus `AppRoutes.audit(5)` to
 ///   build the expected text.
@@ -70,6 +70,7 @@ Widget buildTestApp({
       for (final path in const [
         AppRoutes.home,
         AppRoutes.map,
+        AppRoutes.life,
         '/skill/:skillId',
         '/skill/:skillId/audit',
       ])

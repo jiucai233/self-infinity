@@ -27,14 +27,19 @@ import 'reflection_prompts.dart';
 /// * **Courses**: a topic containing `math` (case-insensitive; Korean `수학` is
 ///   still accepted as a fallback) yields the 12-node math course (any
 ///   settings); with `searchSyllabus` it is based on
-///   `High School Mathematics Curriculum (Ministry of Education)`. Any other topic yields a generic
-///   10-node course. Only the first node of its learning order is
-///   `available` (`learningOrder`: parts before what contains them, the root
-///   last); the rest is `locked`.
-///   Settings are validated like the server does (422).
-/// * **Unlocking**: passing a node marks it `mastered` and opens the next node
-///   of the course's learning order; every other node not mastered stays
-///   `locked`.
+///   `High School Mathematics Curriculum (Ministry of Education)`. A topic with
+///   `vision` yields a course in layers: `Image Features` broken down,
+///   `Geometric Vision` and `Visual Recognition` left `unexpanded`
+///   ([expandSkill] gives each three parts, `{title} 1`–`3`). Any other topic
+///   yields a generic 10-node course. Settings are validated like the server
+///   does (422).
+/// * **Unlocking** (`learningOrder`: parts before what contains them, the root
+///   last): the root's children are chapters, each with one `available` node,
+///   its first one not mastered; the root opens when every chapter is done.
+///   Passing a node opens the next of its chapter.
+/// * **Challenges** (`testOut`): on a branch, root or unexpanded node, locked
+///   or not; scripted like an audit; a pass masters every node under it
+///   (`testedOut`).
 /// * **Audits**: the first answer gets a probe (it names the most recent
 ///   lesson from the Memory Retriever if there is one); later answers get a
 ///   verdict. Pass needs ≥ 80 characters in total and no `don't know` / `not sure`
@@ -107,6 +112,7 @@ class FakeApiClient implements SelfInfinityApi {
     'listCourses',
     'getCourseMap',
     'listSkills',
+    'expandSkill',
     'startAudit',
     'submitTurn',
     'submitReflection',
@@ -119,6 +125,9 @@ class FakeApiClient implements SelfInfinityApi {
     'getChatHistory',
     'getChatSuggestions',
     'getTodayCheckIn',
+    'getLife',
+    'requestLifeAdvice',
+    'editCheckIn',
     'getSkillOverview',
     'listAudits',
     'uploadFile',
@@ -247,8 +256,6 @@ class FakeApiClient implements SelfInfinityApi {
   }) async {
     await _begin('generateCourse');
     _require(request.topic.trim().isNotEmpty, 'topic must not be blank');
-    _require(request.nodeCount >= 4 && request.nodeCount <= 30, 'node_count must be 4-30');
-    _require(request.maxDepth >= 2 && request.maxDepth <= 6, 'max_depth must be 2-6');
 
     // `수학` is a Korean fallback; the English demo uses `math`.
     final isMath = request.topic.toLowerCase().contains('math') || request.topic.contains('수학');
@@ -257,6 +264,9 @@ class FakeApiClient implements SelfInfinityApi {
     if (isMath) {
       specs = _mathNodes;
       requires = _mathRequires;
+    } else if (request.topic.toLowerCase().contains('vision')) {
+      specs = _visionNodes;
+      requires = const [];
     } else {
       final firstLine = request.topic.split('\n').first.trim();
       final rootTitle = firstLine.isEmpty ? 'New Topic' : _shortTitle(firstLine);
@@ -292,6 +302,7 @@ class FakeApiClient implements SelfInfinityApi {
           description: specs[i].description,
           status: SkillStatus.locked,
           nodeType: NodeType.concept,
+          unexpanded: specs[i].expand,
         ),
     ];
     final edges = <SkillEdge>[
@@ -329,6 +340,32 @@ class FakeApiClient implements SelfInfinityApi {
   // ===========================================================================
 
   @override
+  Future<CourseMap> expandSkill(int skillId) async {
+    await _begin('expandSkill');
+    final node = _nodes[skillId];
+    if (node == null) throw const ApiException(404, 'skill not found');
+    if (!node.unexpanded) throw const ApiException(400, 'This node is already broken down.');
+    _nodes[skillId] = node.copyWith(unexpanded: false);
+    for (var i = 1; i <= 3; i++) {
+      final id = _nextNodeId++;
+      _nodes[id] = SkillNode(
+        id: id,
+        courseId: node.courseId,
+        slug: '${node.slug}-part-$i',
+        title: _shortTitle('${node.title} $i'),
+        description: 'Explain how part $i of ${node.title} works and why it holds.',
+        status: SkillStatus.locked,
+        nodeType: NodeType.concept,
+      );
+      _edges.add(
+        SkillEdge(fromId: skillId, toId: id, kind: SkillEdgeKind.contains, isPrimary: true),
+      );
+    }
+    _openNext(node.courseId);
+    return _mapOf(_courses.firstWhere((c) => c.id == node.courseId));
+  }
+
+  @override
   Future<List<Course>> listCourses() async {
     await _begin('listCourses');
     return _courses.reversed.toList();
@@ -339,7 +376,11 @@ class FakeApiClient implements SelfInfinityApi {
     await _begin('getCourseMap');
     final course = _courses.where((c) => c.id == courseId).firstOrNull;
     if (course == null) throw const ApiException(404, 'course not found');
-    final nodes = _nodes.values.where((n) => n.courseId == courseId).toList();
+    return _mapOf(course);
+  }
+
+  CourseMap _mapOf(Course course) {
+    final nodes = _nodes.values.where((n) => n.courseId == course.id).toList();
     final ids = {for (final n in nodes) n.id};
     final edges = _edges.where((e) => ids.contains(e.fromId)).toList();
     return CourseMap(course: course, nodes: nodes, edges: edges);
@@ -359,22 +400,33 @@ class FakeApiClient implements SelfInfinityApi {
   // ===========================================================================
 
   @override
-  Future<AuditStart> startAudit(int skillId, {String mode = 'day'}) async {
+  Future<AuditStart> startAudit(int skillId, {String mode = 'day', bool testOut = false}) async {
     await _begin('startAudit');
     _require(mode == 'day' || mode == 'night', 'mode must be "day" or "night"');
     final node = _nodes[skillId];
     if (node == null) throw const ApiException(404, 'skill not found');
-    if (node.isLocked) throw const ApiException(400, 'skill is locked');
+    final position = positionOf(skillId, _edges, unexpanded: node.unexpanded);
+    if (testOut) {
+      if (node.isMastered) throw const ApiException(400, 'skill is already mastered');
+      if (position == NodePosition.leaf) {
+        throw const ApiException(400, 'Only a branch or a whole course can be challenged.');
+      }
+    } else {
+      if (node.isLocked) throw const ApiException(400, 'skill is locked');
+      if (node.unexpanded) {
+        throw const ApiException(400, 'Break this node down first, or challenge it as a whole.');
+      }
+    }
 
-    final position = positionOf(skillId, _edges);
-    final opening = _openingQuestion(node, position);
-    final base = node.nodeType == NodeType.concept ? 8 : 4;
+    final opening = testOut ? _testOutQuestion(node) : _openingQuestion(node, position);
+    final base = testOut || node.nodeType == NodeType.concept ? 8 : 4;
     final audit = _FakeAudit(
       id: _nextAuditId++,
       skillId: skillId,
       position: position,
       maxTurns: mode == 'night' ? base * 2 : base,
       createdAt: _clock(),
+      testOut: testOut,
     )..turns.add(AuditTurn(role: AuditRole.auditor, content: opening));
     _audits[audit.id] = audit;
     return AuditStart(session: audit.toModel(), openingQuestion: opening);
@@ -503,6 +555,9 @@ class FakeApiClient implements SelfInfinityApi {
         stress: parsed.stress,
         transcript: transcript,
         source: CheckInSource.voice,
+        sleepQuality: _parseSleepQuality(transcript),
+        exerciseMinutes: _parseExerciseMinutes(transcript),
+        weightKg: _parseWeight(transcript),
       ),
     );
   }
@@ -999,6 +1054,176 @@ class FakeApiClient implements SelfInfinityApi {
     return _checkIns[formatKstDate(_clock())];
   }
 
+  // -- 39: life ------------------------------------------------------------------
+
+  LifeAdvice? _lifeAdvice;
+
+  @override
+  Future<Life> getLife({int days = 30}) async {
+    await _begin('getLife');
+    _require(days >= 7 && days <= 365, 'days must be 7-365');
+    return _life(days);
+  }
+
+  @override
+  Future<LifeAdvice> requestLifeAdvice() async {
+    await _begin('requestLifeAdvice');
+    final s = _life(14).summary;
+    final items = [
+      if (s.avgSleepHours != null)
+        LifeAdviceItem(
+          title: 'Protect your sleep',
+          body: 'Pick a fixed time to stop screens this week and keep it five nights.',
+          basedOn: 'slept ${s.avgSleepHours} h on average',
+        ),
+      if (s.avgFocus != null)
+        LifeAdviceItem(
+          title: 'Audit when you focus best',
+          body: 'Put this week\'s audits in the part of the day you feel sharpest.',
+          basedOn: 'focus ${s.avgFocus} of 5 on average',
+        ),
+      LifeAdviceItem(
+        title: 'Log a few more days',
+        body: 'Check in every day this week, even briefly, so your own patterns can show up.',
+        basedOn: '${s.daysLogged} of 14 days logged',
+      ),
+    ].take(3).toList();
+    return _lifeAdvice = LifeAdvice(items: items, generatedAt: _clock());
+  }
+
+  @override
+  Future<DailyCheckIn> editCheckIn(String date, Map<String, Object?> fields) async {
+    await _begin('editCheckIn');
+    if (date.compareTo(formatKstDate(_clock())) > 0) {
+      throw const ApiException(400, 'That day has not come yet.');
+    }
+    final old = _checkIns[date];
+    T? pick<T>(String key, T? current) => fields.containsKey(key) ? fields[key] as T? : current;
+    final minutes = pick<int>('exercise_minutes', old?.exerciseMinutes);
+    final checkIn = DailyCheckIn(
+      date: date,
+      sleepHours: pick<num>('sleep_hours', old?.sleepHours)?.toDouble(),
+      exercised: pick<bool>('exercised', old?.exercised) ?? ((minutes ?? 0) > 0 ? true : null),
+      dietNote: pick<String>('diet_note', old?.dietNote),
+      focus: pick<int>('focus', old?.focus),
+      stress: pick<int>('stress', old?.stress),
+      transcript: old?.transcript,
+      source: old?.source ?? CheckInSource.manual,
+      sleepQuality: pick<int>('sleep_quality', old?.sleepQuality),
+      exerciseMinutes: minutes,
+      weightKg: pick<num>('weight_kg', old?.weightKg)?.toDouble(),
+    );
+    _checkIns[date] = checkIn;
+    return checkIn;
+  }
+
+  /// The server's `services/life.py`, over [window] days ending today (KST).
+  Life _life(int window) {
+    final kst = toKst(_clock());
+    final today = DateTime.utc(kst.year, kst.month, kst.day);
+    String ymd(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final audits = <String, (int, int)>{};
+    for (final a in _audits.values) {
+      if (a.status == AuditStatus.active) continue;
+      final (n, p) = audits[formatKstDate(a.createdAt)] ?? (0, 0);
+      audits[formatKstDate(a.createdAt)] = (n + 1, p + (a.status == AuditStatus.passed ? 1 : 0));
+    }
+    bool? exercised(DailyCheckIn c) => (c.exerciseMinutes ?? 0) > 0 ? true : c.exercised;
+    final days = [
+      for (var i = window - 1; i >= 0; i--)
+        () {
+          final date = ymd(today.subtract(Duration(days: i)));
+          final c = _checkIns[date];
+          final (n, p) = audits[date] ?? (0, 0);
+          return LifeDay(
+            date: date,
+            checkedIn: c != null,
+            sleepHours: c?.sleepHours,
+            sleepQuality: c?.sleepQuality,
+            exercised: c == null ? null : exercised(c),
+            exerciseMinutes: c?.exerciseMinutes,
+            weightKg: c?.weightKg,
+            dietNote: c?.dietNote,
+            focus: c?.focus,
+            stress: c?.stress,
+            audits: n,
+            passed: p,
+          );
+        }(),
+    ];
+    double? mean(Iterable<num?> v) {
+      final present = [for (final x in v) ?x];
+      return present.isEmpty
+          ? null
+          : (present.reduce((a, b) => a + b) / present.length * 10).round() / 10;
+    }
+
+    final logged = [
+      for (final d in days)
+        if (d.checkedIn) _checkIns[d.date]!,
+    ];
+    final weights = [
+      for (final c in logged)
+        if (c.weightKg != null) c.weightKg!,
+    ];
+    LifeGroup group(List<DailyCheckIn> cs) {
+      final n = cs.fold<int>(0, (t, c) => t + (audits[c.date]?.$1 ?? 0));
+      final p = cs.fold<int>(0, (t, c) => t + (audits[c.date]?.$2 ?? 0));
+      return LifeGroup(
+        days: cs.length,
+        audits: n,
+        passRate: n == 0 ? null : (p / n * 100).round() / 100,
+        avgFocus: mean(cs.map((c) => c.focus)),
+      );
+    }
+
+    final all = _checkIns.values.toList()..sort((a, b) => a.date.compareTo(b.date));
+    final splits = <LifePatternKind, (bool Function(DailyCheckIn), bool Function(DailyCheckIn))>{
+      LifePatternKind.sleep: (
+        (c) => (c.sleepHours ?? -1) >= 7,
+        (c) => c.sleepHours != null && c.sleepHours! < 6,
+      ),
+      LifePatternKind.exercise: ((c) => exercised(c) == true, (c) => exercised(c) == false),
+      LifePatternKind.stress: (
+        (c) => c.stress != null && c.stress! <= 2,
+        (c) => (c.stress ?? 0) >= 4,
+      ),
+    };
+    const minDays = 5;
+    final patterns = <LifePattern>[
+      for (final MapEntry(key: kind, value: (better, worse)) in splits.entries)
+        if (all.where(better).length >= minDays && all.where(worse).length >= minDays)
+          LifePattern(
+            kind: kind,
+            better: group(all.where(better).toList()),
+            worse: group(all.where(worse).toList()),
+          ),
+    ];
+    return Life(
+      summary: LifeSummary(
+        days: window,
+        daysLogged: logged.length,
+        avgSleepHours: mean(logged.map((c) => c.sleepHours)),
+        avgSleepQuality: mean(logged.map((c) => c.sleepQuality)),
+        exerciseDays: logged.where((c) => exercised(c) == true).length,
+        avgExerciseMinutes: mean(
+          logged.map((c) => (c.exerciseMinutes ?? 0) > 0 ? c.exerciseMinutes : null),
+        ),
+        avgFocus: mean(logged.map((c) => c.focus)),
+        avgStress: mean(logged.map((c) => c.stress)),
+        weightFirst: weights.firstOrNull,
+        weightLast: weights.lastOrNull,
+        audits: days.fold(0, (t, d) => t + d.audits),
+        passed: days.fold(0, (t, d) => t + d.passed),
+      ),
+      days: days,
+      patterns: patterns,
+      patternMinDays: minDays,
+      advice: _lifeAdvice,
+    );
+  }
+
   @override
   Future<SkillOverview> getSkillOverview(int skillId) async {
     await _begin('getSkillOverview');
@@ -1038,6 +1263,7 @@ class FakeApiClient implements SelfInfinityApi {
     status: a.status,
     score: a.score,
     createdAt: a.createdAt,
+    testOut: a.testOut,
   );
 
   // ===========================================================================
@@ -1323,20 +1549,24 @@ class FakeApiClient implements SelfInfinityApi {
     return goal;
   }
 
-  /// Opens the first node of the course's learning order that is not
-  /// mastered and locks the other unmastered ones; returns the ids it opened.
+  /// Opens the first node not mastered of each chapter (a child of the root)
+  /// in the course's learning order, and the root once every chapter is done;
+  /// locks the other unmastered ones. Returns the ids it opened.
   List<int> _openNext(int courseId) {
     final nodes = [
       for (final n in _nodes.values)
         if (n.courseId == courseId) n,
     ];
     final opened = <int>[];
-    var found = false;
+    final started = <int?>{};
     for (final id in learningOrder(nodes, _edges)) {
       final n = _nodes[id]!;
       if (n.isMastered) continue;
-      final want = found ? SkillStatus.locked : SkillStatus.available;
-      found = true;
+      final chapter = chapterOf(id, _edges);
+      final want = started.contains(chapter) || (chapter == null && started.isNotEmpty)
+          ? SkillStatus.locked
+          : SkillStatus.available;
+      started.add(chapter);
       if (n.status != want) {
         _nodes[id] = n.copyWith(status: want);
         if (want == SkillStatus.available) opened.add(id);
@@ -1483,6 +1713,22 @@ class FakeApiClient implements SelfInfinityApi {
 
   // -- audits -----------------------------------------------------------------
 
+  /// The opening of a challenge: the first of the smallest units under it,
+  /// or, with none yet, what its main parts are.
+  String _testOutQuestion(SkillNode node) {
+    final parts = [
+      for (final id in descendantsOf(node.id, _edges))
+        if (_nodes[id] case final n? when n.unexpanded || containsChildren(id, _edges).isEmpty)
+          n.title,
+    ];
+    if (parts.isEmpty) {
+      return 'So you already know “${node.title}”. Prove it: what are its main parts, '
+          'and how does the most important one work?';
+    }
+    return 'So you already know “${node.title}”. Prove it, one part at a time. '
+        'Start with “${parts.first}”: how does it work?';
+  }
+
   String _openingQuestion(SkillNode node, NodePosition position) {
     final title = node.title;
     if (node.nodeType == NodeType.task) return 'How exactly will you do “$title”?';
@@ -1549,6 +1795,14 @@ class FakeApiClient implements SelfInfinityApi {
       masteryScore: score,
     );
     _nodes[mastered.id] = mastered;
+    if (audit.testOut) {
+      for (final id in descendantsOf(mastered.id, _edges)) {
+        final n = _nodes[id];
+        if (n != null && !n.isMastered) {
+          _nodes[id] = n.copyWith(status: SkillStatus.mastered, testedOut: true);
+        }
+      }
+    }
 
     final unlocked = _openNext(mastered.courseId);
 
@@ -1708,6 +1962,10 @@ class FakeApiClient implements SelfInfinityApi {
       for (final c in recent)
         if (c.stress != null) c.stress!.toDouble(),
     ];
+    final focuses = [
+      for (final c in recent)
+        if (c.focus != null) c.focus!.toDouble(),
+    ];
     double? mean(List<double> v) => v.isEmpty ? null : v.reduce((a, b) => a + b) / v.length;
     double? round1(double? v) => v == null ? null : (v * 10).round() / 10;
 
@@ -1716,7 +1974,9 @@ class FakeApiClient implements SelfInfinityApi {
     final ConditionFlag flag;
     if (recent.isEmpty) {
       flag = ConditionFlag.unknown;
-    } else if ((avgSleep != null && avgSleep < 6) || (avgStress != null && avgStress >= 4)) {
+    } else if ((avgSleep != null && avgSleep < 6) ||
+        (avgStress != null && avgStress >= 4) ||
+        ((mean(focuses) ?? 5) <= 2)) {
       flag = ConditionFlag.low;
     } else {
       flag = ConditionFlag.normal;
@@ -1802,10 +2062,12 @@ class _FakeAudit {
     required this.position,
     required this.maxTurns,
     required this.createdAt,
+    this.testOut = false,
   });
 
   final int id;
   final DateTime createdAt;
+  final bool testOut;
   int reward = 0;
   final int skillId;
   final NodePosition position;
@@ -1829,6 +2091,7 @@ class _FakeAudit {
     gaps: List.unmodifiable(gaps),
     comment: comment,
     turns: List.unmodifiable(turns),
+    testOut: testOut,
   );
 }
 
@@ -1905,10 +2168,13 @@ class _InjectedFailure {
 // =============================================================================
 
 class _NodeSpec {
-  const _NodeSpec(this.slug, this.title, this.parents, this.description);
+  const _NodeSpec(this.slug, this.title, this.parents, this.description, {this.expand = false});
 
   final String slug;
   final String title;
+
+  /// Left to break down later ([FakeApiClient.expandSkill]).
+  final bool expand;
 
   /// 1-based positions (in the course's node list) of the contains parents;
   /// the first is the main parent. Empty for the root.
@@ -1978,6 +2244,48 @@ const List<_RequiresSpec> _mathRequires = [
   _RequiresSpec(11, 12, 'The derivative is defined as a limit.'),
 ];
 
+/// The `vision` course, in layers (the server Mock's `_VISION_NODES`).
+const List<_NodeSpec> _visionNodes = [
+  _NodeSpec(
+    'computer-vision',
+    'Computer Vision',
+    [],
+    'Seeing with cameras and code: features, geometry and recognition.',
+  ),
+  _NodeSpec(
+    'image-features',
+    'Image Features',
+    [1],
+    'Points and patches an algorithm can find again: corners and descriptors.',
+  ),
+  _NodeSpec(
+    'harris',
+    'Harris Corners',
+    [2],
+    'Find corners from the structure tensor and explain why edges and flat areas are rejected.',
+  ),
+  _NodeSpec(
+    'sift',
+    'SIFT',
+    [2],
+    'Build scale-invariant keypoints and descriptors and explain how they are matched.',
+  ),
+  _NodeSpec(
+    'geometry',
+    'Geometric Vision',
+    [1],
+    'Cameras and 3D: calibration, homography, epipolar geometry, triangulation.',
+    expand: true,
+  ),
+  _NodeSpec(
+    'recognition',
+    'Visual Recognition',
+    [1],
+    'Telling what is in an image: classification, detection, segmentation.',
+    expand: true,
+  ),
+];
+
 /// Generic course: root = topic, branches `Core Concepts` / `Key Methods` / `Applications`,
 /// two leaves each.
 List<_NodeSpec> _genericNodes(String rootTitle) => [
@@ -2013,6 +2321,37 @@ typedef _Parsed = ({
   int? focus,
   int? stress,
 });
+
+final RegExp _weightPattern = RegExp(
+  r'\b(\d+(?:\.\d+)?)\s*(?:kg|kilos?|kilograms?)\b',
+  caseSensitive: false,
+);
+final RegExp _minutesPattern = RegExp(
+  r'\b(?:ran|run|jogged|walked|swam|cycled|exercised|worked out|gym|yoga)\b[^.!?\n]*?\b(\d+)\s*(?:minutes?|mins?)\b'
+  r'|\b(\d+)\s*(?:minutes?|mins?)\s+(?:of\s+)?(?:running|exercise|workout|walking|swimming|cycling|yoga)\b',
+  caseSensitive: false,
+);
+final RegExp _sleepQualityPattern = RegExp(
+  r'\bsleep quality (?:was |is |of )?(\d)\b',
+  caseSensitive: false,
+);
+
+/// Weight, minutes of exercise and a numbered sleep quality, only when said
+/// (the server Mock's `_checkin_extras`).
+double? _parseWeight(String text) {
+  final m = _weightPattern.firstMatch(text);
+  return m == null ? null : double.parse(m.group(1)!);
+}
+
+int? _parseExerciseMinutes(String text) {
+  final m = _minutesPattern.firstMatch(text);
+  return m == null ? null : int.parse(m.group(1) ?? m.group(2)!);
+}
+
+int? _parseSleepQuality(String text) {
+  final m = _sleepQualityPattern.firstMatch(text);
+  return m == null ? null : int.parse(m.group(1)!);
+}
 
 _Parsed _parseTranscript(String text) {
   // English rules first; the Korean rules below stay as a fallback because

@@ -67,8 +67,9 @@ List<int> primaryChildren(int nodeId, List<SkillEdge> edges) => [
 ];
 
 /// Position of a node, per the contract: no contains parent → root; a contains
-/// parent but no contains child → leaf; otherwise branch.
-NodePosition positionOf(int nodeId, List<SkillEdge> edges) {
+/// parent but no contains child → leaf; otherwise branch. A category not
+/// broken down yet ([unexpanded]) has no children but is a branch.
+NodePosition positionOf(int nodeId, List<SkillEdge> edges, {bool unexpanded = false}) {
   var hasParent = false;
   var hasChild = false;
   for (final e in edges) {
@@ -77,18 +78,33 @@ NodePosition positionOf(int nodeId, List<SkillEdge> edges) {
     if (e.fromId == nodeId) hasChild = true;
   }
   if (!hasParent) return NodePosition.root;
-  return hasChild ? NodePosition.branch : NodePosition.leaf;
+  return hasChild || unexpanded ? NodePosition.branch : NodePosition.leaf;
 }
 
-/// Whether [nodeId] is a **boss** of the game layer (contract Section 6): a
+/// Whether [node] is a **boss** of the game layer (contract Section 6): a
 /// root or a branch, i.e. anything but a leaf.
-bool isBoss(int nodeId, List<SkillEdge> edges) => positionOf(nodeId, edges) != NodePosition.leaf;
+bool isBoss(SkillNode node, List<SkillEdge> edges) =>
+    positionOf(node.id, edges, unexpanded: node.unexpanded) != NodePosition.leaf;
 
 /// The ids of the bosses among [nodes] (see [isBoss]).
 Set<int> bossIds(Iterable<SkillNode> nodes, List<SkillEdge> edges) => {
   for (final n in nodes)
-    if (isBoss(n.id, edges)) n.id,
+    if (isBoss(n, edges)) n.id,
 };
+
+/// The chapter [nodeId] belongs to: the root's child above it along main
+/// parents (itself for a chapter); null for the root.
+int? chapterOf(int nodeId, List<SkillEdge> edges) {
+  var current = nodeId;
+  final seen = {nodeId};
+  while (true) {
+    final parent = mainParentOf(current, edges);
+    if (parent == null) return current == nodeId ? null : current;
+    if (mainParentOf(parent, edges) == null) return current;
+    if (!seen.add(parent)) return current;
+    current = parent;
+  }
+}
 
 /// The nodes without a contains-parent, in the order of [nodes].
 List<SkillNode> rootNodes(Iterable<SkillNode> nodes, List<SkillEdge> edges) {
@@ -105,8 +121,8 @@ List<SkillNode> rootNodes(Iterable<SkillNode> nodes, List<SkillEdge> edges) {
 /// The course's learning order, the list laid over its tree (the server's
 /// `services/tree.py`): what a node contains comes before it, so the root
 /// comes last; a requires edge puts its prerequisite first; otherwise the
-/// lower id (the planner's order) goes first. Only the first node in it that
-/// is not mastered is open.
+/// lower id (the planner's order) goes first. Each chapter ([chapterOf]) opens
+/// its first node in it that is not mastered; the root comes last.
 List<int> learningOrder(Iterable<SkillNode> nodes, List<SkillEdge> edges) {
   final ids = {for (final n in nodes) n.id};
   final before = {for (final id in ids) id: <int>{}};

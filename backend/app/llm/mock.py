@@ -122,6 +122,21 @@ _MATH_REQUIRES = [
     ("linear-function", "quadratic-function", "You need the graph of a linear function first."),
     ("sequence-limit", "derivative", "The derivative is defined as a limit."),
 ]
+# A topic with "vision": a course in layers. One chapter is broken down; two are left for later
+# ("expand"), each of which breaks down into three parts (_expand).
+_VISION_NODES = [
+    ("computer-vision", "Computer Vision", "Seeing with cameras and code: features, geometry and recognition.", [], False),
+    ("image-features", "Image Features", "Points and patches an algorithm can find again: corners and descriptors.",
+     ["computer-vision"], False),
+    ("harris", "Harris Corners", "Find corners from the structure tensor and explain why edges and flat areas are rejected.",
+     ["image-features"], False),
+    ("sift", "SIFT", "Build scale-invariant keypoints and descriptors and explain how they are matched.",
+     ["image-features"], False),
+    ("geometry", "Geometric Vision", "Cameras and 3D: calibration, homography, epipolar geometry, triangulation.",
+     ["computer-vision"], True),
+    ("recognition", "Visual Recognition", "Telling what is in an image: classification, detection, segmentation.",
+     ["computer-vision"], True),
+]
 _ROOT_TITLE_CHARS = 24
 
 # Generic topic: a root, 3 branches and 6 leaves.
@@ -218,8 +233,35 @@ def _syllabus(messages: list[Message]) -> str:
     )
 
 
+_EXPAND_RE = re.compile(r'^Break down: (.+?) \(slug "([^"]+)"\)', re.M)
+
+
+def _expand(title: str, slug: str) -> str:
+    """Planner.expand: three leaves under the node, named after it."""
+    nodes = [
+        {
+            "slug": f"{slug}-part-{i}",
+            "title": f"{title} {i}"[:_ROOT_TITLE_CHARS],
+            "description": f"Explain how part {i} of {title} works and why it holds.",
+            "parents": [slug],
+            "node_type": "concept",
+        }
+        for i in (1, 2, 3)
+    ]
+    return _dump({"nodes": nodes, "requires": []})
+
+
 def _plan(messages: list[Message]) -> str:
     topic = _first_user(messages).strip()
+    expanding = _EXPAND_RE.search(topic)
+    if expanding:
+        return _expand(expanding.group(1), expanding.group(2))
+    if "vision" in topic.casefold():
+        nodes = [
+            {"slug": slug, "title": title, "description": desc, "parents": parents, "node_type": "concept", "expand": expand}
+            for slug, title, desc, parents, expand in _VISION_NODES
+        ]
+        return _dump({"nodes": nodes, "requires": []})
     if _is_math(topic):
         nodes = [
             {"slug": slug, "title": title, "description": desc, "parents": parents, "node_type": "concept"}
@@ -361,6 +403,27 @@ _STRESS_HIGH_RE = re.compile(r"\b(?:stressed|a lot of stress)\b", re.I)
 _SENTENCE_SPLIT_RE = re.compile(r"(?:\.(?!\d)|[!?;\n])+")  # a "." inside 5.5 is not a sentence end
 
 
+_WEIGHT_RE = re.compile(r"\b(\d+(?:\.\d+)?)\s*(?:kg|kilos?|kilograms?)\b", re.I)
+_EXERCISE_MINUTES_RE = re.compile(
+    r"\b(?:ran|run|jogged|walked|swam|cycled|exercised|worked out|gym|yoga)\b[^.!?\n]*?\b(\d+)\s*(?:minutes?|mins?)\b"
+    r"|\b(\d+)\s*(?:minutes?|mins?)\s+(?:of\s+)?(?:running|exercise|workout|walking|swimming|cycling|yoga)\b",
+    re.I,
+)
+_SLEEP_QUALITY_RE = re.compile(r"\bsleep quality (?:was |is |of )?(\d)\b", re.I)
+
+
+def _checkin_extras(text: str) -> dict:
+    """Weight, minutes of exercise and a numbered sleep quality, only when said."""
+    out: dict = {}
+    if m := _WEIGHT_RE.search(text):
+        out["weight_kg"] = float(m.group(1))
+    if m := _EXERCISE_MINUTES_RE.search(text):
+        out["exercise_minutes"] = int(m.group(1) or m.group(2))
+    if m := _SLEEP_QUALITY_RE.search(text):
+        out["sleep_quality"] = int(m.group(1))
+    return out
+
+
 def _convert_checkin_english(text: str) -> dict:
     text = text.replace("’", "'")
     out: dict = {"sleep_hours": None, "exercised": None, "diet_note": None, "focus": None, "stress": None}
@@ -451,7 +514,40 @@ def _convert_checkin(messages: list[Message]) -> str:
     text = _first_user(messages)
     out = _convert_checkin_english(text)
     _convert_checkin_korean(text, out)
+    out.update(_checkin_extras(text))
     return _dump(out)
+
+
+# ---------------------------------------------------------------- Life Coach
+
+_LOG_MORE = {
+    "title": "Log a few more days",
+    "body": "Check in every day this week, even briefly, so your own patterns can show up.",
+}
+
+
+def _life_coach(messages: list[Message]) -> str:
+    """Three pieces from the facts: sleep, focus, and logging (or the first pattern)."""
+    match = _FACTS_RE.search(_system(messages))
+    facts = json.loads(match.group(1)) if match else {}
+    averages = facts.get("averages") or {}
+    advice = []
+    sleep = averages.get("sleep_hours")
+    if sleep is not None:
+        advice.append({
+            "title": "Protect your sleep",
+            "body": "Pick a fixed time to stop screens this week and keep it five nights.",
+            "based_on": f"slept {sleep} h on average",
+        })
+    focus = averages.get("focus_1_5")
+    if focus is not None:
+        advice.append({
+            "title": "Audit when you focus best",
+            "body": "Put this week's audits in the part of the day you feel sharpest.",
+            "based_on": f"focus {focus} of 5 on average",
+        })
+    advice.append({**_LOG_MORE, "based_on": f"{facts.get('days_logged', 0)} of {facts.get('window_days', 14)} days logged"})
+    return _dump({"advice": advice[:3]})
 
 
 # ---------------------------------------------------------------- 4.6 Narrator / Recommender / Material Finder
@@ -590,6 +686,7 @@ _SCRIPTS = {
     "recommender": _recommend,
     "material_finder": _find_material,
     "front_desk": _front_desk,
+    "life_coach": _life_coach,
 }
 
 

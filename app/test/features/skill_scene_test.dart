@@ -376,9 +376,9 @@ void main() {
       expect(avatar(tester).wave, isFalse);
     });
 
-    testWidgets('any locked node names the same open node', (tester) async {
-      await pumpSkill(tester, api, 12);
-      expect(bubble(tester), 'Still locked. Clear “Discriminant” first.');
+    testWidgets('a locked node names the open node of its own chapter', (tester) async {
+      await pumpSkill(tester, api, 12); // Derivatives, in Calculus
+      expect(bubble(tester), 'Still locked. Clear “Limits of Sequences” first.');
     });
 
     testWidgets('a mastered node can be challenged again', (tester) async {

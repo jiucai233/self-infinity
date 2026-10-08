@@ -22,14 +22,14 @@ def test_acceptance_scenario_end_to_end(client):
     }
 
     # 2. The system generates a course: 12 nodes, a syllabus source, and a learning order over the tree
-    #    in which only the first node is open (parts before what contains them; the root comes last).
-    generated = client.post("/api/skills/generate", json={"topic": "Math", "node_count": 12, "max_depth": 4}).json()
+    #    in which each chapter has one open node (parts before what contains them; the root comes last).
+    generated = client.post("/api/skills/generate", json={"topic": "Math"}).json()
     ids = {n["title"]: n["id"] for n in generated["nodes"]}
     assert len(generated["nodes"]) == 12
     assert generated["course"]["source_course"] == "High School Mathematics Curriculum (Ministry of Education)"
     assert generated["course"]["source_url"].startswith("https://")
     now = statuses(client)
-    assert now.pop("Discriminant") == "available"
+    assert [now.pop(t) for t in ("Discriminant", "Linear Functions", "Limits of Sequences")] == ["available"] * 3
     assert set(now.values()) == {"locked"}
     assert ids["Quadratic Equations"] == 5 and ids["Quadratic Functions"] == 10  # the ids used throughout the contract's examples
 
@@ -55,7 +55,7 @@ def test_acceptance_scenario_end_to_end(client):
     assert verdict["type"] == "verdict" and verdict["passed"] is False
     assert verdict["score"] == 45 and len(verdict["gaps"]) == 2
     assert statuses(client)["Quadratic Equations"] == "available"  # a fail leaves the node as it was
-    assert statuses(client)["Linear Functions"] == "locked"  # and the next one closed
+    assert statuses(client)["Sequences"] == "locked"  # and the next one of its chapter closed
 
     # 4. The user submits a short reflection; the system stores a principle and the misconception.
     reflection = client.post(f"/api/audits/{failed_audit}/reflection", json={"reflection": SHORT_REFLECTION})
@@ -70,9 +70,9 @@ def test_acceptance_scenario_end_to_end(client):
     retry = start(client, ids["Quadratic Equations"])
     _probe, verdict = answer_turns(client, retry, FIRST, LONG)
     assert verdict["passed"] is True
-    assert verdict["unlocked_skill_ids"] == [ids["Linear Functions"]]
+    assert verdict["unlocked_skill_ids"] == [ids["Sequences"]]
     now = statuses(client)
-    assert now["Quadratic Equations"] == "mastered" and now["Linear Functions"] == "available"
+    assert now["Quadratic Equations"] == "mastered" and now["Sequences"] == "available"
 
     # 6. Passing “Linear Functions” opens “Quadratic Functions” (it requires both), whose audit refers back to
     #    the stored misconception in its follow-up question (“Quadratic Equations” is its requires neighbour).
@@ -104,7 +104,7 @@ def test_acceptance_with_a_clarified_topic(client):
 
     assert generated["course"]["topic"] == topic
     assert generated["nodes"][0]["title"] == "Statistics"  # the first line of the topic
-    assert [n["status"] for n in generated["nodes"]].count("available") == 1
+    assert [n["status"] for n in generated["nodes"]].count("available") == 3  # one per chapter
 
 
 VOICE_EXAMPLE = "I slept about six hours last night and didn't exercise. I had ramen for lunch and I'm a bit tired."
@@ -118,7 +118,8 @@ def test_acceptance_check_in_briefing_plan_and_search(client):
     checkin = client.post("/api/checkins", json={"transcript": VOICE_EXAMPLE}).json()
     assert checkin == {
         "checkin": {"date": local_today().isoformat(), "sleep_hours": 6, "exercised": False, "diet_note": "lunch: ramen",
-                    "focus": None, "stress": None, "transcript": VOICE_EXAMPLE, "source": "voice"},
+                    "focus": None, "stress": None, "transcript": VOICE_EXAMPLE, "source": "voice",
+                    "sleep_quality": None, "exercise_minutes": None, "weight_kg": None},
         "missing_fields": ["focus", "stress"],
     }
     # The client's one follow-up replaces the record.
@@ -137,7 +138,7 @@ def test_acceptance_check_in_briefing_plan_and_search(client):
     before = client.get("/api/narrator/briefing").json()
     assert before["narrative"] is None and before["narrative_generated_at"] is None
     facts = before["facts"]
-    assert facts["nodes"] == {"total": 12, "mastered": 2, "available": 1, "locked": 9}
+    assert facts["nodes"] == {"total": 12, "mastered": 2, "available": 3, "locked": 7}
     assert facts["audits"] == {"total": 3, "passed": 2, "failed": 1}
     assert facts["misconception_clusters"] == [
         {"label": SHORT_REFLECTION, "occurrences": 1, "skills": ["Quadratic Equations"], "cross_skill": False,
@@ -154,9 +155,9 @@ def test_acceptance_check_in_briefing_plan_and_search(client):
     assert len(after["narrative"]) <= 400 and after["narrative_generated_at"]
     assert client.get("/api/narrator/briefing").json() == after
 
-    # Study plan: the one open node of the course.
+    # Study plan: the open node of each chapter; the condition is low, so leaves first.
     plan = client.post("/api/plan/generate").json()
-    assert [s["skill_title"] for s in plan["steps"]] == ["Quadratic Equations"]
+    assert [s["skill_title"] for s in plan["steps"]] == ["Linear Functions", "Limits of Sequences", "Quadratic Equations"]
     assert all(s["rationale"] == "Prerequisites checked — you can take this on now." for s in plan["steps"])
     assert plan["steps"][0]["course_id"] == 1 and plan["steps"][0]["node_type"] == "concept"
     assert client.get("/api/plan/current").json() == plan

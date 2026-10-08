@@ -49,7 +49,7 @@ def test_the_tables_are_exactly_the_planned_ones():
     assert set(SQLModel.metadata.tables) == {
         "course", "skillnode", "skilledge", "auditsession", "auditturn", "principle", "principlelink",
         "dailycheckin", "rewardevent", "narratorbriefing", "studyplan", "searchplan", "banditarm", "chatmessage", "upload",
-        "profile", "journalentry", "goal", "voicesession",
+        "profile", "journalentry", "goal", "voicesession", "lifeadvice",
     }
 
 
@@ -57,7 +57,9 @@ def test_skill_node_has_no_parent_id():
     columns = {c.name for c in SkillNode.__table__.columns}
 
     assert "parent_id" not in columns
-    assert columns == {"id", "course_id", "slug", "title", "description", "status", "node_type", "mastery_score"}
+    assert columns == {
+        "id", "course_id", "slug", "title", "description", "status", "node_type", "mastery_score", "unexpanded", "tested_out",
+    }
 
 
 def test_every_timestamp_comes_back_timezone_aware_utc(session):

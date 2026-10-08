@@ -27,6 +27,7 @@ __all__ = [
     "node_depth",
     "node_position",
     "course_order",
+    "descendant_ids",
     "open_every_course",
     "open_next",
 ]
@@ -58,13 +59,16 @@ def contains_children(session: Session, skill_id: int) -> list[SkillNode]:
 def node_position(session: Session, skill: SkillNode) -> NodePosition:
     """没有 contains 父节点是根；有父节点没有子节点是叶子；其余是中间节点。
 
-    顺序有意义：只有一个节点的课程，那个节点是根（先判父节点）。
+    顺序有意义：只有一个节点的课程，那个节点是根（先判父节点）。还没展开的类别（unexpanded）
+    虽然暂时没有子节点，也是中间节点。
     """
     has_parent = session.exec(
         select(SkillEdge.id).where(SkillEdge.to_id == skill.id, SkillEdge.kind == EdgeKind.contains).limit(1)
     ).first()
     if has_parent is None:
         return NodePosition.root
+    if skill.unexpanded:
+        return NodePosition.branch
     has_child = session.exec(
         select(SkillEdge.id).where(SkillEdge.from_id == skill.id, SkillEdge.kind == EdgeKind.contains).limit(1)
     ).first()
@@ -113,6 +117,24 @@ def node_depth(session: Session, skill: SkillNode) -> int:
     return _depth_from(_main_parents(session), skill.id)
 
 
+def descendant_ids(session: Session, skill_id: int) -> list[int]:
+    """Every node under `skill_id` along contains edges (through any parent), nearest first."""
+    edges = session.exec(select(SkillEdge.from_id, SkillEdge.to_id).where(SkillEdge.kind == EdgeKind.contains)).all()
+    children: dict[int, list[int]] = {}
+    for parent, child in edges:
+        children.setdefault(parent, []).append(child)
+    found: list[int] = []
+    seen = {skill_id}
+    queue = [skill_id]
+    while queue:
+        for child in sorted(children.get(queue.pop(0), [])):
+            if child not in seen:
+                seen.add(child)
+                found.append(child)
+                queue.append(child)
+    return found
+
+
 def neighbor_ids(session: Session, skill_id: int) -> set[int]:
     """Direct contains / requires neighbours in either direction."""
     edges = session.exec(
@@ -135,13 +157,17 @@ def course_graph(session: Session, course_id: int) -> tuple[list[SkillNode], lis
     return nodes, edges
 
 
-# ---------------------------------------------------------------- unlocking: one node at a time, in order
+# ---------------------------------------------------------------- unlocking: in order within a chapter
 #
 # Every course carries a learning order, a list laid over its tree: what a node contains comes
 # before it, so a chapter follows its sections and the root, the course itself, comes last; a
 # requires edge puts its prerequisite first; otherwise the planner's order (it follows the
-# outline) decides, which nodes keep as their ids. Exactly one node per course is open: the
-# first one in that order not yet mastered. Mastered nodes stay open for a retake.
+# outline) decides, which nodes keep as their ids.
+#
+# The root's children are the chapters, and the player picks which chapter to work on: each
+# chapter has one open node, the first one of it in that order not yet mastered (a chapter not
+# broken down yet is its own first node). The root opens once every chapter is done. Mastered
+# nodes stay open for a retake.
 
 
 def course_order(session: Session, course_id: int) -> list[SkillNode]:
@@ -181,15 +207,37 @@ def open_every_course(session: Session) -> int:
 
 def _line_up(session: Session, course_id: int) -> list[SkillNode]:
     """Sets the statuses [open_next] describes; returns the nodes it changed."""
+    order = course_order(session, course_id)
+    chapter = _chapters(session, order)
     changed = []
-    found = False
-    for node in course_order(session, course_id):
+    opened: set[int | None] = set()  # chapters (None: the root) whose open node is found
+    for node in order:
         if node.status == SkillStatus.mastered:
             continue
-        want = SkillStatus.locked if found else SkillStatus.available
-        found = True
+        key = chapter.get(node.id)
+        # The root waits for every chapter: it is last in the order, so any chapter still open
+        # was met before it.
+        want = SkillStatus.locked if key in opened or (key is None and opened) else SkillStatus.available
+        opened.add(key)
         if node.status != want:
             node.status = want
             session.add(node)
             changed.append(node)
     return changed
+
+
+def _chapters(session: Session, nodes: list[SkillNode]) -> dict[int, int]:
+    """node id -> the root's child it sits under, along main parents; the root has none."""
+    main = _main_parents(session)
+    ids = {n.id for n in nodes}
+    found: dict[int, int] = {}
+    for node in nodes:
+        current, seen = node.id, {node.id}
+        while current in main and main[current] in ids and main[current] not in seen:
+            parent = main[current]
+            if parent not in main or main[parent] not in ids:  # parent is the root
+                found[node.id] = current
+                break
+            seen.add(parent)
+            current = parent
+    return found

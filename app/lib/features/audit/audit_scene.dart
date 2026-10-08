@@ -38,10 +38,14 @@ import '../../l10n/l10n.dart';
 ///
 /// Route `/skill/:id/audit`. Starts a session when opened.
 class AuditScene extends StatefulWidget {
-  const AuditScene({super.key, required this.skillId});
+  const AuditScene({super.key, required this.skillId, this.testOut = false});
 
   /// The node to challenge.
   final int skillId;
+
+  /// A challenge on the whole branch: pass it and everything under it is
+  /// cleared.
+  final bool testOut;
 
   @override
   State<AuditScene> createState() => _AuditSceneState();
@@ -159,7 +163,7 @@ class _AuditSceneState extends State<AuditScene> {
     });
     try {
       final overview = await _api.getSkillOverview(widget.skillId);
-      final start = await _api.startAudit(widget.skillId);
+      final start = await _api.startAudit(widget.skillId, testOut: widget.testOut);
       if (!mounted) return;
       setState(() {
         _title = overview.skill.title;
@@ -335,7 +339,9 @@ class _AuditSceneState extends State<AuditScene> {
   Widget _statusChip() {
     final verdict = _verdict;
     final l = context.l10n;
-    if (verdict == null) return StatusChip.primary(l.auditInProgress);
+    if (verdict == null) {
+      return StatusChip.primary(_session?.testOut ?? false ? l.challengeInProgress : l.auditInProgress);
+    }
     return verdict.passed ? StatusChip.success(l.auditPassed) : StatusChip.danger(l.auditFailed);
   }
 

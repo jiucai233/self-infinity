@@ -1076,4 +1076,182 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get devNoVoice => '아직 실시간 음성 세션이 없습니다.';
+
+  @override
+  String get breakDown => '나눠 보기';
+
+  @override
+  String get breakingDown => '나누는 중이에요… 1분쯤 걸릴 수 있어요.';
+
+  @override
+  String get breakDownFailed => '나누지 못했어요. 다시 시도해 주세요.';
+
+  @override
+  String get unexpandedLine => '아직 나누지 않은 부분이에요. 나눠서 안을 보거나, 이미 안다면 통째로 도전하세요.';
+
+  @override
+  String get challengeWhole => '통째로 도전';
+
+  @override
+  String get challengeInProgress => '통째로 도전';
+
+  @override
+  String get testedOut => '도전으로 통과';
+
+  @override
+  String get dotUnexpanded => '아직 안 나눔';
+
+  @override
+  String get lifeTitle => '나의 생활';
+
+  @override
+  String get lifeOpen => '나의 생활 →';
+
+  @override
+  String lifeDays(int n) {
+    return '$n일';
+  }
+
+  @override
+  String get lifeSleep => '수면';
+
+  @override
+  String get lifeFocus => '집중';
+
+  @override
+  String get lifeStress => '스트레스';
+
+  @override
+  String get lifeExercise => '운동';
+
+  @override
+  String get lifeWeight => '체중';
+
+  @override
+  String get lifeAudits => '감사';
+
+  @override
+  String get lifeOutOf5 => ' / 5';
+
+  @override
+  String get lifeDaysSuffix => '일';
+
+  @override
+  String lifeChartTitle(int n) {
+    return '최근 $n일';
+  }
+
+  @override
+  String get lifeNoData => '이 기간에는 아직 기록이 없어요.';
+
+  @override
+  String get lifePatterns => '나의 패턴';
+
+  @override
+  String lifePatternsEmpty(int n) {
+    return '양쪽에 $n일씩 쌓이면(예: 7시간 이상 잔 $n일과 6시간 미만 $n일) 나의 패턴이 여기에 나타나요.';
+  }
+
+  @override
+  String get lifePatternNote => '내 날들의 비교일 뿐 원인은 아니에요. 그날들 사이엔 다른 차이도 많아요.';
+
+  @override
+  String get lifeSleepBetter => '7시간 이상 수면';
+
+  @override
+  String get lifeSleepWorse => '6시간 미만';
+
+  @override
+  String get lifeExerciseBetter => '운동함';
+
+  @override
+  String get lifeExerciseWorse => '운동 안 함';
+
+  @override
+  String get lifeStressBetter => '스트레스 1–2';
+
+  @override
+  String get lifeStressWorse => '스트레스 4–5';
+
+  @override
+  String lifeGroupDays(int n) {
+    return '$n일';
+  }
+
+  @override
+  String lifeGroupPassed(int pct, int n) {
+    return '$n회 중 $pct% 통과';
+  }
+
+  @override
+  String get lifeGroupNoAudits => '감사 없음';
+
+  @override
+  String lifeGroupFocus(String value) {
+    return '집중 $value';
+  }
+
+  @override
+  String get lifeAdvice => '이번 주';
+
+  @override
+  String get lifeAdviceGet => '조언 받기';
+
+  @override
+  String get lifeAdviceAgain => '새 조언';
+
+  @override
+  String get lifeAdviceEmpty => '내 숫자를 바탕으로 이번 주에 할 작은 일 세 가지.';
+
+  @override
+  String get lifeAdviceFailed => '지금은 조언을 받을 수 없어요. 다시 시도해 주세요.';
+
+  @override
+  String lifeAdviceBasedOn(String fact) {
+    return '근거: $fact';
+  }
+
+  @override
+  String get lifeLog => '날짜별';
+
+  @override
+  String get lifeFillIn => '하루 채우기';
+
+  @override
+  String lifeEdit(String date) {
+    return '$date 수정';
+  }
+
+  @override
+  String get lifeSleepHours => '수면(시간)';
+
+  @override
+  String get lifeSleepQuality => '수면의 질';
+
+  @override
+  String get lifeExerciseMinutes => '운동(분)';
+
+  @override
+  String get lifeWeightKg => '체중(kg)';
+
+  @override
+  String get lifeSave => '저장';
+
+  @override
+  String lifeMinutes(int n) {
+    return '$n분';
+  }
+
+  @override
+  String lifeKg(String value) {
+    return '${value}kg';
+  }
+
+  @override
+  String lifeAuditsDone(int passed, int n) {
+    return '$passed/$n 통과';
+  }
+
+  @override
+  String get lifePrivacy => '우리 데이터베이스에 저장돼요. 조언을 만들 때 AI는 평균과 패턴만 받고, 하루하루의 기록은 받지 않아요.';
 }

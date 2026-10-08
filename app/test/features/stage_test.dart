@@ -203,7 +203,16 @@ void main() {
     testWidgets('without a check-in all three rows show —', (tester) async {
       await pumpScene(tester, const MapScene(), api: api);
       final summary = find.byKey(const Key('today-summary'));
-      expect(textsIn(tester, summary), ['Sleep', '—', 'Meals', '—', 'Journal', '—']);
+      expect(textsIn(tester, summary), ['Sleep', '—', 'Meals', '—', 'Journal', '—', 'My life →']);
+    });
+
+    testWidgets('My life → opens the life overview', (tester) async {
+      await pumpScene(tester, const MapScene(), api: api);
+      await tester.ensureVisible(find.byKey(const Key('open-life')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('open-life')));
+      await tester.pumpAndSettle();
+      expect(find.text('route:/life'), findsOneWidget);
     });
 
     testWidgets('with a check-in: sleep, meal and the first two lines of the diary', (

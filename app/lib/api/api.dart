@@ -27,8 +27,10 @@ abstract class SelfInfinityApi {
   /// `POST /skills/generate` (LLM). Body: [GenerateRequest.toJson].
   ///
   /// Not used by the app (courses are made in the chat); kept for seeding
-  /// tests. Creates a course. Only the root node is `available`; all others are
-  /// `locked`. 422 on invalid settings, 502 on generation failure.
+  /// tests. Creates a course's first layer: categories it could not break
+  /// down yet come back `unexpanded`. Each chapter (a child of the root) has
+  /// one `available` node; the rest are `locked`. 422 on invalid settings, 502
+  /// on generation failure.
   Future<CourseMap> generateCourse(GenerateRequest request);
 
   /// `POST /skills/scout` (LLM). The tutorial's first course, read next to the
@@ -49,12 +51,22 @@ abstract class SelfInfinityApi {
   /// [courseId]: the nodes of all courses.
   Future<List<SkillNode>> listSkills({int? courseId});
 
-  /// `POST /skills/{skillId}/audits`. Body `{"mode"}`.
+  /// `POST /skills/{skillId}/expand` (LLM). Breaks an `unexpanded` node down
+  /// into its parts; answers the whole course map. 400 when it is already
+  /// broken down, 409 when the course is full, 502 when the Planner fails (it
+  /// stays `unexpanded`).
+  Future<CourseMap> expandSkill(int skillId);
+
+  /// `POST /skills/{skillId}/audits`. Body `{"mode", "test_out"}`.
   ///
-  /// Starts an audit (an audit). [mode] is `'day'` or `'night'` (night doubles the
-  /// turn limit); anything else is a 422. Allowed on `available` and
-  /// `mastered` nodes; 400 `skill is locked`, 404 `skill not found`.
-  Future<AuditStart> startAudit(int skillId, {String mode = 'day'});
+  /// Starts an audit. [mode] is `'day'` or `'night'` (night doubles the turn
+  /// limit); anything else is a 422. Allowed on `available` and `mastered`
+  /// nodes that are not `unexpanded`; 400 otherwise, 404 `skill not found`.
+  ///
+  /// [testOut]: a challenge on a whole branch, root or unexpanded node, locked
+  /// or not (not a leaf, not a mastered node: 400). Passing it masters
+  /// everything under the node.
+  Future<AuditStart> startAudit(int skillId, {String mode = 'day', bool testOut = false});
 
   /// `POST /audits/{sessionId}/turns` (LLM). Body `{"content"}`.
   ///
@@ -123,6 +135,20 @@ abstract class SelfInfinityApi {
 
   /// `GET /checkins/today` — today's (KST) check-in, or `null`.
   Future<DailyCheckIn?> getTodayCheckIn();
+
+  /// `GET /life?days=` (7–365) — the player's own record: every day of the
+  /// window, its summary, their patterns and the latest advice. No LLM.
+  Future<Life> getLife({int days = 30});
+
+  /// `POST /life/advice` (LLM) — the Life Coach's three pieces of advice, from
+  /// coarse facts of the last 14 days. 502 when it cannot answer.
+  Future<LifeAdvice> requestLifeAdvice();
+
+  /// `PUT /checkins/{date}` — fixes or fills in one day: the [fields] given
+  /// (JSON names: `sleep_hours`, `sleep_quality`, `exercised`,
+  /// `exercise_minutes`, `weight_kg`, `diet_note`, `focus`, `stress`) replace
+  /// that day's, `null` clears one. 400 for a day still to come.
+  Future<DailyCheckIn> editCheckIn(String date, Map<String, Object?> fields);
 
   /// `GET /skills/{skillId}/overview` — node, course, parents, prerequisites,
   /// audit history and found materials. 404 `skill not found`.

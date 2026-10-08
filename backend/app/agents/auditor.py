@@ -128,6 +128,13 @@ POSITION_BLOCKS = {
         "This is the whole field. Ask which problems it is for and which it is not for. Judge "
         "whether the user can explain how its main parts fit together."
     ),
+    "test_out": (
+        "This is a challenge: the user says they already know this whole area and wants to skip "
+        "it. Pick three different parts from Parts (or from Covers when there are none) and ask "
+        "about one per question, the way you would audit that single part: its mechanism and the "
+        "cases it must handle. Then ask how two of them relate. Pass only if every part you asked "
+        "about was right; one part they do not know fails the challenge."
+    ),
     "task": (
         "This is an executable step. Judge whether they know the main actions in a workable "
         "order and how to tell it worked. Specs, commands and settings one would look up while "
@@ -199,17 +206,19 @@ class Auditor:
         child_titles: list[str] | None = None,
         pacing: str = "normal",
         after_challenge: bool = False,
+        test_out: bool = False,
     ) -> AuditorTurnResult:
         """`after_challenge`: the last answer replied to the Challenger's question, so this
-        turn must be the verdict (like a turn at the limit)."""
+        turn must be the verdict (like a turn at the limit). `test_out`: a challenge on a whole
+        branch; `child_titles` are then the parts under it to sample from."""
         if max_turns is None:
             max_turns = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
         if pacing not in PACINGS:
             pacing = "normal"
 
-        # Parts 只对根和分支有意义；叶子没有子节点。
+        # Parts 只对根和分支（以及整块挑战）有意义；叶子没有子节点。
         parts_line = ""
-        if position in (NodePosition.root, NodePosition.branch) and child_titles:
+        if (test_out or position in (NodePosition.root, NodePosition.branch)) and child_titles:
             parts_line = f"Parts: {', '.join(child_titles)}\n"
 
         user_turn_count = sum(1 for m in history if m["role"] == "user")
@@ -221,11 +230,11 @@ class Auditor:
             final_line=FINAL_TURN_LINE if final else "",
             title=skill_title,
             description=skill_description,
-            position=position.value,
+            position="challenge on the whole area" if test_out else position.value,
             parts_line=parts_line,
             lessons=format_lessons(lessons),
             pacing=pacing,
-            position_block=position_block(node_type, position),
+            position_block=POSITION_BLOCKS["test_out"] if test_out else position_block(node_type, position),
         )
         messages: list[Message] = [{"role": "system", "content": system}, *history]
 

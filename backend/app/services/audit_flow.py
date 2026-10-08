@@ -10,8 +10,10 @@
 - 结算先原子地把会话从 active 改掉（`_claim`）：两个并发请求只有一个能结算，另一个得到
   AuditClosed（路由回 400），奖励和 bandit 不会记两次。
 - Challenger 出任何问题都按维持原判处理——它只能收紧裁决，不能制造新的失败模式。
-- 终判通过：节点 mastered 并写入 mastery_score；每个以它为 contains 父节点的 locked 节点
-  变 available（任意一个父节点通过就够）；记录奖励。失败：节点状态不动。
+- 终判通过：节点 mastered 并写入 mastery_score，按学习顺序开下一个节点；记录奖励。失败：节点
+  状态不动。
+- 整块挑战（test_out）：对一个分支或整门课，从它下面抽几个部分来问；通过则它和它下面所有
+  没通过的节点都算 mastered（tested_out 标记它们不是自己审过的）。锁着的也能挑战。
 """
 
 import json
@@ -41,7 +43,7 @@ from app.i18n import join_list, quote, t
 from app.services import bandit
 from app.services.condition import audit_pacing
 from app.services.incentive import compute_reward
-from app.services.tree import child_titles, node_position, open_next
+from app.services.tree import child_titles, contains_children, descendant_ids, node_position, open_next
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +79,34 @@ class VerdictOutcome:
 TurnOutcome = ProbeOutcome | VerdictOutcome
 
 
-def opening_question(skill: SkillNode, position: NodePosition, children: list[str]) -> str:
+# How many parts under a challenged node the Auditor is shown to sample from.
+TEST_OUT_PARTS = 12
+
+
+def can_test_out(session: Session, skill: SkillNode) -> bool:
+    """A branch, a course's root, or a category not broken down yet: anything with parts."""
+    return bool(skill.unexpanded) or node_position(session, skill) != NodePosition.leaf
+
+
+def test_out_parts(session: Session, skill: SkillNode) -> list[str]:
+    """Titles of the smallest units under `skill` (leaves, and categories not broken down yet),
+    nearest first; empty for a category not broken down (its description names its parts)."""
+    nodes = {n.id: n for n in session.exec(select(SkillNode).where(SkillNode.course_id == skill.course_id)).all()}
+    parts = []
+    for node_id in descendant_ids(session, skill.id):
+        node = nodes.get(node_id)
+        if node is not None and (node.unexpanded or not contains_children(session, node_id)):
+            parts.append(node.title)
+    return parts[:TEST_OUT_PARTS]
+
+
+def opening_question(
+    skill: SkillNode, position: NodePosition, children: list[str], test_out: bool = False
+) -> str:
+    if test_out:
+        if children:
+            return t("opening_test_out", title=quote(skill.title), part=quote(children[0]))
+        return t("opening_test_out_open", title=quote(skill.title))
     if skill.node_type == NodeType.task:
         return t("opening_task", title=quote(skill.title))
     if position == NodePosition.root:
@@ -102,18 +131,21 @@ def audit_turns(session: Session, audit_id: int) -> list[AuditTurn]:
     )
 
 
-def start_audit(session: Session, skill: SkillNode, mode: str) -> tuple[AuditSession, str]:
+def start_audit(session: Session, skill: SkillNode, mode: str, test_out: bool = False) -> tuple[AuditSession, str]:
     position = node_position(session, skill)
     audit = AuditSession(
         skill_id=skill.id,
         node_position=position,
         status=AuditStatus.active,
-        max_turns=max_turns_for(skill.node_type, mode),
+        # A challenge samples several parts: it gets a concept's turns even over a task.
+        max_turns=max_turns_for(NodeType.concept if test_out else skill.node_type, mode),
+        test_out=True if test_out else None,
     )
     session.add(audit)
     session.flush()
 
-    question = opening_question(skill, position, child_titles(session, skill))
+    parts = test_out_parts(session, skill) if test_out else child_titles(session, skill)
+    question = opening_question(skill, position, parts, test_out)
     session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=question))
     session.commit()
     session.refresh(audit)
@@ -137,7 +169,7 @@ def submit_turn(
     ]
 
     lessons = _lessons(session, skill)
-    parts = child_titles(session, skill)
+    parts = test_out_parts(session, skill) if audit.test_out else child_titles(session, skill)
     pacing = _pacing(session)
     try:
         result = Auditor(auditor_provider).next_turn(
@@ -152,6 +184,7 @@ def submit_turn(
             pacing=pacing,
             # The Challenger's question was the last one: this answer gets the verdict.
             after_challenge=audit.challenged,
+            test_out=bool(audit.test_out),
         )
     except Exception as exc:
         raise AuditorUnavailable from exc
@@ -253,6 +286,8 @@ def _finalize(session: Session, audit: AuditSession, skill: SkillNode, verdict: 
         skill.status = SkillStatus.mastered
         skill.mastery_score = verdict.score
         session.add(skill)
+        if audit.test_out:
+            _master_under(session, skill)
         session.flush()
 
         outcome.unlocked_skill_ids = open_next(session, skill.course_id)
@@ -263,6 +298,16 @@ def _finalize(session: Session, audit: AuditSession, skill: SkillNode, verdict: 
 
     session.commit()
     return outcome
+
+
+def _master_under(session: Session, skill: SkillNode) -> None:
+    """A passed challenge: every node under `skill` not mastered yet is, as tested out."""
+    for node_id in descendant_ids(session, skill.id):
+        node = session.get(SkillNode, node_id)
+        if node is not None and node.status != SkillStatus.mastered:
+            node.status = SkillStatus.mastered
+            node.tested_out = True
+            session.add(node)
 
 
 def _claim(session: Session, audit: AuditSession, status: AuditStatus) -> None:

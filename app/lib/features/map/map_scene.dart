@@ -346,7 +346,13 @@ class _MapSceneState extends State<MapScene> {
                     ?.copyWith(color: AppColors.textTertiary),
               ),
             ),
-          const Positioned(left: AppSpacing.lg, bottom: AppSpacing.lg, child: GraphLegend()),
+          Positioned(
+            left: AppSpacing.lg,
+            bottom: AppSpacing.lg,
+            child: GraphLegend(
+              unexpanded: map?.nodes.any((n) => n.unexpanded && !n.isMastered) ?? false,
+            ),
+          ),
         ],
       ),
     );

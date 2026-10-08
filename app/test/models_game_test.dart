@@ -128,10 +128,14 @@ void main() {
     final edges = [contains(1, 2), contains(1, 3), contains(2, 4), contains(2, 5)];
 
     test('isBoss: root and branch yes, leaf no', () {
-      expect(isBoss(1, edges), isTrue);
-      expect(isBoss(2, edges), isTrue);
-      expect(isBoss(3, edges), isFalse);
-      expect(isBoss(4, edges), isFalse);
+      expect(isBoss(node(1), edges), isTrue);
+      expect(isBoss(node(2), edges), isTrue);
+      expect(isBoss(node(3), edges), isFalse);
+      expect(isBoss(node(4), edges), isFalse);
+    });
+
+    test('a category not broken down yet is a boss without children', () {
+      expect(isBoss(node(3).copyWith(unexpanded: true), edges), isTrue);
     });
 
     test('bossIds picks them out of a node list', () {
@@ -139,7 +143,7 @@ void main() {
     });
 
     test('a lone root counts as a boss', () {
-      expect(isBoss(9, const []), isTrue);
+      expect(isBoss(node(9), const []), isTrue);
     });
   });
 }

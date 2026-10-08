@@ -1083,4 +1083,184 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devNoVoice => 'No live voice sessions yet.';
+
+  @override
+  String get breakDown => 'Break it down';
+
+  @override
+  String get breakingDown => 'Breaking it down… this can take up to a minute.';
+
+  @override
+  String get breakDownFailed => 'Couldn\'t break it down. Try again.';
+
+  @override
+  String get unexpandedLine =>
+      'Not broken down yet. Break it down to see what\'s inside, or challenge it whole if you already know it.';
+
+  @override
+  String get challengeWhole => 'Challenge it whole';
+
+  @override
+  String get challengeInProgress => 'Challenge';
+
+  @override
+  String get testedOut => 'Cleared by challenge';
+
+  @override
+  String get dotUnexpanded => 'Not broken down';
+
+  @override
+  String get lifeTitle => 'My life';
+
+  @override
+  String get lifeOpen => 'My life →';
+
+  @override
+  String lifeDays(int n) {
+    return '$n days';
+  }
+
+  @override
+  String get lifeSleep => 'Sleep';
+
+  @override
+  String get lifeFocus => 'Focus';
+
+  @override
+  String get lifeStress => 'Stress';
+
+  @override
+  String get lifeExercise => 'Exercise';
+
+  @override
+  String get lifeWeight => 'Weight';
+
+  @override
+  String get lifeAudits => 'Audits';
+
+  @override
+  String get lifeOutOf5 => ' / 5';
+
+  @override
+  String get lifeDaysSuffix => ' days';
+
+  @override
+  String lifeChartTitle(int n) {
+    return 'Last $n days';
+  }
+
+  @override
+  String get lifeNoData => 'Nothing logged in these days yet.';
+
+  @override
+  String get lifePatterns => 'Your patterns';
+
+  @override
+  String lifePatternsEmpty(int n) {
+    return 'Once you have $n days on each side (say, $n with 7 h+ of sleep and $n under 6 h), your own patterns show up here.';
+  }
+
+  @override
+  String get lifePatternNote => 'Your own days, not a cause: many things differ between them.';
+
+  @override
+  String get lifeSleepBetter => 'Slept 7 h+';
+
+  @override
+  String get lifeSleepWorse => 'Under 6 h';
+
+  @override
+  String get lifeExerciseBetter => 'Exercised';
+
+  @override
+  String get lifeExerciseWorse => 'No exercise';
+
+  @override
+  String get lifeStressBetter => 'Stress 1–2';
+
+  @override
+  String get lifeStressWorse => 'Stress 4–5';
+
+  @override
+  String lifeGroupDays(int n) {
+    return '$n days';
+  }
+
+  @override
+  String lifeGroupPassed(int pct, int n) {
+    return 'passed $pct% of $n';
+  }
+
+  @override
+  String get lifeGroupNoAudits => 'no audits';
+
+  @override
+  String lifeGroupFocus(String value) {
+    return 'focus $value';
+  }
+
+  @override
+  String get lifeAdvice => 'This week';
+
+  @override
+  String get lifeAdviceGet => 'Get advice';
+
+  @override
+  String get lifeAdviceAgain => 'New advice';
+
+  @override
+  String get lifeAdviceEmpty => 'Three small things for the week, from your own numbers.';
+
+  @override
+  String get lifeAdviceFailed => 'Advice isn\'t available right now. Try again.';
+
+  @override
+  String lifeAdviceBasedOn(String fact) {
+    return 'Based on: $fact';
+  }
+
+  @override
+  String get lifeLog => 'Days';
+
+  @override
+  String get lifeFillIn => 'Fill in a day';
+
+  @override
+  String lifeEdit(String date) {
+    return 'Edit $date';
+  }
+
+  @override
+  String get lifeSleepHours => 'Sleep (h)';
+
+  @override
+  String get lifeSleepQuality => 'Sleep quality';
+
+  @override
+  String get lifeExerciseMinutes => 'Exercise (min)';
+
+  @override
+  String get lifeWeightKg => 'Weight (kg)';
+
+  @override
+  String get lifeSave => 'Save';
+
+  @override
+  String lifeMinutes(int n) {
+    return '$n min';
+  }
+
+  @override
+  String lifeKg(String value) {
+    return '$value kg';
+  }
+
+  @override
+  String lifeAuditsDone(int passed, int n) {
+    return '$passed/$n passed';
+  }
+
+  @override
+  String get lifePrivacy =>
+      'Stored in our database. For advice the AI gets averages and patterns, never your days.';
 }

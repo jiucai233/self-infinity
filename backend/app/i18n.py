@@ -145,6 +145,16 @@ _TEXTS: dict[str, dict[str, str]] = {
         "zh": "哪些问题需要用到{title}，哪些不需要？你怎么判断？",
         "ko": "{title}: 어떤 문제에 필요하고, 어떤 문제엔 필요 없을까요? 어떻게 판단하나요?",
     },
+    "opening_test_out": {
+        "en": "So you already know {title}. Prove it, one part at a time. Start with {part}: how does it work?",
+        "zh": "你说{title}已经会了，那我们一块一块来验证。先从{part}开始：它是怎么工作的？",
+        "ko": "{title}은 이미 안다고 했죠. 한 부분씩 확인해 볼게요. {part}부터: 어떻게 작동하나요?",
+    },
+    "opening_test_out_open": {
+        "en": "So you already know {title}. Prove it: what are its main parts, and how does the most important one work?",
+        "zh": "你说{title}已经会了，那来验证一下：它主要由哪几部分组成？最重要的那部分是怎么工作的？",
+        "ko": "{title}은 이미 안다고 했죠. 확인해 볼게요: 주요 부분은 무엇이고, 가장 중요한 부분은 어떻게 작동하나요?",
+    },
     "opening_task": {
         "en": "How exactly will you do {title}?",
         "zh": "你具体打算怎么完成{title}？",

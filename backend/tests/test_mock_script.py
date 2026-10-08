@@ -69,7 +69,7 @@ MATH_TABLE = [
 
 
 @pytest.mark.parametrize("topic", ["Math", "high school MATH", "math\n\nQ: level?\nA: high school", "수학"])
-@pytest.mark.parametrize("settings", [{}, {"node_count": 4, "max_depth": 2, "difficulty": "deep"}])
+@pytest.mark.parametrize("settings", [{}, {"difficulty": "deep"}])
 def test_42_math_course_is_the_twelve_node_table_whatever_the_settings(topic, settings):
     planned = Planner(MOCK).generate(topic, **settings)
 

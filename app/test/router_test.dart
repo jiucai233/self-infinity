@@ -272,10 +272,10 @@ void main() {
     expect(app.title, 'Self-Infinity');
   });
 
-  testWidgets('createRouter has exactly the four scene routes', (tester) async {
+  testWidgets('createRouter has exactly the five scene routes', (tester) async {
     final router = createRouter();
     addTearDown(router.dispose);
     final paths = router.configuration.routes.whereType<GoRoute>().map((r) => r.path).toList();
-    expect(paths, ['/', '/map', '/skill/:skillId', '/skill/:skillId/audit']);
+    expect(paths, ['/', '/map', '/life', '/skill/:skillId', '/skill/:skillId/audit']);
   });
 }

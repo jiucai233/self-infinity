@@ -35,11 +35,14 @@ Related plan sections: 4 (course structure), 5 (schema), 6 (API), 7.4 (agents), 
 ### SkillNode
 ```json
 {"id": 5, "course_id": 1, "slug": "quadratic-equation", "title": "Quadratic Equations",
- "description": "...", "status": "available", "node_type": "concept", "mastery_score": null}
+ "description": "...", "status": "available", "node_type": "concept", "mastery_score": null,
+ "unexpanded": false, "tested_out": false}
 ```
 - `status`: `locked` | `available` | `mastered`
 - `node_type`: `concept` | `task`
 - `mastery_score`: integer 0–100 or null; written when an audit passes.
+- `unexpanded` **(added 2026-10-08)**: a category the Planner left to break down later; it has no children yet. Break it down with endpoint 38, or challenge it as a whole (endpoint 7, `test_out`). It cannot be audited on its own.
+- `tested_out` **(added 2026-10-08)**: mastered by passing a challenge on a node above it, not by its own audit.
 
 ### SkillEdge
 ```json
@@ -55,8 +58,10 @@ no contains parent → `root`; contains parent but no contains child → `leaf`;
 ```json
 {"id": 31, "skill_id": 5, "node_position": "leaf", "status": "active", "score": null,
  "gaps": [], "comment": null,
- "turns": [{"role": "auditor", "content": "Explain “Quadratic Equations” from scratch to someone who has never heard of it."}]}
+ "turns": [{"role": "auditor", "content": "Explain “Quadratic Equations” from scratch to someone who has never heard of it."}],
+ "test_out": false}
 ```
+- `test_out` **(added 2026-10-08)**: a challenge on a whole branch (endpoint 7).
 - `node_position`: `root` | `branch` | `leaf`. (The example copies plan 6.3, where Quadratic Equations is a leaf. In the Section 4.2 demo course it has children, so there it is a `branch` and gets the branch opening question.)
 - `status`: `active` | `passed` | `failed`
 - `turns[].role`: `user` | `auditor`. The opening question is the first auditor turn.
@@ -88,9 +93,11 @@ Verdict:
 ### DailyCheckIn
 ```json
 {"date": "2026-10-05", "sleep_hours": 6, "exercised": false, "diet_note": "lunch: ramen",
- "focus": null, "stress": null, "transcript": "I slept about six hours last night ...", "source": "voice"}
+ "focus": null, "stress": null, "transcript": "I slept about six hours last night ...", "source": "voice",
+ "sleep_quality": null, "exercise_minutes": null, "weight_kg": null}
 ```
 Ranges: `sleep_hours` 0–14, `focus` 1–5, `stress` 1–5; each may be null. `source`: `voice` | `manual`.
+`sleep_quality` (1–5), `exercise_minutes` (0–600), `weight_kg` (20–400, one decimal) **(added 2026-10-08)**: kept for trends (endpoint 39) when said or typed, never asked for, so they are never in `missing_fields`. Minutes of exercise mean `exercised: true`. No calories, no meals counted: `diet_note` stays a note.
 
 ### ProfileFacts
 ```json
@@ -105,7 +112,7 @@ Ranges: `sleep_hours` 0–14, `focus` 1–5, `stress` 1–5; each may be null. `
 }
 ```
 - `audits` and `principle_ids` **(added)**.
-- `condition` uses the last 3 check-ins. `flag`: `low` if average sleep < 6 h or average stress ≥ 4; `unknown` with no check-ins; else `normal`. `days` = number of check-ins used (0–3).
+- `condition` uses the last 3 check-ins. `flag`: `low` if average sleep < 6 h, average stress ≥ 4 or average focus ≤ 2 (focus **added 2026-10-08**); `unknown` with no check-ins; else `normal`. `days` = number of check-ins used (0–3).
 
 ### Briefing
 ```json
@@ -188,10 +195,11 @@ A: {answer 1}
 ### 2. `POST /api/skills/generate`
 Request:
 ```json
-{"topic": "Math", "node_count": 12, "max_depth": 4, "difficulty": "standard", "search_syllabus": true}
+{"topic": "Math", "difficulty": "standard", "search_syllabus": true}
 ```
-Validation (422): topic not blank; `node_count` 4–30 (default 12); `max_depth` 2–6 (default 4); `difficulty` `intro`|`standard`|`deep` (default `standard`); `search_syllabus` bool (default true).
-Response: `{"course": Course, "nodes": SkillNode[], "edges": SkillEdge[]}`. Only the first node of the course's learning order is `available`; every other node is `locked`. The learning order lays a list over the tree: what a node contains comes before it (so the root comes last), a requires edge puts its prerequisite first, and otherwise the planner's order decides.
+Validation (422): topic not blank; `difficulty` `intro`|`standard`|`deep` (default `standard`); `search_syllabus` bool (default true). `node_count` / `max_depth` **(removed 2026-10-08)** are ignored if sent: a course is as big as its topic.
+**Size and layers**: there is no limit on the number of nodes or levels, only on the smallest unit: a leaf is one model, method, algorithm, theorem or technique (“Quadratic Functions”, “CNN”, “Soft Actor-Critic”), in the humanities one concept. One Planner call writes at most 30 nodes: the root, every main area, and as much below them as fits; a category it cannot break down within that budget is saved with `unexpanded: true` and broken down later (endpoint 38, up to 40 nodes a call). A safety stop keeps a course under 500 nodes.
+Response: `{"course": Course, "nodes": SkillNode[], "edges": SkillEdge[]}`. **Unlocking**: the root's children are chapters, and the player picks the chapter. Each chapter has one `available` node, the first of it in the learning order that is not mastered (a chapter not broken down yet is its own first node); the root opens once every chapter is mastered; everything else is `locked`. The learning order lays a list over the tree: what a node contains comes before it (so the root comes last), a requires edge puts its prerequisite first, and otherwise the planner's order decides.
 Errors: 502 `Course generation failed. Please try again.`
 
 ### 3. `GET /api/courses`
@@ -212,7 +220,8 @@ Response:
 `context_bucket`: `low`|`mid`|`high`. Tiers: `easy`|`medium`|`hard`. `skill_tiers` has one entry per skill node; keys are skill ids as strings.
 
 ### 7. `POST /api/skills/{id}/audits`
-Request `{"mode": "day"}` — `mode` `day`|`night`, default `day` (422 otherwise).
+Request `{"mode": "day", "test_out": false}` — `mode` `day`|`night`, default `day` (422 otherwise).
+**`test_out: true` — a challenge** **(added 2026-10-08)**: on a branch, a root or an unexpanded node, the player says they already know the whole area. The Auditor samples three of the smallest units under it (up to 12 are listed to it; for an unexpanded node, its description) and asks one per question, then how two relate; one part not known fails it. Opening: `So you already know “{title}”. Prove it, one part at a time. Start with “{first part}”: how does it work?`, or, with no parts yet, `So you already know “{title}”. Prove it: what are its main parts, and how does the most important one work?`. It always gets a concept's turn limit. Allowed on locked nodes (that is what it is for), not on a leaf (400 `Only a branch or a whole course can be challenged.`) or a mastered node (400 `skill is already mastered`). A pass masters the node (`mastery_score`) and every node under it not yet mastered (`tested_out: true`), then unlocks as usual; a fail changes nothing.
 Response `{"session": AuditSession, "opening_question": "..."}`.
 - Opening question by position (Section 17.2), in English:
   - leaf: `Explain “{title}” from scratch to someone who has never heard of it.`
@@ -220,7 +229,7 @@ Response `{"session": AuditSession, "opening_question": "..."}`.
   - root: `Which problems call for “{title}”, and which don't? How do you decide?`
   - task node (any position): `How exactly will you do “{title}”?`
 - Turn limit: concept 8, task 4; `night` doubles it. Stored in `max_turns`, never shown to the model.
-- Allowed on `available` and `mastered` nodes, even with unmet requires.
+- Allowed on `available` and `mastered` nodes, even with unmet requires; not on an `unexpanded` node (400 `Break this node down first, or challenge it as a whole.`).
 
 Errors: 404 `skill not found`; 400 `skill is locked`.
 
@@ -230,7 +239,7 @@ Response: `TurnResult`. Behavior follows Section 6.6 and 8.4:
 - The user turn is saved before the Auditor is called (kept even if the Auditor fails). If the last saved turn is a user turn with no reply after it (the previous attempt failed, or the client stopped waiting), the new content **replaces** it instead of adding a second user turn, so a resend never uses up the turn limit.
 - Memory Retriever passes ≤3 lessons to the Auditor.
 - Pass + Challenger enabled + not yet challenged → Challenger. Overturn → `challenged = true`, its question saved as an auditor turn and returned as a probe. Uphold or Challenger error → final pass.
-- Final pass: session `passed`, `score` saved, node `mastered` with `mastery_score`, the next node of the learning order that is not mastered → `available` (one open node per course), reward recorded.
+- Final pass: session `passed`, `score` saved, node `mastered` with `mastery_score`, the next node of its chapter in the learning order that is not mastered → `available` (one open node per chapter, endpoint 2), reward recorded.
 - Fail: session `failed`, gaps and comment saved; node status unchanged.
 - **Final turns** — the turn limit is reached, or this answer replies to the Challenger's question: the Auditor's prompt gets the line `This is the final turn: give the verdict now, do not ask another question.` (only on these turns; the limit itself is still never shown). If it probes anyway → forced verdict `passed=false`, `score=0` (comment names the limit, or the follow-up question after a challenge). If its output is unusable (not JSON or the wrong shape after the JSON retry) → 502, nothing is decided, and the user resends.
 - Finalizing closes the session with one conditional update (`WHERE status = 'active'`): of two concurrent requests only one finalizes; the other gets 400 `audit session is already closed`, so rewards and bandit updates are never recorded twice.
@@ -252,7 +261,7 @@ Response: `Graph` (all courses).
 ### 12. `POST /api/checkins`
 Request — **one of**:
 - Voice: `{"transcript": "I slept about six hours last night and didn't exercise. I had ramen for lunch and I'm a bit tired."}` → Check-in Converter (LLM), `source: "voice"`.
-- Manual: any subset of `{"sleep_hours": 6, "exercised": false, "diet_note": "lunch: ramen", "focus": 3, "stress": 2}` → no LLM, `source: "manual"`.
+- Manual: any subset of `{"sleep_hours": 6, "exercised": false, "diet_note": "lunch: ramen", "focus": 3, "stress": 2, "sleep_quality": 4, "exercise_minutes": 30, "weight_kg": 71.5}` → no LLM, `source: "manual"`.
 
 Validation (422): transcript, if present, not blank; numeric ranges as in DailyCheckIn; a body with neither a transcript nor any field.
 If `transcript` is present, the structured fields are ignored.
@@ -430,7 +439,7 @@ Errors: 404 `skill not found`.
 ### AuditSummary
 ```json
 {"id": 31, "skill_id": 5, "skill_title": "Quadratic Equations", "status": "failed", "score": 45,
- "created_at": "2026-10-05T03:20:00Z"}
+ "created_at": "2026-10-05T03:20:00Z", "test_out": false}
 ```
 
 ### 23. `GET /api/audits?limit=20`
@@ -582,3 +591,19 @@ Endpoints:
 - `PUT /api/voice/sessions/{id}` `{"kind": "guide" | "transcribe", "model", "started_at", "seconds", "turns", "text_in", "text_in_cached", "audio_in", "audio_in_cached", "text_out", "audio_out", "transcribed_seconds"}` → 204. The browser's running totals for one live session (`id`: its own, 1–64 characters; each report replaces the last): the Realtime API's `response.done` usage summed, the input transcription's seconds, and how long the session has been open. Sent after every turn, every 30 s while open, and on close.
 - `GET /api/dev/voice?limit=50` (developers only, like #34) → `{"totals": {...}, "sessions": [{"id", "kind", "model", "started_at", "minutes", "turns", "audio_in", "audio_out", "cached_share", "cost", "live_equivalent"}]}`. Dollars at list price (app/services/voice_usage.py): the Guide by tokens (silence is free) plus its input transcription; `live_equivalent` is the same minutes on GPT-Live ($0.05 a minute open, its backend apart); an audit's live transcription by its open minutes ($0.017), an upper bound. Totals: `guide_sessions`, `guide_minutes`, `guide_cost`, `guide_live_equivalent`, `guide_cost_per_minute`, `guide_cached_share`, `audit_sessions`, `audit_minutes`, `audit_cost`.
 
+### 38. `POST /api/skills/{id}/expand`  (LLM: Planner, added 2026-10-08)
+Breaks an `unexpanded` node down into its parts (endpoint 2, **Size and layers**). No request body. The Planner gets the course topic, the node's title, description and path from the root, and the titles already in the course (not to repeat); its output hangs under the node: parts that name no known parent become its children, a part whose title the course already has (and that has no parts of its own) is dropped, and a slug the course already uses gets `-2`, `-3`. Parts it cannot break down within its budget come back `unexpanded` themselves. The node is claimed first in one statement, so two requests never both expand it. Any node may be expanded, locked or not: looking inside is free. Then unlocking runs again (the chapter's open node moves down to its first part).
+Response: the whole course map, as endpoint 4.
+Errors: 404 `skill not found`; 400 `This node is already broken down.` (also for a node that never was a category); 409 `This course has reached its size limit.` (500 nodes); 502 `Breaking this node down failed. Please try again.` (the node stays `unexpanded`).
+
+### 39. Life: the player's own record  (added 2026-10-08)
+How they live next to how they learn, kept in one place so the two can be compared rather than guessed at (proposal 1.1.2(1)). Not tracking: no calories, no meals counted, no devices.
+- `GET /api/life?days=30` (7–365, no LLM) → `{"summary", "days", "patterns", "pattern_min_days": 5, "advice"}`.
+  - `days`: every calendar day of the window (APP_TIMEZONE), oldest first: `{"date", "checked_in", "sleep_hours", "sleep_quality", "exercised", "exercise_minutes", "weight_kg", "diet_note", "focus", "stress", "audits", "passed"}` (the check-in's fields are null without one; `audits` / `passed` = finished audits started that day).
+  - `summary` over the window: `days`, `days_logged`, `avg_sleep_hours`, `avg_sleep_quality`, `exercise_days`, `avg_exercise_minutes` (on days with minutes), `avg_focus`, `avg_stress`, `weight_first`, `weight_last` (the window's first and last weight), `audits`, `passed`. Averages one decimal, null without data.
+  - `patterns`: the player's own days compared in two groups, over the whole history: `{"kind": "sleep" | "exercise" | "stress", "better": Group, "worse": Group}` — sleep 7 h or more vs under 6 h; exercised vs not; stress 1–2 vs 4–5. `Group` = `{"days", "audits", "pass_rate" (null without audits), "avg_focus"}`. A pattern is listed once both groups have `pattern_min_days` days. They are the player's own numbers on few days, shown as such, never as causes: a population result need not hold for one person (Fisher et al., 2018), which is why the record is personal.
+  - `advice`: the latest Life Coach advice, or null.
+- `POST /api/life/advice` (LLM: Life Coach) → `{"items": [{"title", "body", "based_on"}], "generated_at"}` (three items; title ≤ 40, body ≤ 280, based_on ≤ 100 characters). The coach gets coarse facts of the last 14 days only — averages, exercise days, the weight change, finished and passed audits, the patterns with their day counts, nodes mastered, and the player's identity, win condition, stakes, rules and main quests; never a day's row or a meal. Each item names the fact it rests on; patterns come as something to try, never as a cause; no diagnosis, medication, calorie counts or diet plans; worrying numbers → see a professional. Saved (history kept; the facts it was given are stored with it). Errors: 502 `Advice is not available right now. Please try again.` (nothing saved).
+- `PUT /api/checkins/{date}` (no LLM) → `DailyCheckIn`. Fixes or fills in one day: the fields sent replace that day's (`null` clears one), the others stay; a day without a check-in gets one (`source: "manual"`). Errors: 400 `That day has not come yet.`; 422 for out-of-range values.
+- **The narrator** may state such a comparison when its facts include one, with its number of days, never as a cause (it still gives no advice; the coach does).
+- **Privacy**: check-ins are stored in the app's database (Postgres on Supabase in the deployment, one schema per account); a voice check-in's transcript goes to the configured LLM provider to be converted; for advice, the coach gets only the coarse facts above.

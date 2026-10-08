@@ -10,12 +10,13 @@ from app.llm.mock import MockProvider
 from tests.helpers import BrokenProvider, ScriptedProvider, generate, ids_by_slug, pass_node, planner_json
 
 
-def test_it01_generate_saves_the_course_and_only_the_first_node_to_learn_is_available(client, client_engine):
+def test_it01_generate_saves_the_course_and_opens_the_first_node_of_each_chapter(client, client_engine):
     body = generate(client, "Math")
 
     assert body["course"]["id"] == 1
     statuses = {n["slug"]: n["status"] for n in body["nodes"]}
-    assert statuses.pop("discriminant") == "available"  # learning order: tests/test_learning_order.py
+    # learning order: tests/test_learning_order.py
+    assert [statuses.pop(s) for s in ("discriminant", "linear-function", "sequence-limit")] == ["available"] * 3
     assert set(statuses.values()) == {"locked"}
     assert len(body["nodes"]) == 12
 
@@ -33,8 +34,10 @@ def test_it01_the_response_matches_the_contract_shapes(client):
     assert body["course"]["topic"] == "Math"
     assert set(body["nodes"][0]) == {
         "id", "course_id", "slug", "title", "description", "status", "node_type", "mastery_score",
+        "unexpanded", "tested_out",
     }
     assert all(n["course_id"] == 1 and n["mastery_score"] is None and n["node_type"] == "concept" for n in body["nodes"])
+    assert not any(n["unexpanded"] or n["tested_out"] for n in body["nodes"])
     assert [n["id"] for n in body["nodes"]] == list(range(1, 13))  # in the Planner's order, ids from 1
     for edge in body["edges"]:
         assert set(edge) == {"from_id", "to_id", "kind", "is_primary", "reason"}
@@ -146,17 +149,17 @@ def test_it01_a_generic_course_has_ten_nodes_and_one_root(client):
     body = generate(client, "History")
 
     assert [n["title"] for n in body["nodes"]][:4] == ["History", "Core Concepts", "Key Methods", "Applications"]
-    assert [n["status"] for n in body["nodes"]].count("available") == 1
+    assert [n["status"] for n in body["nodes"]].count("available") == 3  # one per chapter
 
 
 def test_it01_the_validation_counts_are_stored_with_the_course_settings(client, client_engine):
-    generate(client, "Math", node_count=20, max_depth=5, difficulty="deep")
+    generate(client, "Math", difficulty="deep")
 
     with Session(client_engine) as session:
         import json
 
         saved = json.loads(session.get(Course, 1).settings_json)
-    assert saved["node_count"] == 20 and saved["max_depth"] == 5 and saved["difficulty"] == "deep"
+    assert saved["difficulty"] == "deep" and "node_count" not in saved
     assert saved["validation"]["levels"] == 4
     assert saved["validation"]["depth_exceeded"] is False
     assert set(saved["validation"]["removals"]) == {str(n) for n in range(1, 12)}
@@ -165,10 +168,6 @@ def test_it01_the_validation_counts_are_stored_with_the_course_settings(client, 
 @pytest.mark.parametrize(
     "bad",
     [
-        {"node_count": 3},
-        {"node_count": 31},
-        {"max_depth": 1},
-        {"max_depth": 7},
         {"difficulty": "insane"},
         {"search_syllabus": "perhaps"},
     ],
@@ -177,9 +176,10 @@ def test_it02_out_of_range_settings_are_rejected(client, bad):
     assert client.post("/api/skills/generate", json={"topic": "Math", **bad}).status_code == 422
 
 
-def test_it02_boundary_values_are_accepted(client):
-    for settings in ({"node_count": 4, "max_depth": 2}, {"node_count": 30, "max_depth": 6, "difficulty": "intro"}):
-        assert client.post("/api/skills/generate", json={"topic": "Math", **settings}).status_code == 200
+def test_it02_the_old_size_settings_are_ignored(client):
+    # A course is as big as its topic; old clients that still send a size are not refused.
+    body = client.post("/api/skills/generate", json={"topic": "Math", "node_count": 4, "max_depth": 2}).json()
+    assert len(body["nodes"]) == 12
 
 
 @pytest.mark.parametrize("topic", ["", "   ", "\n\t"])
@@ -288,7 +288,7 @@ def test_it23_two_courses_with_the_same_titles_have_independent_statuses(client)
     second_now = {n["slug"]: n["status"] for n in client.get("/api/skills", params={"course_id": 2}).json()}
     assert (first_now["discriminant"], first_now["root-coefficient"]) == ("mastered", "available")
     assert (second_now["discriminant"], second_now["root-coefficient"]) == ("available", "locked")
-    assert list(second_now.values()).count("available") == 1
+    assert list(second_now.values()).count("available") == 3
     # Same slugs in both courses is fine: slugs are unique per course only.
     assert list(first_now) == list(second_now)
 

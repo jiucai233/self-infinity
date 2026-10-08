@@ -27,6 +27,12 @@ Fields:
 - diet_note: what the user said they ate, as a short phrase
 - focus: self-rated focus, integer 1 to 5, only if the user said a number
 - stress: self-rated stress, integer 1 to 5, only if the user said a number
+- sleep_quality: self-rated sleep quality, integer 1 to 5, only if the user
+  said a number for it
+- exercise_minutes: how many minutes they exercised, integer, only if they
+  said a duration ("ran for half an hour" is 30)
+- weight_kg: their body weight in kilograms, only if they said it (convert
+  pounds: 1 lb = 0.4536 kg), one decimal
 
 Rules:
 - Extract only what the user explicitly said. Never infer.
@@ -36,7 +42,8 @@ Rules:
 - Write diet_note in English.
 
 Output only JSON:
-{{"sleep_hours": null, "exercised": null, "diet_note": null, "focus": null, "stress": null}}
+{{"sleep_hours": null, "exercised": null, "diet_note": null, "focus": null, "stress": null,
+  "sleep_quality": null, "exercise_minutes": null, "weight_kg": null}}
 """
 )
 
@@ -48,9 +55,13 @@ class ConvertedCheckin:
     diet_note: str | None = None
     focus: int | None = None
     stress: int | None = None
+    # Never asked for: not part of missing_fields.
+    sleep_quality: int | None = None
+    exercise_minutes: int | None = None
+    weight_kg: float | None = None
 
     def missing_fields(self) -> list[str]:
-        return [f.name for f in fields(self) if getattr(self, f.name) is None]
+        return [f.name for f in fields(self)[:5] if getattr(self, f.name) is None]
 
 
 def _int_in(value, low: int, high: int) -> int | None:
@@ -81,10 +92,17 @@ class CheckinConverter:
         diet = data.get("diet_note")
         diet_note = " ".join(diet.split()) if isinstance(diet, str) else ""
         exercised = data.get("exercised")
+        minutes = _int_in(data.get("exercise_minutes"), 0, 600)
+        weight = data.get("weight_kg")
+        weight_kg = round(float(weight), 1) if isinstance(weight, (int, float)) and not isinstance(weight, bool) else None
         return ConvertedCheckin(
             sleep_hours=_int_in(data.get("sleep_hours"), 0, 14),
-            exercised=exercised if isinstance(exercised, bool) else None,
+            # Minutes of exercise say they exercised.
+            exercised=exercised if isinstance(exercised, bool) else (True if minutes else None),
             diet_note=diet_note or None,
             focus=_int_in(data.get("focus"), 1, 5),
             stress=_int_in(data.get("stress"), 1, 5),
+            sleep_quality=_int_in(data.get("sleep_quality"), 1, 5),
+            exercise_minutes=minutes,
+            weight_kg=weight_kg if weight_kg is not None and 20 <= weight_kg <= 400 else None,
         )

@@ -552,5 +552,140 @@
   "devVoicePerMinute": "Per minute",
   "devVoiceCached": "From cache",
   "devVoiceTurns": "Turns",
-  "devNoVoice": "No live voice sessions yet."
+  "devNoVoice": "No live voice sessions yet.",
+  "breakDown": "Break it down",
+  "breakingDown": "Breaking it down… this can take up to a minute.",
+  "breakDownFailed": "Couldn't break it down. Try again.",
+  "unexpandedLine": "Not broken down yet. Break it down to see what's inside, or challenge it whole if you already know it.",
+  "challengeWhole": "Challenge it whole",
+  "challengeInProgress": "Challenge",
+  "testedOut": "Cleared by challenge",
+  "dotUnexpanded": "Not broken down",
+  "lifeTitle": "My life",
+  "lifeOpen": "My life →",
+  "lifeDays": "{n} days",
+  "@lifeDays": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lifeSleep": "Sleep",
+  "lifeFocus": "Focus",
+  "lifeStress": "Stress",
+  "lifeExercise": "Exercise",
+  "lifeWeight": "Weight",
+  "lifeAudits": "Audits",
+  "lifeOutOf5": " / 5",
+  "lifeDaysSuffix": " days",
+  "lifeChartTitle": "Last {n} days",
+  "@lifeChartTitle": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lifeNoData": "Nothing logged in these days yet.",
+  "lifePatterns": "Your patterns",
+  "lifePatternsEmpty": "Once you have {n} days on each side (say, {n} with 7 h+ of sleep and {n} under 6 h), your own patterns show up here.",
+  "@lifePatternsEmpty": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lifePatternNote": "Your own days, not a cause: many things differ between them.",
+  "lifeSleepBetter": "Slept 7 h+",
+  "lifeSleepWorse": "Under 6 h",
+  "lifeExerciseBetter": "Exercised",
+  "lifeExerciseWorse": "No exercise",
+  "lifeStressBetter": "Stress 1–2",
+  "lifeStressWorse": "Stress 4–5",
+  "lifeGroupDays": "{n} days",
+  "@lifeGroupDays": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lifeGroupPassed": "passed {pct}% of {n}",
+  "@lifeGroupPassed": {
+    "placeholders": {
+      "pct": {
+        "type": "int"
+      },
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lifeGroupNoAudits": "no audits",
+  "lifeGroupFocus": "focus {value}",
+  "@lifeGroupFocus": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "lifeAdvice": "This week",
+  "lifeAdviceGet": "Get advice",
+  "lifeAdviceAgain": "New advice",
+  "lifeAdviceEmpty": "Three small things for the week, from your own numbers.",
+  "lifeAdviceFailed": "Advice isn't available right now. Try again.",
+  "lifeAdviceBasedOn": "Based on: {fact}",
+  "@lifeAdviceBasedOn": {
+    "placeholders": {
+      "fact": {
+        "type": "String"
+      }
+    }
+  },
+  "lifeLog": "Days",
+  "lifeFillIn": "Fill in a day",
+  "lifeEdit": "Edit {date}",
+  "@lifeEdit": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "lifeSleepHours": "Sleep (h)",
+  "lifeSleepQuality": "Sleep quality",
+  "lifeExerciseMinutes": "Exercise (min)",
+  "lifeWeightKg": "Weight (kg)",
+  "lifeSave": "Save",
+  "lifeMinutes": "{n} min",
+  "@lifeMinutes": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lifeKg": "{value} kg",
+  "@lifeKg": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "lifeAuditsDone": "{passed}/{n} passed",
+  "@lifeAuditsDone": {
+    "placeholders": {
+      "passed": {
+        "type": "int"
+      },
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lifePrivacy": "Stored in our database. For advice the AI gets averages and patterns, never your days."
 }

@@ -499,12 +499,16 @@ void main() {
   });
 
   group('test helpers', () {
-    test('seededFakeApi has the math course with only its first node to learn available', () async {
+    test('seededFakeApi has the math course with the first node of each chapter available', () async {
       final api = await seededFakeApi();
       expect(api.latency, Duration.zero);
       final skills = await api.listSkills();
       expect(skills, hasLength(12));
-      expect(skills.where((s) => s.isAvailable).map((s) => s.title), ['Discriminant']);
+      expect(skills.where((s) => s.isAvailable).map((s) => s.title), [
+        'Discriminant',
+        'Linear Functions',
+        'Limits of Sequences',
+      ]);
     });
 
     test('longAnswer is long enough to pass without a challenge', () {
