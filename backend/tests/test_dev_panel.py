@@ -99,4 +99,6 @@ def test_with_accounts_only_the_listed_emails_are_developers(accounts, monkeypat
     assert accounts.get("/api/me", headers=alice).json()["is_dev"] is True
     assert accounts.get("/api/dev/audits", headers=bob).json() == {"detail": "developers only"}
     assert accounts.put("/api/dev/audits/1/review", headers=bob, json={"review": None}).status_code == 403
+    assert accounts.get("/api/dev/voice", headers=bob).status_code == 403
+    assert accounts.get("/api/dev/voice", headers=alice).status_code == 200
     assert accounts.get("/api/me", headers=bob).json()["is_dev"] is False

@@ -2043,6 +2043,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Refresh'**
   String get devRefresh;
+
+  /// No description provided for @devTabAudits.
+  ///
+  /// In en, this message translates to:
+  /// **'Audits'**
+  String get devTabAudits;
+
+  /// No description provided for @devTabVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice cost'**
+  String get devTabVoice;
+
+  /// No description provided for @devVoiceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'At list price. The realtime Guide is billed by tokens, so silence is free; GPT-Live bills every minute the session is open, its backend apart. Audit transcription counts the whole open session, an upper bound.'**
+  String get devVoiceHint;
+
+  /// No description provided for @devVoiceGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Home Guide (realtime)'**
+  String get devVoiceGuide;
+
+  /// No description provided for @devVoiceAudits.
+  ///
+  /// In en, this message translates to:
+  /// **'Audits (live transcription)'**
+  String get devVoiceAudits;
+
+  /// No description provided for @devVoiceSessions.
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions'**
+  String get devVoiceSessions;
+
+  /// No description provided for @devVoiceMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes'**
+  String get devVoiceMinutes;
+
+  /// No description provided for @devVoiceCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost'**
+  String get devVoiceCost;
+
+  /// No description provided for @devVoiceLive.
+  ///
+  /// In en, this message translates to:
+  /// **'On GPT-Live'**
+  String get devVoiceLive;
+
+  /// No description provided for @devVoicePerMinute.
+  ///
+  /// In en, this message translates to:
+  /// **'Per minute'**
+  String get devVoicePerMinute;
+
+  /// No description provided for @devVoiceCached.
+  ///
+  /// In en, this message translates to:
+  /// **'From cache'**
+  String get devVoiceCached;
+
+  /// No description provided for @devVoiceTurns.
+  ///
+  /// In en, this message translates to:
+  /// **'Turns'**
+  String get devVoiceTurns;
+
+  /// No description provided for @devNoVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'No live voice sessions yet.'**
+  String get devNoVoice;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

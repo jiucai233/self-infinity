@@ -22,7 +22,8 @@ Future<void> showDevPanel(BuildContext context) => showDialog<void>(
 
 /// The developer panel: how well the Auditor judges, from the developers'
 /// reviews of its verdicts, and how audits go overall; below, every finished
-/// audit with its transcript and the buttons to review it.
+/// audit with its transcript and the buttons to review it. A second tab shows
+/// what live voice costs, next to what GPT-Live would (contract #37).
 class DevPanel extends StatefulWidget {
   const DevPanel({super.key});
 
@@ -35,6 +36,9 @@ class _DevPanelState extends State<DevPanel> {
   DevAudits? _data;
   Object? _error;
   final Set<int> _open = {};
+  bool _voiceTab = false;
+  DevVoice? _voice;
+  Object? _voiceError;
 
   @override
   void initState() {
@@ -54,6 +58,25 @@ class _DevPanelState extends State<DevPanel> {
     } on Object catch (e) {
       if (mounted) setState(() => _error = e);
     }
+  }
+
+  Future<void> _loadVoice() async {
+    try {
+      final voice = await _api.getDevVoice(limit: 100);
+      if (mounted) {
+        setState(() {
+          _voice = voice;
+          _voiceError = null;
+        });
+      }
+    } on Object catch (e) {
+      if (mounted) setState(() => _voiceError = e);
+    }
+  }
+
+  void _showVoice(bool on) {
+    setState(() => _voiceTab = on);
+    if (on && _voice == null) unawaited(_loadVoice());
   }
 
   Future<void> _review(DevAudit audit, AuditReview? review, bool leaked) async {
@@ -82,10 +105,27 @@ class _DevPanelState extends State<DevPanel> {
             child: Row(
               children: [
                 Expanded(child: Text(l.devTitle, style: theme.titleLarge)),
+                SegmentedButton<bool>(
+                  key: const Key('dev-tabs'),
+                  showSelectedIcon: false,
+                  segments: [
+                    ButtonSegment(
+                      value: false,
+                      label: Text(l.devTabAudits, key: const Key('dev-tab-audits')),
+                    ),
+                    ButtonSegment(
+                      value: true,
+                      label: Text(l.devTabVoice, key: const Key('dev-tab-voice')),
+                    ),
+                  ],
+                  selected: {_voiceTab},
+                  onSelectionChanged: (s) => _showVoice(s.first),
+                ),
+                const SizedBox(width: AppSpacing.sm),
                 IconButton(
                   key: const Key('dev-refresh'),
                   tooltip: l.devRefresh,
-                  onPressed: () => unawaited(_load()),
+                  onPressed: () => unawaited(_voiceTab ? _loadVoice() : _load()),
                   icon: const Icon(Icons.refresh_rounded),
                 ),
                 IconButton(
@@ -97,7 +137,9 @@ class _DevPanelState extends State<DevPanel> {
             ),
           ),
           Expanded(
-            child: data == null
+            child: _voiceTab
+                ? _VoiceCosts(voice: _voice, error: _voiceError)
+                : data == null
                 ? Center(
                     child: _error == null
                         ? const CircularProgressIndicator()
@@ -147,7 +189,115 @@ class _DevPanelState extends State<DevPanel> {
 }
 
 String _pct(double? v) => v == null ? '—' : '${(v * 100).round()}%';
+String _usd(double? v) =>
+    v == null ? '—' : '\$${v < 1 ? v.toStringAsFixed(3) : v.toStringAsFixed(2)}';
 String _num(double? v, [int digits = 1]) => v == null ? '—' : v.toStringAsFixed(digits);
+
+/// A titled row of number tiles, keyed `dev-metric-<key>`.
+Widget _tiles(BuildContext context, String title, List<(String, String, String)> tiles) {
+  final theme = Theme.of(context).textTheme;
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(title, style: theme.labelLarge),
+      const SizedBox(height: AppSpacing.sm),
+      Wrap(
+        spacing: AppSpacing.xl,
+        runSpacing: AppSpacing.md,
+        children: [
+          for (final (key, label, value) in tiles)
+            SizedBox(
+              width: 112,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: theme.labelSmall?.copyWith(color: AppColors.textTertiary)),
+                  Text(value, key: Key('dev-metric-$key'), style: theme.headlineMedium),
+                ],
+              ),
+            ),
+        ],
+      ),
+    ],
+  );
+}
+
+/// What live voice costs: the realtime Guide next to GPT-Live, the audits'
+/// transcription, and every session.
+class _VoiceCosts extends StatelessWidget {
+  const _VoiceCosts({required this.voice, required this.error});
+
+  final DevVoice? voice;
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context).textTheme;
+    final v = voice;
+    if (v == null) {
+      final e = error;
+      return Center(
+        child: e == null
+            ? const CircularProgressIndicator()
+            : Text(e is ApiException ? e.userMessage : '$e'),
+      );
+    }
+    return ListView(
+      key: const Key('dev-voice'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.xl,
+      ),
+      children: [
+        Text(l.devVoiceHint, style: theme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+        const SizedBox(height: AppSpacing.lg),
+        _tiles(context, l.devVoiceGuide, [
+          ('guide-sessions', l.devVoiceSessions, '${v.guideSessions}'),
+          ('guide-minutes', l.devVoiceMinutes, _num(v.guideMinutes)),
+          ('guide-cost', l.devVoiceCost, _usd(v.guideCost)),
+          ('guide-live', l.devVoiceLive, _usd(v.guideLiveEquivalent)),
+          ('guide-per-minute', l.devVoicePerMinute, _usd(v.guideCostPerMinute)),
+          ('guide-cached', l.devVoiceCached, _pct(v.guideCachedShare)),
+        ]),
+        const SizedBox(height: AppSpacing.lg),
+        _tiles(context, l.devVoiceAudits, [
+          ('audit-sessions', l.devVoiceSessions, '${v.auditSessions}'),
+          ('audit-minutes', l.devVoiceMinutes, _num(v.auditMinutes)),
+          ('audit-cost', l.devVoiceCost, _usd(v.auditCost)),
+        ]),
+        const SizedBox(height: AppSpacing.xl),
+        if (v.sessions.isEmpty)
+          Text(l.devNoVoice, style: theme.bodyMedium)
+        else
+          for (final s in v.sessions)
+            Padding(
+              key: Key('dev-voice-${s.id}'),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${s.kind == 'guide' ? l.devVoiceGuide : l.devVoiceAudits} · '
+                      '${MaterialLocalizations.of(context).formatShortDate(s.startedAt.toLocal())} '
+                      '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(s.startedAt.toLocal()))}',
+                      style: theme.bodyMedium,
+                    ),
+                  ),
+                  Text(
+                    '${_num(s.minutes)} ${l.devVoiceMinutes} · ${s.turns} ${l.devVoiceTurns} · ${_usd(s.cost)}'
+                    '${s.liveEquivalent == null ? '' : ' · ${l.devVoiceLive} ${_usd(s.liveEquivalent)}'}',
+                    style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+      ],
+    );
+  }
+}
 
 class _Metrics extends StatelessWidget {
   const _Metrics({required this.metrics});
@@ -182,33 +332,8 @@ class _Metrics extends StatelessWidget {
     );
   }
 
-  Widget _row(BuildContext context, String title, List<(String, String, String)> tiles) {
-    final theme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: theme.labelLarge),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: AppSpacing.xl,
-          runSpacing: AppSpacing.md,
-          children: [
-            for (final (key, label, value) in tiles)
-              SizedBox(
-                width: 112,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: theme.labelSmall?.copyWith(color: AppColors.textTertiary)),
-                    Text(value, key: Key('dev-metric-$key'), style: theme.headlineMedium),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
+  Widget _row(BuildContext context, String title, List<(String, String, String)> tiles) =>
+      _tiles(context, title, tiles);
 }
 
 class _AuditCard extends StatelessWidget {

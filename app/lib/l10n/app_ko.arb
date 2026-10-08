@@ -324,5 +324,18 @@
   "devGaveAnswer": "답을 알려줌",
   "devNoAudits": "끝난 감사가 아직 없어요.",
   "devTranscript": "대화 기록",
-  "devRefresh": "새로고침"
+  "devRefresh": "새로고침",
+  "devTabAudits": "감사",
+  "devTabVoice": "음성 비용",
+  "devVoiceHint": "정가 기준입니다. 실시간 가이드는 토큰으로 과금되어 침묵은 무료이고, GPT-Live는 세션이 열려 있는 동안 분 단위로 과금됩니다(백엔드 별도). 감사 받아쓰기는 연결 시간 전체로 계산한 상한입니다.",
+  "devVoiceGuide": "홈 가이드 (실시간)",
+  "devVoiceAudits": "감사 (실시간 받아쓰기)",
+  "devVoiceSessions": "세션",
+  "devVoiceMinutes": "분",
+  "devVoiceCost": "비용",
+  "devVoiceLive": "GPT-Live라면",
+  "devVoicePerMinute": "분당",
+  "devVoiceCached": "캐시 적중",
+  "devVoiceTurns": "턴",
+  "devNoVoice": "아직 실시간 음성 세션이 없습니다."
 }

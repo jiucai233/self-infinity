@@ -237,4 +237,12 @@ abstract class SelfInfinityApi {
   /// realtime Guide in the history; blank lines are skipped. Returns what was
   /// saved.
   Future<List<ChatMessage>> chatLog(List<({ChatRole role, String content})> lines);
+
+  /// `PUT /voice/sessions/{id}` (contract #37, no LLM): a live voice session's
+  /// usage so far; the developer panel prices it.
+  Future<void> reportVoiceUsage(VoiceUsage usage);
+
+  /// `GET /dev/voice?limit=` (contract #37; developers only): what live voice
+  /// cost, and the newest [limit] sessions next to their GPT-Live price.
+  Future<DevVoice> getDevVoice({int limit = 50});
 }

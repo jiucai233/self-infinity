@@ -1032,4 +1032,44 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get devRefresh => '刷新';
+
+  @override
+  String get devTabAudits => '审计';
+
+  @override
+  String get devTabVoice => '语音费用';
+
+  @override
+  String get devVoiceHint =>
+      '按官方价格估算。实时 Guide 按 token 计费，静音不花钱；GPT-Live 只要会话开着就按分钟计费，后台模型另算。审计转写按整个连接时长算，是上限。';
+
+  @override
+  String get devVoiceGuide => '首页 Guide（实时）';
+
+  @override
+  String get devVoiceAudits => '审计（实时转写）';
+
+  @override
+  String get devVoiceSessions => '会话';
+
+  @override
+  String get devVoiceMinutes => '分钟';
+
+  @override
+  String get devVoiceCost => '花费';
+
+  @override
+  String get devVoiceLive => '换成 GPT-Live';
+
+  @override
+  String get devVoicePerMinute => '每分钟';
+
+  @override
+  String get devVoiceCached => '缓存命中';
+
+  @override
+  String get devVoiceTurns => '轮';
+
+  @override
+  String get devNoVoice => '还没有实时语音会话。';
 }

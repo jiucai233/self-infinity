@@ -1036,4 +1036,44 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get devRefresh => '새로고침';
+
+  @override
+  String get devTabAudits => '감사';
+
+  @override
+  String get devTabVoice => '음성 비용';
+
+  @override
+  String get devVoiceHint =>
+      '정가 기준입니다. 실시간 가이드는 토큰으로 과금되어 침묵은 무료이고, GPT-Live는 세션이 열려 있는 동안 분 단위로 과금됩니다(백엔드 별도). 감사 받아쓰기는 연결 시간 전체로 계산한 상한입니다.';
+
+  @override
+  String get devVoiceGuide => '홈 가이드 (실시간)';
+
+  @override
+  String get devVoiceAudits => '감사 (실시간 받아쓰기)';
+
+  @override
+  String get devVoiceSessions => '세션';
+
+  @override
+  String get devVoiceMinutes => '분';
+
+  @override
+  String get devVoiceCost => '비용';
+
+  @override
+  String get devVoiceLive => 'GPT-Live라면';
+
+  @override
+  String get devVoicePerMinute => '분당';
+
+  @override
+  String get devVoiceCached => '캐시 적중';
+
+  @override
+  String get devVoiceTurns => '턴';
+
+  @override
+  String get devNoVoice => '아직 실시간 음성 세션이 없습니다.';
 }

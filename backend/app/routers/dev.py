@@ -1,5 +1,6 @@
-"""The developer panel (contract #34): audits, reviews and metrics. Only for developers: everyone
-in dev auth mode (local, no accounts), the emails in DEV_EMAILS otherwise. No LLM."""
+"""The developer panel (contract #34, #37): audits, reviews and metrics, and what live voice
+costs. Only for developers: everyone in dev auth mode (local, no accounts), the emails in
+DEV_EMAILS otherwise. No LLM."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
@@ -7,8 +8,8 @@ from sqlmodel import Session
 from app.auth import CurrentUser, current_user
 from app.config import settings
 from app.db import get_session
-from app.schemas import AuditReviewIn, DevAuditOut, DevAuditsOut
-from app.services import audit_review
+from app.schemas import AuditReviewIn, DevAuditOut, DevAuditsOut, DevVoiceOut
+from app.services import audit_review, voice_usage
 
 router = APIRouter(prefix="/api/dev", tags=["dev"])
 
@@ -39,3 +40,9 @@ def review_audit(audit_id: int, body: AuditReviewIn, session: Session = Depends(
         raise HTTPException(404, "audit session not found") from None
     except audit_review.ReviewError as e:
         raise HTTPException(400, str(e)) from None
+
+
+@router.get("/voice", response_model=DevVoiceOut, dependencies=[Depends(require_dev)])
+def voice_costs(limit: int = Query(50, ge=1, le=200), session: Session = Depends(get_session)):
+    return voice_usage.overview(session, limit)
+

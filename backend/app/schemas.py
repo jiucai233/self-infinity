@@ -641,3 +641,52 @@ class TranscriptOut(BaseModel):
 
 class SpeechIn(BaseModel):
     text: str = Field(min_length=1, max_length=4096)
+
+
+class VoiceUsageIn(BaseModel):
+    """A live voice session's running totals (contract #37)."""
+
+    kind: Literal["guide", "transcribe"]
+    model: str = Field("", max_length=64)
+    started_at: datetime | None = None
+    seconds: float = Field(0, ge=0, le=6 * 3600)
+    turns: int = Field(0, ge=0)
+    text_in: int = Field(0, ge=0)
+    text_in_cached: int = Field(0, ge=0)
+    audio_in: int = Field(0, ge=0)
+    audio_in_cached: int = Field(0, ge=0)
+    text_out: int = Field(0, ge=0)
+    audio_out: int = Field(0, ge=0)
+    transcribed_seconds: float = Field(0, ge=0)
+
+
+class DevVoiceSessionOut(BaseModel):
+    id: int
+    kind: str
+    model: str
+    started_at: datetime
+    minutes: float
+    turns: int
+    audio_in: int
+    audio_out: int
+    cached_share: float | None
+    # Dollars at list price; live_equivalent: the same minutes on GPT-Live (Guide sessions only).
+    cost: float
+    live_equivalent: float | None
+
+
+class DevVoiceTotalsOut(BaseModel):
+    guide_sessions: int
+    guide_minutes: float
+    guide_cost: float
+    guide_live_equivalent: float
+    guide_cost_per_minute: float | None
+    guide_cached_share: float | None
+    audit_sessions: int
+    audit_minutes: float
+    audit_cost: float
+
+
+class DevVoiceOut(BaseModel):
+    totals: DevVoiceTotalsOut
+    sessions: list[DevVoiceSessionOut]

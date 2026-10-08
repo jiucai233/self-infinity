@@ -140,6 +140,8 @@ class FakeApiClient implements SelfInfinityApi {
     'speech',
     'chatAct',
     'chatLog',
+    'reportVoiceUsage',
+    'getDevVoice',
   };
 
   // -- state ------------------------------------------------------------------
@@ -1136,6 +1138,53 @@ class FakeApiClient implements SelfInfinityApi {
     ];
     _chat.addAll(saved);
     return saved;
+  }
+
+  // ===========================================================================
+  // 37: what live voice costs (offline there is none; reports are kept as sent)
+  // ===========================================================================
+
+  final Map<String, Json> _voiceUsage = {};
+
+  @override
+  Future<void> reportVoiceUsage(VoiceUsage usage) async {
+    await _begin('reportVoiceUsage');
+    _voiceUsage[usage.id] = usage.toJson();
+  }
+
+  @override
+  Future<DevVoice> getDevVoice({int limit = 50}) async {
+    await _begin('getDevVoice');
+    _require(limit >= 1 && limit <= 200, 'limit must be 1-200');
+    var id = 0;
+    final sessions = [
+      for (final u in _voiceUsage.values)
+        DevVoiceSession(
+          id: ++id,
+          kind: u['kind'] as String,
+          model: u['model'] as String,
+          startedAt: DateTime.parse(u['started_at'] as String),
+          minutes: (u['seconds'] as num) / 60,
+          turns: u['turns'] as int,
+          audioIn: u['audio_in'] as int,
+          audioOut: u['audio_out'] as int,
+          cost: 0,
+          liveEquivalent: u['kind'] == 'guide' ? (u['seconds'] as num) / 60 * 0.05 : null,
+        ),
+    ];
+    final guide = sessions.where((s) => s.kind == 'guide');
+    final audits = sessions.where((s) => s.kind != 'guide');
+    final guideMinutes = guide.fold(0.0, (t, s) => t + s.minutes);
+    return DevVoice(
+      guideSessions: guide.length,
+      guideMinutes: guideMinutes,
+      guideCost: 0,
+      guideLiveEquivalent: guideMinutes * 0.05,
+      auditSessions: audits.length,
+      auditMinutes: audits.fold(0.0, (t, s) => t + s.minutes),
+      auditCost: 0,
+      sessions: sessions.reversed.take(limit).toList(),
+    );
   }
 
   DevAudit _devAuditOf(_FakeAudit a) => DevAudit(

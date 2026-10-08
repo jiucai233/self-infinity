@@ -1816,3 +1816,170 @@ class DevAudits {
   final DevMetrics metrics;
   final List<DevAudit> audits;
 }
+
+/// A live voice session's running totals, reported as it goes (contract #37):
+/// the realtime Guide's token usage (`response.done`) or an audit's live
+/// transcription. Mutable: the session adds to it.
+class VoiceUsage {
+  VoiceUsage({required this.id, required this.kind, this.model = '', DateTime? startedAt})
+    : startedAt = startedAt ?? DateTime.now().toUtc();
+
+  /// The browser's id for the session; reports upsert on it.
+  final String id;
+
+  /// `guide` or `transcribe`.
+  final String kind;
+  String model;
+  final DateTime startedAt;
+  double seconds = 0;
+  int turns = 0;
+  int textIn = 0;
+  int textInCached = 0;
+  int audioIn = 0;
+  int audioInCached = 0;
+  int textOut = 0;
+  int audioOut = 0;
+  double transcribedSeconds = 0;
+
+  /// Adds a Realtime `response.done` usage object.
+  void addResponse(Object? usage) {
+    turns++;
+    if (usage is! Map) return;
+    int n(Object? v) => v is num ? v.toInt() : 0;
+    final input = usage['input_token_details'];
+    final output = usage['output_token_details'];
+    if (input is Map) {
+      textIn += n(input['text_tokens']);
+      audioIn += n(input['audio_tokens']);
+      final cached = input['cached_tokens_details'];
+      if (cached is Map) {
+        textInCached += n(cached['text_tokens']);
+        audioInCached += n(cached['audio_tokens']);
+      }
+    }
+    if (output is Map) {
+      textOut += n(output['text_tokens']);
+      audioOut += n(output['audio_tokens']);
+    }
+  }
+
+  /// Adds an input transcription's usage (`{"type": "duration", "seconds": …}`).
+  void addTranscription(Object? usage) {
+    if (usage is Map && usage['seconds'] is num) transcribedSeconds += (usage['seconds'] as num).toDouble();
+  }
+
+  Json toJson() => {
+    'kind': kind,
+    'model': model,
+    'started_at': startedAt.toIso8601String(),
+    'seconds': double.parse(seconds.toStringAsFixed(1)),
+    'turns': turns,
+    'text_in': textIn,
+    'text_in_cached': textInCached,
+    'audio_in': audioIn,
+    'audio_in_cached': audioInCached,
+    'text_out': textOut,
+    'audio_out': audioOut,
+    'transcribed_seconds': double.parse(transcribedSeconds.toStringAsFixed(1)),
+  };
+}
+
+/// One live voice session in the developer panel, priced at list price.
+@immutable
+class DevVoiceSession {
+  const DevVoiceSession({
+    required this.id,
+    required this.kind,
+    required this.model,
+    required this.startedAt,
+    required this.minutes,
+    required this.turns,
+    required this.audioIn,
+    required this.audioOut,
+    this.cachedShare,
+    required this.cost,
+    this.liveEquivalent,
+  });
+
+  factory DevVoiceSession.fromJson(Json json) => DevVoiceSession(
+    id: _int(json, 'id'),
+    kind: _str(json, 'kind'),
+    model: _strN(json, 'model') ?? '',
+    startedAt: _time(json, 'started_at'),
+    minutes: _double(json, 'minutes'),
+    turns: _int(json, 'turns'),
+    audioIn: _int(json, 'audio_in'),
+    audioOut: _int(json, 'audio_out'),
+    cachedShare: _doubleN(json, 'cached_share'),
+    cost: _double(json, 'cost'),
+    liveEquivalent: _doubleN(json, 'live_equivalent'),
+  );
+
+  final int id;
+
+  /// `guide` (the home page's realtime Guide) or `transcribe` (an audit).
+  final String kind;
+  final String model;
+  final DateTime startedAt;
+  final double minutes;
+  final int turns;
+  final int audioIn;
+  final int audioOut;
+
+  /// The share of input tokens read from the cache, 0–1.
+  final double? cachedShare;
+
+  /// Dollars.
+  final double cost;
+
+  /// What the same minutes would cost on GPT-Live (Guide sessions only).
+  final double? liveEquivalent;
+}
+
+/// `GET /dev/voice` (contract #37).
+@immutable
+class DevVoice {
+  const DevVoice({
+    required this.guideSessions,
+    required this.guideMinutes,
+    required this.guideCost,
+    required this.guideLiveEquivalent,
+    this.guideCostPerMinute,
+    this.guideCachedShare,
+    required this.auditSessions,
+    required this.auditMinutes,
+    required this.auditCost,
+    required this.sessions,
+  });
+
+  factory DevVoice.fromJson(Json json) {
+    final t = _obj(json, 'totals');
+    return DevVoice(
+      guideSessions: _int(t, 'guide_sessions'),
+      guideMinutes: _double(t, 'guide_minutes'),
+      guideCost: _double(t, 'guide_cost'),
+      guideLiveEquivalent: _double(t, 'guide_live_equivalent'),
+      guideCostPerMinute: _doubleN(t, 'guide_cost_per_minute'),
+      guideCachedShare: _doubleN(t, 'guide_cached_share'),
+      auditSessions: _int(t, 'audit_sessions'),
+      auditMinutes: _double(t, 'audit_minutes'),
+      auditCost: _double(t, 'audit_cost'),
+      sessions: [
+        for (final s in (json['sessions'] as List? ?? const []))
+          DevVoiceSession.fromJson(_asJson(s, 'sessions')),
+      ],
+    );
+  }
+
+  final int guideSessions;
+  final double guideMinutes;
+  final double guideCost;
+  final double guideLiveEquivalent;
+  final double? guideCostPerMinute;
+  final double? guideCachedShare;
+  final int auditSessions;
+  final double auditMinutes;
+  final double auditCost;
+  final List<DevVoiceSession> sessions;
+}
+

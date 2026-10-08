@@ -539,5 +539,18 @@
   "devGaveAnswer": "Gave the answer away",
   "devNoAudits": "No finished audits yet.",
   "devTranscript": "Transcript",
-  "devRefresh": "Refresh"
+  "devRefresh": "Refresh",
+  "devTabAudits": "Audits",
+  "devTabVoice": "Voice cost",
+  "devVoiceHint": "At list price. The realtime Guide is billed by tokens, so silence is free; GPT-Live bills every minute the session is open, its backend apart. Audit transcription counts the whole open session, an upper bound.",
+  "devVoiceGuide": "Home Guide (realtime)",
+  "devVoiceAudits": "Audits (live transcription)",
+  "devVoiceSessions": "Sessions",
+  "devVoiceMinutes": "Minutes",
+  "devVoiceCost": "Cost",
+  "devVoiceLive": "On GPT-Live",
+  "devVoicePerMinute": "Per minute",
+  "devVoiceCached": "From cache",
+  "devVoiceTurns": "Turns",
+  "devNoVoice": "No live voice sessions yet."
 }

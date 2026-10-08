@@ -87,6 +87,10 @@ class _LiveApi extends FakeApiClient {
   bool available = true;
   final List<(String, Map<String, Object?>, String)> acts = [];
   final List<List<({ChatRole role, String content})>> logs = [];
+  final List<Map<String, Object?>> usage = [];
+
+  @override
+  Future<void> reportVoiceUsage(VoiceUsage u) async => usage.add(u.toJson());
   int _id = 1000;
 
   @override
@@ -179,8 +183,12 @@ void main() {
         'type': 'conversation.item.input_audio_transcription.completed',
         'item_id': 'i1',
         'transcript': 'The roots are real.',
+        'usage': {'type': 'duration', 'seconds': 3.5},
       });
       expect(results.last, ('The roots are real.', true));
+      expect(api.usage.last['kind'], 'transcribe');
+      expect(api.usage.last['turns'], 1);
+      expect(api.usage.last['transcribed_seconds'], 3.5);
       expect(ends, 1);
       expect(link.closed, isFalse); // kept for the next turn
 
@@ -196,6 +204,7 @@ void main() {
       expect(io.link.sentTypes, ['input_audio_buffer.clear', 'input_audio_buffer.clear']);
       expect(results, isEmpty);
       expect(ends, 1);
+      await tester.runAsync(voice.cancelListening);
     });
 
     testWidgets('no final words in time: the partial ones are kept', (tester) async {
@@ -207,6 +216,7 @@ void main() {
       await tester.pump(StreamingVoiceService.finalTimeout);
       expect(results.last, ('half', true));
       expect(ends, 1);
+      await tester.runAsync(voice.cancelListening);
     });
 
     testWidgets('leaving voice mode closes the session', (tester) async {
@@ -293,6 +303,14 @@ void main() {
         'type': 'response.done',
         'response': {
           'status': 'completed',
+          'usage': {
+            'input_token_details': {
+              'text_tokens': 900,
+              'audio_tokens': 40,
+              'cached_tokens_details': {'text_tokens': 800, 'audio_tokens': 0},
+            },
+            'output_token_details': {'text_tokens': 20, 'audio_tokens': 60},
+          },
           'output': [
             {
               'type': 'message',
@@ -304,6 +322,11 @@ void main() {
         },
       });
       await pumpEventQueue();
+      expect(api.usage.last, containsPair('kind', 'guide'));
+      expect(api.usage.last, containsPair('text_in', 900));
+      expect(api.usage.last, containsPair('text_in_cached', 800));
+      expect(api.usage.last, containsPair('audio_out', 60));
+      expect(api.usage.last, containsPair('turns', 1));
       expect(api.logs, hasLength(1));
       expect([for (final l in api.logs.single) l.content], ['Hi there', 'Hi! What shall we learn today?']);
       expect(shown.single, hasLength(2));
@@ -390,10 +413,11 @@ void main() {
       expect(device.listenCalls, 1);
     });
 
-    test('stop closes the session', () async {
+    test('stop closes the session and reports its usage once more', () async {
       await guide.start();
       await guide.stop();
       expect(io.link.closed, isTrue);
+      expect(api.usage, hasLength(1));
       expect(guide.state, VoiceModeState.off);
     });
   });

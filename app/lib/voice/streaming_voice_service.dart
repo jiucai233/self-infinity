@@ -7,6 +7,7 @@ import '../api/api.dart';
 import '../api/api_exception.dart';
 import 'live_io.dart';
 import 'pause_detector.dart';
+import 'usage_meter.dart';
 import 'voice_service.dart';
 
 /// [VoiceService] for a spoken audit (contract #35): live transcription over
@@ -47,6 +48,9 @@ class StreamingVoiceService implements VoiceService {
   Timer? _waitForFinal;
   String _partial = '';
   bool _committed = false;
+
+  /// What the open session costs (contract #37).
+  UsageMeter? _meter;
   String? _turnItem;
 
   /// Whether this goes through the live session (decided by the first [init]).
@@ -83,6 +87,7 @@ class StreamingVoiceService implements VoiceService {
     );
     link.microphoneOn = false;
     _link = link;
+    _meter = UsageMeter(api: api, kind: 'transcribe')..usage.model = 'gpt-live-transcribe';
     _events = link.events.listen(_onEvent, onDone: () {
       if (identical(_link, link)) _link = null;
     });
@@ -144,6 +149,13 @@ class StreamingVoiceService implements VoiceService {
       case 'conversation.item.input_audio_transcription.completed':
         final item = event['item_id'] as String?;
         if (!_committed || (_turnItem != null && item != _turnItem)) return;
+        final meter = _meter;
+        if (meter != null) {
+          meter.usage
+            ..turns += 1
+            ..addTranscription(event['usage']);
+          meter.report();
+        }
         _deliver(_session, '${event['transcript'] ?? ''}');
       case 'error':
         debugPrint('StreamingVoiceService: ${event['error'] ?? event}');
@@ -218,6 +230,8 @@ class StreamingVoiceService implements VoiceService {
   }
 
   Future<void> _close() async {
+    _meter?.close();
+    _meter = null;
     final link = _link;
     _link = null;
     await _events?.cancel();

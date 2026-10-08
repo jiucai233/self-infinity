@@ -7,6 +7,7 @@ import '../api/api.dart';
 import '../api/api_exception.dart';
 import '../api/models.dart';
 import 'live_io.dart';
+import 'usage_meter.dart';
 import 'voice_mode.dart';
 
 /// The home page's Guide as one speech-to-speech model (contract #35, #36):
@@ -67,6 +68,9 @@ class RealtimeGuideMode extends VoiceMode {
   String? _lastInput;
   int _toolsRunning = 0;
 
+  /// What this session costs (contract #37).
+  UsageMeter? _meter;
+
   /// Whether the realtime model is talking (not the fallback).
   bool get isRealtime => _link != null;
 
@@ -118,6 +122,7 @@ class RealtimeGuideMode extends VoiceMode {
         return false;
       }
       _link = link;
+      _meter = UsageMeter(api: api, kind: 'guide');
       _events = link.events.listen(_onEvent, onDone: () {
         if (connection == _connection && _link != null) unawaited(stop());
       });
@@ -143,6 +148,9 @@ class RealtimeGuideMode extends VoiceMode {
 
   void _onEvent(Map<String, Object?> event) {
     switch (event['type']) {
+      case 'session.created':
+        final session = event['session'];
+        if (session is Map && session['model'] is String) _meter?.usage.model = session['model'] as String;
       case 'input_audio_buffer.speech_started':
         _heard = '';
         _set(VoiceModeState.listening);
@@ -156,6 +164,7 @@ class RealtimeGuideMode extends VoiceMode {
       case 'conversation.item.input_audio_transcription.completed':
         final item = event['item_id'] as String?;
         final words = '${event['transcript'] ?? ''}'.trim();
+        _meter?.usage.addTranscription(event['usage']);
         if (item != null && !_saidFor(item).isCompleted) _saidFor(item).complete(words);
         if (words.isNotEmpty) {
           _heard = words;
@@ -185,6 +194,11 @@ class RealtimeGuideMode extends VoiceMode {
 
   Future<void> _onResponse(Object? response) async {
     if (response is! Map) return;
+    final meter = _meter;
+    if (meter != null) {
+      meter.usage.addResponse(response['usage']);
+      meter.report();
+    }
     final output = (response['output'] as List?) ?? const [];
     final input = _lastInput;
     final calls = [
@@ -280,6 +294,8 @@ class RealtimeGuideMode extends VoiceMode {
       return;
     }
     _connection++;
+    _meter?.close();
+    _meter = null;
     final link = _link;
     _link = null;
     await _events?.cancel();
@@ -303,6 +319,8 @@ class RealtimeGuideMode extends VoiceMode {
     _disposed = true;
     fallback.removeListener(_relay);
     _connection++;
+    _meter?.close();
+    _meter = null;
     unawaited(_events?.cancel());
     unawaited(_link?.close());
     _link = null;

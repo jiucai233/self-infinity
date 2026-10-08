@@ -313,3 +313,30 @@ class Goal(SQLModel, table=True):
     title: str
     course_ids_json: str = "[]"
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+
+
+class VoiceSession(SQLModel, table=True):
+    """One live voice session's usage (contract #37), reported by the browser as it goes: the
+    home page's realtime Guide (`guide`) or an audit's live transcription (`transcribe`).
+    Token counts are the Realtime API's `response.done` usage, summed; the developer panel
+    turns them into dollars (app/services/voice_usage.py)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    # The browser's id for the session; reports upsert on it.
+    client_id: str = Field(index=True, unique=True)
+    kind: str
+    model: str = ""
+    started_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    updated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    # How long the session has been open.
+    seconds: float = 0
+    # Responses the model made (guide) or turns committed (transcribe).
+    turns: int = 0
+    text_in: int = 0
+    text_in_cached: int = 0
+    audio_in: int = 0
+    audio_in_cached: int = 0
+    text_out: int = 0
+    audio_out: int = 0
+    # Speech the input transcription wrote down (its usage, in seconds).
+    transcribed_seconds: float = 0

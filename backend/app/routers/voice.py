@@ -8,8 +8,8 @@ from sqlmodel import Session
 
 from app.auth import CurrentUser, current_user
 from app.db import get_session
-from app.schemas import SpeechIn, TranscriptOut, VoiceStatusOut
-from app.services import realtime, voice
+from app.schemas import SpeechIn, TranscriptOut, VoiceStatusOut, VoiceUsageIn
+from app.services import realtime, voice, voice_usage
 
 router = APIRouter(prefix="/api/voice", tags=["voice"], dependencies=[Depends(current_user)])
 
@@ -96,4 +96,16 @@ async def realtime_guide(
 @router.post("/realtime/transcribe", status_code=201, responses={201: {"content": {"application/sdp": {}}}})
 async def realtime_transcribe(request: Request, user: CurrentUser = Depends(current_user)):
     return await _connect(await _offer(request), realtime.transcription_session(), user)
+
+
+@router.put("/sessions/{client_id}", status_code=204)
+def report_usage(client_id: str, body: VoiceUsageIn, session: Session = Depends(get_session)):
+    """A live session's usage so far (contract #37); the developer panel prices it."""
+    if not 1 <= len(client_id) <= 64:
+        raise HTTPException(400, "bad session id")
+    values = body.model_dump(exclude={"started_at"})
+    if body.started_at is not None:
+        values["started_at"] = body.started_at
+    voice_usage.report(session, client_id, values)
+    return Response(status_code=204)
 

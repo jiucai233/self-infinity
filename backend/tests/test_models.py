@@ -49,7 +49,7 @@ def test_the_tables_are_exactly_the_planned_ones():
     assert set(SQLModel.metadata.tables) == {
         "course", "skillnode", "skilledge", "auditsession", "auditturn", "principle", "principlelink",
         "dailycheckin", "rewardevent", "narratorbriefing", "studyplan", "searchplan", "banditarm", "chatmessage", "upload",
-        "profile", "journalentry", "goal",
+        "profile", "journalentry", "goal", "voicesession",
     }
 
 

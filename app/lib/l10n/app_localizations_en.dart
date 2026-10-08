@@ -1043,4 +1043,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devRefresh => 'Refresh';
+
+  @override
+  String get devTabAudits => 'Audits';
+
+  @override
+  String get devTabVoice => 'Voice cost';
+
+  @override
+  String get devVoiceHint =>
+      'At list price. The realtime Guide is billed by tokens, so silence is free; GPT-Live bills every minute the session is open, its backend apart. Audit transcription counts the whole open session, an upper bound.';
+
+  @override
+  String get devVoiceGuide => 'Home Guide (realtime)';
+
+  @override
+  String get devVoiceAudits => 'Audits (live transcription)';
+
+  @override
+  String get devVoiceSessions => 'Sessions';
+
+  @override
+  String get devVoiceMinutes => 'Minutes';
+
+  @override
+  String get devVoiceCost => 'Cost';
+
+  @override
+  String get devVoiceLive => 'On GPT-Live';
+
+  @override
+  String get devVoicePerMinute => 'Per minute';
+
+  @override
+  String get devVoiceCached => 'From cache';
+
+  @override
+  String get devVoiceTurns => 'Turns';
+
+  @override
+  String get devNoVoice => 'No live voice sessions yet.';
 }

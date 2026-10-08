@@ -361,6 +361,21 @@ class HttpApi implements SelfInfinityApi {
     parse: _chatMessages,
   );
 
+  @override
+  Future<void> reportVoiceUsage(VoiceUsage usage) => _send(
+    'PUT',
+    '/voice/sessions/${Uri.encodeComponent(usage.id)}',
+    body: usage.toJson(),
+    parse: (_) {},
+  );
+
+  @override
+  Future<DevVoice> getDevVoice({int limit = 50}) => _get(
+    '/dev/voice',
+    query: {'limit': '$limit'},
+    parse: (j) => DevVoice.fromJson(_object(j)),
+  );
+
   static List<ChatMessage> _chatMessages(Object? j) =>
       _array(_object(j)['messages']).map((e) => ChatMessage.fromJson(_object(e))).toList();
 
