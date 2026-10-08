@@ -6,15 +6,16 @@ Offline evaluation of `Auditor.next_turn` judgment quality against a hand-labele
 ## Running
 
 ```
-backend/.venv/bin/python backend/eval/run_calibration.py --provider mock
-backend/.venv/bin/python backend/eval/run_calibration.py --provider gemini
-backend/.venv/bin/python backend/eval/run_calibration.py --provider deepseek
+backend/.venv/bin/python backend/eval/run_calibration.py                    # OpenAI, the Auditor's model
+backend/.venv/bin/python backend/eval/run_calibration.py --challenger       # same, with the Challenger
+backend/.venv/bin/python backend/eval/run_calibration.py --provider mock    # offline
 ```
 
-`--provider mock` (default) runs offline with no API key, using the deterministic
-`MockProvider` heuristic. `--provider gemini`/`--provider deepseek` require the
-matching API key set in `backend/.env` (see `app/config.py`), since they make
-real API calls for every scenario.
+`--provider openai` (default) needs `OPENAI_API_KEY` in `backend/.env` and makes
+real API calls for every scenario; it uses the Auditor's model (`LLM_MODEL_OVERRIDES`,
+then `LLM_MODEL`, then `gpt-6-luna`), the one the app runs. `--provider mock` runs
+offline with no key, using the deterministic `MockProvider` heuristic. The
+DeepSeek runs below are history from before the app moved to OpenAI.
 
 ## What it measures
 
@@ -28,7 +29,7 @@ and compares the final verdict's `passed` against the scenario's
   Auditor incorrectly passed — this is the false-pass / grade-inflation risk
 - both metrics broken down by `node_type` (concept vs task)
 
-## Interpreting mock vs gemini results
+## Interpreting mock vs real results
 
 `MockProvider` is a simple keyword/length heuristic (see `app/llm/mock.py`),
 not real language understanding — it exists for fast offline tests, not for
@@ -37,7 +38,7 @@ judging genuine comprehension. Its accuracy on this calibration set is
 wording happens to trip its keyword checks in either direction.
 
 The M2 bar (accuracy ≥ 80%, leniency ≤ 10%) applies to a real provider
-(`--provider gemini` or `--provider deepseek`). Run it that way to get the
+(`--provider openai`). Run it that way to get the
 number that actually gates the milestone.
 
 ## Real run (2026-07-19, `--provider deepseek`, model `deepseek-chat`)

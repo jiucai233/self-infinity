@@ -62,6 +62,7 @@
 | `LLM_TIMEOUT_SECONDS` | 可选：默认 90（推理模型生成一门课约 25 秒） |
 | `TAVILY_API_KEY` | 可选，不填用离线搜索替身（没有网上课纲参考） |
 | `DEV_EMAILS` | 可选：能看到开发者面板（审计指标）的邮箱，逗号分隔 |
+| `TRANSCRIBE_MODEL` / `SPEECH_MODEL` / `SPEECH_VOICE` | 可选：语音转写和朗读（默认 `gpt-transcribe` / `gpt-4o-mini-tts` / `marin`）。语音只走 OpenAI，有 `OPENAI_API_KEY` 就开着；没有就用浏览器自带的识别和朗读 |
 
    改了环境变量要 **Redeploy** 才生效。
 

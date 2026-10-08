@@ -39,8 +39,12 @@ abstract class VoiceService {
     Duration pauseFor = kVoicePause,
   });
 
-  /// Stops listening; [onEnd] of the running session is called.
+  /// Ends the utterance now and keeps it: its final result (if any) and then
+  /// [onEnd] of the running session follow.
   Future<void> stopListening();
+
+  /// Drops the utterance: no more results, [onEnd] is called.
+  Future<void> cancelListening();
 
   /// Speaks [text] and completes when it is finished (or was stopped).
   Future<void> speak(String text);

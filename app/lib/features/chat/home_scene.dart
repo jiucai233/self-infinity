@@ -53,6 +53,10 @@ class _HomeSceneState extends State<HomeScene> {
   final LastSaid _lastSaid = LastSaid();
   bool _chatting = false;
   ChatMessage? _reply;
+
+  /// Everything she said in answer to the last message (a reply and, say, the
+  /// check-in receipt): what voice mode reads aloud.
+  String? _spokenReply;
   String? _error;
 
   /// The reflection prompt the Guide has asked and the user has not answered
@@ -129,6 +133,7 @@ class _HomeSceneState extends State<HomeScene> {
     if (asked == null) _uploads.clear();
     _lastSaid.fade();
     final assistants = saved.where((m) => !m.isUser).toList();
+    _spokenReply = assistants.isEmpty ? null : assistants.map((m) => m.content.trim()).join(' ');
     setState(() {
       _asked = null;
       _reply = assistants.isEmpty ? null : assistants.last;
@@ -177,8 +182,9 @@ class _HomeSceneState extends State<HomeScene> {
   // -- voice mode ------------------------------------------------------------
 
   Future<VoiceReply> _onHeard(String heard) async {
+    _spokenReply = null;
     await _send(heard, fromVoice: true);
-    return (speak: _reply?.content, keepGoing: true);
+    return (speak: _spokenReply, keepGoing: true);
   }
 
   void _voiceUnavailable() {

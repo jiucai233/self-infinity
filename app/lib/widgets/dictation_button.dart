@@ -11,7 +11,8 @@ import '../l10n/l10n.dart';
 /// A microphone for a text field (the `suffixIcon`): tap it and speak, and
 /// the words are typed into [controller] after what is already there.
 ///
-/// It stops after [pauseFor] of silence, or when tapped again. While it
+/// It stops after [pauseFor] of silence, or when tapped again (what was said
+/// is still typed in). While it
 /// listens it shows a small waveform and a stop icon. A device without speech
 /// recognition gets a toast. Changing [controller] or disabling the button
 /// ends the session.
@@ -66,14 +67,14 @@ class _DictationButtonState extends State<DictationButton> {
     if (_listening && (old.controller != widget.controller || !widget.enabled)) {
       _session++;
       _listening = false; // this build already shows it
-      _voice.stopListening();
+      _voice.cancelListening();
     }
   }
 
   @override
   void dispose() {
     _session++;
-    if (_listening) _voice.stopListening();
+    if (_listening) _voice.cancelListening();
     super.dispose();
   }
 
@@ -112,11 +113,9 @@ class _DictationButtonState extends State<DictationButton> {
     );
   }
 
-  void _stop() {
-    _session++;
-    setState(() => _listening = false);
-    _voice.stopListening();
-  }
+  /// Ends the session but keeps what was said: with the server's speech the
+  /// words arrive only now, so the session stays open until its end.
+  void _stop() => _voice.stopListening();
 
   void _write(TextEditingController controller, String text) {
     final max = widget.maxLength;

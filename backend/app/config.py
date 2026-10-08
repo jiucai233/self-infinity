@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     openai_api_key: str = ""
     kimi_api_key: str = ""
+    # Voice (app/services/voice.py) always goes through OpenAI and needs OPENAI_API_KEY,
+    # whatever LLM_PROVIDER is; without it the app uses the device's own speech.
+    transcribe_model: str = "gpt-transcribe"
+    speech_model: str = "gpt-4o-mini-tts"
+    speech_voice: str = "marin"
     # 留空则用离线搜索替身。搜索是独立于 LLM provider 的一层，互不影响。
     tavily_api_key: str = ""
     # POSTGRES_URL is what the Vercel ↔ Supabase integration sets (the transaction pooler);

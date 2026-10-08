@@ -9,6 +9,7 @@ from app.agents.auditor import Auditor
 from app.agents.challenger import Challenger
 from app.llm.base import LLMProvider, Message, complete_with_json_retry
 from app.llm.mock import MockProvider
+from app.config import settings
 from app.models import NodeType
 
 CALIBRATION_SET_PATH = Path(__file__).parent / "calibration_set.json"
@@ -55,14 +56,12 @@ STUDENT_SYSTEM_PROMPT = """\
 def build_provider(name: str):
     if name == "mock":
         return MockProvider()
-    if name == "gemini":
-        from app.llm.gemini import GeminiProvider
+    if name == "openai":
+        from app.llm.openai import OpenAIProvider
 
-        return GeminiProvider()
-    if name == "deepseek":
-        from app.llm.deepseek import DeepSeekProvider
-
-        return DeepSeekProvider()
+        # The Auditor's model (LLM_MODEL_OVERRIDES / LLM_MODEL / gpt-6-luna), so the
+        # number is for the model the app actually runs.
+        return OpenAIProvider(model=settings.model_name_for("auditor") or None)
     raise ValueError(f"unknown provider: {name}")
 
 
@@ -150,7 +149,7 @@ def run_scenario(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--provider", choices=["mock", "gemini", "deepseek"], default="mock")
+    parser.add_argument("--provider", choices=["openai", "mock"], default="openai")
     # Defaults to on for real providers, off for mock (mock's Auditor never
     # asks beyond ~2 rounds, so the 3 scripted turns are always enough and
     # spending real API calls on a student for it would be pointless).
@@ -189,7 +188,7 @@ def main() -> None:
     leniency = len(false_pass) / len(should_fail) * 100 if should_fail else 0.0
 
     print("\n=== summary ===")
-    print(f"provider: {args.provider}")
+    print(f"provider: {args.provider}" + (f" ({provider.model})" if args.provider == "openai" else ""))
     print(f"adaptive_student: {adaptive_student}")
     print(f"challenger: {args.challenger}")
     print(f"accuracy: {correct}/{total} = {accuracy:.1f}%")

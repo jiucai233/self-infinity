@@ -73,8 +73,16 @@ class FakeVoiceService implements VoiceService {
     end?.call();
   }
 
+  int cancelCalls = 0;
+
   @override
   Future<void> stopListening() async => end();
+
+  @override
+  Future<void> cancelListening() async {
+    cancelCalls++;
+    end();
+  }
 
   @override
   Future<void> speak(String text) {

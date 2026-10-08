@@ -7,6 +7,7 @@ library;
 
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'api.dart';
 import 'api_exception.dart';
@@ -133,6 +134,9 @@ class FakeApiClient implements SelfInfinityApi {
     'getMe',
     'getDevAudits',
     'reviewAudit',
+    'voiceAvailable',
+    'transcribe',
+    'speech',
   };
 
   // -- state ------------------------------------------------------------------
@@ -1071,6 +1075,29 @@ class FakeApiClient implements SelfInfinityApi {
       ..review = review
       ..leaked = review != null && leaked;
     return _devAuditOf(a);
+  }
+
+  // ===========================================================================
+  // 35: voice
+  // ===========================================================================
+
+  /// Offline there is no speech server: the app uses the device's own speech.
+  @override
+  Future<bool> voiceAvailable() async {
+    await _begin('voiceAvailable');
+    return false;
+  }
+
+  @override
+  Future<String> transcribe(Uint8List audio, {required String filename}) async {
+    await _begin('transcribe');
+    throw const ApiException(503, 'voice is not configured');
+  }
+
+  @override
+  Future<Uint8List> speech(String text) async {
+    await _begin('speech');
+    throw const ApiException(503, 'voice is not configured');
   }
 
   DevAudit _devAuditOf(_FakeAudit a) => DevAudit(

@@ -2,6 +2,7 @@
 // response parsing, and the mapping of failures to ApiException.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -462,6 +463,48 @@ void main() {
     test('toString is informative', () {
       expect(const ApiException(404, 'skill not found').toString(), contains('404'));
       expect(const ApiException.network('down').toString(), contains('no response'));
+    });
+  });
+
+  group('voice (#35)', () {
+    test('GET /voice', () async {
+      final h = ok({'available': true});
+      expect(await h.api.voiceAvailable(), isTrue);
+      expect(h.last.method, 'GET');
+      expect(h.last.url.path, '/api/voice');
+    });
+
+    test('POST /voice/transcribe uploads the recording', () async {
+      http.BaseRequest? sent;
+      final api = HttpApi(
+        client: MockClient.streaming((request, body) async {
+          sent = request;
+          final bytes = await body.toBytes();
+          expect(utf8.decode(bytes, allowMalformed: true), contains('filename="speech.webm"'));
+          return http.StreamedResponse(
+            Stream.value(utf8.encode(jsonEncode({'text': 'hello there'}))),
+            200,
+          );
+        }),
+      );
+      expect(await api.transcribe(Uint8List.fromList([1, 2]), filename: 'speech.webm'), 'hello there');
+      expect(sent!.method, 'POST');
+      expect(sent!.url.path, '/api/voice/transcribe');
+    });
+
+    test('POST /voice/speech returns the MP3 bytes', () async {
+      final h = Harness(
+        (_) => http.Response.bytes([0xff, 0xf3, 1], 200, headers: {'content-type': 'audio/mpeg'}),
+      );
+      expect(await h.api.speech('hi'), [0xff, 0xf3, 1]);
+      expect(h.last.url.path, '/api/voice/speech');
+      expect(h.lastBody, {'text': 'hi'});
+    });
+
+    test('no voice on the server is a 503', () async {
+      final h = Harness((_) => jsonResponse({'detail': 'voice is not configured'}, 503));
+      final e = await failure(() => h.api.speech('hi'));
+      expect(e.statusCode, 503);
     });
   });
 }

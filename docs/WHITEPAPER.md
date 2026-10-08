@@ -73,7 +73,7 @@ backend/ (FastAPI + SQLModel + SQLite)
 | | Challenger | LLM | 对"通过"做一次对抗复核 |
 | | Recorder | LLM | 把失败反思整理成原则卡 |
 | | Linker | LLM | 判断新卡与旧卡/节点的 related / contradicts 关系（后台运行） |
-| Analyst | Transcriber | 平台 STT | 语音转文字（客户端，规划中） |
+| Analyst | Transcriber | OpenAI `gpt-transcribe`（无 key 时用浏览器/手机自带 STT） | 语音转文字（`POST /api/voice/transcribe`）；回复由 `gpt-4o-mini-tts` 朗读 |
 | | Check-in Converter | LLM | 自由文本打卡 → 结构化字段，缺的字段留空不猜 |
 | | Profile Builder | 代码 | 汇总画像：反复出现的误解、跨领域复发 |
 

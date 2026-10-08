@@ -65,7 +65,7 @@ class VoiceModeController extends ChangeNotifier {
     _generation++;
     _setState(VoiceModeState.off);
     _level = 0;
-    await voice.stopListening();
+    await voice.cancelListening();
     await voice.stopSpeaking();
   }
 
@@ -135,7 +135,7 @@ class VoiceModeController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _generation++;
-    voice.stopListening();
+    voice.cancelListening();
     voice.stopSpeaking();
     super.dispose();
   }

@@ -608,3 +608,16 @@ class JournalEntryOut(_Out):
     prompt: str
     answer: str
     created_at: datetime
+
+
+class VoiceStatusOut(BaseModel):
+    # False: no OPENAI_API_KEY; the app uses the device's own speech.
+    available: bool
+
+
+class TranscriptOut(BaseModel):
+    text: str
+
+
+class SpeechIn(BaseModel):
+    text: str = Field(min_length=1, max_length=4096)

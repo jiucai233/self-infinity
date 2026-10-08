@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -298,6 +299,29 @@ class HttpApi implements SelfInfinityApi {
     parse: (j) => DevAudit.fromJson(_object(j)),
   );
 
+  // -- 35: voice ---------------------------------------------------------------
+
+  @override
+  Future<bool> voiceAvailable() =>
+      _get('/voice', parse: (j) => _object(j)['available'] == true);
+
+  @override
+  Future<String> transcribe(Uint8List audio, {required String filename}) => _send(
+    'POST',
+    '/voice/transcribe',
+    file: http.MultipartFile.fromBytes('file', audio, filename: filename),
+    parse: (j) => '${_object(j)['text'] ?? ''}',
+  );
+
+  @override
+  Future<Uint8List> speech(String text) => _send(
+    'POST',
+    '/voice/speech',
+    body: {'text': text},
+    bytes: true,
+    parse: (b) => b! as Uint8List,
+  );
+
   // -- transport --------------------------------------------------------------
 
   Future<T> _get<T>(
@@ -315,6 +339,7 @@ class HttpApi implements SelfInfinityApi {
     Map<String, String>? query,
     Object? body,
     http.MultipartFile? file,
+    bool bytes = false,
     required T Function(Object?) parse,
   }) async {
     final base = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
@@ -324,7 +349,7 @@ class HttpApi implements SelfInfinityApi {
     final bearer = token?.call();
     final lang = language?.call();
     final headers = <String, String>{
-      'Accept': 'application/json',
+      'Accept': bytes ? '*/*' : 'application/json',
       if (body != null) 'Content-Type': 'application/json; charset=utf-8',
       if (bearer != null) 'Authorization': 'Bearer $bearer',
       'Accept-Language': ?lang,
@@ -373,6 +398,7 @@ class HttpApi implements SelfInfinityApi {
     final status = response.statusCode;
     if (status == 401) onUnauthorized?.call();
     if (status < 200 || status >= 300) throw _errorFor(status, text);
+    if (bytes) return parse(response.bodyBytes);
 
     try {
       final decoded = text.trim().isEmpty ? null : jsonDecode(text);

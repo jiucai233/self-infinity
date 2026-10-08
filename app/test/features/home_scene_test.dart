@@ -767,6 +767,21 @@ void main() {
       expect(inHistory(find.text('Hello there')), findsOneWidget);
     });
 
+    testWidgets('a spoken check-in: her whole answer is read aloud, receipt included', (
+      tester,
+    ) async {
+      final voice = FakeVoiceService();
+      final api = FakeApiClient(latency: Duration.zero);
+      await pumpHome(tester, api, voice: voice);
+      await tester.tap(find.byKey(const Key('voice-mode')));
+      await tester.pumpAndSettle();
+      voice.hear('I slept 7 hours and went for a run');
+      await tester.pumpAndSettle();
+      final said = (await api.getChatHistory()).where((m) => !m.isUser).map((m) => m.content);
+      expect(said.length, greaterThan(1));
+      expect(voice.spoken, [said.join(' ')]);
+    });
+
     testWidgets('Esc leaves voice mode', (tester) async {
       final voice = FakeVoiceService();
       await pumpHome(tester, FakeApiClient(latency: Duration.zero), voice: voice);

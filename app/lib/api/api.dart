@@ -1,6 +1,8 @@
 /// The client-side view of `docs/api-contract.md`: one method per endpoint.
 library;
 
+import 'dart:typed_data';
+
 import 'models.dart';
 
 /// Everything the UI can ask of the backend.
@@ -203,4 +205,18 @@ abstract class SelfInfinityApi {
   /// the review does not fit the verdict (`too_strict` is for a fail,
   /// `too_lenient` for a pass); 404 for an unknown audit.
   Future<DevAudit> reviewAudit(int auditId, AuditReview? review, {bool leaked = false});
+
+  /// `GET /voice` (contract #35, no LLM): whether the server can hear and
+  /// speak (it has an OpenAI key). False: use the device's own speech.
+  Future<bool> voiceAvailable();
+
+  /// `POST /voice/transcribe` (contract #35): the words in one recorded
+  /// utterance ([audio] as recorded, [filename] with its format's extension:
+  /// `speech.webm`, `speech.mp4`, ...); '' for silence. 503 without a key,
+  /// 400 for an empty or too long (> 4 MB) recording, 502 when OpenAI fails.
+  Future<String> transcribe(Uint8List audio, {required String filename});
+
+  /// `POST /voice/speech` (contract #35): [text] (1–4096 characters) read
+  /// aloud, as MP3 bytes. 503 without a key, 502 when OpenAI fails.
+  Future<Uint8List> speech(String text);
 }

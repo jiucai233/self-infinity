@@ -12,6 +12,7 @@ import '../features/stage/profile_controller.dart';
 import '../l10n/l10n.dart';
 import '../theme/app_theme.dart';
 import '../upload/file_picker_service.dart';
+import '../voice/cloud_voice_service.dart';
 import '../voice/platform_voice_service.dart';
 import '../voice/voice_service.dart';
 import '../widgets/widgets.dart';
@@ -80,8 +81,8 @@ class SelfInfinityApp extends StatefulWidget {
   /// Who is signed in; [LocalAuth] (no accounts) when null.
   final AuthService? auth;
 
-  /// Speech in and out; defaults to the platform implementation
-  /// (`speech_to_text` + `flutter_tts`).
+  /// Speech in and out; defaults to the server's OpenAI voice in the browser,
+  /// falling back to the platform's own (`speech_to_text` + `flutter_tts`).
   final VoiceService? voice;
 
   /// The file dialog of the ⊕ upload; defaults to the `file_picker` plugin.
@@ -112,7 +113,8 @@ class _AppLook {
 class _SelfInfinityAppState extends State<SelfInfinityApp> {
   late final LocaleController _locale = widget.locale ?? LocaleController();
   late final AuthService _auth = widget.auth ?? LocalAuth();
-  late final VoiceService _voice = widget.voice ?? PlatformVoiceService();
+  late final VoiceService _voice =
+      widget.voice ?? CloudVoiceService(api: widget.api, device: PlatformVoiceService());
   late final FilePickerService _filePicker = widget.filePicker ?? PlatformFilePickerService();
 
   @override

@@ -105,6 +105,16 @@ class PlatformVoiceService implements VoiceService {
   }
 
   @override
+  Future<void> cancelListening() async {
+    try {
+      await _stt?.cancel();
+    } on Object catch (e) {
+      debugPrint('PlatformVoiceService: could not cancel listening ($e)');
+    }
+    _finishListening();
+  }
+
+  @override
   Future<void> speak(String text) async {
     final tts = _tts;
     if (tts == null || text.trim().isEmpty) return;
