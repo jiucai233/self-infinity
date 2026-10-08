@@ -373,7 +373,7 @@ void main() {
 
     test('400 with a known message is translated to English', () async {
       const known = {
-        'skill is locked': 'This node is locked. Clear its parent first.',
+        'skill is locked': 'This node is locked. Clear the nodes before it first.',
         'audit session is already closed': 'This audit has already ended.',
         'reflection is only accepted for a failed audit':
             'Lesson cards can only be made after a failed audit.',
@@ -455,7 +455,7 @@ void main() {
     test('known 400 messages are matched ignoring case and surrounding spaces', () {
       expect(
         const ApiException(400, '  Skill is locked ').userMessage,
-        'This node is locked. Clear its parent first.',
+        'This node is locked. Clear the nodes before it first.',
       );
     });
 

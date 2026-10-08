@@ -72,9 +72,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get askTodaysQuests => '我今天该做什么？';
 
   @override
-  String get attachCourse => '关联一门课程';
-
-  @override
   String get attempts => '尝试';
 
   @override
@@ -301,7 +298,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get errNoNodeReady => '还没有可挑战的节点。先建一个世界吧。';
 
   @override
-  String get errNodeLocked => '这个节点还没解锁。先通关它的上一级。';
+  String get errNodeLocked => '这个节点还没解锁。先通关排在它前面的节点。';
 
   @override
   String get errNotFound => '找不到这个内容。';
@@ -417,7 +414,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get lockedClearParent => '还没解锁。先通关上一级节点。';
+  String get lockedClearParent => '还没解锁。先通关排在它前面的节点。';
 
   @override
   String get mainQuest => '主线任务';
@@ -472,9 +469,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get noConversationYet => '还没有对话。';
-
-  @override
-  String get noCourseServesQuest => '还没有课程归属这个任务。';
 
   @override
   String get noDescriptionYet => '还没有简介。';
@@ -665,11 +659,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get previous => '上一页';
 
   @override
-  String questProgress(int done, int total, int count) {
-    return '$count 门课程共 $total 个节点，已通关 $done 个。';
-  }
-
-  @override
   String get readyToTry => '准备好试试了吗？';
 
   @override
@@ -683,9 +672,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get removeRule => '删除规则';
-
-  @override
-  String get renameUnderCharacter => '可以在「我的角色」里改名或删除。';
 
   @override
   String get replayTutorial => '重看新手教程';

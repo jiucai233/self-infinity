@@ -351,15 +351,6 @@ void main() {
         act: (t) => tapLifeNode(t, 's3'),
       );
     });
-    testWidgets(skip: dir == null, 'scene 2 a main quest card ($tag)', (tester) async {
-      await scene(
-        tester,
-        size: size,
-        name: '2-life-goal-$tag',
-        location: '/map',
-        act: (t) => tapLifeNode(t, 'g1'),
-      );
-    });
     testWidgets(skip: dir == null, 'scene 2 outline ($tag)', (tester) async {
       await scene(
         tester,

@@ -11,6 +11,7 @@ import app.db as app_db
 from app.models import DailyCheckIn, RewardEvent
 from app.utils import local_today
 from tests.helpers import (
+    MATH_ORDER,
     LONG,
     FIRST,
     answer_turns,
@@ -35,25 +36,25 @@ def test_xp_starts_at_level_one_with_nothing(client):
 def test_xp_total_is_the_sum_of_rewards_and_progress_follows_mastered_nodes(client):
     ids = ids_by_slug(generate(client, "Math"))
     rewards = []
-    for slug in ("high-school-math", "algebra"):
+    for slug in MATH_ORDER[:2]:
         rewards.append(pass_node(client, ids[slug])["reward_amount"])
 
     assert xp(client) == {"total": sum(rewards), "level": 1, "level_progress": 0.4}
 
-    for slug in ("functions", "calculus"):
+    for slug in MATH_ORDER[2:4]:
         rewards.append(pass_node(client, ids[slug])["reward_amount"])
     assert xp(client)["level_progress"] == 0.8 and xp(client)["level"] == 1
 
-    rewards.append(pass_node(client, ids["quadratic-equation"])["reward_amount"])  # the 5th mastered node
+    rewards.append(pass_node(client, ids[MATH_ORDER[4]])["reward_amount"])  # the 5th mastered node
     assert xp(client) == {"total": sum(rewards), "level": 2, "level_progress": 0.0}
 
-    pass_node(client, ids["sequences"])
+    pass_node(client, ids[MATH_ORDER[5]])
     assert (xp(client)["level"], xp(client)["level_progress"]) == (2, 0.2)
 
 
 def test_a_failed_audit_gives_no_xp(client):
     ids = ids_by_slug(generate(client, "Math"))
-    fail_node(client, ids["high-school-math"])
+    fail_node(client, ids["discriminant"])
 
     assert xp(client) == {"total": 0, "level": 1, "level_progress": 0.0}
 
@@ -62,7 +63,7 @@ def test_xp_level_is_the_incentive_engines_level(client, client_engine):
     from app.services.incentive import global_level
 
     ids = ids_by_slug(generate(client, "Math"))
-    for slug in ("high-school-math", "algebra", "functions", "calculus", "quadratic-equation"):
+    for slug in MATH_ORDER[:5]:
         pass_node(client, ids[slug])
 
     with Session(client_engine) as session:
@@ -70,8 +71,7 @@ def test_xp_level_is_the_incentive_engines_level(client, client_engine):
 
 
 def test_xp_counts_reward_rows_directly(client, client_engine):
-    generate(client, "Math")
-    pass_node(client, 1)
+    pass_node(client, ids_by_slug(generate(client, "Math"))["discriminant"])
     with Session(client_engine) as session:
         session.add(RewardEvent(session_id=1, amount=100, multiplier=1.1))
         session.commit()
@@ -81,8 +81,7 @@ def test_xp_counts_reward_rows_directly(client, client_engine):
 
 
 def test_xp_is_in_the_chat_briefing_and_the_narrate_response_too(client):
-    generate(client, "Math")
-    pass_node(client, 1)
+    pass_node(client, ids_by_slug(generate(client, "Math"))["discriminant"])
 
     narrated = client.post("/api/narrator/narrate").json()
 
@@ -164,7 +163,7 @@ def test_overview_of_a_fresh_node_has_empty_lists(client):
     body = client.get(f"/api/skills/{ids['high-school-math']}/overview").json()
 
     assert set(body) == {"skill", "course", "contains_parents", "requires", "audits", "materials"}
-    assert body["skill"]["title"] == "High School Math" and body["skill"]["status"] == "available"
+    assert body["skill"]["title"] == "High School Math" and body["skill"]["status"] == "locked"
     assert body["course"] == generated["course"]
     assert body["contains_parents"] == [] and body["requires"] == []
     assert body["audits"] == [] and body["materials"] == []
@@ -204,17 +203,17 @@ def test_overview_requires_only_lists_incoming_edges(client):
 
 def test_overview_audits_are_this_nodes_newest_first(client):
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    first = fail_node(client, ids["algebra"])
-    second = start(client, ids["algebra"])
+    pass_node(client, ids["discriminant"])
+    first = fail_node(client, ids["root-coefficient"])
+    second = start(client, ids["root-coefficient"])
     _probe, verdict = answer_turns(client, second, FIRST, LONG)
     assert verdict["passed"]
 
-    audits = client.get(f"/api/skills/{ids['algebra']}/overview").json()["audits"]
+    audits = client.get(f"/api/skills/{ids['root-coefficient']}/overview").json()["audits"]
 
     assert [(a["id"], a["status"], a["skill_id"], a["skill_title"]) for a in audits] == [
-        (second, "passed", ids["algebra"], "Algebra"),
-        (first, "failed", ids["algebra"], "Algebra"),
+        (second, "passed", ids["root-coefficient"], "Roots and Coefficients"),
+        (first, "failed", ids["root-coefficient"], "Roots and Coefficients"),
     ]
     assert audits[0]["score"] == verdict["score"] and audits[1]["score"] == 45
     assert set(audits[0]) == {"id", "skill_id", "skill_title", "status", "score", "created_at"}
@@ -237,9 +236,9 @@ def test_overview_materials_are_this_nodes_search_plans_newest_first(client):
 
 def test_overview_an_audit_active_session_is_listed_without_a_score(client):
     ids = ids_by_slug(generate(client, "Math"))
-    audit_id = start(client, ids["high-school-math"])
+    audit_id = start(client, ids["discriminant"])
 
-    audits = client.get(f"/api/skills/{ids['high-school-math']}/overview").json()["audits"]
+    audits = client.get(f"/api/skills/{ids['discriminant']}/overview").json()["audits"]
 
     assert audits == [{**audits[0], "id": audit_id, "status": "active", "score": None}]
 
@@ -256,16 +255,16 @@ def test_audits_list_is_empty_at_first(client):
 def test_audits_list_is_newest_first_across_courses(client):
     a = ids_by_slug(generate(client, "Math"))
     b = ids_by_slug(generate(client, "Cooking"))
-    first = fail_node(client, a["high-school-math"])
-    second = fail_node(client, b["root"])
-    third = fail_node(client, a["high-school-math"])
+    first = fail_node(client, a["discriminant"])
+    second = fail_node(client, b["core-concepts-1"])
+    third = fail_node(client, a["discriminant"])
 
     body = client.get("/api/audits").json()
 
     assert [x["id"] for x in body] == [third, second, first]
-    assert [x["skill_title"] for x in body] == ["High School Math", "Cooking", "High School Math"]
+    assert [x["skill_title"] for x in body] == ["Discriminant", "Core Concepts 1", "Discriminant"]
     assert body[0] == {
-        "id": third, "skill_id": a["high-school-math"], "skill_title": "High School Math", "status": "failed",
+        "id": third, "skill_id": a["discriminant"], "skill_title": "Discriminant", "status": "failed",
         "score": 45, "created_at": body[0]["created_at"],
     }
     assert body[0]["created_at"].endswith("Z") or body[0]["created_at"].endswith("+00:00")
@@ -273,7 +272,7 @@ def test_audits_list_is_newest_first_across_courses(client):
 
 def test_audits_list_limit_and_default(client):
     ids = ids_by_slug(generate(client, "Math"))
-    created = [fail_node(client, ids["high-school-math"]) for _ in range(23)]
+    created = [fail_node(client, ids["discriminant"]) for _ in range(23)]
 
     assert len(client.get("/api/audits").json()) == 20  # the default
     assert [a["id"] for a in client.get("/api/audits?limit=3").json()] == created[::-1][:3]
@@ -287,8 +286,8 @@ def test_audits_list_limit_out_of_range_is_422(client):
 
 def test_audits_list_mixes_statuses(client):
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    start(client, ids["algebra"])
+    pass_node(client, ids["discriminant"])
+    start(client, ids["root-coefficient"])
 
     statuses = [a["status"] for a in client.get("/api/audits").json()]
 

@@ -53,12 +53,12 @@ void main() {
       expect(key('history-panel'), findsOneWidget);
       expect(
         tester.widget<Text>(key('bubble-text')).data,
-        startsWith("Today's quests: “High School Math”"),
+        startsWith("Today's quests: “Discriminant”"),
       );
       // ... and the left panel lists the quest instead of the row.
       expect(find.text("Get today's quests →"), findsNothing);
       expect(
-        find.descendant(of: key('daily-quests'), matching: find.text('High School Math')),
+        find.descendant(of: key('daily-quests'), matching: find.text('Discriminant')),
         findsOneWidget,
       );
     });
@@ -71,7 +71,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(api.chatMessages, ['What should I do today?']);
       expect(key('history-panel'), findsOneWidget);
-      expect(key('quest-1'), findsOneWidget);
+      expect(key('quest-6'), findsOneWidget);
     });
 
     testWidgets('without a course the Guide says no node is ready and the row stays', (
@@ -93,9 +93,9 @@ void main() {
       await api.generateCourse(const GenerateRequest(topic: 'math'));
       await api.sendChat('What should I do today?');
       await pumpApp(tester, api, initialLocation: '/map');
-      await tester.tap(key('quest-1'));
+      await tester.tap(key('quest-6'));
       await tester.pumpAndSettle();
-      expect(GoRouter.of(tester.element(find.byType(Scaffold).first)).state.uri.path, '/skill/1');
+      expect(GoRouter.of(tester.element(find.byType(Scaffold).first)).state.uri.path, '/skill/6');
     });
   });
 }

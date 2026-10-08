@@ -50,7 +50,10 @@ void main() {
     testWidgets('ErrorView shows the right text for every status', (tester) async {
       const cases = <(ApiException, String)>[
         (ApiException.network(), "Can't reach the server. Check your connection."),
-        (ApiException(400, 'skill is locked'), 'This node is locked. Clear its parent first.'),
+        (
+          ApiException(400, 'skill is locked'),
+          'This node is locked. Clear the nodes before it first.',
+        ),
         (ApiException(400, 'whatever'), "You can't do that right now."),
         (ApiException(404, 'skill not found'), "We couldn't find that."),
         (ApiException(422), 'Please check what you entered.'),
@@ -484,12 +487,12 @@ void main() {
   });
 
   group('test helpers', () {
-    test('seededFakeApi has the math course with only the root available', () async {
+    test('seededFakeApi has the math course with only its first node to learn available', () async {
       final api = await seededFakeApi();
       expect(api.latency, Duration.zero);
       final skills = await api.listSkills();
       expect(skills, hasLength(12));
-      expect(skills.where((s) => s.isAvailable).map((s) => s.title), ['High School Math']);
+      expect(skills.where((s) => s.isAvailable).map((s) => s.title), ['Discriminant']);
     });
 
     test('longAnswer is long enough to pass without a challenge', () {

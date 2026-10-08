@@ -34,8 +34,8 @@ GET_ENDPOINTS = [
 def populated_fixture(client):
     """A course, a pass, a fail and a principle, so every GET has something to return."""
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    pass_node(client, ids["algebra"])
+    pass_node(client, ids["discriminant"])
+    pass_node(client, ids["root-coefficient"])
     audit_id = fail_node(client, ids["quadratic-equation"])
     assert client.post(f"/api/audits/{audit_id}/reflection", json={"reflection": "A misconception"}).status_code == 200
     return ids
@@ -69,5 +69,5 @@ def test_it29_the_forbidden_call_really_would_fail_a_post(client, populated, mon
     assert response.json() == {"needs_clarification": False, "questions": []}
     # ...but a turn really does reach the provider and fails with the auditor-unavailable 502.
     ids = populated
-    audit = client.post(f"/api/skills/{ids['high-school-math']}/audits").json()["session"]["id"]
+    audit = client.post(f"/api/skills/{ids['quadratic-equation']}/audits").json()["session"]["id"]
     assert client.post(f"/api/audits/{audit}/turns", json={"content": "Hello"}).status_code == 502

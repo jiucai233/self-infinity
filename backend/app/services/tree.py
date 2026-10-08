@@ -14,7 +14,7 @@
 
 from sqlmodel import Session, col, select
 
-from app.models import EdgeKind, NodePosition, SkillEdge, SkillNode
+from app.models import EdgeKind, NodePosition, SkillEdge, SkillNode, SkillStatus
 
 __all__ = [
     "NodePosition",
@@ -26,6 +26,9 @@ __all__ = [
     "neighbor_ids",
     "node_depth",
     "node_position",
+    "course_order",
+    "open_every_course",
+    "open_next",
 ]
 
 
@@ -130,3 +133,63 @@ def course_graph(session: Session, course_id: int) -> tuple[list[SkillNode], lis
         session.exec(select(SkillEdge).where(col(SkillEdge.from_id).in_(ids)).order_by(SkillEdge.id)).all()
     )
     return nodes, edges
+
+
+# ---------------------------------------------------------------- unlocking: one node at a time, in order
+#
+# Every course carries a learning order, a list laid over its tree: what a node contains comes
+# before it, so a chapter follows its sections and the root, the course itself, comes last; a
+# requires edge puts its prerequisite first; otherwise the planner's order (it follows the
+# outline) decides, which nodes keep as their ids. Exactly one node per course is open: the
+# first one in that order not yet mastered. Mastered nodes stay open for a retake.
+
+
+def course_order(session: Session, course_id: int) -> list[SkillNode]:
+    """The course's nodes in learning order (see above)."""
+    nodes = {n.id: n for n in session.exec(select(SkillNode).where(SkillNode.course_id == course_id)).all()}
+    before: dict[int, set[int]] = {i: set() for i in nodes}
+    for edge in session.exec(
+        select(SkillEdge).where(col(SkillEdge.from_id).in_(nodes), col(SkillEdge.to_id).in_(nodes))
+    ).all():
+        if edge.kind == EdgeKind.contains:
+            before[edge.from_id].add(edge.to_id)  # the parts before what contains them
+        else:
+            before[edge.to_id].add(edge.from_id)  # the prerequisite first
+    order: list[SkillNode] = []
+    left = set(nodes)
+    while left:
+        ready = [i for i in left if not before[i] & left]
+        # A requires edge running against the tree can close a loop; the earliest node breaks it.
+        pick = min(ready or left)
+        order.append(nodes[pick])
+        left.remove(pick)
+    return order
+
+
+def open_next(session: Session, course_id: int) -> list[int]:
+    """Opens the first node of the course's order that is not mastered and locks the others that
+    are not mastered. Returns the ids this call opened. Does not commit."""
+    return [n.id for n in _line_up(session, course_id) if n.status == SkillStatus.available]
+
+
+def open_every_course(session: Session) -> int:
+    """[open_next] for every course: moves courses built under an older rule (they opened at the
+    root) over to the order; on courses already in line it changes nothing. Returns how many
+    nodes changed. Does not commit."""
+    return sum(len(_line_up(session, c)) for c in session.exec(select(SkillNode.course_id).distinct()).all())
+
+
+def _line_up(session: Session, course_id: int) -> list[SkillNode]:
+    """Sets the statuses [open_next] describes; returns the nodes it changed."""
+    changed = []
+    found = False
+    for node in course_order(session, course_id):
+        if node.status == SkillStatus.mastered:
+            continue
+        want = SkillStatus.locked if found else SkillStatus.available
+        found = True
+        if node.status != want:
+            node.status = want
+            session.add(node)
+            changed.append(node)
+    return changed

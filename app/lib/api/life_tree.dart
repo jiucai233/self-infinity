@@ -1,7 +1,7 @@
-/// The life tree (`docs/ux-chat.md` §6): you in the middle, your main quests
-/// (goals) around you, the courses that serve them further out, and every
-/// node of those courses beyond that. Courses under no goal hang from you
-/// directly — side quests.
+/// The life tree (`docs/ux-chat.md` §6): you in the middle, your courses
+/// around you and every node of those courses beyond that. Main quests are
+/// not points on it — they live on the character sheet; a course only
+/// remembers the quest it serves ([LifeNode.goalId]).
 ///
 /// Pure data, built on the client from endpoints that already exist; no API of
 /// its own.
@@ -14,7 +14,7 @@ import 'package:flutter/foundation.dart';
 import 'graph_utils.dart';
 import 'models.dart';
 
-enum LifeKind { self, goal, course, skill }
+enum LifeKind { self, course, skill }
 
 /// One point of the life tree.
 @immutable
@@ -32,7 +32,7 @@ class LifeNode {
     this.boss = false,
   });
 
-  /// `me`, `g{id}`, `c{id}` (a course with several roots), `s{id}`.
+  /// `me`, `c{id}` (a course with several roots), `s{id}`.
   final String key;
   final LifeKind kind;
   final String label;
@@ -112,8 +112,7 @@ class LifeTree {
 
   LifeNode? byKey(String key) => nodes.where((n) => n.key == key).firstOrNull;
 
-  LifeNode? bySkill(int skillId) =>
-      nodes.where((n) => n.skillId == skillId).firstOrNull;
+  LifeNode? bySkill(int skillId) => nodes.where((n) => n.skillId == skillId).firstOrNull;
 
   List<LifeNode> childrenOf(String key) => [
     for (final n in nodes)
@@ -152,14 +151,8 @@ class LifeTree {
       }
     }
 
-    for (final g in goals) {
-      nodes.add(LifeNode(key: 'g${g.id}', kind: LifeKind.goal, label: g.title, parent: selfKey, goalId: g.id));
-    }
-
     for (final map in sorted) {
-      final goal = owner[map.course.id];
-      final parentKey = goal == null ? selfKey : 'g${goal.id}';
-      _addCourse(nodes, map, parentKey, goal?.id, failed);
+      _addCourse(nodes, map, selfKey, owner[map.course.id]?.id, failed);
     }
 
     var total = 0;

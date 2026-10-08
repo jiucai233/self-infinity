@@ -45,8 +45,8 @@ def use_provider(monkeypatch, provider, agents=None):
 def failed_audit_on_quadratic_equation(client) -> tuple[dict, int]:
     """Pass the root and algebra, then fail Quadratic Equations. Returns (ids by slug, audit id)."""
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    pass_node(client, ids["algebra"])
+    pass_node(client, ids["discriminant"])
+    pass_node(client, ids["root-coefficient"])
     return ids, fail_node(client, ids["quadratic-equation"])
 
 
@@ -102,11 +102,11 @@ def test_it19_the_recorder_sees_the_node_the_gaps_and_the_reflection(client, mon
 
 def test_it19_links_are_saved_after_the_principle_is_returned(client, client_engine):
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    pass_node(client, ids["algebra"])
+    pass_node(client, ids["discriminant"])
+    pass_node(client, ids["root-coefficient"])
     first_audit = fail_node(client, ids["quadratic-equation"])
     post_reflection(client, first_audit, "First misconception")
-    second_audit = fail_node(client, ids["sequences"])
+    second_audit = fail_node(client, ids["quadratic-equation"])
 
     second = post_reflection(client, second_audit, "Second misconception").json()
 
@@ -190,8 +190,8 @@ def test_it19_the_response_is_sent_before_the_linker_runs(client_engine, monkeyp
 
 def test_a_broken_linker_does_not_fail_the_reflection(client, client_engine, monkeypatch):
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    pass_node(client, ids["algebra"])
+    pass_node(client, ids["discriminant"])
+    pass_node(client, ids["root-coefficient"])
     audit_id = fail_node(client, ids["quadratic-equation"])
     use_provider(monkeypatch, BrokenProvider(), agents={"linker"})
 
@@ -222,7 +222,7 @@ def test_linker_links_to_a_node_are_saved_with_the_judged_reason(client, client_
 
 def test_it20_reflection_on_a_passed_session_is_a_400(client):
     ids = ids_by_slug(generate(client, "Math"))
-    audit_id = start(client, ids["high-school-math"])
+    audit_id = start(client, ids["discriminant"])
     client.post(f"/api/audits/{audit_id}/turns", json={"content": "x" * 10})
     client.post(f"/api/audits/{audit_id}/turns", json={"content": "x" * 200})
 
@@ -234,7 +234,7 @@ def test_it20_reflection_on_a_passed_session_is_a_400(client):
 
 def test_it20_reflection_on_an_active_session_is_a_400(client):
     ids = ids_by_slug(generate(client, "Math"))
-    audit_id = start(client, ids["high-school-math"])
+    audit_id = start(client, ids["discriminant"])
 
     response = post_reflection(client, audit_id)
 
@@ -297,15 +297,15 @@ def test_unusable_recorder_output_is_a_502_too(client, monkeypatch):
 
 def test_principles_are_listed_newest_first_with_their_origin_node(client):
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    pass_node(client, ids["algebra"])
+    pass_node(client, ids["discriminant"])
+    pass_node(client, ids["root-coefficient"])
     post_reflection(client, fail_node(client, ids["quadratic-equation"]), "First")
-    post_reflection(client, fail_node(client, ids["sequences"]), "Second")
+    post_reflection(client, fail_node(client, ids["quadratic-equation"]), "Second")
 
     principles = client.get("/api/principles").json()
 
     assert [(p["id"], p["misconception"], p["skill_title"]) for p in principles] == [
-        (2, "Second", "Sequences"),
+        (2, "Second", "Quadratic Equations"),
         (1, "First", "Quadratic Equations"),
     ]
     assert principles[1]["skill_id"] == ids["quadratic-equation"]
@@ -342,19 +342,19 @@ def test_it21_graph_after_a_reflection_has_the_principle_node_and_its_origin_edg
 
 def test_graph_skill_nodes_carry_status_type_and_course(client):
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
+    pass_node(client, ids["discriminant"])
 
     nodes = {n["id"]: n for n in client.get("/api/graph").json()["nodes"]}
 
-    assert nodes[f"skill:{ids['high-school-math']}"] == {
-        "id": f"skill:{ids['high-school-math']}",
+    assert nodes[f"skill:{ids['discriminant']}"] == {
+        "id": f"skill:{ids['discriminant']}",
         "kind": "skill",
-        "title": "High School Math",
+        "title": "Discriminant",
         "status": "mastered",
         "node_type": "concept",
         "course_id": 1,
     }
-    assert nodes[f"skill:{ids['algebra']}"]["status"] == "available"
+    assert nodes[f"skill:{ids['root-coefficient']}"]["status"] == "available"
     assert nodes[f"skill:{ids['derivative']}"]["status"] == "locked"
 
 

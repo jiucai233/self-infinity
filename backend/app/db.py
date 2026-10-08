@@ -92,6 +92,7 @@ def ensure_schema(eng: Engine, schema: str) -> Engine:
             conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
     SQLModel.metadata.create_all(scoped)
     _add_missing_columns(scoped, schema)
+    _open_from_leaves(scoped)
     _ready.add(key)
     return scoped
 
@@ -157,6 +158,18 @@ def init_db() -> None:
     _refuse_legacy_database()
     SQLModel.metadata.create_all(engine)
     _add_missing_columns()
+    _open_from_leaves(engine)
+
+
+def _open_from_leaves(eng: Engine) -> None:
+    """Courses used to open at the root; they now open one node at a time in learning order
+    (services/tree.py). Moves old courses over once per process; idempotent, so courses already
+    in line are untouched."""
+    from app.services.tree import open_every_course
+
+    with Session(eng) as session:
+        if open_every_course(session):
+            session.commit()
 
 
 def get_session(user: CurrentUser = Depends(current_user)):

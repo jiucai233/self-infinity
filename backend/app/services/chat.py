@@ -20,7 +20,7 @@ from app.i18n import join_list, quote, t
 from app.agents.front_desk import FrontDesk, FrontDeskResult
 from app.llm.base import LLMProvider
 from app.agents.planner import SyllabusText
-from app.models import AuditSession, ChatMessage, Course, SkillNode, SkillStatus, Upload
+from app.models import AuditSession, ChatMessage, Course, EdgeKind, SkillNode, SkillStatus, Upload
 from app.schemas import (
     ChatMessageOut,
     ChatSuggestionOut,
@@ -161,7 +161,9 @@ def _run_generate_course(
         logger.warning("chat: course generation failed", exc_info=True)
         session.rollback()
         return _save(session, "assistant", t("world_failed"), "front_desk")
-    root = next((n for n in generated.nodes if n.status == SkillStatus.available), generated.nodes[0])
+    # The world is named after the course's root: the node nothing contains.
+    contained = {e.to_id for e in generated.edges if e.kind == EdgeKind.contains}
+    root = next((n for n in generated.nodes if n.id not in contained), generated.nodes[0])
     return _save(
         session,
         "assistant",

@@ -30,7 +30,6 @@
   "answerHint": "Your answer…",
   "askAboutNodeHint": "Ask about this node…",
   "askTodaysQuests": "What should I do today?",
-  "attachCourse": "Attach a course",
   "attempts": "Attempts",
   "auditFailed": "Failed",
   "auditHistory": "Audit history",
@@ -141,7 +140,7 @@
   "errMaxMainQuests": "You can have at most 3 main quests.",
   "errNetwork": "Can't reach the server. Check your connection.",
   "errNoNodeReady": "No node is ready yet. Make a world first.",
-  "errNodeLocked": "This node is locked. Clear its parent first.",
+  "errNodeLocked": "This node is locked. Clear the nodes before it first.",
   "errNotFound": "We couldn't find that.",
   "errPickGap": "Pick a gap or misconception to search for.",
   "errSignedOut": "Your session ended. Please sign in again.",
@@ -208,7 +207,7 @@
       }
     }
   },
-  "lockedClearParent": "Still locked. Clear the parent node first.",
+  "lockedClearParent": "Still locked. Clear the nodes before it first.",
   "mainQuest": "Main quest",
   "mainQuestPlaceholder": "e.g. Teach calculus to a stranger",
   "mainQuests": "Main quests",
@@ -227,7 +226,6 @@
   "noAttemptsYet": "No attempts yet.",
   "noAuditsYet": "No audits yet.",
   "noConversationYet": "No conversation yet.",
-  "noCourseServesQuest": "No course serves this quest yet.",
   "noDescriptionYet": "No description yet.",
   "noMatchingNode": "No matching node.",
   "noQuestLineYet": "No quest line yet",
@@ -347,26 +345,11 @@
   },
   "pointsUnit": "pts",
   "previous": "Previous",
-  "questProgress": "{done} of {total} nodes cleared across {count, plural, =1{1 course} other{{count} courses}}.",
-  "@questProgress": {
-    "placeholders": {
-      "done": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      },
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "readyToTry": "Ready to try?",
   "recorderAsk": "What did you misunderstand?",
   "recorderTagline": "Turns a miss into a lesson",
   "removeMainQuest": "Remove main quest",
   "removeRule": "Remove rule",
-  "renameUnderCharacter": "Rename or remove it under My character.",
   "replayTutorial": "Replay the tutorial",
   "resetLinkSent": "We sent a password reset link to {email}.",
   "@resetLinkSent": {

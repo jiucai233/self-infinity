@@ -17,19 +17,19 @@ def _engine():
 def test_passing_audit_creates_reward_event(client, client_engine):
     ids = ids_by_slug(generate(client, "Math"))
 
-    verdict = pass_node(client, ids["high-school-math"])
+    verdict = pass_node(client, ids["discriminant"])
 
-    assert verdict["reward_amount"] == 22  # round(10 x 2.0 x 1.1)
+    assert verdict["reward_amount"] == 55  # round(10 x 2.0 x (1 + 0.5 x depth 3) x 1.1)
     assert verdict["reward_multiplier"] == 1.1
     with Session(client_engine) as session:
         (event,) = session.exec(select(RewardEvent)).all()
-        assert (event.amount, event.multiplier) == (22, 1.1)
+        assert (event.amount, event.multiplier) == (55, 1.1)
 
 
 def test_failing_audit_creates_no_reward_event(client, client_engine):
     ids = ids_by_slug(generate(client, "Math"))
 
-    fail_node(client, ids["high-school-math"])
+    fail_node(client, ids["discriminant"])
 
     with Session(client_engine) as session:
         assert session.exec(select(RewardEvent)).all() == []

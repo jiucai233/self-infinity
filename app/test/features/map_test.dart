@@ -223,38 +223,37 @@ void main() {
       (
         tester,
       ) async {
-        await passAudit(
-          api,
-          1,
-        ); // High School Math mastered; Algebra (2), Functions (3), Calculus (4) available
-        await failAudit(api, 3); // Functions: the newest audit failed
-        await passAudit(api, 4); // Calculus mastered
-        await failAudit(api, 4); // ...a later failed audit on a mastered node stays green
+        await passAudit(api, 6); // Discriminant mastered
+        await failAudit(api, 6); // ...a later failed audit on a mastered node stays green
+        await passAudit(api, 7); // Roots and Coefficients mastered; Quadratic Equations (5) opens
         await pumpOutline(tester, api: api);
 
-        expect(dotColor(tester, 1), AppColors.success);
-        expect(dotColor(tester, 4), AppColors.success);
-        expect(dotColor(tester, 3), AppColors.danger);
-        expect(dotColor(tester, 2), AppColors.surface); // available: white
-        expect(dotRing(tester, 2), AppColors.primary); // ... with a blue ring
-        expect(dotColor(tester, 5), AppColors.locked);
+        expect(dotColor(tester, 6), AppColors.success);
+        expect(dotColor(tester, 7), AppColors.success);
+        expect(dotColor(tester, 5), AppColors.surface); // available: white
+        expect(dotRing(tester, 5), AppColors.primary); // ... with a blue ring
+        expect(dotColor(tester, 1), AppColors.locked);
+
+        await failAudit(api, 5); // the newest audit failed
+        await pumpOutline(tester, api: api);
+        expect(dotColor(tester, 5), AppColors.danger);
       },
     );
 
     testWidgets('a failed node that is passed later is no longer red', (tester) async {
-      await passAudit(api, 1);
-      await failAudit(api, 2);
-      await passAudit(api, 2);
+      await passAudit(api, 6);
+      await failAudit(api, 7);
+      await passAudit(api, 7);
       await pumpOutline(tester, api: api);
-      expect(dotColor(tester, 2), AppColors.success);
+      expect(dotColor(tester, 7), AppColors.success);
     });
 
     testWidgets('only the latest finished audit of a node counts', (tester) async {
-      await passAudit(api, 1);
-      await failAudit(api, 2);
-      await api.startAudit(2); // an unfinished one on top
+      await passAudit(api, 6);
+      await failAudit(api, 7);
+      await api.startAudit(7); // an unfinished one on top
       await pumpOutline(tester, api: api);
-      expect(dotColor(tester, 2), AppColors.danger);
+      expect(dotColor(tester, 7), AppColors.danger);
     });
 
     testWidgets('tapping a dot or a title opens the node (scene 4)', (tester) async {
@@ -281,7 +280,9 @@ void main() {
       expect(find.text('route:/skill/12'), findsOneWidget);
     });
 
-    testWidgets('the title bar is “Life tree”; the outline names the course in a chip', (tester) async {
+    testWidgets('the title bar is “Life tree”; the outline names the course in a chip', (
+      tester,
+    ) async {
       await pumpOutline(tester, api: api);
       expect(tester.widget<Text>(find.byKey(const Key('stage-title'))).data, 'Life tree');
       expect(
@@ -403,7 +404,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: find.byKey(const Key('graph-viewer')), matching: find.text('High School Math')),
+        find.descendant(
+          of: find.byKey(const Key('graph-viewer')),
+          matching: find.text('High School Math'),
+        ),
         findsNothing,
       );
       expect(find.byKey(const Key('node-13')), findsOneWidget);
@@ -486,11 +490,11 @@ void main() {
     testWidgets('it reloads when data changes (an audit finished)', (tester) async {
       final state = AppState();
       await pumpOutline(tester, api: api, state: state);
-      expect(dotColor(tester, 1), AppColors.surface);
-      await passAudit(api, 1);
+      expect(dotColor(tester, 6), AppColors.surface);
+      await passAudit(api, 6);
       state.markDataChanged();
       await tester.pumpAndSettle();
-      expect(dotColor(tester, 1), AppColors.success);
+      expect(dotColor(tester, 6), AppColors.success);
     });
 
     testWidgets('the graph can be panned and zoomed', (tester) async {

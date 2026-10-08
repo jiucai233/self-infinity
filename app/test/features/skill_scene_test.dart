@@ -76,13 +76,13 @@ void main() {
     testWidgets('a status chip next to it: Locked / Ready / Cleared / Failed', (tester) async {
       await pumpSkill(tester, api, 5);
       expect(find.text('Locked'), findsOneWidget);
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       expect(find.text('Ready'), findsOneWidget);
-      await passAudit(api, 1);
-      await pumpSkill(tester, api, 1);
+      await passAudit(api, 6);
+      await pumpSkill(tester, api, 6);
       expect(find.text('Cleared'), findsOneWidget);
-      await failAudit(api, 2);
-      await pumpSkill(tester, api, 2);
+      await failAudit(api, 7); // the next node of the order
+      await pumpSkill(tester, api, 7);
       final chip = find.descendant(
         of: find.byKey(const Key('stage-panel')),
         matching: find.text('Failed'),
@@ -98,7 +98,7 @@ void main() {
     testWidgets('no badges, no day/night switch, no audit button outside the bubble', (
       tester,
     ) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       expect(find.byType(SegmentedButton<String>), findsNothing);
       expect(find.byKey(const Key('mode-toggle')), findsNothing);
       expect(find.text('Day'), findsNothing);
@@ -108,7 +108,7 @@ void main() {
     });
 
     testWidgets('← goes back to scene 2', (tester) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       await tester.tap(find.byKey(const Key('back-map')));
       await tester.pumpAndSettle();
       expect(find.text('route:/map'), findsOneWidget);
@@ -121,7 +121,7 @@ void main() {
     });
 
     testWidgets('the input asks the chat: no ⊕, ∿ is there', (tester) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       expect(find.text('Ask about this node…'), findsOneWidget);
       expect(find.byKey(const Key('upload')), findsNothing);
       expect(find.byKey(const Key('voice-mode')), findsOneWidget);
@@ -351,7 +351,7 @@ void main() {
 
   group('the avatar', () {
     testWidgets('an available node: waving, Ready to try? →', (tester) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       expect(bubble(tester), 'Ready to try?');
       expect(find.byKey(const Key('start-audit')), findsOneWidget);
       expect(avatar(tester).wave, isTrue);
@@ -359,33 +359,36 @@ void main() {
     });
 
     testWidgets('→ opens the audit (scene 4-1) without a mode', (tester) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       await tester.tap(find.byKey(const Key('start-audit')));
       await tester.pumpAndSettle();
-      expect(find.text('route:/skill/1/audit'), findsOneWidget);
+      expect(find.text('route:/skill/6/audit'), findsOneWidget);
     });
 
-    testWidgets('a locked node: Still locked. Clear “parent” first. and no →', (tester) async {
+    testWidgets('a locked node: Still locked. Clear “the open node” first. and no →', (
+      tester,
+    ) async {
       await pumpSkill(tester, api, 5);
-      expect(bubble(tester), 'Still locked. Clear “Algebra” first.');
+      // One node of the course is open at a time: that is the one to clear.
+      expect(bubble(tester), 'Still locked. Clear “Discriminant” first.');
       expect(find.byKey(const Key('start-audit')), findsNothing);
       expect(avatar(tester).wave, isFalse);
     });
 
-    testWidgets('a locked root-less node still says it is locked', (tester) async {
+    testWidgets('any locked node names the same open node', (tester) async {
       await pumpSkill(tester, api, 12);
-      expect(bubble(tester), 'Still locked. Clear “Calculus” first.');
+      expect(bubble(tester), 'Still locked. Clear “Discriminant” first.');
     });
 
     testWidgets('a mastered node can be challenged again', (tester) async {
-      await passAudit(api, 1);
-      await pumpSkill(tester, api, 1);
+      await passAudit(api, 6);
+      await pumpSkill(tester, api, 6);
       expect(bubble(tester), 'Ready to try?');
       expect(find.byKey(const Key('start-audit')), findsOneWidget);
     });
 
     testWidgets('her name is above the bubble', (tester) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       expect(
         find.descendant(of: find.byKey(const Key('skill-bubble')), matching: find.text('Guide')),
         findsOneWidget,
@@ -393,7 +396,7 @@ void main() {
     });
 
     testWidgets('the bubble is the soft grey one', (tester) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       final decoration =
           tester
                   .widget<DecoratedBox>(
@@ -412,7 +415,7 @@ void main() {
 
   group('Attempts: the audits of this node as cards', () {
     testWidgets('empty', (tester) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       expect(find.text('No attempts yet.'), findsOneWidget);
       expect(find.text('Attempts'), findsOneWidget);
     });
@@ -420,9 +423,9 @@ void main() {
     testWidgets('a card per audit: date, a Passed/Failed chip and the score, newest first', (
       tester,
     ) async {
-      await failAudit(api, 1);
-      await passAudit(api, 1);
-      await pumpSkill(tester, api, 1);
+      await failAudit(api, 6);
+      await passAudit(api, 6);
+      await pumpSkill(tester, api, 6);
       final cards = find.byKey(const Key('audit-card'));
       expect(cards, findsNWidgets(2));
       final newest = textsIn(tester, cards.at(0)).toList();
@@ -438,9 +441,9 @@ void main() {
     });
 
     testWidgets('the chips are colored: green for a pass, red for a fail', (tester) async {
-      await failAudit(api, 1);
-      await passAudit(api, 1);
-      await pumpSkill(tester, api, 1);
+      await failAudit(api, 6);
+      await passAudit(api, 6);
+      await pumpSkill(tester, api, 6);
       Color colorOf(String label) => tester.widget<Text>(find.text(label)).style!.color!;
       Color fillOf(String label) =>
           (tester
@@ -459,8 +462,8 @@ void main() {
     });
 
     testWidgets('only this node’s audits', (tester) async {
-      await passAudit(api, 1);
-      await pumpSkill(tester, api, 2);
+      await passAudit(api, 6);
+      await pumpSkill(tester, api, 7);
       expect(find.text('No attempts yet.'), findsOneWidget);
     });
   });
@@ -485,7 +488,7 @@ void main() {
       ) async {
         final slow = _SlowChatApi();
         await slow.generateCourse(const GenerateRequest(topic: 'math'));
-        await pumpSkill(tester, slow, 1);
+        await pumpSkill(tester, slow, 6);
         await type(tester, 'a question');
         await tester.tap(find.byKey(const Key('send')));
         await tester.pump();
@@ -506,7 +509,7 @@ void main() {
     );
 
     testWidgets('a failure: a red line above the input and the text comes back', (tester) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       api.failNext(method: 'sendChat');
       await say(tester, 'a question');
       expect(find.byKey(const Key('input-error')), findsOneWidget);
@@ -515,13 +518,13 @@ void main() {
     });
 
     testWidgets('a navigate action in her answer switches the scene', (tester) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       await say(tester, 'Show me the map');
       expect(find.text('route:/map'), findsOneWidget);
     });
 
     testWidgets('after an answer the → is still there', (tester) async {
-      await pumpSkill(tester, api, 1);
+      await pumpSkill(tester, api, 6);
       await say(tester, 'a question');
       expect(find.byKey(const Key('start-audit')), findsOneWidget);
     });
@@ -530,7 +533,7 @@ void main() {
   group('voice', () {
     testWidgets('∿ listens; what is heard is asked; her answer is spoken', (tester) async {
       final voice = FakeVoiceService();
-      await pumpSkill(tester, api, 1, voice: voice);
+      await pumpSkill(tester, api, 6, voice: voice);
       await tester.tap(find.byKey(const Key('voice-mode')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('voice-wave-row')), findsOneWidget);
@@ -538,7 +541,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         (await api.getChatHistory()).first.content,
-        'About “High School Math”: explain it simply',
+        'About “Discriminant”: explain it simply',
       );
       expect(voice.spoken, ['Sure. What would you like to do today?']);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -547,7 +550,7 @@ void main() {
     });
 
     testWidgets('without speech support: a short message', (tester) async {
-      await pumpSkill(tester, api, 1, voice: FakeVoiceService(available: false));
+      await pumpSkill(tester, api, 6, voice: FakeVoiceService(available: false));
       await tester.tap(find.byKey(const Key('voice-mode')));
       await tester.pumpAndSettle();
       expect(find.text("Voice mode isn't available on this device."), findsOneWidget);
@@ -565,11 +568,16 @@ void main() {
       expect(find.byKey(const ValueKey('link-https://example.org/1')), findsOneWidget);
     });
 
-    testWidgets('unlocked after the parent is cleared', (tester) async {
+    testWidgets('unlocked after the node before it is cleared', (tester) async {
       final state = AppState();
-      await pumpSkill(tester, api, 2, state: state);
+      await pumpSkill(
+        tester,
+        api,
+        7,
+        state: state,
+      ); // Roots and Coefficients comes after Discriminant
       expect(find.byKey(const Key('start-audit')), findsNothing);
-      await passAudit(api, 1);
+      await passAudit(api, 6);
       state.markDataChanged();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('start-audit')), findsOneWidget);

@@ -20,7 +20,7 @@ from app.llm.base import LLMProvider
 from app.models import Course, EdgeKind, SkillEdge, SkillNode, SkillStatus
 from app.search.base import SearchProvider
 from app.services.structure_validator import StructureError, ValidatedCourse, validate_structure
-from app.services.tree import course_graph
+from app.services.tree import course_graph, open_next
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +156,7 @@ def save_course(
             slug=node.slug,
             title=node.title,
             description=node.description,
-            status=SkillStatus.available if node.slug == validated.root_slug else SkillStatus.locked,
+            status=SkillStatus.locked,
             node_type=node.node_type,
         )
         session.add(row)
@@ -182,6 +182,9 @@ def save_course(
                 reason=edge.reason,
             )
         )
+    # Ids follow the planner's order, which the learning order breaks ties by.
+    session.flush()
+    open_next(session, course.id)
     session.commit()
     session.refresh(course)
 

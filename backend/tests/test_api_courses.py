@@ -10,12 +10,12 @@ from app.llm.mock import MockProvider
 from tests.helpers import BrokenProvider, ScriptedProvider, generate, ids_by_slug, pass_node, planner_json
 
 
-def test_it01_generate_saves_the_course_and_only_the_root_is_available(client, client_engine):
+def test_it01_generate_saves_the_course_and_only_the_first_node_to_learn_is_available(client, client_engine):
     body = generate(client, "Math")
 
     assert body["course"]["id"] == 1
     statuses = {n["slug"]: n["status"] for n in body["nodes"]}
-    assert statuses.pop("high-school-math") == "available"
+    assert statuses.pop("discriminant") == "available"  # learning order: tests/test_learning_order.py
     assert set(statuses.values()) == {"locked"}
     assert len(body["nodes"]) == 12
 
@@ -282,15 +282,15 @@ def test_it23_two_courses_with_the_same_titles_have_independent_statuses(client)
     assert [n["title"] for n in first["nodes"]] == [n["title"] for n in second["nodes"]]
     assert first["course"]["id"] == 1 and second["course"]["id"] == 2
 
-    pass_node(client, first["nodes"][0]["id"])
+    pass_node(client, ids_by_slug(first)["discriminant"])
 
-    first_now = client.get("/api/skills", params={"course_id": 1}).json()
-    second_now = client.get("/api/skills", params={"course_id": 2}).json()
-    assert [n["status"] for n in first_now][:4] == ["mastered", "available", "available", "available"]
-    assert [n["status"] for n in second_now][:4] == ["available", "locked", "locked", "locked"]
-    assert all(n["status"] == "locked" for n in second_now[1:])
+    first_now = {n["slug"]: n["status"] for n in client.get("/api/skills", params={"course_id": 1}).json()}
+    second_now = {n["slug"]: n["status"] for n in client.get("/api/skills", params={"course_id": 2}).json()}
+    assert (first_now["discriminant"], first_now["root-coefficient"]) == ("mastered", "available")
+    assert (second_now["discriminant"], second_now["root-coefficient"]) == ("available", "locked")
+    assert list(second_now.values()).count("available") == 1
     # Same slugs in both courses is fine: slugs are unique per course only.
-    assert [n["slug"] for n in first_now] == [n["slug"] for n in second_now]
+    assert list(first_now) == list(second_now)
 
 
 # ---------------------------------------------------------------- GET /courses, /courses/{id}/map, /skills

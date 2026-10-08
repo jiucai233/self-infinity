@@ -30,11 +30,9 @@ from app.models import (
     AuditSession,
     AuditStatus,
     AuditTurn,
-    EdgeKind,
     NodePosition,
     NodeType,
     RewardEvent,
-    SkillEdge,
     SkillNode,
     SkillStatus,
     TurnRole,
@@ -43,7 +41,7 @@ from app.i18n import join_list, quote, t
 from app.services import bandit
 from app.services.condition import audit_pacing
 from app.services.incentive import compute_reward
-from app.services.tree import child_titles, node_position
+from app.services.tree import child_titles, node_position, open_next
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +255,7 @@ def _finalize(session: Session, audit: AuditSession, skill: SkillNode, verdict: 
         session.add(skill)
         session.flush()
 
-        outcome.unlocked_skill_ids = unlock_children(session, skill)
+        outcome.unlocked_skill_ids = open_next(session, skill.course_id)
         outcome.reward_amount, outcome.reward_multiplier = compute_reward(session, skill)
         session.add(
             RewardEvent(session_id=audit.id, amount=outcome.reward_amount, multiplier=outcome.reward_multiplier)
@@ -279,25 +277,3 @@ def _claim(session: Session, audit: AuditSession, status: AuditStatus) -> None:
     if claimed.rowcount != 1:
         session.rollback()
         raise AuditClosed(audit.id)
-
-
-def unlock_children(session: Session, skill: SkillNode) -> list[int]:
-    """Every locked node that has `skill` as a contains parent becomes available.
-
-    Any one mastered parent is enough, so a node with several parents opens as soon as the
-    first of them is passed. Returns the ids that actually changed.
-    """
-    children = session.exec(
-        select(SkillNode)
-        .join(SkillEdge, SkillEdge.to_id == SkillNode.id)
-        .where(
-            SkillEdge.from_id == skill.id,
-            SkillEdge.kind == EdgeKind.contains,
-            SkillNode.status == SkillStatus.locked,
-        )
-        .order_by(SkillNode.id)
-    ).all()
-    for child in children:
-        child.status = SkillStatus.available
-        session.add(child)
-    return [child.id for child in children]

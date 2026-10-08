@@ -437,9 +437,16 @@ void main() {
     group('with a plan', () {
       late FakeApiClient api;
 
+      // One node per course is open, so three courses make a three-step plan:
+      // Discriminant (6), then the first leaf of each generic course (17, 27).
+      Future<void> twoMoreCourses(FakeApiClient api) async {
+        await api.generateCourse(const GenerateRequest(topic: 'reinforcement learning'));
+        await api.generateCourse(const GenerateRequest(topic: 'chess'));
+      }
+
       setUp(() async {
         api = await seededFakeApi();
-        await passAudit(api, 1); // opens Algebra (2), Functions (3), Calculus (4)
+        await twoMoreCourses(api);
         await api.sendChat('What should I do today?');
       });
 
@@ -449,22 +456,24 @@ void main() {
       testWidgets('one row per step, in order; a node that is mastered is checked', (
         tester,
       ) async {
-        await passAudit(api, 2);
+        await passAudit(api, 6);
         await pumpScene(tester, const MapScene(), api: api);
         final plan = (await api.getCurrentPlan())!;
-        expect(plan.steps.map((s) => s.skillId), [2, 3, 4]);
-        expect(mark(2, 'quest-done'), findsOneWidget);
-        expect(mark(3, 'quest-open'), findsOneWidget);
-        expect(mark(4, 'quest-open'), findsOneWidget);
+        expect(plan.steps.map((s) => s.skillId), [6, 17, 27]);
+        expect(mark(6, 'quest-done'), findsOneWidget);
+        expect(mark(17, 'quest-open'), findsOneWidget);
+        expect(mark(27, 'quest-open'), findsOneWidget);
         expect(questCount('1/3'), findsOneWidget);
         // Mastered titles are muted.
         final done = tester.widget<Text>(
-          find.descendant(of: key('quest-2'), matching: find.text('Algebra')),
+          find.descendant(of: key('quest-6'), matching: find.text('Discriminant')),
         );
         expect(done.style!.color, AppColors.textTertiary);
         expect(
           tester
-              .widget<Text>(find.descendant(of: key('quest-3'), matching: find.text('Functions')))
+              .widget<Text>(
+                find.descendant(of: key('quest-17'), matching: find.text('Core Concepts 1')),
+              )
               .style!
               .color,
           AppColors.textPrimary,
@@ -472,17 +481,17 @@ void main() {
       });
 
       testWidgets('a node audited today counts, even when the audit failed', (tester) async {
-        await failAudit(api, 3);
+        await failAudit(api, 17);
         await pumpScene(tester, const MapScene(), api: api);
-        expect(mark(3, 'quest-done'), findsOneWidget);
-        expect(mark(4, 'quest-open'), findsOneWidget);
+        expect(mark(17, 'quest-done'), findsOneWidget);
+        expect(mark(27, 'quest-open'), findsOneWidget);
         expect(questCount('1/3'), findsOneWidget);
       });
 
       testWidgets('an audit that is still running does not count', (tester) async {
-        await api.startAudit(4);
+        await api.startAudit(27);
         await pumpScene(tester, const MapScene(), api: api);
-        expect(mark(4, 'quest-open'), findsOneWidget);
+        expect(mark(27, 'quest-open'), findsOneWidget);
         expect(questCount('0/3'), findsOneWidget);
       });
 
@@ -498,11 +507,11 @@ void main() {
           clock: () => DateTime.now().toUtc().subtract(const Duration(days: 2)),
         );
         await old.generateCourse(const GenerateRequest(topic: 'math'));
-        await passAudit(old, 1);
+        await twoMoreCourses(old);
         await old.sendChat('What should I do today?');
-        await failAudit(old, 3);
+        await failAudit(old, 17);
         await pumpScene(tester, const MapScene(), api: old);
-        expect(mark(3, 'quest-open'), findsOneWidget);
+        expect(mark(17, 'quest-open'), findsOneWidget);
         expect(questCount('0/3'), findsOneWidget);
       });
 
@@ -512,40 +521,40 @@ void main() {
         final moment = DateTime.utc(2026, 10, 5, 14, 30);
         final clocked = FakeApiClient(latency: Duration.zero, clock: () => moment);
         await clocked.generateCourse(const GenerateRequest(topic: 'math'));
-        await passAudit(clocked, 1);
+        await twoMoreCourses(clocked);
         await clocked.sendChat('What should I do today?');
-        await failAudit(clocked, 3);
+        await failAudit(clocked, 17);
         await pumpScene(
           tester,
           const MapScene(),
           api: clocked,
           clock: () => DateTime.utc(2026, 10, 5, 14, 50), // still the 5th in Seoul
         );
-        expect(mark(3, 'quest-done'), findsOneWidget);
+        expect(mark(17, 'quest-done'), findsOneWidget);
         await pumpScene(
           tester,
           const MapScene(),
           api: clocked,
           clock: () => DateTime.utc(2026, 10, 5, 15, 30), // the 6th in Seoul
         );
-        expect(mark(3, 'quest-open'), findsOneWidget);
+        expect(mark(17, 'quest-open'), findsOneWidget);
       });
 
       testWidgets('tapping a quest opens its node (scene 4)', (tester) async {
         await pumpScene(tester, const MapScene(), api: api);
-        await tester.tap(key('quest-3'));
+        await tester.tap(key('quest-17'));
         await tester.pumpAndSettle();
-        expect(find.text('route:/skill/3'), findsOneWidget);
+        expect(find.text('route:/skill/17'), findsOneWidget);
       });
 
       testWidgets('finishing an audit refreshes the checks', (tester) async {
         final state = AppState();
         await pumpScene(tester, const MapScene(), api: api, state: state);
         expect(questCount('0/3'), findsOneWidget);
-        await failAudit(api, 4);
+        await failAudit(api, 27);
         state.markDataChanged(); // what the audit scene does when an audit ends
         await tester.pumpAndSettle();
-        expect(mark(4, 'quest-done'), findsOneWidget);
+        expect(mark(27, 'quest-done'), findsOneWidget);
         expect(questCount('1/3'), findsOneWidget);
       });
     });

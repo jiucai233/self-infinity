@@ -85,6 +85,8 @@ def test_it06_a_missing_node_is_a_404(client):
 
 
 def test_it07_root_opening_question_and_position(client, client_engine, math):
+    set_status_by_api(client_engine, math["high-school-math"])  # it opens last
+
     response = client.post(f"/api/skills/{math['high-school-math']}/audits")
 
     assert response.status_code == 200
@@ -157,19 +159,19 @@ def test_it07_task_nodes_get_the_task_question_at_any_position(client, client_en
 
 
 def test_the_session_response_matches_the_contract_shape(client, math):
-    body = client.post(f"/api/skills/{math['high-school-math']}/audits", json={"mode": "day"}).json()
+    body = client.post(f"/api/skills/{math['discriminant']}/audits", json={"mode": "day"}).json()
 
     assert set(body) == {"session", "opening_question"}
     assert set(body["session"]) == {"id", "skill_id", "node_position", "status", "score", "gaps", "comment", "turns"}
-    assert body["session"]["skill_id"] == math["high-school-math"]
+    assert body["session"]["skill_id"] == math["discriminant"]
     assert (body["session"]["status"], body["session"]["score"], body["session"]["gaps"], body["session"]["comment"]) == (
         "active", None, [], None,
     )
 
 
 def test_the_mode_defaults_to_day_and_other_values_are_rejected(client, client_engine, math):
-    no_body = client.post(f"/api/skills/{math['high-school-math']}/audits")
-    bad = client.post(f"/api/skills/{math['high-school-math']}/audits", json={"mode": "midnight"})
+    no_body = client.post(f"/api/skills/{math['discriminant']}/audits")
+    bad = client.post(f"/api/skills/{math['discriminant']}/audits", json={"mode": "midnight"})
 
     assert no_body.status_code == 200
     assert bad.status_code == 422
@@ -183,10 +185,10 @@ def test_the_mode_defaults_to_day_and_other_values_are_rejected(client, client_e
 def test_turn_limits_are_eight_for_concepts_and_four_for_tasks_and_night_doubles(
     client, client_engine, monkeypatch, math, mode, concept, task
 ):
-    concept_audit = start(client, math["high-school-math"], mode)
+    concept_audit = start(client, math["discriminant"], mode)
     monkeypatch.setattr("app.routers.skills.get_provider", lambda agent=None: ScriptedProvider(planner=TASK_COURSE))
     task_ids = ids_by_slug(generate(client, "Moving", search_syllabus=False))
-    task_audit = start(client, task_ids["plan"], mode)
+    task_audit = start(client, task_ids["labels"], mode)  # the leaf opens first
 
     assert stored_audit(client_engine, concept_audit).max_turns == concept
     assert stored_audit(client_engine, task_audit).max_turns == task
@@ -203,21 +205,21 @@ def test_it12_an_available_node_with_unmet_requires_can_be_audited(client, clien
 
 
 def test_a_mastered_node_can_be_audited_again_and_stays_mastered_after_a_fail(client, math):
-    pass_node(client, math["high-school-math"])
-    assert node_status(client, math["high-school-math"]) == "mastered"
+    pass_node(client, math["discriminant"])
+    assert node_status(client, math["discriminant"]) == "mastered"
 
-    fail_node(client, math["high-school-math"])
+    fail_node(client, math["discriminant"])
 
-    assert node_status(client, math["high-school-math"]) == "mastered"
-    pass_node(client, math["high-school-math"])  # and it can be passed again
-    assert node_status(client, math["high-school-math"]) == "mastered"
+    assert node_status(client, math["discriminant"]) == "mastered"
+    pass_node(client, math["discriminant"])  # and it can be passed again
+    assert node_status(client, math["discriminant"]) == "mastered"
 
 
 # ---------------------------------------------------------------- 提交回答
 
 
 def test_it08_a_turn_can_return_a_probe_and_the_session_stays_active(client, client_engine, math):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     response = client.post(f"/api/audits/{audit_id}/turns", json={"content": FIRST})
 
@@ -233,8 +235,8 @@ def test_it08_a_turn_can_return_a_probe_and_the_session_stays_active(client, cli
     assert stored_audit(client_engine, audit_id).status == AuditStatus.active
 
 
-def test_it09_pass_upheld_unlocks_children_masters_the_node_and_records_the_reward(client, client_engine, math):
-    audit_id = start(client, math["high-school-math"])
+def test_it09_pass_upheld_opens_the_next_node_masters_this_one_and_records_the_reward(client, client_engine, math):
+    audit_id = start(client, math["discriminant"])
 
     probe, verdict = answer_turns(client, audit_id, FIRST, LONG)
 
@@ -245,27 +247,27 @@ def test_it09_pass_upheld_unlocks_children_masters_the_node_and_records_the_rewa
         "score": 91,  # min(95, 70 + 210 // 10)
         "gaps": [],
         "comment": "You explained the core idea and why it holds.",
-        "unlocked_skill_ids": [math["algebra"], math["functions"], math["calculus"]],
-        "reward_amount": 22,
+        "unlocked_skill_ids": [math["root-coefficient"]],  # the next in the learning order
+        "reward_amount": 55,
         "reward_multiplier": 1.1,
     }
-    assert node_status(client, math["high-school-math"]) == "mastered"
-    assert [node_status(client, math[s]) for s in ("algebra", "functions", "calculus")] == ["available"] * 3
-    assert node_status(client, math["quadratic-equation"]) == "locked"  # only direct children open
+    assert node_status(client, math["discriminant"]) == "mastered"
+    assert node_status(client, math["root-coefficient"]) == "available"
+    assert node_status(client, math["quadratic-equation"]) == "locked"  # one node at a time
 
     with Session(client_engine) as session:
-        root = session.get(SkillNode, math["high-school-math"])
+        root = session.get(SkillNode, math["discriminant"])
         assert root.mastery_score == 91
         audit = session.get(AuditSession, audit_id)
         assert (audit.status, audit.score, audit.comment, audit.gaps_json) == (
             AuditStatus.passed, 91, "You explained the core idea and why it holds.", "[]",
         )
         (reward,) = session.exec(select(RewardEvent)).all()
-        assert (reward.session_id, reward.amount, reward.multiplier) == (audit_id, 22, 1.1)
+        assert (reward.session_id, reward.amount, reward.multiplier) == (audit_id, 55, 1.1)
 
 
 def test_the_probe_and_verdict_shapes_are_exactly_the_contract_keys(client, math):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     probe, verdict = answer_turns(client, audit_id, FIRST, LONG)
 
@@ -275,49 +277,8 @@ def test_the_probe_and_verdict_shapes_are_exactly_the_contract_keys(client, math
     }
 
 
-def test_it10_a_node_with_two_parents_opens_when_either_parent_is_mastered(client, math):
-    pass_node(client, math["high-school-math"])
-    assert node_status(client, math["sequence-limit"]) == "locked"
-
-    verdict = pass_node(client, math["calculus"])  # its main parent
-
-    assert math["sequence-limit"] in verdict["unlocked_skill_ids"]
-    assert node_status(client, math["sequence-limit"]) == "available"
-    assert node_status(client, math["sequences"]) == "locked"  # the other parent is untouched
-
-
-def test_it10_the_second_parent_opens_it_too(client, math):
-    pass_node(client, math["high-school-math"])
-    pass_node(client, math["algebra"])  # opens sequences (and quadratic-equation)
-
-    verdict = pass_node(client, math["sequences"])  # its other, non-primary parent
-
-    assert verdict["unlocked_skill_ids"] == [math["sequence-limit"]]
-    assert node_status(client, math["calculus"]) == "available"  # the main parent was never mastered
-    assert node_status(client, math["sequence-limit"]) == "available"
-
-
-def test_it10_an_already_open_node_is_not_reported_as_unlocked_twice(client, math):
-    pass_node(client, math["high-school-math"])
-    pass_node(client, math["algebra"])
-    pass_node(client, math["calculus"])  # opens sequence-limit through the main parent
-
-    verdict = pass_node(client, math["sequences"])
-
-    assert verdict["unlocked_skill_ids"] == []
-
-
-def test_it11_a_node_with_two_parents_stays_locked_while_neither_is_mastered(client, math):
-    pass_node(client, math["high-school-math"])
-    pass_node(client, math["functions"])  # unrelated branch
-
-    assert node_status(client, math["sequence-limit"]) == "locked"
-    assert node_status(client, math["calculus"]) == "available"
-    assert node_status(client, math["sequences"]) == "locked"
-
-
 def test_it13_a_pass_the_challenger_overturns_becomes_one_more_probe(client, client_engine, math):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     first, challenge = answer_turns(client, audit_id, FIRST, MEDIUM)
 
@@ -327,7 +288,7 @@ def test_it13_a_pass_the_challenger_overturns_becomes_one_more_probe(client, cli
     assert audit.challenged is True
     assert audit.status == AuditStatus.active
     assert stored_turns(client_engine, audit_id)[-1] == ("auditor", CHALLENGER_QUESTION)
-    assert node_status(client, math["high-school-math"]) == "available"  # not mastered yet
+    assert node_status(client, math["discriminant"]) == "available"  # not mastered yet
 
 
 def test_it14_after_an_overturn_the_next_pass_is_final_and_the_challenger_is_not_called_again(
@@ -335,19 +296,19 @@ def test_it14_after_an_overturn_the_next_pass_is_final_and_the_challenger_is_not
 ):
     provider = CountingProvider()
     use_provider(monkeypatch, provider)
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     _probe, challenge, verdict = answer_turns(client, audit_id, FIRST, MEDIUM, MEDIUM)
 
     assert challenge["type"] == "probe"
     assert verdict["type"] == "verdict" and verdict["passed"] is True
     assert provider.counts == {"auditor": 3, "challenger": 1}
-    assert node_status(client, math["high-school-math"]) == "mastered"
+    assert node_status(client, math["discriminant"]) == "mastered"
     assert stored_audit(client_engine, audit_id).status == AuditStatus.passed
 
 
 def test_it14_a_fail_after_an_overturn_is_final_too(client, math):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
     answer_turns(client, audit_id, FIRST, MEDIUM)  # overturned
 
     verdict = answer_turns(client, audit_id, "I don't know")[0]  # the latest answer admits it
@@ -359,7 +320,7 @@ def test_it15_with_the_challenger_disabled_a_pass_is_final_at_once(client, monke
     monkeypatch.setattr(settings, "challenger_enabled", False)
     provider = CountingProvider()
     use_provider(monkeypatch, provider)
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     _probe, verdict = answer_turns(client, audit_id, FIRST, MEDIUM)
 
@@ -370,7 +331,7 @@ def test_it15_with_the_challenger_disabled_a_pass_is_final_at_once(client, monke
 def test_a_fail_is_never_sent_to_the_challenger(client, monkeypatch, math):
     provider = CountingProvider()
     use_provider(monkeypatch, provider)
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     answer_turns(client, audit_id, FIRST, SHORT)
 
@@ -385,7 +346,7 @@ def test_a_challenger_that_errors_upholds_the_pass(client, monkeypatch, math):
             return super().complete(messages)
 
     use_provider(monkeypatch, ChallengerDown())
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     _probe, verdict = answer_turns(client, audit_id, FIRST, MEDIUM)
 
@@ -393,7 +354,7 @@ def test_a_challenger_that_errors_upholds_the_pass(client, monkeypatch, math):
 
 
 def test_it16_a_fail_closes_the_session_and_leaves_the_node_status_alone(client, client_engine, math):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     _probe, verdict = answer_turns(client, audit_id, FIRST, SHORT)
 
@@ -410,7 +371,7 @@ def test_it16_a_fail_closes_the_session_and_leaves_the_node_status_alone(client,
         "reward_amount": None,
         "reward_multiplier": None,
     }
-    assert node_status(client, math["high-school-math"]) == "available"
+    assert node_status(client, math["discriminant"]) == "available"
     assert node_status(client, math["algebra"]) == "locked"
     audit = stored_audit(client_engine, audit_id)
     assert (audit.status, audit.score) == (AuditStatus.failed, 45)
@@ -418,20 +379,20 @@ def test_it16_a_fail_closes_the_session_and_leaves_the_node_status_alone(client,
     assert audit.comment == verdict["comment"]
     with Session(client_engine) as session:
         assert session.exec(select(RewardEvent)).all() == []
-        assert session.get(SkillNode, math["high-school-math"]).mastery_score is None
+        assert session.get(SkillNode, math["discriminant"]).mastery_score is None
 
 
 def test_a_failed_audit_can_be_followed_by_a_new_one(client, math):
-    fail_node(client, math["high-school-math"])
+    fail_node(client, math["discriminant"])
 
-    verdict = pass_node(client, math["high-school-math"])
+    verdict = pass_node(client, math["discriminant"])
 
     assert verdict["passed"] is True
 
 
 @pytest.mark.parametrize("closing", ["pass", "fail"])
 def test_it17_a_turn_on_a_closed_session_is_a_400(client, client_engine, math, closing):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
     answer_turns(client, audit_id, FIRST, LONG if closing == "pass" else SHORT)
     turns_before = stored_turns(client_engine, audit_id)
 
@@ -451,13 +412,13 @@ def test_it17_a_turn_on_a_missing_session_is_a_404(client):
 
 @pytest.mark.parametrize("content", ["", "   ", "\n"])
 def test_a_blank_answer_is_rejected(client, math, content):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     assert client.post(f"/api/audits/{audit_id}/turns", json={"content": content}).status_code == 422
 
 
 def test_it18_an_auditor_failure_is_a_502_and_the_answer_is_kept(client, client_engine, monkeypatch, math):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
     use_provider(monkeypatch, BrokenProvider())
 
     response = client.post(f"/api/audits/{audit_id}/turns", json={"content": FIRST})
@@ -469,7 +430,7 @@ def test_it18_an_auditor_failure_is_a_502_and_the_answer_is_kept(client, client_
 
 
 def test_it18_after_the_outage_the_resent_answer_replaces_the_unanswered_one(client, client_engine, monkeypatch, math):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
     use_provider(monkeypatch, BrokenProvider())
     client.post(f"/api/audits/{audit_id}/turns", json={"content": FIRST})
     spy = ScriptedProvider(auditor=probe_json("Shall we go on?"))
@@ -485,7 +446,7 @@ def test_it18_after_the_outage_the_resent_answer_replaces_the_unanswered_one(cli
 
 
 def test_a_resend_does_not_use_up_the_turn_limit(client, client_engine, monkeypatch, math):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
     for _ in range(3):
         use_provider(monkeypatch, BrokenProvider())
         client.post(f"/api/audits/{audit_id}/turns", json={"content": FIRST})
@@ -514,7 +475,7 @@ class RacingProvider:
 
 
 def test_an_audit_finalized_by_a_concurrent_request_is_not_finalized_twice(client, client_engine, monkeypatch, math):
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
     use_provider(monkeypatch, RacingProvider(client_engine, audit_id))
 
     response = client.post(f"/api/audits/{audit_id}/turns", json={"content": FIRST})
@@ -527,7 +488,7 @@ def test_an_audit_finalized_by_a_concurrent_request_is_not_finalized_twice(clien
 
 def test_a_malformed_auditor_answer_becomes_the_generic_probe(client, monkeypatch, math):
     use_provider(monkeypatch, ScriptedProvider(auditor="I am not sure what to say"))
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     result = answer_turns(client, audit_id, FIRST)[0]
 
@@ -539,7 +500,7 @@ def test_a_malformed_auditor_answer_becomes_the_generic_probe(client, monkeypatc
 
 def test_the_turn_limit_forces_a_failing_verdict_with_score_zero(client, client_engine, monkeypatch, math):
     use_provider(monkeypatch, ScriptedProvider(auditor=probe_json("Keep going")))
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     results = answer_turns(client, audit_id, *["answer"] * 8)
 
@@ -548,12 +509,12 @@ def test_the_turn_limit_forces_a_failing_verdict_with_score_zero(client, client_
     assert results[-1]["score"] == 0
     assert results[-1]["unlocked_skill_ids"] == []
     assert stored_audit(client_engine, audit_id).status == AuditStatus.failed
-    assert node_status(client, math["high-school-math"]) == "available"
+    assert node_status(client, math["discriminant"]) == "available"
 
 
 def test_night_mode_doubles_the_turn_limit(client, monkeypatch, math):
     use_provider(monkeypatch, ScriptedProvider(auditor=probe_json()))
-    audit_id = start(client, math["high-school-math"], "night")
+    audit_id = start(client, math["discriminant"], "night")
 
     results = answer_turns(client, audit_id, *["answer"] * 16)
 
@@ -566,8 +527,8 @@ def test_a_task_node_is_forced_after_four_answers_and_eight_at_night(client, mon
     ids = ids_by_slug(generate(client, "Moving", search_syllabus=False))
     use_provider(monkeypatch, ScriptedProvider(auditor=probe_json()))
 
-    day = answer_turns(client, start(client, ids["plan"]), *["answer"] * 4)
-    night = answer_turns(client, start(client, ids["plan"], "night"), *["answer"] * 8)
+    day = answer_turns(client, start(client, ids["labels"]), *["answer"] * 4)
+    night = answer_turns(client, start(client, ids["labels"], "night"), *["answer"] * 8)
 
     assert [r["type"] for r in day] == ["probe"] * 3 + ["verdict"]
     assert [r["type"] for r in night] == ["probe"] * 7 + ["verdict"]
@@ -603,7 +564,8 @@ def test_lessons_from_unrelated_nodes_are_not(client, client_engine, monkeypatch
     assert "<lessons>\nnone\n</lessons>" in spy.system_prompts("auditor")[0]
 
 
-def test_the_position_and_parts_reach_the_auditor_prompt(client, monkeypatch, math):
+def test_the_position_and_parts_reach_the_auditor_prompt(client, client_engine, monkeypatch, math):
+    set_status_by_api(client_engine, math["high-school-math"])
     spy = ScriptedProvider(auditor=probe_json())
     use_provider(monkeypatch, spy)
 
@@ -635,7 +597,7 @@ def test_a_low_condition_makes_the_auditor_pace_light_without_touching_the_limit
     add_checkins(client_engine, [5, 5, 5])
     spy = ScriptedProvider(auditor=probe_json())
     use_provider(monkeypatch, spy)
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
 
     answer_turns(client, audit_id, FIRST)
 
@@ -646,9 +608,9 @@ def test_a_low_condition_makes_the_auditor_pace_light_without_touching_the_limit
 def test_a_normal_or_unknown_condition_paces_normally(client, client_engine, monkeypatch, math):
     spy = ScriptedProvider(auditor=probe_json())
     use_provider(monkeypatch, spy)
-    answer_turns(client, start(client, math["high-school-math"]), FIRST)  # no check-ins: unknown
+    answer_turns(client, start(client, math["discriminant"]), FIRST)  # no check-ins: unknown
     add_checkins(client_engine, [8, 8, 8])
-    answer_turns(client, start(client, math["high-school-math"]), FIRST)  # rested: normal
+    answer_turns(client, start(client, math["discriminant"]), FIRST)  # rested: normal
 
     assert ["Pacing: normal" in p for p in spy.system_prompts("auditor")] == [True, True]
 
@@ -656,9 +618,9 @@ def test_a_normal_or_unknown_condition_paces_normally(client, client_engine, mon
 def test_the_pass_standard_does_not_change_under_light_pacing(client, client_engine, math):
     add_checkins(client_engine, [4, 4, 4], [5, 5, 5])
 
-    audit_id = start(client, math["high-school-math"])
+    audit_id = start(client, math["discriminant"])
     _probe, short = answer_turns(client, audit_id, FIRST, SHORT)
-    _probe, long = answer_turns(client, start(client, math["high-school-math"]), FIRST, LONG)
+    _probe, long = answer_turns(client, start(client, math["discriminant"]), FIRST, LONG)
 
     assert short["passed"] is False
     assert long["passed"] is True

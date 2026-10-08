@@ -214,12 +214,6 @@ abstract class AppLocalizations {
   /// **'What should I do today?'**
   String get askTodaysQuests;
 
-  /// No description provided for @attachCourse.
-  ///
-  /// In en, this message translates to:
-  /// **'Attach a course'**
-  String get attachCourse;
-
   /// No description provided for @attempts.
   ///
   /// In en, this message translates to:
@@ -655,7 +649,7 @@ abstract class AppLocalizations {
   /// No description provided for @errNodeLocked.
   ///
   /// In en, this message translates to:
-  /// **'This node is locked. Clear its parent first.'**
+  /// **'This node is locked. Clear the nodes before it first.'**
   String get errNodeLocked;
 
   /// No description provided for @errNotFound.
@@ -871,7 +865,7 @@ abstract class AppLocalizations {
   /// No description provided for @lockedClearParent.
   ///
   /// In en, this message translates to:
-  /// **'Still locked. Clear the parent node first.'**
+  /// **'Still locked. Clear the nodes before it first.'**
   String get lockedClearParent;
 
   /// No description provided for @mainQuest.
@@ -981,12 +975,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No conversation yet.'**
   String get noConversationYet;
-
-  /// No description provided for @noCourseServesQuest.
-  ///
-  /// In en, this message translates to:
-  /// **'No course serves this quest yet.'**
-  String get noCourseServesQuest;
 
   /// No description provided for @noDescriptionYet.
   ///
@@ -1330,12 +1318,6 @@ abstract class AppLocalizations {
   /// **'Previous'**
   String get previous;
 
-  /// No description provided for @questProgress.
-  ///
-  /// In en, this message translates to:
-  /// **'{done} of {total} nodes cleared across {count, plural, =1{1 course} other{{count} courses}}.'**
-  String questProgress(int done, int total, int count);
-
   /// No description provided for @readyToTry.
   ///
   /// In en, this message translates to:
@@ -1365,12 +1347,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove rule'**
   String get removeRule;
-
-  /// No description provided for @renameUnderCharacter.
-  ///
-  /// In en, this message translates to:
-  /// **'Rename or remove it under My character.'**
-  String get renameUnderCharacter;
 
   /// No description provided for @replayTutorial.
   ///

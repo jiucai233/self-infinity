@@ -276,6 +276,7 @@ class _SkillSceneState extends State<SkillScene> {
         final contents = _ContentsCard(overview: overview);
         final avatar = _AvatarColumn(
           overview: overview,
+          openNode: _courseMap?.nodes.where((n) => n.isAvailable).firstOrNull,
           reply: _reply,
           replyAgent: _replyAgent,
           thinking: chat.sending,
@@ -519,6 +520,7 @@ class _MaterialRow extends StatelessWidget {
 class _AvatarColumn extends StatelessWidget {
   const _AvatarColumn({
     required this.overview,
+    required this.openNode,
     required this.reply,
     required this.replyAgent,
     required this.thinking,
@@ -528,6 +530,10 @@ class _AvatarColumn extends StatelessWidget {
   });
 
   final SkillOverview overview;
+
+  /// The node of the course that is open now (one at a time, in the learning
+  /// order); null until the course map is read.
+  final SkillNode? openNode;
   final String? reply;
   final String replyAgent;
   final bool thinking;
@@ -539,8 +545,8 @@ class _AvatarColumn extends StatelessWidget {
     final node = overview.skill;
     if (reply != null) return reply!;
     if (node.isLocked) {
-      final parent = overview.containsParents.firstOrNull;
-      return parent == null ? l.lockedClearParent : l.lockedClearNamed(parent.title);
+      final open = openNode;
+      return open == null ? l.lockedClearParent : l.lockedClearNamed(open.title);
     }
     return l.readyToTry;
   }

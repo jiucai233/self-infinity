@@ -20,8 +20,8 @@ import '../../l10n/l10n.dart';
 /// Scene 2 of `docs/ux-chat.md`: your **life tree**.
 ///
 /// * On top, your progress over every course in big numbers.
-/// * Below, the night panel: you in the middle, your main quests, the courses
-///   serving them and their nodes, turning slowly (`LifeConstellation`). Tap a
+/// * Below, the night panel: you in the middle, your courses and their
+///   nodes, turning slowly (`LifeConstellation`). Tap a
 ///   point and its card opens (`NodeSheet`): audit history, lessons, `Take it
 ///   on`.
 /// * `Outline` switches to the layered graph of one course (the old map).
@@ -424,7 +424,6 @@ class _NightLegend extends StatelessWidget {
     );
     final entries = <(Widget, String)>[
       (dot(fill: AppColors.nightText), context.l10n.you),
-      (dot(ring: AppColors.nightText), context.l10n.mainQuest),
       (dot(ring: AppColors.nightText, fill: AppColors.night), context.l10n.dotReady),
       (dot(fill: AppColors.ember), context.l10n.dotCleared),
       (dot(fill: AppColors.emberRed), context.l10n.auditFailed),
@@ -458,9 +457,7 @@ class _Guide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final narrow = MediaQuery.sizeOf(context).width < AppLayout.wideBreakpoint;
-    final line = empty
-        ? context.l10n.mapEmptyLine
-        : context.l10n.mapTapNode;
+    final line = empty ? context.l10n.mapEmptyLine : context.l10n.mapTapNode;
     return Row(
       key: const Key('map-guide'),
       mainAxisSize: MainAxisSize.min,

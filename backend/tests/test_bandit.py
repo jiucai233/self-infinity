@@ -122,21 +122,23 @@ def test_recommendation_endpoint_shape(client):
     assert set(body["skill_tiers"].keys()) == {str(i) for i in ids.values()}
     # The root is a depth-0 concept node -> difficulty score 2.0 -> "medium".
     assert body["skill_tiers"][str(ids["high-school-math"])] == "medium"
+    # The first node to learn, a leaf at depth 3 -> 2.0 x (1 + 0.5 x 3) = 5.0 -> "hard".
+    assert body["skill_tiers"][str(ids["discriminant"])] == "hard"
 
 
 def test_passing_an_audit_updates_the_bandit_arm(client, client_engine):
     ids = ids_by_slug(generate(client, "Math"))
 
-    verdict = pass_node(client, ids["high-school-math"])
+    verdict = pass_node(client, ids["discriminant"])
     assert verdict["passed"] is True
 
-    # Root is a "medium" tier node — passing it should have grown the alpha
-    # (success count) on the "medium" arm for whatever bucket the user was
+    # The discriminant is a "hard" tier node — passing it should have grown the alpha
+    # (success count) on the "hard" arm for whatever bucket the user was
     # in right before this audit resolved.
     with Session(client_engine) as session:
-        medium_arms = session.exec(select(BanditArm).where(BanditArm.tier == "medium")).all()
-    assert len(medium_arms) >= 1
-    assert any(arm.alpha > 1.0 for arm in medium_arms)
+        hard_arms = session.exec(select(BanditArm).where(BanditArm.tier == "hard")).all()
+    assert len(hard_arms) >= 1
+    assert any(arm.alpha > 1.0 for arm in hard_arms)
 
 
 def test_failing_an_audit_grows_the_beta_of_that_arm(client, client_engine):
@@ -144,9 +146,9 @@ def test_failing_an_audit_grows_the_beta_of_that_arm(client, client_engine):
 
     ids = ids_by_slug(generate(client, "Math"))
 
-    fail_node(client, ids["high-school-math"])
+    fail_node(client, ids["discriminant"])
 
     with Session(client_engine) as session:
-        medium_arms = session.exec(select(BanditArm).where(BanditArm.tier == "medium")).all()
-    assert any(arm.beta > 1.0 for arm in medium_arms)
-    assert not any(arm.alpha > 1.0 for arm in medium_arms)
+        hard_arms = session.exec(select(BanditArm).where(BanditArm.tier == "hard")).all()
+    assert any(arm.beta > 1.0 for arm in hard_arms)
+    assert not any(arm.alpha > 1.0 for arm in hard_arms)

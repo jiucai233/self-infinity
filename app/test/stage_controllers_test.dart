@@ -21,12 +21,12 @@ void main() {
       expect(stage.courseMap!.nodes, hasLength(12));
 
       await api.checkInVoice('I slept six hours last night.');
-      await passAudit(api, 1);
+      await passAudit(api, 6);
       state.markDataChanged();
       await pumpEventQueue();
       expect(stage.todayCheckIn!.sleepHours, 6);
       expect(stage.facts!.nodes.mastered, 1);
-      expect(stage.courseMap!.nodeById(1)!.isMastered, isTrue);
+      expect(stage.courseMap!.nodeById(6)!.isMastered, isTrue);
       stage.dispose();
     });
 

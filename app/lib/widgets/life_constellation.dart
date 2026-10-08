@@ -10,9 +10,9 @@ import 'avatar.dart';
 import '../l10n/l10n.dart';
 
 /// The life tree as a constellation on the night panel (`docs/DESIGN.md` §4):
-/// you in the middle, main quests on the first ring, courses on the next,
-/// their nodes beyond. The disc floats inside a faint wire shell and turns
-/// slowly in 3D; cleared nodes burn gold and throw sparks.
+/// you in the middle, courses on the first ring, their nodes beyond. The disc
+/// floats inside a faint wire shell and turns slowly in 3D; cleared nodes burn
+/// gold and throw sparks.
 ///
 /// * [compact]: the version inside the crystal ball — no labels, no input.
 /// * Hover a node: the drift pauses and its name shows. Drag sideways: turn
@@ -459,7 +459,7 @@ class _NightPainter extends CustomPainter {
 
     if (compact) return;
 
-    // Labels on top: you, main quests, courses; skills when hovered,
+    // Labels on top: you, courses; skills when hovered,
     // selected or found.
     for (final n in order.reversed) {
       final hit = projection.at[n.key];
@@ -472,7 +472,7 @@ class _NightPainter extends CustomPainter {
       if (!show) continue;
       final f = n.key == hovered || n.key == selected ? 1.0 : fade(depth);
       final style = switch (n.kind) {
-        LifeKind.self || LifeKind.goal => titleStyle,
+        LifeKind.self => titleStyle,
         _ => labelStyle,
       };
       final label = n.kind == LifeKind.self ? l10nNow.you : n.label;
@@ -491,11 +491,6 @@ class _NightPainter extends CustomPainter {
         _glow(canvas, p, u * 4.2 * s, AppColors.emberHot, 0.35 * f * glowBoost);
         canvas.drawCircle(p, u * 1.25 * s, Paint()..color = AppColors.nightText.withValues(alpha: f));
         _star(canvas, p, u * 3.4 * s, AppColors.nightText.withValues(alpha: 0.75 * f));
-      case LifeKind.goal:
-        canvas
-          ..drawCircle(p, u * 1.6 * s, Paint()..color = AppColors.night)
-          ..drawCircle(p, u * 1.6 * s, ring..color = AppColors.nightText.withValues(alpha: f))
-          ..drawCircle(p, u * 0.6 * s, Paint()..color = AppColors.nightText.withValues(alpha: f));
       case LifeKind.course || LifeKind.skill:
         final r = u * (n.kind == LifeKind.course ? 1.25 : (n.boss ? 1.0 : 0.82)) * s;
         if (n.isMastered) {

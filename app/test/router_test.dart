@@ -193,10 +193,10 @@ void main() {
       // Scene 2: a node (in the outline).
       await tester.tap(find.byKey(const Key('view-outline')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('node-1')));
+      await tester.tap(find.byKey(const Key('node-6')));
       await tester.pumpAndSettle();
       expect(find.byType(SkillScene), findsOneWidget);
-      expect(tester.widget<Text>(find.byKey(const Key('stage-title'))).data, 'High School Math');
+      expect(tester.widget<Text>(find.byKey(const Key('stage-title'))).data, 'Discriminant');
       // Scene 4: →
       await tester.tap(find.byKey(const Key('start-audit')));
       await tester.pumpAndSettle();
@@ -215,7 +215,7 @@ void main() {
 
     testWidgets('the "continue" suggestion goes to scene 4; a search to the node', (tester) async {
       await pumpApp(tester);
-      await tester.tap(find.text('Start with “High School Math”'));
+      await tester.tap(find.text('Start with “Discriminant”'));
       await tester.pumpAndSettle();
       expect(find.byType(SkillScene), findsOneWidget);
 
@@ -243,8 +243,8 @@ void main() {
       expect(find.byKey(const Key('node-12')), findsOneWidget);
     });
 
-    testWidgets('an audit passed on the stage opens the next nodes on the map', (tester) async {
-      await pumpApp(tester, initialLocation: '/skill/1/audit');
+    testWidgets('an audit passed on the stage shows on the map', (tester) async {
+      await pumpApp(tester, initialLocation: '/skill/6/audit');
       await say(tester, longAnswer);
       await say(tester, longAnswer);
       expect(find.byKey(const Key('celebration-card')), findsOneWidget);
@@ -254,10 +254,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('view-outline')));
       await tester.pumpAndSettle();
-      // The root is a boss: its dot has two containers, the inner one holds the fill.
+      // The innermost container of the dot holds the fill.
       final dot = tester
           .widgetList<Container>(
-            find.descendant(of: find.byKey(const Key('dot-1')), matching: find.byType(Container)),
+            find.descendant(of: find.byKey(const Key('dot-6')), matching: find.byType(Container)),
           )
           .last;
       expect((dot.decoration! as BoxDecoration).color, AppColors.success);

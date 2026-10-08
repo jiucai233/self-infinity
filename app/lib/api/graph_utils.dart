@@ -102,6 +102,37 @@ List<SkillNode> rootNodes(Iterable<SkillNode> nodes, List<SkillEdge> edges) {
   ];
 }
 
+/// The course's learning order, the list laid over its tree (the server's
+/// `services/tree.py`): what a node contains comes before it, so the root
+/// comes last; a requires edge puts its prerequisite first; otherwise the
+/// lower id (the planner's order) goes first. Only the first node in it that
+/// is not mastered is open.
+List<int> learningOrder(Iterable<SkillNode> nodes, List<SkillEdge> edges) {
+  final ids = {for (final n in nodes) n.id};
+  final before = {for (final id in ids) id: <int>{}};
+  for (final e in edges) {
+    if (!ids.contains(e.fromId) || !ids.contains(e.toId)) continue;
+    if (e.isContains) {
+      before[e.fromId]!.add(e.toId);
+    } else {
+      before[e.toId]!.add(e.fromId);
+    }
+  }
+  final order = <int>[];
+  final left = {...ids};
+  while (left.isNotEmpty) {
+    final ready = [
+      for (final id in left)
+        if (!before[id]!.any(left.contains)) id,
+    ];
+    // A requires edge running against the tree can close a loop; the lowest id breaks it.
+    final pick = (ready.isEmpty ? left : ready).reduce((a, b) => a < b ? a : b);
+    order.add(pick);
+    left.remove(pick);
+  }
+  return order;
+}
+
 /// Every node reachable from [nodeId] through contains edges (excluding
 /// [nodeId] itself), breadth first, each id once.
 List<int> descendantsOf(int nodeId, List<SkillEdge> edges) {

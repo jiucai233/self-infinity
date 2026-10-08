@@ -72,9 +72,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get askTodaysQuests => 'What should I do today?';
 
   @override
-  String get attachCourse => 'Attach a course';
-
-  @override
   String get attempts => 'Attempts';
 
   @override
@@ -305,7 +302,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errNoNodeReady => 'No node is ready yet. Make a world first.';
 
   @override
-  String get errNodeLocked => 'This node is locked. Clear its parent first.';
+  String get errNodeLocked => 'This node is locked. Clear the nodes before it first.';
 
   @override
   String get errNotFound => 'We couldn\'t find that.';
@@ -422,7 +419,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get lockedClearParent => 'Still locked. Clear the parent node first.';
+  String get lockedClearParent => 'Still locked. Clear the nodes before it first.';
 
   @override
   String get mainQuest => 'Main quest';
@@ -477,9 +474,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noConversationYet => 'No conversation yet.';
-
-  @override
-  String get noCourseServesQuest => 'No course serves this quest yet.';
 
   @override
   String get noDescriptionYet => 'No description yet.';
@@ -673,17 +667,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get previous => 'Previous';
 
   @override
-  String questProgress(int done, int total, int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count courses',
-      one: '1 course',
-    );
-    return '$done of $total nodes cleared across $_temp0.';
-  }
-
-  @override
   String get readyToTry => 'Ready to try?';
 
   @override
@@ -697,9 +680,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeRule => 'Remove rule';
-
-  @override
-  String get renameUnderCharacter => 'Rename or remove it under My character.';
 
   @override
   String get replayTutorial => 'Replay the tutorial';

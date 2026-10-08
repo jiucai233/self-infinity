@@ -27,7 +27,7 @@ def setup(client, client_engine):
     other = generate(client, "Physics")
     goal = client.post("/api/goals", json={"title": "Pass the exam"}).json()
     client.put(f"/api/goals/{goal['id']}", json={"course_ids": [course["course"]["id"], other["course"]["id"]]})
-    root = course["nodes"][0]["id"]
+    root = ids_by_slug(course)["discriminant"]
     pass_node(client, root)
     with Session(client_engine) as session:
         lesson = make_principle(session, session.get(SkillNode, root), title="Own lesson")

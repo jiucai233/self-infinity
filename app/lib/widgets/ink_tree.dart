@@ -11,8 +11,7 @@ import 'ink_sprites.dart';
 /// kept for the life tree redesign (2026-10-06); see it with
 /// `SHOTS_DIR=… flutter test test/ink_tree_preview_test.dart`.
 ///
-/// The trunk rises from you; each main quest is a limb, each course a branch,
-/// each node a twig. What you have mastered blossoms in ember — the only
+/// The trunk rises from you; each course is a limb, each node a twig. What you have mastered blossoms in ember — the only
 /// color. Ready nodes are open buds, locked ones closed buds, failed ones a
 /// small red leaf. The shape comes from the data alone (a seeded wobble, no
 /// randomness between frames), so the same tree always grows the same way.
@@ -131,7 +130,6 @@ class InkTreeState extends State<InkTree> with SingleTickerProviderStateMixin {
               hovered: _hovered,
               highlighted: widget.highlighted,
               labels: (
-                goal: theme.labelLarge!.copyWith(color: AppColors.textPrimary),
                 course: theme.labelMedium!.copyWith(color: AppColors.textSecondary),
                 skill: theme.labelSmall!.copyWith(color: AppColors.textPrimary),
                 self: theme.labelMedium!.copyWith(
@@ -381,7 +379,7 @@ class _Fit {
 
 // ---------------------------------------------------------------- paint
 
-typedef _Labels = ({TextStyle goal, TextStyle course, TextStyle skill, TextStyle self});
+typedef _Labels = ({TextStyle course, TextStyle skill, TextStyle self});
 
 class _InkPainter extends CustomPainter {
   _InkPainter({
@@ -569,10 +567,6 @@ class _InkPainter extends CustomPainter {
     switch (node.kind) {
       case LifeKind.self:
         return;
-      case LifeKind.goal:
-        canvas.drawCircle(at, unit * 1.6, Paint()..color = AppColors.background);
-        canvas.drawCircle(at, unit * 1.6, line..strokeWidth = compact ? 1.2 : 1.6);
-        canvas.drawCircle(at, unit * 0.55, Paint()..color = AppColors.textPrimary);
       case LifeKind.course:
       case LifeKind.skill:
         final sprites = this.sprites;
@@ -686,8 +680,6 @@ class _InkPainter extends CustomPainter {
     switch (node.kind) {
       case LifeKind.self:
         style = labels.self;
-      case LifeKind.goal:
-        style = labels.goal;
       case LifeKind.course:
         style = labels.course;
       case LifeKind.skill:
@@ -708,7 +700,7 @@ class _InkPainter extends CustomPainter {
     } else {
       // Beside the point, on the side its branch leans to.
       final right = math.sin(mark.direction) >= 0;
-      final gap = node.kind == LifeKind.goal ? 10.0 : 8.0;
+      const gap = 8.0;
       final x = right ? at.dx + gap : at.dx - gap - tp.width;
       // Never off the edge: a label that would leave the panel comes back in.
       topLeft = Offset(

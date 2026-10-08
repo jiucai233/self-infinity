@@ -87,6 +87,24 @@ def ids_by_slug(generated: dict) -> dict[str, int]:
     return {n["slug"]: n["id"] for n in generated["nodes"]}
 
 
+# The Mock math course in learning order (services/tree.py): only the first node not yet
+# mastered is open, so a test passes them in this order.
+MATH_ORDER = [
+    "discriminant",
+    "root-coefficient",
+    "quadratic-equation",
+    "linear-function",
+    "quadratic-function",  # requires linear-function and quadratic-equation
+    "functions",
+    "sequence-limit",
+    "sequences",
+    "algebra",
+    "derivative",  # requires sequence-limit
+    "calculus",
+    "high-school-math",
+]
+
+
 # ---------------------------------------------------------------- 直接造数据库行
 
 def make_course(session: Session, topic: str = "Test course") -> Course:

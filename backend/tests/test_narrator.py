@@ -107,7 +107,7 @@ def test_it26_briefing_before_any_narration_has_facts_and_a_null_narrative(clien
 
 def test_narrate_saves_the_narrative_and_the_briefing_returns_it(client, client_engine):
     ids = ids_by_slug(generate(client))
-    pass_node(client, ids["high-school-math"])
+    pass_node(client, ids["discriminant"])
 
     narrated = client.post("/api/narrator/narrate")
 
@@ -123,7 +123,7 @@ def test_narrate_saves_the_narrative_and_the_briefing_returns_it(client, client_
 def test_facts_are_fresh_while_the_narrative_stays_cached(client):
     ids = ids_by_slug(generate(client))
     first = client.post("/api/narrator/narrate").json()
-    pass_node(client, ids["high-school-math"])
+    pass_node(client, ids["discriminant"])
 
     briefing = client.get("/api/narrator/briefing").json()
 
@@ -134,7 +134,7 @@ def test_facts_are_fresh_while_the_narrative_stays_cached(client):
 def test_the_latest_narrative_wins(client):
     client.post("/api/narrator/narrate")
     ids = ids_by_slug(generate(client))
-    pass_node(client, ids["high-school-math"])
+    pass_node(client, ids["discriminant"])
 
     assert client.post("/api/narrator/narrate").json()["narrative"] == "You've cleared 1 of 12 nodes."
     assert client.get("/api/narrator/briefing").json()["narrative"] == "You've cleared 1 of 12 nodes."
@@ -163,8 +163,8 @@ def test_narrate_uses_the_narrator_provider_once(client, monkeypatch):
 
 def test_briefing_reports_the_condition_and_clusters(client, client_engine):
     ids = ids_by_slug(generate(client))
-    pass_node(client, ids["high-school-math"])
-    pass_node(client, ids["algebra"])
+    pass_node(client, ids["discriminant"])
+    pass_node(client, ids["root-coefficient"])
     audit_id = fail_node(client, ids["quadratic-equation"])
     client.post(f"/api/audits/{audit_id}/reflection", json={"reflection": "I thought no real roots meant no solutions"})
     with Session(client_engine) as session:

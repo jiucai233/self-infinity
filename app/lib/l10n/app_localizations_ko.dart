@@ -72,9 +72,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get askTodaysQuests => '오늘 뭘 하면 좋을까?';
 
   @override
-  String get attachCourse => '강좌 연결하기';
-
-  @override
   String get attempts => '시도';
 
   @override
@@ -304,7 +301,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get errNoNodeReady => '아직 도전할 노드가 없어요. 먼저 세계를 만들어 보세요.';
 
   @override
-  String get errNodeLocked => '이 노드는 잠겨 있어요. 상위 노드를 먼저 클리어하세요.';
+  String get errNodeLocked => '이 노드는 잠겨 있어요. 앞의 노드부터 클리어하세요.';
 
   @override
   String get errNotFound => '찾을 수 없어요.';
@@ -420,7 +417,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get lockedClearParent => '아직 잠겨 있어요. 상위 노드를 먼저 클리어하세요.';
+  String get lockedClearParent => '아직 잠겨 있어요. 앞의 노드부터 클리어하세요.';
 
   @override
   String get mainQuest => '메인 퀘스트';
@@ -475,9 +472,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get noConversationYet => '아직 대화가 없어요.';
-
-  @override
-  String get noCourseServesQuest => '아직 이 퀘스트에 연결된 강좌가 없어요.';
 
   @override
   String get noDescriptionYet => '아직 설명이 없어요.';
@@ -668,11 +662,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get previous => '이전';
 
   @override
-  String questProgress(int done, int total, int count) {
-    return '강좌 $count개, 노드 $total개 중 $done개 클리어.';
-  }
-
-  @override
   String get readyToTry => '도전해 볼까요?';
 
   @override
@@ -686,9 +675,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get removeRule => '규칙 삭제';
-
-  @override
-  String get renameUnderCharacter => '이름 변경이나 삭제는 \'내 캐릭터\'에서 할 수 있어요.';
 
   @override
   String get replayTutorial => '튜토리얼 다시 보기';

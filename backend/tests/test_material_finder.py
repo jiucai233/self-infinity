@@ -175,8 +175,8 @@ def test_search_plan_from_a_stored_misconception(client, client_engine):
 def test_a_missing_or_empty_misconception_is_404(client, client_engine):
     ids = ids_by_slug(generate(client))
     with Session(client_engine) as session:
-        empty = make_principle(session, session.get(SkillNode, ids["algebra"]), misconception="  ").id
-        none = make_principle(session, session.get(SkillNode, ids["algebra"]), misconception=None).id
+        empty = make_principle(session, session.get(SkillNode, ids["root-coefficient"]), misconception="  ").id
+        none = make_principle(session, session.get(SkillNode, ids["root-coefficient"]), misconception=None).id
 
     for principle_id in (999, empty, none):
         response = client.post(f"/api/skills/{ids['algebra']}/search-plan", json={"misconception_id": principle_id})

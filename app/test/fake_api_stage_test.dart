@@ -150,7 +150,7 @@ void main() {
       expect(assistantOf(r, 0).content, "Let me pick today's quests.");
       final second = assistantOf(r, 1);
       expect(second.agent, 'recommender');
-      expect((second.action! as PlanAction).plan.steps.first.skillTitle, 'High School Math');
+      expect((second.action! as PlanAction).plan.steps.first.skillTitle, 'Discriminant');
     });
 
     test('intent briefing: the narrator, content = the narrative', () async {
@@ -334,11 +334,11 @@ void main() {
       expect(s[0].skillId, isNull);
     });
 
-    test('a fresh course: the lowest available node of the newest course', () async {
+    test('a fresh course: the open node of the newest course', () async {
       final api = await seededFakeApi();
       final s = await api.getChatSuggestions();
-      expect(s.map((x) => x.label), ['How was your day?', 'Start with “High School Math”']);
-      expect(s[1].skillId, 1);
+      expect(s.map((x) => x.label), ['How was your day?', 'Start with “Discriminant”']);
+      expect(s[1].skillId, 6);
       expect(s[1].message, s[1].label);
     });
 
@@ -346,8 +346,8 @@ void main() {
       final api = await seededFakeApi();
       await api.generateCourse(const GenerateRequest(topic: 'reinforcement learning'));
       final s = await api.getChatSuggestions();
-      expect(s.last.label, 'Start with “reinforcement learning”');
-      expect(s.last.skillId, 13);
+      expect(s.last.label, 'Start with “Core Concepts 1”');
+      expect(s.last.skillId, 17);
     });
 
     test('the most recent audit, if its node is not mastered: continue it', () async {
@@ -355,46 +355,41 @@ void main() {
       await api.generateCourse(const GenerateRequest(topic: 'math'));
       await api.checkInVoice('I slept seven hours.');
       await api.sendChat('Later.', reflectionPrompt: 'What are you putting off right now?');
-      await failAudit(api, 1);
+      await failAudit(api, 6);
       final s = await api.getChatSuggestions();
-      expect(s.map((x) => x.label), ['Continue “High School Math”']);
-      expect(s.single.skillId, 1);
+      expect(s.map((x) => x.label), ['Continue “Discriminant”']);
+      expect(s.single.skillId, 6);
       expect(s.single.message, s.single.label);
     });
 
     test('an abandoned (active) audit counts as the most recent one', () async {
       final api = await seededFakeApi();
-      await api.startAudit(1);
-      expect((await api.getChatSuggestions()).last.label, 'Continue “High School Math”');
+      await api.startAudit(6);
+      expect((await api.getChatSuggestions()).last.label, 'Continue “Discriminant”');
     });
 
     test('the most recent audit decides, whichever node it was on', () async {
       final api = await seededFakeApi();
-      await passAudit(api, 1); // opens Algebra (2), Functions (3), Calculus (4)
-      await failAudit(api, 2);
-      await failAudit(api, 3);
-      expect((await api.getChatSuggestions()).last.label, 'Continue “Functions”');
+      await api.generateCourse(const GenerateRequest(topic: 'reinforcement learning'));
+      await failAudit(api, 17);
+      await failAudit(api, 6);
+      expect((await api.getChatSuggestions()).last.label, 'Continue “Discriminant”');
     });
 
     test('when it was mastered, the lowest available node of the newest course', () async {
       final api = await seededFakeApi();
-      await failAudit(api, 1);
-      await passAudit(api, 1);
-      expect((await api.getChatSuggestions()).last.label, 'Start with “Algebra”');
+      await failAudit(api, 6);
+      await passAudit(api, 6);
+      expect((await api.getChatSuggestions()).last.label, 'Start with “Roots and Coefficients”');
     });
 
     test('no available node in the newest course: the "tell me" line', () async {
       final api = newApi();
       // A course whose only available node is mastered, with the audit on an older course.
-      final map = await api.generateCourse(const GenerateRequest(topic: 'math'));
-      await passAudit(api, map.nodes.first.id);
-      for (final n in await api.listSkills()) {
-        if (n.isAvailable) await passAudit(api, n.id);
-      }
-      for (var round = 0; round < 6; round++) {
-        for (final n in await api.listSkills()) {
-          if (n.isAvailable) await passAudit(api, n.id);
-        }
+      await api.generateCourse(const GenerateRequest(topic: 'math'));
+      // One node opens at a time: pass each in turn.
+      for (var round = 0; round < 12; round++) {
+        await passAudit(api, (await api.listSkills()).firstWhere((n) => n.isAvailable).id);
       }
       expect((await api.listSkills()).every((n) => n.isMastered), isTrue);
       final s = await api.getChatSuggestions();
@@ -443,17 +438,17 @@ void main() {
 
     test('audits and materials, newest first', () async {
       final api = await seededFakeApi();
-      await failAudit(api, 1);
-      await passAudit(api, 1);
-      await api.createSearchPlan(1, gap: 'first gap');
-      await api.createSearchPlan(1, gap: 'second gap');
-      await api.createSearchPlan(2, gap: 'another node'); // not this node's
-      final o = await api.getSkillOverview(1);
+      await failAudit(api, 6);
+      await passAudit(api, 6);
+      await api.createSearchPlan(6, gap: 'first gap');
+      await api.createSearchPlan(6, gap: 'second gap');
+      await api.createSearchPlan(7, gap: 'another node'); // not this node's
+      final o = await api.getSkillOverview(6);
       expect(o.audits.map((a) => a.status), [AuditStatus.passed, AuditStatus.failed]);
-      expect(o.audits.map((a) => a.skillId), [1, 1]);
+      expect(o.audits.map((a) => a.skillId), [6, 6]);
       expect(o.audits.first.score, greaterThan(70));
       expect(o.audits.last.score, 45);
-      expect(o.audits.first.skillTitle, 'High School Math');
+      expect(o.audits.first.skillTitle, 'Discriminant');
       expect(o.materials.map((p) => p.gap), ['second gap', 'first gap']);
       expect(o.skill.status, SkillStatus.mastered);
     });
@@ -470,10 +465,10 @@ void main() {
     test('all courses, newest first, limited', () async {
       final api = await seededFakeApi();
       await api.generateCourse(const GenerateRequest(topic: 'reinforcement learning'));
-      await failAudit(api, 1);
-      await passAudit(api, 13);
+      await failAudit(api, 6);
+      await passAudit(api, 17);
       final all = await api.listAudits();
-      expect(all.map((a) => a.skillTitle), ['reinforcement learning', 'High School Math']);
+      expect(all.map((a) => a.skillTitle), ['Core Concepts 1', 'Discriminant']);
       expect(all.map((a) => a.status), [AuditStatus.passed, AuditStatus.failed]);
       expect(all.first.id, greaterThan(all.last.id));
       expect(await api.listAudits(limit: 1), hasLength(1));
@@ -481,7 +476,7 @@ void main() {
 
     test('an unfinished audit is listed as active, without a score', () async {
       final api = await seededFakeApi();
-      await api.startAudit(1);
+      await api.startAudit(6);
       final a = (await api.listAudits()).single;
       expect(a.status, AuditStatus.active);
       expect(a.score, isNull);
@@ -491,7 +486,7 @@ void main() {
       final now = DateTime.utc(2026, 10, 5, 3, 20);
       final api = newApi(clock: () => now);
       await api.generateCourse(const GenerateRequest(topic: 'math'));
-      await api.startAudit(1);
+      await api.startAudit(6);
       expect((await api.listAudits()).single.createdAt, now);
     });
 
@@ -511,14 +506,14 @@ void main() {
       expect(xp.level, 1);
       expect(xp.levelProgress, 0);
 
-      final first = await passAudit(api, 1);
+      final first = await passAudit(api, 6);
       xp = (await api.getBriefing()).facts.xp;
       expect(xp.total, first.rewardAmount);
       expect(xp.level, 1);
       expect(xp.levelProgress, 0.2);
 
       var sum = first.rewardAmount!;
-      for (final id in [2, 3, 4]) {
+      for (final id in [7, 5, 9]) {
         sum += (await passAudit(api, id)).rewardAmount!;
       }
       xp = (await api.getBriefing()).facts.xp;
@@ -526,7 +521,7 @@ void main() {
       expect(xp.level, 1);
       expect(xp.levelProgress, 0.8);
 
-      sum += (await passAudit(api, 5)).rewardAmount!; // the fifth cleared node
+      sum += (await passAudit(api, 10)).rewardAmount!; // the fifth cleared node
       xp = (await api.getBriefing()).facts.xp;
       expect(xp.total, sum);
       expect(xp.level, 2);
@@ -535,7 +530,7 @@ void main() {
 
     test('a failed audit gives no XP', () async {
       final api = await seededFakeApi();
-      await failAudit(api, 1);
+      await failAudit(api, 6);
       expect((await api.getBriefing()).facts.xp.total, 0);
     });
   });

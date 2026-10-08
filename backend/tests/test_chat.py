@@ -388,8 +388,8 @@ def test_plan_runs_the_recommender(client):
     assert second["action"]["type"] == "plan"
     plan = second["action"]["plan"]
     assert plan["id"] == client.get("/api/plan/current").json()["id"]
-    assert [s["skill_title"] for s in plan["steps"]] == ["High School Math"]
-    assert second["content"] == "Today's quests: “High School Math”."
+    assert [s["skill_title"] for s in plan["steps"]] == ["Discriminant"]
+    assert second["content"] == "Today's quests: “Discriminant”."
 
 
 def test_plan_without_an_available_node_is_explained_with_200(client):
@@ -593,13 +593,13 @@ def test_no_course_with_a_checkin_today_swaps_the_checkin_chip_for_the_reflectio
     ]
 
 
-def test_a_fresh_course_suggests_the_checkin_and_starting_the_root(client):
+def test_a_fresh_course_suggests_the_checkin_and_starting_its_first_node(client):
     ids = ids_by_slug(generate(client, "Math"))
 
     assert suggestions(client) == [
         CHECKIN_CHIP,
-        {"label": "Start with “High School Math”", "message": "Start with “High School Math”",
-         "skill_id": ids["high-school-math"], "reflection": False},
+        {"label": "Start with “Discriminant”", "message": "Start with “Discriminant”",
+         "skill_id": ids["discriminant"], "reflection": False},
     ]
 
 
@@ -608,39 +608,39 @@ def test_with_a_checkin_today_the_checkin_chip_becomes_the_reflection(client, mo
     generate(client, "Math")
     client.post("/api/checkins", json={"sleep_hours": 7})
 
-    assert labels(client) == [NOON_REFLECTION, "Start with “High School Math”"]
+    assert labels(client) == [NOON_REFLECTION, "Start with “Discriminant”"]
 
 
 def test_a_failed_unmastered_audit_node_is_continued(client):
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    fail_node(client, ids["algebra"])
+    pass_node(client, ids["discriminant"])
+    fail_node(client, ids["root-coefficient"])
 
     items = suggestions(client)
 
-    assert [s["label"] for s in items] == ["How was your day?", "Continue “Algebra”"]
-    assert items[1]["skill_id"] == ids["algebra"]
+    assert [s["label"] for s in items] == ["How was your day?", "Continue “Roots and Coefficients”"]
+    assert items[1]["skill_id"] == ids["root-coefficient"]
 
 
 def test_only_the_most_recent_audit_decides(client):
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    fail_node(client, ids["algebra"])
-    fail_node(client, ids["functions"])
+    cooking = ids_by_slug(generate(client, "Cooking"))
+    fail_node(client, ids["discriminant"])
+    fail_node(client, cooking["core-concepts-1"])
 
-    assert suggestions(client)[1]["label"] == "Continue “Functions”"
+    assert suggestions(client)[1]["label"] == "Continue “Core Concepts 1”"
 
 
 def test_when_the_latest_audit_node_is_mastered_the_course_start_is_offered(client):
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    fail_node(client, ids["algebra"])
-    pass_node(client, ids["algebra"])  # the most recent audit is now on a mastered node
+    pass_node(client, ids["discriminant"])
+    fail_node(client, ids["root-coefficient"])
+    pass_node(client, ids["root-coefficient"])  # the most recent audit is now on a mastered node
 
     item = suggestions(client)[1]
 
     assert item["label"].startswith("Start with “")
-    assert item["skill_id"] not in (ids["high-school-math"], ids["algebra"])  # an available, not-yet-mastered node
+    assert item["skill_id"] not in (ids["discriminant"], ids["root-coefficient"])  # an available, not-yet-mastered node
 
 
 def test_start_node_is_the_lowest_available_id_of_the_newest_course(client):
@@ -649,14 +649,17 @@ def test_start_node_is_the_lowest_available_id_of_the_newest_course(client):
 
     item = suggestions(client)[1]
 
-    assert item == {"label": "Start with “Cooking”", "message": "Start with “Cooking”", "skill_id": ids["root"], "reflection": False}
+    assert item == {
+        "label": "Start with “Core Concepts 1”", "message": "Start with “Core Concepts 1”",
+        "skill_id": ids["core-concepts-1"], "reflection": False,
+    }
 
 
 def test_never_more_than_two_suggestions(client, monkeypatch):
     freeze_clock(monkeypatch, "2026-10-05 12:00")
     ids = ids_by_slug(generate(client, "Math"))
-    pass_node(client, ids["high-school-math"])
-    fail_node(client, ids["algebra"])
+    pass_node(client, ids["discriminant"])
+    fail_node(client, ids["root-coefficient"])
 
     assert len(suggestions(client)) == 2
 

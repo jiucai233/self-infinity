@@ -68,17 +68,21 @@ void main() {
     });
 
     testWidgets('the ring keeps the state color of the dot', (tester) async {
-      await passAudit(api, 1); // root cleared: green
-      await failAudit(api, 2); // Algebra failed: red
+      // The learning order up to Functions (3): Quadratic Equations (5) is a cleared boss.
+      for (final id in [6, 7, 5, 9, 10]) {
+        await passAudit(api, id);
+      }
       await pumpOutline(tester, api: api);
       Color ringColor(int id) =>
           ((tester.widget<Container>(ringOf(id)).decoration! as BoxDecoration).border! as Border)
               .top
               .color;
-      expect(ringColor(1), AppColors.success);
-      expect(ringColor(2), AppColors.danger);
+      expect(ringColor(5), AppColors.success);
       expect(ringColor(3), AppColors.primary); // Functions: ready, blue
-      expect(ringColor(5), AppColors.locked); // Quadratic Equations: a boss, still locked
+      expect(ringColor(1), AppColors.locked); // the root: a boss, still locked
+      await failAudit(api, 3);
+      await pumpOutline(tester, api: api);
+      expect(ringColor(3), AppColors.danger); // failed: red
     });
 
     testWidgets('the legend ends with a double-ringed Boss entry', (tester) async {
@@ -108,6 +112,7 @@ void main() {
         pumpScene(tester, SkillScene(skillId: id), api: api);
 
     testWidgets('the root has one, in the title row before its status', (tester) async {
+      api.debugSetStatus(1, SkillStatus.available); // it opens last; open it by hand
       await pumpNode(tester, 1);
       expect(key('boss-chip'), findsOneWidget);
       expect(find.descendant(of: key('boss-chip'), matching: find.text('Boss')), findsOneWidget);
@@ -120,7 +125,6 @@ void main() {
     });
 
     testWidgets('a branch has one', (tester) async {
-      await passAudit(api, 1);
       await pumpNode(tester, 2); // Algebra
       expect(key('boss-chip'), findsOneWidget);
     });
@@ -132,10 +136,7 @@ void main() {
     });
 
     testWidgets('a leaf has none', (tester) async {
-      for (final id in [1, 2, 5]) {
-        await passAudit(api, id);
-      }
-      await pumpNode(tester, 6); // Discriminant
+      await pumpNode(tester, 6); // Discriminant, the first node of the order
       expect(find.widgetWithText(StatusChip, 'Ready'), findsOneWidget);
       expect(key('boss-chip'), findsNothing);
     });
@@ -143,7 +144,9 @@ void main() {
     testWidgets('if the course map cannot be read the scene works without the chip', (
       tester,
     ) async {
-      api.failNext(method: 'getCourseMap');
+      api
+        ..debugSetStatus(1, SkillStatus.available)
+        ..failNext(method: 'getCourseMap');
       await pumpNode(tester, 1);
       expect(find.widgetWithText(StatusChip, 'Ready'), findsOneWidget);
       expect(key('boss-chip'), findsNothing);
@@ -164,6 +167,7 @@ void main() {
     }
 
     testWidgets('a boss (the root) says Boss cleared!', (tester) async {
+      api.debugSetStatus(1, SkillStatus.available);
       await pass(tester, 1);
       expect(key('celebration-card'), findsOneWidget);
       expect(tester.widget<GradientText>(key('celebration-title')).text, 'Boss cleared!');
@@ -172,15 +176,13 @@ void main() {
     });
 
     testWidgets('a branch says Boss cleared!', (tester) async {
-      await passAudit(api, 1);
-      await pass(tester, 2);
+      await passAudit(api, 6);
+      await passAudit(api, 7);
+      await pass(tester, 5); // Quadratic Equations
       expect(find.text('Boss cleared!'), findsOneWidget);
     });
 
     testWidgets('a leaf says plain Cleared!', (tester) async {
-      for (final id in [1, 2, 5]) {
-        await passAudit(api, id);
-      }
       await pass(tester, 6);
       expect(key('celebration-card'), findsOneWidget);
       expect(find.text('Cleared!'), findsOneWidget);
@@ -188,6 +190,7 @@ void main() {
     });
 
     testWidgets('the verdict card keeps the same words for bosses', (tester) async {
+      api.debugSetStatus(1, SkillStatus.available);
       await pass(tester, 1);
       await tester.tap(key('celebration-close'));
       await tester.pumpAndSettle();

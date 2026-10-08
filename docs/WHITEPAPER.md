@@ -96,10 +96,10 @@ backend/ (FastAPI + SQLModel + SQLite)
 
 用户输入一个主题，流水线是：Clarifier（可选追问）→ Syllabus Finder → Planner → Structure Validator。Syllabus Finder 会用三条查询（两种“课纲”说法，加官方文档/教程）读取搜索结果的页面正文，只接受两类来源：学校课纲（机构 + 课程名或代码 + 主题列表），或项目维护者、出版方的官方文档、教程、教材目录；找到时 Planner 以它的主题和顺序为骨架编排，找不到就凭模型自身知识。结果是一张有向无环图：
 
-- **两种边**：`contains`（包含，决定位置和解锁）与 `requires`（软前置，只影响推荐顺序，不锁节点）。
+- **两种边**：`contains`（包含，决定位置）与 `requires`（前置）。两者一起决定学习顺序。
 - **多父节点**：一个节点最多 3 个 contains 父节点，其中一个标 `is_primary`，决定它在地图上画在哪里。
 - **位置**：root / branch / leaf，由 contains 边算出，不由 LLM 声明。
-- **解锁规则**：任一 contains 父节点 mastered，该节点即 available。生成时只有 root 是 available。
+- **学习顺序**：树上叠一条线性顺序。一个节点包含的部分排在它前面（先学小节，再学整章，root 最后），`requires` 的前置排在前面，其余按 Planner 给出的大纲顺序。每门课同一时间只开放一个节点：顺序里第一个还没 mastered 的；通过后下一个才 available。已 mastered 的节点可以再审。
 - **节点类型**：`concept`（要讲清为什么）与 `task`（只确认做法具体），决定审计协议和轮次上限。
 
 Planner 只决定结构，不生成教学内容。内容质量由审计把关：拆得再合理，讲不清照样不过。

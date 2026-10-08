@@ -106,8 +106,11 @@ def test_it27_plan_with_no_available_node_is_400(client):
 
 
 def test_plan_generation_returns_and_stores_a_study_plan(client):
+    # One node per course is open (the next in its learning order), so three courses.
     ids = ids_by_slug(generate(client))
-    pass_node(client, ids["high-school-math"])
+    pass_node(client, ids["discriminant"])
+    cooking = ids_by_slug(generate(client, "Cooking"))
+    chess = ids_by_slug(generate(client, "Chess"))
 
     response = client.post("/api/plan/generate")
 
@@ -115,8 +118,8 @@ def test_plan_generation_returns_and_stores_a_study_plan(client):
     plan = response.json()
     assert set(plan) == {"id", "suggested_tier", "context_bucket", "created_at", "steps"}
     assert plan["suggested_tier"] in ("easy", "medium", "hard") and plan["context_bucket"] in ("low", "mid", "high")
-    assert [s["skill_id"] for s in plan["steps"]] == [ids["algebra"], ids["functions"], ids["calculus"]]
-    assert plan["steps"][0] == {"skill_id": ids["algebra"], "course_id": 1, "skill_title": "Algebra",
+    assert [s["skill_id"] for s in plan["steps"]] == [ids["root-coefficient"], cooking["core-concepts-1"], chess["core-concepts-1"]]
+    assert plan["steps"][0] == {"skill_id": ids["root-coefficient"], "course_id": 1, "skill_title": "Roots and Coefficients",
                                 "node_type": "concept", "rationale": REASON, "focus_hint": HINT}
     assert client.get("/api/plan/current").json() == plan
 
@@ -124,10 +127,11 @@ def test_plan_generation_returns_and_stores_a_study_plan(client):
 def test_current_plan_is_the_latest_one(client):
     ids = ids_by_slug(generate(client))
     first = client.post("/api/plan/generate").json()
-    pass_node(client, ids["high-school-math"])
+    pass_node(client, ids["discriminant"])
+    generate(client, "Cooking")
     second = client.post("/api/plan/generate").json()
 
-    assert second["id"] != first["id"] and len(second["steps"]) == 3 and len(first["steps"]) == 1
+    assert second["id"] != first["id"] and len(second["steps"]) == 2 and len(first["steps"]) == 1
     assert client.get("/api/plan/current").json() == second
 
 
@@ -169,11 +173,11 @@ def test_unmet_requires_reach_the_recommender(client, client_engine, monkeypatch
 
 def test_hallucinated_ids_are_dropped_by_the_endpoint(client, monkeypatch):
     ids = ids_by_slug(generate(client))
-    monkeypatch.setattr("app.routers.plan.get_provider", lambda agent=None: reply(999, ids["high-school-math"]))
+    monkeypatch.setattr("app.routers.plan.get_provider", lambda agent=None: reply(999, ids["discriminant"]))
 
     steps = client.post("/api/plan/generate").json()["steps"]
 
-    assert [s["skill_id"] for s in steps] == [ids["high-school-math"]]
+    assert [s["skill_id"] for s in steps] == [ids["discriminant"]]
 
 
 @pytest.mark.parametrize("provider", [BrokenProvider(), ScriptedProvider(recommender="nope"), reply(999)])

@@ -191,7 +191,7 @@ Request:
 {"topic": "Math", "node_count": 12, "max_depth": 4, "difficulty": "standard", "search_syllabus": true}
 ```
 Validation (422): topic not blank; `node_count` 4–30 (default 12); `max_depth` 2–6 (default 4); `difficulty` `intro`|`standard`|`deep` (default `standard`); `search_syllabus` bool (default true).
-Response: `{"course": Course, "nodes": SkillNode[], "edges": SkillEdge[]}`. Only the root is `available`; every other node is `locked`.
+Response: `{"course": Course, "nodes": SkillNode[], "edges": SkillEdge[]}`. Only the first node of the course's learning order is `available`; every other node is `locked`. The learning order lays a list over the tree: what a node contains comes before it (so the root comes last), a requires edge puts its prerequisite first, and otherwise the planner's order decides.
 Errors: 502 `Course generation failed. Please try again.`
 
 ### 3. `GET /api/courses`
@@ -230,7 +230,7 @@ Response: `TurnResult`. Behavior follows Section 6.6 and 8.4:
 - The user turn is saved before the Auditor is called (kept even if the Auditor fails). If the last saved turn is a user turn with no reply after it (the previous attempt failed, or the client stopped waiting), the new content **replaces** it instead of adding a second user turn, so a resend never uses up the turn limit.
 - Memory Retriever passes ≤3 lessons to the Auditor.
 - Pass + Challenger enabled + not yet challenged → Challenger. Overturn → `challenged = true`, its question saved as an auditor turn and returned as a probe. Uphold or Challenger error → final pass.
-- Final pass: session `passed`, `score` saved, node `mastered` with `mastery_score`, every locked node with this node as a contains parent → `available`, reward recorded.
+- Final pass: session `passed`, `score` saved, node `mastered` with `mastery_score`, the next node of the learning order that is not mastered → `available` (one open node per course), reward recorded.
 - Fail: session `failed`, gaps and comment saved; node status unchanged.
 - **Final turns** — the turn limit is reached, or this answer replies to the Challenger's question: the Auditor's prompt gets the line `This is the final turn: give the verdict now, do not ask another question.` (only on these turns; the limit itself is still never shown). If it probes anyway → forced verdict `passed=false`, `score=0` (comment names the limit, or the follow-up question after a challenge). If its output is unusable (not JSON or the wrong shape after the JSON retry) → 502, nothing is decided, and the user resends.
 - Finalizing closes the session with one conditional update (`WHERE status = 'active'`): of two concurrent requests only one finalizes; the other gets 400 `audit session is already closed`, so rewards and bandit updates are never recorded twice.

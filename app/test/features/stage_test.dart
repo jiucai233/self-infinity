@@ -36,7 +36,7 @@ void main() {
       'scene 1': () => const HomeScene(),
       'scene 2': () => const MapScene(),
       'scene 4': () => const SkillScene(skillId: 1),
-      'scene 4-1': () => const AuditScene(skillId: 1),
+      'scene 4-1': () => const AuditScene(skillId: 6),
     };
     for (final entry in scenes.entries) {
       testWidgets(entry.key, (tester) async {
@@ -114,7 +114,7 @@ void main() {
     testWidgets('Lv, Cleared and Condition — labels with their numbers and 8 px bars', (
       tester,
     ) async {
-      await passAudit(api, 1); // 1 of 12 mastered; 1 of 5 for the level
+      await passAudit(api, 6); // 1 of 12 mastered; 1 of 5 for the level
       await pumpScene(tester, const MapScene(), api: api);
       expect(find.text('Lv 1 · 1/5'), findsOneWidget);
       expect(find.text('Cleared 1/12'), findsOneWidget);
@@ -134,7 +134,7 @@ void main() {
     });
 
     testWidgets('Cleared is green; the level bar is blue', (tester) async {
-      await passAudit(api, 1);
+      await passAudit(api, 6);
       await pumpScene(tester, const MapScene(), api: api);
       Color colorOf(int i) => tester
           .widget<ColoredBox>(
@@ -156,11 +156,9 @@ void main() {
     });
 
     testWidgets('five cleared nodes make level 2: Lv 2 · 0/5', (tester) async {
-      await passAudit(api, 1);
-      for (final id in [2, 3, 4]) {
-        await passAudit(api, id);
+      for (final id in [6, 7, 5, 9, 10]) {
+        await passAudit(api, id); // the first five of the learning order
       }
-      await passAudit(api, 5);
       await pumpScene(tester, const MapScene(), api: api);
       expect(find.text('Lv 2 · 0/5'), findsOneWidget);
       expect(find.text('Cleared 5/12'), findsOneWidget);
@@ -231,7 +229,9 @@ void main() {
   });
 
   group('◎ the account menu', () {
-    testWidgets('local mode: says so, offers the tutorial and the front page, no sign out', (tester) async {
+    testWidgets('local mode: says so, offers the tutorial and the front page, no sign out', (
+      tester,
+    ) async {
       await pumpScene(tester, const MapScene(), api: api);
       expect(find.byIcon(Icons.adjust_rounded), findsOneWidget);
       await tester.tap(find.byKey(const Key('settings-button')));
@@ -286,7 +286,7 @@ void main() {
     });
 
     testWidgets('scene 4-1: none, the dialogue column is the log', (tester) async {
-      await pumpScene(tester, const AuditScene(skillId: 1), api: api);
+      await pumpScene(tester, const AuditScene(skillId: 6), api: api);
       expect(historyPanel, findsNothing);
       expect(find.text('Audit log'), findsNothing);
       expect(find.byKey(const Key('audit-qa')), findsOneWidget);
@@ -305,7 +305,7 @@ void main() {
         const HomeScene(),
         const MapScene(),
         const SkillScene(skillId: 1),
-        const AuditScene(skillId: 1),
+        const AuditScene(skillId: 6),
       ]) {
         await pumpScene(tester, scene, api: api);
         for (final english in ['history', "today's summary", 'node:', 'contents']) {
@@ -401,7 +401,7 @@ void main() {
     });
 
     testWidgets('scene 4: a right drawer with the history (4-1 has none)', (tester) async {
-      await pumpScene(tester, const AuditScene(skillId: 1), api: api, size: phoneScreen);
+      await pumpScene(tester, const AuditScene(skillId: 6), api: api, size: phoneScreen);
       expect(find.byKey(const Key('open-right-drawer')), findsNothing);
       for (final scene in [const SkillScene(skillId: 1)]) {
         await pumpScene(tester, scene, api: api, size: phoneScreen);
@@ -428,7 +428,7 @@ void main() {
         const HomeScene(),
         const MapScene(),
         const SkillScene(skillId: 1),
-        const AuditScene(skillId: 1),
+        const AuditScene(skillId: 6),
       ];
       for (final scene in scenes) {
         await pumpScene(tester, scene, api: api, size: phoneScreen);
@@ -458,7 +458,10 @@ void main() {
       expect(find.byType(SegmentedButton<String>), findsNothing);
       // (The only menu is the account menu ◎ in the left panel.)
       expect(
-        find.descendant(of: find.byKey(const Key('stage-panel')), matching: find.byType(PopupMenuButton<String>)),
+        find.descendant(
+          of: find.byKey(const Key('stage-panel')),
+          matching: find.byType(PopupMenuButton<String>),
+        ),
         findsNothing,
       );
       expect(find.byType(DropdownButton<int>), findsNothing);

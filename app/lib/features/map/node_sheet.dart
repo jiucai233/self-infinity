@@ -49,7 +49,6 @@ class NodeSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final body = switch (node.kind) {
       LifeKind.self => _SelfBody(tree: tree),
-      LifeKind.goal => _GoalBody(node: node, tree: tree),
       LifeKind.course || LifeKind.skill => _SkillBody(
         key: ValueKey('skill-body-${node.key}'),
         node: node,
@@ -151,7 +150,6 @@ class _Kicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = switch (node.kind) {
       LifeKind.self => context.l10n.you,
-      LifeKind.goal => context.l10n.mainQuest,
       LifeKind.course => node.goalId == null ? context.l10n.sideQuestCourse : context.l10n.course,
       LifeKind.skill => node.boss ? context.l10n.boss : context.l10n.node,
     };
@@ -575,107 +573,6 @@ class _CourseProgress extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-
-class _GoalBody extends StatelessWidget {
-  const _GoalBody({required this.node, required this.tree});
-
-  final LifeNode node;
-  final LifeTree tree;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    final courses = tree.childrenOf(node.key);
-    final skills = [for (final c in courses) ...tree.skillsOf(c.courseId!)];
-    final done = skills.where((s) => s.isMastered).length;
-    final goals = context.select<StageController, List<Goal>>((s) => s.goals);
-    final goal = goals.where((g) => g.id == node.goalId).firstOrNull;
-    final side = [
-      for (final n in tree.childrenOf(LifeTree.selfKey))
-        if (n.kind == LifeKind.course) n,
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _Title(node.label),
-        Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.lg),
-          child: Row(
-            children: [
-              ProgressRing(
-                value: skills.isEmpty ? 0 : done / skills.length,
-                label: '$done/${skills.length}',
-                size: 56,
-              ),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                child: Text(
-                  skills.isEmpty
-                      ? context.l10n.noCourseServesQuest
-                      : context.l10n.questProgress(done, skills.length, courses.length),
-                  style: theme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-                ),
-              ),
-            ],
-          ),
-        ),
-        _SectionLabel(context.l10n.courses),
-        if (courses.isEmpty)
-          Text('—', style: theme.bodyMedium?.copyWith(color: AppColors.textTertiary)),
-        for (final c in courses)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: Row(
-              children: [
-                Expanded(child: Text(c.label, style: theme.labelLarge)),
-                Text(
-                  '${tree.skillsOf(c.courseId!).where((s) => s.isMastered).length}/${tree.skillsOf(c.courseId!).length}',
-                  style: theme.labelMedium,
-                ),
-              ],
-            ),
-          ),
-        if (goal != null && side.isNotEmpty)
-          PopupMenuButton<int>(
-            key: const Key('goal-attach'),
-            tooltip: context.l10n.attachCourse,
-            onSelected: (courseId) => unawaited(_attach(context, goal, courseId)),
-            itemBuilder: (_) => [
-              for (final c in side) PopupMenuItem(value: c.courseId, child: Text(c.label)),
-            ],
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.add_rounded, size: 16),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(context.l10n.attachCourse, style: theme.labelLarge),
-                ],
-              ),
-            ),
-          ),
-        const SizedBox(height: AppSpacing.md),
-        Text(
-          context.l10n.renameUnderCharacter,
-          style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _attach(BuildContext context, Goal goal, int courseId) async {
-    final api = context.read<SelfInfinityApi>();
-    final appState = context.read<AppState>();
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    try {
-      await api.updateGoal(goal.id, courseIds: [...goal.courseIds, courseId]);
-      appState.markDataChanged();
-    } on ApiException catch (e) {
-      messenger?.showSnackBar(SnackBar(content: Text(e.userMessage)));
-    }
-  }
-}
 
 class _SelfBody extends StatelessWidget {
   const _SelfBody({required this.tree});

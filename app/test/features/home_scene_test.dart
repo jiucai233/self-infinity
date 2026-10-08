@@ -61,7 +61,10 @@ void main() {
       final ball = tester.getRect(find.byKey(const Key('crystal-ball')));
       expect(ball.width, closeTo(ball.height, 0.01));
       expect(
-        find.descendant(of: find.byKey(const Key('crystal-ball')), matching: find.byType(LifeConstellation)),
+        find.descendant(
+          of: find.byKey(const Key('crystal-ball')),
+          matching: find.byType(LifeConstellation),
+        ),
         findsOneWidget,
       );
       final avatarHeight = tester.getSize(find.byType(Avatar)).height;
@@ -76,7 +79,9 @@ void main() {
       expect(find.text('route:/map'), findsOneWidget);
     });
 
-    testWidgets('the ball holds every course, each under its main quest', (tester) async {
+    testWidgets('the ball holds every course around you; main quests are not points', (
+      tester,
+    ) async {
       final api = await seededFakeApi();
       await api.generateCourse(const GenerateRequest(topic: 'reinforcement learning'));
       final goal = await api.createGoal('Become an RL researcher');
@@ -85,9 +90,10 @@ void main() {
       final tree = tester.widget<LifeConstellation>(find.byType(LifeConstellation)).tree;
       expect({for (final n in tree.nodes) n.courseId}..remove(null), {1, 2});
       final rl = tree.nodes.firstWhere((n) => n.kind == LifeKind.course && n.courseId == 2);
-      expect(rl.parent, 'g${goal.id}');
+      expect((rl.parent, rl.goalId), (LifeTree.selfKey, goal.id));
       final math = tree.nodes.firstWhere((n) => n.kind == LifeKind.course && n.courseId == 1);
-      expect(math.parent, LifeTree.selfKey); // a side quest
+      expect((math.parent, math.goalId), (LifeTree.selfKey, null)); // a side quest
+      expect(tree.nodes.where((n) => n.label == goal.title), isEmpty);
     });
 
     testWidgets('an empty ball also opens scene 2', (tester) async {
@@ -134,7 +140,7 @@ void main() {
       expect(find.byKey(const Key('suggestion-1')), findsOneWidget);
       expect(find.byKey(const Key('suggestion-2')), findsNothing);
       expect(find.text('How was your day?'), findsOneWidget);
-      expect(find.text('Start with “High School Math”'), findsOneWidget);
+      expect(find.text('Start with “Discriminant”'), findsOneWidget);
       final first = tester.getRect(find.byKey(const Key('suggestion-0')));
       final second = tester.getRect(find.byKey(const Key('suggestion-1')));
       expect(first.top, second.top, reason: 'side by side');
@@ -193,7 +199,7 @@ void main() {
       await pumpHome(tester, api);
       await tester.tap(find.byKey(const Key('suggestion-1')));
       await tester.pumpAndSettle();
-      expect(find.text('route:/skill/1'), findsOneWidget);
+      expect(find.text('route:/skill/6'), findsOneWidget);
       expect(await api.getChatHistory(), isEmpty);
     });
 

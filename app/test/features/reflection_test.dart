@@ -55,7 +55,7 @@ void main() {
         ),
         findsNothing,
       );
-      expect(find.text('Start with “High School Math”'), findsOneWidget);
+      expect(find.text('Start with “Discriminant”'), findsOneWidget);
     });
 
     testWidgets('the check-in card keeps its sun icon', (tester) async {

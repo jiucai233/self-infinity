@@ -81,8 +81,14 @@ void main() {
       ]);
       expect(map.course.sourceCourse, isNull);
       expect(map.course.sourceUrl, isNull);
-      expect(map.nodes.first.status, SkillStatus.available);
-      expect(map.nodes.skip(1).every((n) => n.status == SkillStatus.locked), isTrue);
+      // Only the first node of the learning order is open: the first leaf.
+      expect(
+        [
+          for (final n in map.nodes)
+            if (n.isAvailable) n.title,
+        ],
+        ['Core Concepts 1'],
+      );
       final byTitle = {for (final n in map.nodes) n.title: n.id};
       expect(
         map.edges.where((e) => e.isRequires).map((e) => (e.fromId, e.toId)).toList(),
@@ -133,7 +139,13 @@ void main() {
       final api = await seededFakeApi();
       final second = await api.generateCourse(const GenerateRequest(topic: 'University math'));
       expect(second.nodes.map((n) => n.id).toList(), [for (var i = 13; i <= 24; i++) i]);
-      expect(second.nodes.first.status, SkillStatus.available);
+      expect(
+        [
+          for (final n in second.nodes)
+            if (n.isAvailable) n.id,
+        ],
+        [18],
+      ); // its Discriminant
       expect(second.edges.every((e) => e.fromId >= 13 && e.toId >= 13), isTrue);
       expect(containsParentsOf(23, second.edges), [
         16,
@@ -143,8 +155,8 @@ void main() {
         17,
         21,
       ]); // Quadratic Functions needs Quadratic Equations, Linear Functions
-      // Both courses are independent: passing the first root opens nothing in the second.
-      await passAudit(api, 1);
+      // Both courses are independent: a pass in the first opens nothing in the second.
+      await passAudit(api, 6);
       expect(
         (await api.listSkills(courseId: second.course.id)).where((n) => n.isAvailable),
         hasLength(1),
@@ -172,6 +184,10 @@ void main() {
   group('audits', () {
     test('opening questions by position and node type', () async {
       final api = await seededFakeApi();
+      // The root and Algebra open last in the learning order; open them by hand.
+      api
+        ..debugSetStatus(1, SkillStatus.available)
+        ..debugSetStatus(2, SkillStatus.available);
       final root = await api.startAudit(1);
       expect(
         root.openingQuestion,
@@ -186,8 +202,6 @@ void main() {
       expect(root.session.turns.single.role, AuditRole.auditor);
       expect(root.session.turns.single.content, root.openingQuestion);
 
-      await passAudit(api, 1);
-      await passAudit(api, 2);
       final branch = await api.startAudit(2);
       expect(branch.session.nodePosition, NodePosition.branch);
       expect(
@@ -195,7 +209,6 @@ void main() {
         '“Algebra” covers Quadratic Equations, Sequences. Why do these belong together, and when do you use which?',
       );
 
-      await passAudit(api, 5);
       final leaf = await api.startAudit(6);
       expect(leaf.session.nodePosition, NodePosition.leaf);
       expect(
@@ -210,34 +223,34 @@ void main() {
 
     test('audits are allowed on available and mastered nodes, not on locked ones', () async {
       final api = await seededFakeApi();
-      final locked = await failure(() => api.startAudit(2));
+      final locked = await failure(() => api.startAudit(7));
       expect(locked.statusCode, 400);
       expect(locked.serverMessage, 'skill is locked');
       expect((await failure(() => api.startAudit(99))).statusCode, 404);
       expect((await failure(() => api.startAudit(99))).serverMessage, 'skill not found');
-      expect((await failure(() => api.startAudit(1, mode: 'dusk'))).statusCode, 422);
+      expect((await failure(() => api.startAudit(6, mode: 'dusk'))).statusCode, 422);
 
-      await api.startAudit(1); // available
-      await passAudit(api, 1);
-      await api.startAudit(1, mode: 'night'); // mastered again: still allowed
+      await api.startAudit(6); // available
+      await passAudit(api, 6);
+      await api.startAudit(6, mode: 'night'); // mastered again: still allowed
     });
 
     test('turn limits: concept 8, task 4, night doubles', () async {
       final api = await seededFakeApi();
-      final day = await api.startAudit(1);
-      final night = await api.startAudit(1, mode: 'night');
+      final day = await api.startAudit(6);
+      final night = await api.startAudit(6, mode: 'night');
       expect(api.debugMaxTurns(day.session.id), 8);
       expect(api.debugMaxTurns(night.session.id), 16);
-      api.debugSetNodeType(1, NodeType.task);
-      final taskDay = await api.startAudit(1);
-      final taskNight = await api.startAudit(1, mode: 'night');
+      api.debugSetNodeType(6, NodeType.task);
+      final taskDay = await api.startAudit(6);
+      final taskNight = await api.startAudit(6, mode: 'night');
       expect(api.debugMaxTurns(taskDay.session.id), 4);
       expect(api.debugMaxTurns(taskNight.session.id), 8);
     });
 
     test('the first answer always gets a probe, even a long one', () async {
       final api = await seededFakeApi();
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       final r = await api.submitTurn(s.session.id, longAnswer) as ProbeResult;
       expect(
         r.question,
@@ -247,7 +260,7 @@ void main() {
 
     test('a short answer fails with the scripted gaps and comment', () async {
       final api = await seededFakeApi();
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       final r = await playTwoAnswers(api, s.session.id, text(10), text(20)) as VerdictResult;
       expect(r.passed, isFalse);
       expect(r.score, 45);
@@ -256,13 +269,13 @@ void main() {
         "You didn't cover the exceptions.",
       ]);
       expect(r.comment, 'The answer stops at the conclusion and lacks reasons.');
-      expect((await nodeOf(api, 'High School Math')).status, SkillStatus.available);
-      expect((await nodeOf(api, 'High School Math')).masteryScore, isNull);
+      expect((await nodeOf(api, 'Discriminant')).status, SkillStatus.available);
+      expect((await nodeOf(api, 'Discriminant')).masteryScore, isNull);
     });
 
     test('"don\'t know" in the latest answer fails even a long answer', () async {
       final api = await seededFakeApi();
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       final r = await playTwoAnswers(
         api,
         s.session.id,
@@ -275,42 +288,42 @@ void main() {
     test('a long answer passes at once: score = min(95, 70 + n ~/ 10)', () async {
       final api = await seededFakeApi();
       // n = 100 + 1 (joiner) + 100 = 201 → 70 + 20
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       final r = await playTwoAnswers(api, s.session.id, text(100), text(100)) as VerdictResult;
       expect(r.passed, isTrue);
       expect(r.score, 90);
       expect(r.gaps, isEmpty);
       expect(r.comment, 'You explained the core idea and why it holds.');
-      final node = await nodeOf(api, 'High School Math');
+      final node = await nodeOf(api, 'Discriminant');
       expect(node.status, SkillStatus.mastered);
       expect(node.masteryScore, 90);
 
       // The score is capped at 95.
-      final capped = await passAudit(api, 1);
+      final capped = await passAudit(api, 6);
       expect(capped.score, 95);
     });
 
     test('a medium answer is challenged once and then passes', () async {
       final api = await seededFakeApi();
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       // n = 50 + 1 + 50 = 101: passes the Auditor (≥ 80) but is below 160.
       final challenge = await playTwoAnswers(api, s.session.id, text(50), text(50)) as ProbeResult;
       expect(
         challenge.question,
         'Before I pass this: give one case where this idea does not hold, and explain why.',
       );
-      expect((await nodeOf(api, 'High School Math')).status, SkillStatus.available);
+      expect((await nodeOf(api, 'Discriminant')).status, SkillStatus.available);
 
       // n = 101 + 1 + 30 = 132 → still < 160, but the Challenger acts at most once.
       final verdict = await api.submitTurn(s.session.id, text(30)) as VerdictResult;
       expect(verdict.passed, isTrue);
       expect(verdict.score, 70 + 132 ~/ 10);
-      expect((await nodeOf(api, 'High School Math')).status, SkillStatus.mastered);
+      expect((await nodeOf(api, 'Discriminant')).status, SkillStatus.mastered);
     });
 
     test('after a Challenger probe the final answer can still fail', () async {
       final api = await seededFakeApi();
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       await playTwoAnswers(api, s.session.id, text(50), text(50));
       final verdict = await api.submitTurn(s.session.id, "I'm not sure") as VerdictResult;
       expect(verdict.passed, isFalse);
@@ -319,15 +332,15 @@ void main() {
 
     test('a pass that is not challenged also happens when the total reaches 160', () async {
       final api = await seededFakeApi();
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       // n = 79 → fail
       final fail1 = await playTwoAnswers(api, s.session.id, text(39), text(39)) as VerdictResult;
       expect(fail1.passed, isFalse);
       // n = 80 → pass candidate, but < 160 → Challenger.
-      final s2 = await api.startAudit(1);
+      final s2 = await api.startAudit(6);
       expect(await playTwoAnswers(api, s2.session.id, text(39), text(40)), isA<ProbeResult>());
       // n = 160 → passes at once.
-      final s3 = await api.startAudit(1);
+      final s3 = await api.startAudit(6);
       final pass = await playTwoAnswers(api, s3.session.id, text(80), text(79)) as VerdictResult;
       expect(pass.passed, isTrue);
       expect(pass.score, 86);
@@ -335,14 +348,14 @@ void main() {
 
     test('the turn limit turns a probe into a failing verdict with score 0', () async {
       final api = await seededFakeApi();
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       api.debugSetMaxTurns(s.session.id, 2);
       // Second answer would be challenged (n = 101) but the limit of 2 is reached.
       final verdict = await playTwoAnswers(api, s.session.id, text(50), text(50)) as VerdictResult;
       expect(verdict.passed, isFalse);
       expect(verdict.score, 0);
       expect(verdict.gaps, isNotEmpty);
-      expect((await nodeOf(api, 'High School Math')).status, SkillStatus.available);
+      expect((await nodeOf(api, 'Discriminant')).status, SkillStatus.available);
       // A reflection is accepted for it.
       final p = await api.submitReflection(s.session.id, 'I ran out of turns');
       expect(p.misconception, 'I ran out of turns');
@@ -350,7 +363,7 @@ void main() {
 
     test('closed or unknown sessions and blank answers are rejected', () async {
       final api = await seededFakeApi();
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       await playTwoAnswers(api, s.session.id, text(10), text(10)); // fails → closed
       final closed = await failure(() => api.submitTurn(s.session.id, 'again'));
       expect(closed.statusCode, 400);
@@ -360,48 +373,47 @@ void main() {
       expect(missing.statusCode, 404);
       expect(missing.serverMessage, 'audit session not found');
 
-      final s2 = await api.startAudit(1);
+      final s2 = await api.startAudit(6);
       expect((await failure(() => api.submitTurn(s2.session.id, '   '))).statusCode, 422);
       // The blank answer left no trace: the first real answer still gets the probe.
       expect(await api.submitTurn(s2.session.id, text(10)), isA<ProbeResult>());
     });
 
-    test('unlocking: any mastered contains parent opens a locked child', () async {
+    test('unlocking: one node at a time, in the learning order', () async {
       final api = await seededFakeApi();
-      await passAudit(api, 1);
-      await passAudit(api, 2); // Algebra → Quadratic Equations (5), Sequences (8)
-      // Limits of Sequences (11) has the parents Calculus (4) and Sequences (8).
-      expect((await nodeOf(api, 'Limits of Sequences')).status, SkillStatus.locked);
-      final viaSequences = await passAudit(api, 8);
-      expect(viaSequences.unlockedSkillIds, [11]);
-      expect((await nodeOf(api, 'Limits of Sequences')).status, SkillStatus.available);
-      // Passing the other parent later unlocks only what is still locked.
-      final viaCalculus = await passAudit(api, 4);
-      expect(viaCalculus.unlockedSkillIds, [12]);
-      // requires edges never block: Quadratic Functions (10) needs Quadratic Equations but opens with Functions.
-      final viaFunctions = await passAudit(api, 3);
-      expect(viaFunctions.unlockedSkillIds, [9, 10]);
-      // Passing a leaf unlocks nothing; passing a mastered node again unlocks nothing.
-      expect((await passAudit(api, 9)).unlockedSkillIds, isEmpty);
+      final map = await api.getCourseMap(1);
+      // Parts before what contains them, prerequisites first, the root last.
+      expect(learningOrder(map.nodes, map.edges), [6, 7, 5, 9, 10, 3, 11, 8, 2, 12, 4, 1]);
+      expect(await titlesWhere(api, SkillStatus.available), ['Discriminant']);
+      expect((await passAudit(api, 6)).unlockedSkillIds, [7]);
+      expect((await passAudit(api, 7)).unlockedSkillIds, [5]);
+      expect(await titlesWhere(api, SkillStatus.available), ['Quadratic Equations']);
+      // A failed audit opens nothing; passing a mastered node again neither.
+      expect((await failAudit(api, 5)).verdict.unlockedSkillIds, isEmpty);
+      expect((await passAudit(api, 6)).unlockedSkillIds, isEmpty);
+      for (final id in [5, 9, 10, 3, 11, 8, 2, 12, 4]) {
+        await passAudit(api, id);
+      }
+      expect(await titlesWhere(api, SkillStatus.available), ['High School Math']);
       expect((await passAudit(api, 1)).unlockedSkillIds, isEmpty);
     });
 
     test('reward: base 10 × difficulty × level multiplier, only on a pass', () async {
       final api = await seededFakeApi();
-      final root = await passAudit(api, 1);
-      // concept (2.0) × depth 0 (1.0) × 1.1^1 × 10
-      expect(root.rewardMultiplier, 1.1);
-      expect(root.rewardAmount, 22);
-      final algebra = await passAudit(api, 2);
-      // concept × (1 + 0.5 × 1) × 1.1^1 × 10 = 33
-      expect(algebra.rewardAmount, 33);
-      final failed = await failAudit(api, 3);
+      final discriminant = await passAudit(api, 6);
+      // concept (2.0) × (1 + 0.5 × depth 3) × 1.1^1 × 10
+      expect(discriminant.rewardMultiplier, 1.1);
+      expect(discriminant.rewardAmount, 55);
+      final failed = await failAudit(api, 7);
       expect(failed.verdict.rewardAmount, isNull);
       expect(failed.verdict.rewardMultiplier, isNull);
+      await passAudit(api, 7);
+      final quadratic = await passAudit(api, 5);
+      // concept × (1 + 0.5 × 2) × 1.1^1 × 10 = 44
+      expect(quadratic.rewardAmount, 44);
       // The multiplier grows with the number of mastered nodes (level = mastered ~/ 5 + 1).
-      await passAudit(api, 3);
-      await passAudit(api, 4);
-      final fifth = await passAudit(api, 5);
+      await passAudit(api, 9);
+      final fifth = await passAudit(api, 10);
       expect(fifth.rewardMultiplier, 1.21);
     });
   });
@@ -409,24 +421,24 @@ void main() {
   group('reflection', () {
     test('only for a failed audit and only once', () async {
       final api = await seededFakeApi();
-      final active = await api.startAudit(1);
+      final active = await api.startAudit(6);
       final notFailed = await failure(() => api.submitReflection(active.session.id, 'x'));
       expect(notFailed.statusCode, 400);
       expect(notFailed.serverMessage, 'reflection is only accepted for a failed audit');
 
-      final passed = await api.startAudit(1);
+      final passed = await api.startAudit(6);
       await playTwoAnswers(api, passed.session.id, longAnswer, longAnswer);
       final afterPass = await failure(() => api.submitReflection(passed.session.id, 'x'));
       expect(afterPass.serverMessage, 'reflection is only accepted for a failed audit');
 
-      final failed = await failAudit(api, 1);
+      final failed = await failAudit(api, 6);
       await api.submitReflection(failed.sessionId, 'I could not give the reason');
       final twice = await failure(() => api.submitReflection(failed.sessionId, 'again'));
       expect(twice.statusCode, 400);
       expect(twice.serverMessage, 'reflection already submitted for this audit');
 
       expect((await failure(() => api.submitReflection(999, 'x'))).statusCode, 404);
-      final failed2 = await failAudit(api, 1);
+      final failed2 = await failAudit(api, 6);
       expect((await failure(() => api.submitReflection(failed2.sessionId, '  '))).statusCode, 422);
       await api.submitReflection(
         failed2.sessionId,
@@ -444,6 +456,7 @@ void main() {
       // The root title is cut at a word boundary (40 here); the “Revisit …” wrapper is longer than 40.
       final root = (await api.listSkills()).first;
       expect(root.title, 'An introductory course in a really quite');
+      api.debugSetStatus(root.id, SkillStatus.available); // it opens last
       final failed = await failAudit(api, root.id);
       final p = await api.submitReflection(failed.sessionId, 'b' * 80);
       expect(p.title.runes.length, lessThanOrEqualTo(40));
@@ -456,8 +469,9 @@ void main() {
   group('Memory Retriever', () {
     Future<FakeApiClient> mathWithOpenNodes() async {
       final api = await seededFakeApi();
-      for (final id in [1, 2, 4]) {
-        await passAudit(api, id); // opens 2,3,4 / 5,8 / 11,12
+      // Discriminant (6) is open; open three more by hand.
+      for (final id in [5, 8, 12]) {
+        api.debugSetStatus(id, SkillStatus.available);
       }
       return api;
     }
@@ -498,9 +512,7 @@ void main() {
     test('a lesson from a direct contains neighbour is found', () async {
       final api = await mathWithOpenNodes();
       await lesson(api, 5, 'a misconception from the parent node');
-      // Quadratic Equations (5) is the contains parent of Discriminant (6) — which is still locked,
-      // so audit Sequences (8) whose neighbours are Algebra (2) and Limits of Sequences (11) instead.
-      await passAudit(api, 5);
+      // Quadratic Equations (5) is the contains parent of Discriminant (6).
       expect(await firstProbe(api, 6), contains('a misconception from the parent node'));
     });
 
@@ -514,7 +526,6 @@ void main() {
 
     test('a lesson linked by the Linker to a nearby lesson is found', () async {
       final api = await mathWithOpenNodes();
-      await passAudit(api, 5);
       await lesson(
         api,
         5,
@@ -706,13 +717,13 @@ void main() {
 
     test('facts are computed from the state', () async {
       final api = await seededFakeApi();
-      await passAudit(api, 1);
-      await failAudit(api, 2);
-      await api.startAudit(2); // an abandoned session is not counted
+      await passAudit(api, 6);
+      await failAudit(api, 7);
+      await api.startAudit(7); // an abandoned session is not counted
       final f = (await api.getBriefing()).facts;
       expect(f.nodes.mastered, 1);
-      expect(f.nodes.available, 3);
-      expect(f.nodes.locked, 8);
+      expect(f.nodes.available, 1);
+      expect(f.nodes.locked, 10);
       expect(f.audits.passed, 1);
       expect(f.audits.failed, 1);
       expect(f.audits.total, 2);
@@ -720,35 +731,34 @@ void main() {
 
     test('misconceptions that overlap form one cluster; cross-skill ones come first', () async {
       final api = await seededFakeApi();
-      await passAudit(api, 1);
-      await passAudit(api, 3);
+      await passAudit(api, 6); // opens Roots and Coefficients (7)
       Future<void> lesson(int skillId, String m) async {
         final f = await failAudit(api, skillId);
         await api.submitReflection(f.sessionId, m);
       }
 
-      await lesson(2, 'a completely different kind of mistake, lol');
-      await lesson(2, 'thought no real roots means no solution');
-      await lesson(3, 'saw no real roots as no solution'); // Functions (3): same idea, other skill
+      await lesson(6, 'a completely different kind of mistake, lol');
+      await lesson(6, 'thought no real roots means no solution');
+      await lesson(7, 'saw no real roots as no solution'); // same idea, other skill
       final clusters = (await api.getBriefing()).facts.misconceptionClusters;
       expect(clusters, hasLength(2));
       final cross = clusters.first;
       expect(cross.crossSkill, isTrue);
       expect(cross.occurrences, 2);
       expect(cross.label, 'thought no real roots means no solution');
-      expect(cross.skills, ['Algebra', 'Functions']);
+      expect(cross.skills, ['Discriminant', 'Roots and Coefficients']);
       expect(cross.principleIds, hasLength(2));
       final single = clusters.last;
       expect(single.crossSkill, isFalse);
       expect(single.occurrences, 1);
-      expect(single.skills, ['Algebra']);
+      expect(single.skills, ['Discriminant']);
     });
 
     test('the narrative is cut to 400 characters', () async {
       final api = await seededFakeApi();
       for (var i = 0; i < 9; i++) {
         final label = String.fromCharCodes([for (var j = 0; j < 40; j++) 0x100 + i * 100 + j * 2]);
-        final f = await failAudit(api, 1);
+        final f = await failAudit(api, 6);
         await api.submitReflection(f.sessionId, label);
       }
       final b = await api.narrate();
@@ -780,7 +790,7 @@ void main() {
 
     test('the narrator builds a narrative of at most 400 characters', () async {
       final api = await seededFakeApi();
-      await passAudit(api, 1);
+      await passAudit(api, 6);
       final b = await api.narrate();
       expect(b.narrative, startsWith("You've cleared 1 of 12 nodes."));
       expect(b.narrativeGeneratedAt, isNotNull);
@@ -789,10 +799,10 @@ void main() {
     test('the narrator pluralizes: 1 time / n times, 1 day / n days', () async {
       final api = await seededFakeApi();
       await api.checkInVoice('Last night I slept eight hours.');
-      final f = await failAudit(api, 1);
+      final f = await failAudit(api, 6);
       await api.submitReflection(f.sessionId, 'thought the rule always holds');
       final one = (await api.narrate()).narrative!;
-      expect(one, contains('showed up 1 time in High School Math.'));
+      expect(one, contains('showed up 1 time in Discriminant.'));
       expect(one, contains('Average sleep over the last day: 8 h.'));
     });
 
@@ -802,14 +812,17 @@ void main() {
       expect(map.nodes.first.title, 'New Topic');
     });
 
-    test('the planner needs an available node; a fresh course offers the root only', () async {
-      final api = newApi();
-      expect((await failure(api.generatePlan)).statusCode, 400);
-      await api.generateCourse(const GenerateRequest(topic: 'math'));
-      final plan = await api.generatePlan();
-      expect(plan.steps.map((s) => s.skillTitle), ['High School Math']);
-      expect(plan.suggestedTier, Tier.medium);
-    });
+    test(
+      'the planner needs an available node; a fresh course offers its first node only',
+      () async {
+        final api = newApi();
+        expect((await failure(api.generatePlan)).statusCode, 400);
+        await api.generateCourse(const GenerateRequest(topic: 'math'));
+        final plan = await api.generatePlan();
+        expect(plan.steps.map((s) => s.skillTitle), ['Discriminant']);
+        expect(plan.suggestedTier, Tier.medium);
+      },
+    );
   });
 
   group('uploads', () {
@@ -881,7 +894,7 @@ void main() {
 
     test('by misconception id: searches for that lesson card misconception', () async {
       final api = await seededFakeApi();
-      final failed = await failAudit(api, 1);
+      final failed = await failAudit(api, 6);
       final p = await api.submitReflection(
         failed.sessionId,
         'I thought no real roots means no solution',
@@ -924,7 +937,7 @@ void main() {
 
     test('the default message is the one of the endpoint', () async {
       final api = await seededFakeApi();
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       api.failNext();
       expect(
         (await failure(() => api.submitTurn(s.session.id, 'x'))).serverMessage,
@@ -959,7 +972,7 @@ void main() {
 
     test('a failed call has no effect on the state', () async {
       final api = await seededFakeApi();
-      final s = await api.startAudit(1);
+      final s = await api.startAudit(6);
       api.failNext(method: 'submitTurn');
       await failure(() => api.submitTurn(s.session.id, longAnswer));
       // The failed answer was not stored: this is still the first answer → a probe.
@@ -975,10 +988,10 @@ void main() {
       api.failNext(statusCode: 404, message: 'skill not found', method: 'startAudit');
       expect(await api.listCourses(), hasLength(1)); // passes
       expect(await api.getBriefing(), isA<Briefing>()); // passes
-      final e = await failure(() => api.startAudit(1));
+      final e = await failure(() => api.startAudit(6));
       expect(e.statusCode, 404);
       expect(e.serverMessage, 'skill not found');
-      await api.startAudit(1); // consumed
+      await api.startAudit(6); // consumed
     });
 
     test('times, a custom message, network failures and clearFailures', () async {
@@ -986,7 +999,7 @@ void main() {
       api.failNext(statusCode: 400, message: 'skill is locked', times: 2);
       final first = await failure(() => api.listCourses());
       expect(first.statusCode, 400);
-      expect(first.userMessage, 'This node is locked. Clear its parent first.');
+      expect(first.userMessage, 'This node is locked. Clear the nodes before it first.');
       expect((await failure(() => api.listCourses())).statusCode, 400);
       expect(await api.listCourses(), isNotEmpty);
 

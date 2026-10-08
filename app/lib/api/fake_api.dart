@@ -26,11 +26,13 @@ import 'reflection_prompts.dart';
 ///   still accepted as a fallback) yields the 12-node math course (any
 ///   settings); with `searchSyllabus` it is based on
 ///   `High School Mathematics Curriculum (Ministry of Education)`. Any other topic yields a generic
-///   10-node course. Only the root is `available`; the rest is `locked`.
+///   10-node course. Only the first node of its learning order is
+///   `available` (`learningOrder`: parts before what contains them, the root
+///   last); the rest is `locked`.
 ///   Settings are validated like the server does (422).
-/// * **Unlocking**: passing a node marks it `mastered` and unlocks every
-///   `locked` node that has it as a contains parent (so a node with two
-///   parents opens when either is mastered). `requires` edges never block.
+/// * **Unlocking**: passing a node marks it `mastered` and opens the next node
+///   of the course's learning order; every other node not mastered stays
+///   `locked`.
 /// * **Audits**: the first answer gets a probe (it names the most recent
 ///   lesson from the Memory Retriever if there is one); later answers get a
 ///   verdict. Pass needs ≥ 80 characters in total and no `don't know` / `not sure`
@@ -210,6 +212,13 @@ class FakeApiClient implements SelfInfinityApi {
     _nodes[skillId] = node.copyWith(nodeType: type);
   }
 
+  /// Sets a node's status directly, e.g. to open a node further along the
+  /// learning order than the one the course has open.
+  void debugSetStatus(int skillId, SkillStatus status) {
+    final node = _nodes[skillId] ?? (throw StateError('No skill node $skillId'));
+    _nodes[skillId] = node.copyWith(status: status);
+  }
+
   // ===========================================================================
   // course creation (only the chat uses it; tests seed with it)
   // ===========================================================================
@@ -269,7 +278,7 @@ class FakeApiClient implements SelfInfinityApi {
           slug: specs[i].slug,
           title: specs[i].title,
           description: specs[i].description,
-          status: i == 0 ? SkillStatus.available : SkillStatus.locked,
+          status: SkillStatus.locked,
           nodeType: NodeType.concept,
         ),
     ];
@@ -295,7 +304,12 @@ class FakeApiClient implements SelfInfinityApi {
       _nodes[n.id] = n;
     }
     _edges.addAll(edges);
-    return CourseMap(course: course, nodes: nodes, edges: edges);
+    _openNext(course.id);
+    return CourseMap(
+      course: course,
+      nodes: [for (final n in nodes) _nodes[n.id]!],
+      edges: edges,
+    );
   }
 
   // ===========================================================================
@@ -1095,6 +1109,28 @@ class FakeApiClient implements SelfInfinityApi {
     return goal;
   }
 
+  /// Opens the first node of the course's learning order that is not
+  /// mastered and locks the other unmastered ones; returns the ids it opened.
+  List<int> _openNext(int courseId) {
+    final nodes = [
+      for (final n in _nodes.values)
+        if (n.courseId == courseId) n,
+    ];
+    final opened = <int>[];
+    var found = false;
+    for (final id in learningOrder(nodes, _edges)) {
+      final n = _nodes[id]!;
+      if (n.isMastered) continue;
+      final want = found ? SkillStatus.locked : SkillStatus.available;
+      found = true;
+      if (n.status != want) {
+        _nodes[id] = n.copyWith(status: want);
+        if (want == SkillStatus.available) opened.add(id);
+      }
+    }
+    return opened;
+  }
+
   @override
   Future<Goal> updateGoal(int goalId, {String? title, List<int>? courseIds}) async {
     await _begin('updateGoal');
@@ -1300,15 +1336,7 @@ class FakeApiClient implements SelfInfinityApi {
     );
     _nodes[mastered.id] = mastered;
 
-    // Every locked contains-child becomes available.
-    final unlocked = <int>[];
-    for (final childId in containsChildren(mastered.id, _edges)) {
-      final child = _nodes[childId]!;
-      if (child.isLocked) {
-        _nodes[childId] = child.copyWith(status: SkillStatus.available);
-        unlocked.add(childId);
-      }
-    }
+    final unlocked = _openNext(mastered.courseId);
 
     // Reward: base 10 × difficulty × 1.1^level (level = mastered nodes ~/ 5 + 1).
     final typeWeight = mastered.nodeType == NodeType.concept ? 2.0 : 1.0;

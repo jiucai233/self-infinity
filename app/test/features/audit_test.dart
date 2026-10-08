@@ -84,6 +84,9 @@ void main() {
 
   setUp(() async {
     api = await seededFakeApi();
+    // The course opens at Discriminant (6); these tests take the root (1) on
+    // too, whose question names the whole field.
+    api.debugSetStatus(1, SkillStatus.available);
   });
 
   group('opening', () {
@@ -115,7 +118,7 @@ void main() {
     );
 
     testWidgets('a branch node gets its branch question', (tester) async {
-      await passAudit(api, 1);
+      api.debugSetStatus(2, SkillStatus.available);
       await pumpAudit(tester, api, 2);
       expect(bubble(tester), contains('“Algebra” covers Quadratic Equations, Sequences.'));
     });
@@ -151,7 +154,7 @@ void main() {
 
     testWidgets('a locked node cannot be audited: the error with a retry', (tester) async {
       await pumpAudit(tester, api, 5);
-      expect(find.text('This node is locked. Clear its parent first.'), findsOneWidget);
+      expect(find.text('This node is locked. Clear the nodes before it first.'), findsOneWidget);
       expect(find.text('Try again'), findsOneWidget);
     });
 
@@ -203,7 +206,7 @@ void main() {
       ) async {
         final slow = _SlowTurnApi();
         await slow.generateCourse(const GenerateRequest(topic: 'math'));
-        await pumpAudit(tester, slow, 1);
+        await pumpAudit(tester, slow, 6);
         await type(tester, 'ans');
         await tester.tap(find.byKey(const Key('send')));
         await tester.pump();
@@ -247,7 +250,7 @@ void main() {
       (
         tester,
       ) async {
-        await pumpAudit(tester, api, 1);
+        await pumpAudit(tester, api, 6);
         await passIt(tester);
         await closeCelebration(tester); // the card floats over the column
         final v = (await api.listAudits()).first;
@@ -257,7 +260,8 @@ void main() {
         expect(avatar(tester).mood, AvatarMood.happy);
         expect(avatar(tester).agent, 'auditor');
         expect(inputVisible(tester), isFalse);
-        expect((await api.getSkillOverview(2)).skill.status, SkillStatus.available);
+        // The next node of the learning order opened.
+        expect((await api.getSkillOverview(7)).skill.status, SkillStatus.available);
         expect(find.text('Passed'), findsOneWidget); // the chip in the title bar
         expect(find.byKey(const Key('audit-next')), findsNothing); // no lesson card for a pass
       },
@@ -334,10 +338,11 @@ void main() {
     );
 
     testWidgets('a level up shows Lv N → N+1 (the stage data was refreshed)', (tester) async {
-      for (final id in [1, 2, 3, 4]) {
+      // The first four of the learning order; Quadratic Functions (10) is next.
+      for (final id in [6, 7, 5, 9]) {
         await passAudit(api, id);
       }
-      await pumpAudit(tester, api, 5);
+      await pumpAudit(tester, api, 10);
       expect(find.text('Lv 1 · 4/5'), findsOneWidget);
       await passIt(tester);
       expect(find.byKey(const Key('celebration-level')), findsOneWidget);
@@ -355,33 +360,26 @@ void main() {
     testWidgets('the newly unlocked nodes are blue chips; a tap opens that node (scene 4)', (
       tester,
     ) async {
-      await pumpAudit(tester, api, 1);
+      await pumpAudit(tester, api, 6);
       await passIt(tester);
-      // High School Math opens Algebra, Functions, Calculus.
+      // Discriminant opens the next node of the order, Roots and Coefficients.
       expect(find.text('New nodes unlocked'), findsOneWidget);
-      for (final id in [2, 3, 4]) {
-        expect(find.byKey(Key('unlocked-$id')), findsOneWidget);
-      }
-      expect(textsIn(tester, celebration), containsAll(['Algebra', 'Functions', 'Calculus']));
+      expect(find.byKey(const Key('unlocked-7')), findsOneWidget);
+      expect(textsIn(tester, celebration), contains('Roots and Coefficients'));
       final chip = tester.widget<Material>(
         find
-            .descendant(of: find.byKey(const Key('unlocked-3')), matching: find.byType(Material))
+            .descendant(of: find.byKey(const Key('unlocked-7')), matching: find.byType(Material))
             .first,
       );
       expect(chip.color, AppColors.primarySoft);
-      await tester.tap(find.byKey(const Key('unlocked-3')));
+      await tester.tap(find.byKey(const Key('unlocked-7')));
       await tester.pumpAndSettle();
-      expect(find.text('route:/skill/3'), findsOneWidget);
+      expect(find.text('route:/skill/7'), findsOneWidget);
     });
 
     testWidgets('a pass that opens nothing has no chips', (tester) async {
-      await passAudit(api, 1);
-      await passAudit(api, 2);
-      await passAudit(api, 3);
-      await passAudit(api, 4);
-      await passAudit(api, 5);
-      await passAudit(api, 6);
-      await pumpAudit(tester, api, 7); // Roots and Coefficients: its leaves 10 needs 9 too
+      // The root, opened by hand: the next node (6) is open already.
+      await pumpAudit(tester, api, 1);
       await passIt(tester);
       expect(celebration, findsOneWidget);
       expect(find.text('New nodes unlocked'), findsNothing);
@@ -398,11 +396,11 @@ void main() {
       expect(textOf(tester, 'verdict-title'), 'Cleared.');
       expect(avatar(tester).mood, AvatarMood.happy);
       // A fresh pass in a new scene, then Back to node.
-      await pumpAudit(tester, api, 2);
+      await pumpAudit(tester, api, 6);
       await passIt(tester);
       await tester.tap(find.byKey(const Key('celebration-continue')));
       await tester.pumpAndSettle();
-      expect(find.text('route:/skill/2'), findsOneWidget);
+      expect(find.text('route:/skill/6'), findsOneWidget);
     });
 
     testWidgets('a failing unlock lookup only leaves the chips out', (tester) async {
@@ -487,7 +485,9 @@ void main() {
   });
 
   group('a fail', () {
-    testWidgets('angry face and the verdict card: Not yet., the score, the comment', (tester) async {
+    testWidgets('angry face and the verdict card: Not yet., the score, the comment', (
+      tester,
+    ) async {
       await pumpAudit(tester, api, 1);
       await failIt(tester);
       expect(textOf(tester, 'verdict-title'), 'Not yet.');
@@ -509,7 +509,10 @@ void main() {
       final gaps = (await api.listAudits()).first;
       expect(find.text('What was missing'), findsOneWidget);
       expect(
-        find.descendant(of: verdictCard, matching: find.textContaining('You stated the definition')),
+        find.descendant(
+          of: verdictCard,
+          matching: find.textContaining('You stated the definition'),
+        ),
         findsOneWidget,
       );
       expect(find.byKey(const Key('verdict-gap-1')), findsOneWidget);
