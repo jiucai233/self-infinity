@@ -128,6 +128,9 @@ class FakeApiClient implements SelfInfinityApi {
     'getLife',
     'requestLifeAdvice',
     'editCheckIn',
+    'addLifeFact',
+    'editLifeFact',
+    'deleteLifeFact',
     'getSkillOverview',
     'listAudits',
     'uploadFile',
@@ -837,6 +840,10 @@ class FakeApiClient implements SelfInfinityApi {
     } on ApiException catch (e) {
       out.add(assistant('front_desk', _pipelineFailure(intent, e)));
     }
+    // A check-in or plain chat also goes to the Fact Keeper (#40).
+    if (intent is _CheckIn || (intent is _None && files.isEmpty && courseTopic == null)) {
+      _keepFacts(message);
+    }
     _chat.addAll(out.skip(1));
     return out;
   }
@@ -1117,6 +1124,154 @@ class FakeApiClient implements SelfInfinityApi {
     return checkIn;
   }
 
+  // -- 40: lasting facts ---------------------------------------------------------
+
+  static const int maxFacts = 20;
+  final List<LifeFact> _lifeFacts = []; // creation order
+  int _nextFactId = 1;
+
+  List<LifeFact> get _holding => [
+    for (final f in _lifeFacts.reversed)
+      if (f.endedAt == null) f,
+  ];
+
+  void _putFact(LifeFact fact) {
+    final i = _lifeFacts.indexWhere((f) => f.id == fact.id);
+    if (i < 0) {
+      _lifeFacts.add(fact);
+    } else {
+      _lifeFacts[i] = fact;
+    }
+  }
+
+  LifeFact _endFact(LifeFact f) => LifeFact(
+    id: f.id,
+    category: f.category,
+    text: f.text,
+    said: f.said,
+    createdAt: f.createdAt,
+    endedAt: _clock(),
+    replacesId: f.replacesId,
+  );
+
+  /// The server Mock's Fact Keeper: injuries and healing, night shifts, a
+  /// vegetarian or vegan diet and exam periods; nothing else.
+  void _keepFacts(String said) {
+    LifeFact? holds(String word) =>
+        _holding.where((f) => f.text.toLowerCase().contains(word.toLowerCase())).firstOrNull;
+    void add(FactCategory category, String text) {
+      if (_holding.length >= maxFacts) return;
+      if (_holding.any((f) => f.text.toLowerCase() == text.toLowerCase())) return;
+      _lifeFacts.add(
+        LifeFact(
+          id: _nextFactId++,
+          category: category,
+          text: text,
+          said: true,
+          createdAt: _clock(),
+        ),
+      );
+    }
+
+    final healed = _healedPattern.firstMatch(said);
+    final injured = _injuredPattern.firstMatch(said);
+    if (healed != null) {
+      final fact = holds(healed.group(1) ?? healed.group(2)!);
+      if (fact != null) _putFact(_endFact(fact));
+    } else if (injured != null) {
+      final part = (injured.group(1) ?? injured.group(2)!).toLowerCase();
+      if (holds(part) == null) {
+        add(FactCategory.health, '${part[0].toUpperCase()}${part.substring(1)} injury');
+      }
+    }
+    if (_nightShiftPattern.hasMatch(said)) add(FactCategory.schedule, 'Works night shifts');
+    final diet = _dietPattern.firstMatch(said);
+    if (diet != null) {
+      final d = diet.group(1)!.toLowerCase();
+      add(FactCategory.preference, '${d[0].toUpperCase()}${d.substring(1)}');
+    }
+    final exams = _examsPattern.firstMatch(said);
+    if (exams != null) add(FactCategory.schedule, 'Exams until ${exams.group(1)!.trim()}');
+  }
+
+  static const String _factsFull = 'You can keep $maxFacts lasting facts. End or delete one first.';
+
+  LifeFact _fact(int id) =>
+      _lifeFacts.where((f) => f.id == id).firstOrNull ??
+      (throw const ApiException(404, 'fact not found'));
+
+  String _factText(String text) {
+    final t = text.trim().split(RegExp(r'\s+')).join(' ');
+    _require(t.isNotEmpty && t.length <= LifeFact.maxLength, 'text must be 1-120 characters');
+    return t;
+  }
+
+  @override
+  Future<LifeFact> addLifeFact(String text, {FactCategory category = FactCategory.other}) async {
+    await _begin('addLifeFact');
+    final clean = _factText(text);
+    if (_holding.length >= maxFacts) throw const ApiException(409, _factsFull);
+    final fact = LifeFact(
+      id: _nextFactId++,
+      category: category,
+      text: clean,
+      said: false,
+      createdAt: _clock(),
+    );
+    _lifeFacts.add(fact);
+    return fact;
+  }
+
+  @override
+  Future<LifeFact> editLifeFact(
+    int id, {
+    String? text,
+    FactCategory? category,
+    bool? ended,
+  }) async {
+    await _begin('editLifeFact');
+    final old = _fact(id);
+    final clean = text == null ? null : _factText(text);
+    var endedAt = old.endedAt;
+    if (ended == true && endedAt == null) endedAt = _clock();
+    if (ended == false && endedAt != null) {
+      if (_holding.length >= maxFacts) throw const ApiException(409, _factsFull);
+      endedAt = null;
+    }
+    final fact = LifeFact(
+      id: old.id,
+      category: category ?? old.category,
+      text: clean ?? old.text,
+      said: old.said,
+      createdAt: old.createdAt,
+      endedAt: endedAt,
+      replacesId: old.replacesId,
+    );
+    _putFact(fact);
+    return fact;
+  }
+
+  @override
+  Future<void> deleteLifeFact(int id) async {
+    await _begin('deleteLifeFact');
+    _fact(id);
+    _lifeFacts.removeWhere((f) => f.id == id);
+    for (final f in [..._lifeFacts]) {
+      if (f.replacesId == id) {
+        _putFact(
+          LifeFact(
+            id: f.id,
+            category: f.category,
+            text: f.text,
+            said: f.said,
+            createdAt: f.createdAt,
+            endedAt: f.endedAt,
+          ),
+        );
+      }
+    }
+  }
+
   /// The server's `services/life.py`, over [window] days ending today (KST).
   Life _life(int window) {
     final kst = toKst(_clock());
@@ -1221,6 +1376,10 @@ class FakeApiClient implements SelfInfinityApi {
       patterns: patterns,
       patternMinDays: minDays,
       advice: _lifeAdvice,
+      facts: _holding,
+      pastFacts: [..._lifeFacts.where((f) => f.endedAt != null)]
+        ..sort((a, b) => b.endedAt!.compareTo(a.endedAt!)),
+      maxFacts: maxFacts,
     );
   }
 
@@ -1363,6 +1522,8 @@ class FakeApiClient implements SelfInfinityApi {
           ),
     ];
     _chat.addAll(saved);
+    final said = saved.where((m) => m.role == ChatRole.user).map((m) => m.content).join('\n');
+    if (said.isNotEmpty) _keepFacts(said);
     return saved;
   }
 
@@ -2335,6 +2496,18 @@ final RegExp _sleepQualityPattern = RegExp(
   r'\bsleep quality (?:was |is |of )?(\d)\b',
   caseSensitive: false,
 );
+
+final RegExp _injuredPattern = RegExp(
+  r'\b(?:hurt|injured|sprained|broke|pulled) my (\w+)|\bmy (\w+) (?:is|got) (?:injured|hurt|sprained)',
+  caseSensitive: false,
+);
+final RegExp _healedPattern = RegExp(
+  r'\bmy (\w+) (?:is|feels) (?:fine|better|healed|ok|okay)\b|\b(\w+) (?:has )?healed\b',
+  caseSensitive: false,
+);
+final RegExp _nightShiftPattern = RegExp(r'\bnight shifts?\b', caseSensitive: false);
+final RegExp _dietPattern = RegExp(r'\b(vegetarian|vegan)\b', caseSensitive: false);
+final RegExp _examsPattern = RegExp(r'\bexams? until ([^.,!?\n]+)', caseSensitive: false);
 
 /// Weight, minutes of exercise and a numbered sleep quality, only when said
 /// (the server Mock's `_checkin_extras`).

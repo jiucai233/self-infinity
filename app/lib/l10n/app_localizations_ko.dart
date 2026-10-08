@@ -1253,5 +1253,70 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get lifePrivacy => '우리 데이터베이스에 저장돼요. 조언을 만들 때 AI는 평균과 패턴만 받고, 하루하루의 기록은 받지 않아요.';
+  String get lifePrivacy => '우리 데이터베이스에 저장돼요. 조언을 만들 때 AI는 평균, 패턴, 지속되는 상황만 받고, 하루하루의 기록은 받지 않아요.';
+
+  @override
+  String get lifeFacts => '지속되는 상황';
+
+  @override
+  String get lifeFactsEmpty => '부상, 야간 근무, 시험처럼 몇 주 동안 이어지는 상황이에요. 체크인할 때 말하면 기록되고, 직접 추가할 수도 있어요.';
+
+  @override
+  String get lifeFactAdd => '추가';
+
+  @override
+  String get lifeFactNew => '새 상황';
+
+  @override
+  String get lifeFactHint => '예: 무릎 부상, 11월 19일까지 달리기 금지';
+
+  @override
+  String lifeFactSince(String date) {
+    return '$date부터';
+  }
+
+  @override
+  String lifeFactSpan(String start, String end) {
+    return '$start – $end';
+  }
+
+  @override
+  String get lifeFactSaid => '말한 내용에서';
+
+  @override
+  String get lifeFactEdit => '수정';
+
+  @override
+  String get lifeFactEnd => '더 이상 아님';
+
+  @override
+  String get lifeFactRestore => '아직 그대로';
+
+  @override
+  String get lifeFactDeleteConfirm => '완전히 삭제할까요? ‘더 이상 아님’으로 두면 기록으로 남아요.';
+
+  @override
+  String lifeFactPast(int n) {
+    return '지난 상황 ($n)';
+  }
+
+  @override
+  String lifeFactsFull(int n) {
+    return '최대 $n개까지 둘 수 있어요. 먼저 하나를 끝내거나 삭제하세요.';
+  }
+
+  @override
+  String get factHealth => '건강';
+
+  @override
+  String get factSchedule => '일정';
+
+  @override
+  String get factConstraint => '제약';
+
+  @override
+  String get factPreference => '선호';
+
+  @override
+  String get factOther => '기타';
 }

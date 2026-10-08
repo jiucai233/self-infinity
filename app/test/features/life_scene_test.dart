@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/fake_api.dart';
+import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/features/life/life_scene.dart';
 
 import '../support/scene_helpers.dart';
@@ -109,5 +110,120 @@ void main() {
     await tester.tap(key('life-window-7'));
     await tester.pumpAndSettle();
     expect(find.text('Last 7 days'), findsOneWidget);
+  });
+
+  // -- lasting facts (#40) ------------------------------------------------------
+
+  testWidgets('lasting: empty says how facts get there', (tester) async {
+    await pumpScene(tester, const LifeScene(), api: newApi());
+    expect(find.textContaining('Things that hold for weeks'), findsOneWidget);
+    expect(key('life-facts-past'), findsNothing);
+  });
+
+  testWidgets('a fact said in chat shows with where it came from', (tester) async {
+    final api = newApi();
+    await api.sendChat('fyi I hurt my knee playing football');
+    await pumpScene(tester, const LifeScene(), api: api);
+
+    final id = (await api.getLife()).facts.single.id;
+    expect(
+      textsIn(tester, key('life-fact-$id')),
+      ['Knee injury', 'Health · since Oct 8 · from what you said'],
+    );
+  });
+
+  testWidgets('adding one types the text and picks a kind', (tester) async {
+    final api = newApi();
+    await pumpScene(tester, const LifeScene(), api: api);
+
+    await tester.tap(key('life-fact-add'));
+    await tester.pumpAndSettle();
+    await tester.enterText(key('fact-text'), 'No screens after 23:00');
+    await tester.tap(key('fact-category-constraint'));
+    await tester.tap(key('fact-save'));
+    await tester.pumpAndSettle();
+
+    expect(key('life-fact-dialog'), findsNothing);
+    final fact = (await api.getLife()).facts.single;
+    expect((fact.text, fact.category, fact.said), ('No screens after 23:00', FactCategory.constraint, false));
+    expect(find.text('No screens after 23:00'), findsOneWidget);
+  });
+
+  testWidgets('ending one folds it under Past, and it can come back', (tester) async {
+    final api = newApi();
+    final fact = await api.addLifeFact('Exams until Friday', category: FactCategory.schedule);
+    await pumpScene(tester, const LifeScene(), api: api);
+
+    await tester.ensureVisible(key('life-fact-menu-${fact.id}'));
+    await tester.tap(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
+    await tester.tap(key('fact-end'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Exams until Friday'), findsNothing);
+    expect(find.text('Past (1)'), findsOneWidget);
+    await tester.tap(key('life-facts-past'));
+    await tester.pumpAndSettle();
+    expect(textsIn(tester, key('life-fact-${fact.id}')).last, 'Schedule · Oct 8 – Oct 8');
+
+    await tester.tap(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
+    await tester.tap(key('fact-restore'));
+    await tester.pumpAndSettle();
+    expect((await api.getLife()).facts.single.endedAt, isNull);
+    expect(key('life-facts-past'), findsNothing);
+  });
+
+  testWidgets('editing fixes the wording in place', (tester) async {
+    final api = newApi();
+    final fact = await api.addLifeFact('Knee injry');
+    await pumpScene(tester, const LifeScene(), api: api);
+
+    await tester.ensureVisible(key('life-fact-menu-${fact.id}'));
+    await tester.tap(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
+    await tester.tap(key('fact-edit'));
+    await tester.pumpAndSettle();
+    await tester.enterText(key('fact-text'), 'Knee injury');
+    await tester.tap(key('fact-save'));
+    await tester.pumpAndSettle();
+
+    final now = (await api.getLife()).facts.single;
+    expect((now.id, now.text), (fact.id, 'Knee injury'));
+  });
+
+  testWidgets('deleting asks first', (tester) async {
+    final api = newApi();
+    final fact = await api.addLifeFact('Vegetarian');
+    await pumpScene(tester, const LifeScene(), api: api);
+
+    await tester.ensureVisible(key('life-fact-menu-${fact.id}'));
+    await tester.tap(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
+    await tester.tap(key('fact-delete'));
+    await tester.pumpAndSettle();
+    expect(key('fact-delete-dialog'), findsOneWidget);
+    await tester.tap(key('fact-delete-confirm'));
+    await tester.pumpAndSettle();
+
+    expect((await api.getLife()).facts, isEmpty);
+    expect(find.text('Vegetarian'), findsNothing);
+  });
+
+  testWidgets('a full list says so in the dialog', (tester) async {
+    final api = newApi();
+    for (var i = 0; i < 20; i++) {
+      await api.addLifeFact('fact $i');
+    }
+    await pumpScene(tester, const LifeScene(), api: api);
+
+    await tester.tap(key('life-fact-add'));
+    await tester.pumpAndSettle();
+    await tester.enterText(key('fact-text'), 'one more');
+    await tester.tap(key('fact-save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('You can keep 20. End or delete one first.'), findsOneWidget);
+    expect(key('life-fact-dialog'), findsOneWidget);
   });
 }

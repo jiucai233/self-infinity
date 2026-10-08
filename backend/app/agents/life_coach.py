@@ -2,8 +2,9 @@
 numbers.
 
 It sees only coarse facts (app/services/life.py `coach_facts`): averages, counts, a weight change
-and the player's own patterns with their day counts, next to their identity, win condition, rules
-and main quests. Never a day's row or a meal. It coaches; it does not diagnose: no medical or
+and the player's own patterns with their day counts, next to their identity, win condition, rules,
+main quests and the lasting facts they have told us (an injury, a work shift; contract #40).
+Never a day's row or a meal. It coaches; it does not diagnose: no medical or
 psychological judgement, no medication, no calorie counting or diet plans. Patterns are the
 player's own few days, so it offers them as something to test, never as a cause.
 """
@@ -40,6 +41,9 @@ Rules:
 - "patterns" compare the player's own days in two groups, with day counts.
   They are few days and many things differ between them: offer a pattern as
   something to try and watch, never as a cause.
+- "lasting" are things the player told us hold for a while (an injury, a
+  work shift, exams). Never advise against them: no running on an injured
+  knee, no early mornings for a night-shift worker. A piece may rest on one.
 - Small and concrete: one thing they can do this week, tied to their win
   condition, rules or main quests when it fits.
 - With few days logged, one piece may be about logging more days.

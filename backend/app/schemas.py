@@ -10,7 +10,7 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models import AuditStatus, CheckInSource, EdgeKind, NodePosition, NodeType, SkillStatus
+from app.models import AuditStatus, CheckInSource, EdgeKind, FactCategory, FactSource, NodePosition, NodeType, SkillStatus
 
 
 def _not_blank(value: str) -> str:
@@ -345,6 +345,56 @@ class LifeAdviceOut(BaseModel):
     generated_at: datetime
 
 
+FACT_CHARS = 120
+
+
+class LifeFactOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    category: FactCategory
+    text: str
+    source: FactSource
+    created_at: datetime
+    ended_at: datetime | None
+    replaces_id: int | None
+
+
+def _fact_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = " ".join(value.split())
+    if not text:
+        raise ValueError("text is empty")
+    return text
+
+
+class LifeFactIn(BaseModel):
+    """POST /life/facts: a fact the player types."""
+
+    category: FactCategory = FactCategory.other
+    text: str = Field(max_length=FACT_CHARS)
+
+    @field_validator("text")
+    @classmethod
+    def _clean_text(cls, value: str | None) -> str | None:
+        return _fact_text(value)
+
+
+class LifeFactEdit(BaseModel):
+    """PATCH /life/facts/{id}: fix the wording or category, end it (ended=true) or bring an
+    ended one back (ended=false). Fields not sent stay."""
+
+    category: FactCategory | None = None
+    text: str | None = Field(default=None, max_length=FACT_CHARS)
+    ended: bool | None = None
+
+    @field_validator("text")
+    @classmethod
+    def _clean_text(cls, value: str | None) -> str | None:
+        return _fact_text(value)
+
+
 class LifeOut(BaseModel):
     summary: LifeSummaryOut
     days: list[LifeDayOut]  # every day of the window, oldest first
@@ -352,6 +402,9 @@ class LifeOut(BaseModel):
     # Days each group needs before a pattern is shown.
     pattern_min_days: int
     advice: LifeAdviceOut | None
+    facts: list[LifeFactOut]  # what holds now, newest first
+    past_facts: list[LifeFactOut]  # ended ones, most recently ended first
+    max_facts: int  # how many can hold at once
 
 
 class CheckInResponse(BaseModel):

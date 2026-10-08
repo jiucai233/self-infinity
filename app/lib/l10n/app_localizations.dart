@@ -2431,8 +2431,122 @@ abstract class AppLocalizations {
   /// No description provided for @lifePrivacy.
   ///
   /// In en, this message translates to:
-  /// **'Stored in our database. For advice the AI gets averages and patterns, never your days.'**
+  /// **'Stored in our database. For advice the AI gets averages, patterns and your lasting facts, never your days.'**
   String get lifePrivacy;
+
+  /// No description provided for @lifeFacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Lasting'**
+  String get lifeFacts;
+
+  /// No description provided for @lifeFactsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Things that hold for weeks, like an injury, night shifts or exams. Mention them when you check in, or add one.'**
+  String get lifeFactsEmpty;
+
+  /// No description provided for @lifeFactAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get lifeFactAdd;
+
+  /// No description provided for @lifeFactNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New lasting fact'**
+  String get lifeFactNew;
+
+  /// No description provided for @lifeFactHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Knee injury; no running until 19 Nov'**
+  String get lifeFactHint;
+
+  /// No description provided for @lifeFactSince.
+  ///
+  /// In en, this message translates to:
+  /// **'since {date}'**
+  String lifeFactSince(String date);
+
+  /// No description provided for @lifeFactSpan.
+  ///
+  /// In en, this message translates to:
+  /// **'{start} – {end}'**
+  String lifeFactSpan(String start, String end);
+
+  /// No description provided for @lifeFactSaid.
+  ///
+  /// In en, this message translates to:
+  /// **'from what you said'**
+  String get lifeFactSaid;
+
+  /// No description provided for @lifeFactEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get lifeFactEdit;
+
+  /// No description provided for @lifeFactEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'No longer true'**
+  String get lifeFactEnd;
+
+  /// No description provided for @lifeFactRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Still true'**
+  String get lifeFactRestore;
+
+  /// No description provided for @lifeFactDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this for good? “No longer true” keeps it as history.'**
+  String get lifeFactDeleteConfirm;
+
+  /// No description provided for @lifeFactPast.
+  ///
+  /// In en, this message translates to:
+  /// **'Past ({n})'**
+  String lifeFactPast(int n);
+
+  /// No description provided for @lifeFactsFull.
+  ///
+  /// In en, this message translates to:
+  /// **'You can keep {n}. End or delete one first.'**
+  String lifeFactsFull(int n);
+
+  /// No description provided for @factHealth.
+  ///
+  /// In en, this message translates to:
+  /// **'Health'**
+  String get factHealth;
+
+  /// No description provided for @factSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get factSchedule;
+
+  /// No description provided for @factConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Constraint'**
+  String get factConstraint;
+
+  /// No description provided for @factPreference.
+  ///
+  /// In en, this message translates to:
+  /// **'Preference'**
+  String get factPreference;
+
+  /// No description provided for @factOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get factOther;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

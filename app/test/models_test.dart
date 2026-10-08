@@ -497,6 +497,54 @@ void main() {
     });
   });
 
+  group('lasting facts (#40)', () {
+    Json summary() => {
+      'days': 30,
+      'days_logged': 0,
+      'exercise_days': 0,
+      'audits': 0,
+      'passed': 0,
+    };
+
+    test('a fact, and an unknown category reads as other', () {
+      final f = LifeFact.fromJson({
+        'id': 4,
+        'category': 'mood',
+        'text': 'Night shifts',
+        'source': 'manual',
+        'created_at': '2026-10-01T00:00:00Z',
+        'ended_at': '2026-10-05T00:00:00Z',
+        'replaces_id': 2,
+      });
+      expect((f.category, f.said, f.replacesId), (FactCategory.other, false, 2));
+      expect(f.endedAt, DateTime.utc(2026, 10, 5));
+    });
+
+    test('life carries facts; a server without them has none', () {
+      final fact = {
+        'id': 1,
+        'category': 'health',
+        'text': 'Knee injury',
+        'source': 'said',
+        'created_at': '2026-10-01T00:00:00Z',
+        'ended_at': null,
+        'replaces_id': null,
+      };
+      final life = Life.fromJson({
+        'summary': summary(),
+        'days': <Object>[],
+        'facts': [fact],
+        'past_facts': <Object>[],
+        'max_facts': 20,
+      });
+      expect(life.facts.single.text, 'Knee injury');
+      expect(life.maxFacts, 20);
+      final old = Life.fromJson({'summary': summary(), 'days': <Object>[]});
+      expect(old.facts, isEmpty);
+      expect(old.pastFacts, isEmpty);
+    });
+  });
+
   group('parsing errors', () {
     test('an unknown enum value throws a FormatException', () {
       expect(() => SkillStatus.fromJson('weird'), throwsFormatException);

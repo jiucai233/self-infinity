@@ -17,8 +17,9 @@ import '../stage/stage_scaffold.dart';
 import 'life_chart.dart';
 
 /// The player's own record (contract #39): how they live next to how they
-/// learn. The window's numbers and chart, their own patterns, the Life
-/// Coach's advice, and every day, which they can fix or fill in.
+/// learn. The window's numbers and chart, their own patterns, what lasts
+/// (#40), the Life Coach's advice, and every day, which they can fix or fill
+/// in.
 ///
 /// Route `/life`. Reading never calls the LLM; only `Get advice` does.
 class LifeScene extends StatefulWidget {
@@ -147,6 +148,8 @@ class _LifeSceneState extends State<LifeScene> {
                         ),
                         const SizedBox(height: AppSpacing.lg),
                         _Patterns(life: life),
+                        const SizedBox(height: AppSpacing.lg),
+                        _Facts(api: _api, life: life, onChanged: _load),
                         const SizedBox(height: AppSpacing.lg),
                         _Advice(
                           advice: life.advice,
@@ -462,6 +465,338 @@ class _Patterns extends StatelessWidget {
                 ),
               ],
             ),
+    );
+  }
+}
+
+/// What lasts (contract #40): kept from what the player said, or added by
+/// them. Each one can be fixed, ended (kept as history) or deleted; ended
+/// ones fold away under "Past".
+class _Facts extends StatefulWidget {
+  const _Facts({required this.api, required this.life, required this.onChanged});
+
+  final SelfInfinityApi api;
+  final Life life;
+  final Future<void> Function() onChanged;
+
+  @override
+  State<_Facts> createState() => _FactsState();
+}
+
+class _FactsState extends State<_Facts> {
+  bool _showPast = false;
+  String? _error;
+
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() => _error = null);
+    try {
+      await action();
+      await widget.onChanged();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(
+        () => _error = e.statusCode == 409
+            ? context.l10n.lifeFactsFull(widget.life.maxFacts)
+            : (e.serverMessage ?? '$e'),
+      );
+    } on Object catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    }
+  }
+
+  Future<void> _open([LifeFact? fact]) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => _FactDialog(api: widget.api, fact: fact, maxFacts: widget.life.maxFacts),
+    );
+    if (saved == true) await widget.onChanged();
+  }
+
+  Future<void> _delete(LifeFact fact) async {
+    final l = context.l10n;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const Key('fact-delete-dialog'),
+        content: Text(l.lifeFactDeleteConfirm),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l.cancel)),
+          TextButton(
+            key: const Key('fact-delete-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l.delete, style: const TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (sure == true) await _run(() => widget.api.deleteLifeFact(fact.id));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context).textTheme;
+    final life = widget.life;
+    return _Card(
+      key: const Key('life-facts'),
+      title: l.lifeFacts,
+      trailing: TextButton(
+        key: const Key('life-fact-add'),
+        onPressed: () => unawaited(_open()),
+        child: Text(l.lifeFactAdd),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Text(
+                _error!,
+                key: const Key('life-fact-error'),
+                style: theme.bodyMedium?.copyWith(color: AppColors.danger),
+              ),
+            ),
+          if (life.facts.isEmpty) _muted(context, l.lifeFactsEmpty),
+          for (final f in life.facts)
+            _FactRow(
+              fact: f,
+              onEdit: () => unawaited(_open(f)),
+              onEnd: () => unawaited(_run(() => widget.api.editLifeFact(f.id, ended: true))),
+              onDelete: () => unawaited(_delete(f)),
+            ),
+          if (life.pastFacts.isNotEmpty) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const Key('life-facts-past'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  foregroundColor: AppColors.textTertiary,
+                ),
+                onPressed: () => setState(() => _showPast = !_showPast),
+                icon: Icon(
+                  _showPast ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                  size: 18,
+                ),
+                label: Text(l.lifeFactPast(life.pastFacts.length)),
+              ),
+            ),
+            if (_showPast)
+              for (final f in life.pastFacts)
+                _FactRow(
+                  fact: f,
+                  onRestore: () =>
+                      unawaited(_run(() => widget.api.editLifeFact(f.id, ended: false))),
+                  onDelete: () => unawaited(_delete(f)),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+String factCategoryLabel(BuildContext context, FactCategory c) {
+  final l = context.l10n;
+  return switch (c) {
+    FactCategory.health => l.factHealth,
+    FactCategory.schedule => l.factSchedule,
+    FactCategory.constraint => l.factConstraint,
+    FactCategory.preference => l.factPreference,
+    FactCategory.other => l.factOther,
+  };
+}
+
+/// One fact: its text, what kind and since when; a ⋯ menu for the rest.
+class _FactRow extends StatelessWidget {
+  const _FactRow({
+    required this.fact,
+    required this.onDelete,
+    this.onEdit,
+    this.onEnd,
+    this.onRestore,
+  });
+
+  final LifeFact fact;
+  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onEnd;
+  final VoidCallback? onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context).textTheme;
+    final ended = fact.endedAt;
+    String day(DateTime t) => formatLocal(t, style: DateStyle.monthDay);
+    final meta = [
+      factCategoryLabel(context, fact.category),
+      if (ended == null)
+        l.lifeFactSince(day(fact.createdAt))
+      else
+        l.lifeFactSpan(day(fact.createdAt), day(ended)),
+      if (fact.said) l.lifeFactSaid,
+    ].join(' · ');
+    return Padding(
+      key: Key('life-fact-${fact.id}'),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fact.text,
+                  style: theme.bodyMedium?.copyWith(
+                    color: ended == null ? AppColors.textPrimary : AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(meta, style: theme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+              ],
+            ),
+          ),
+          PopupMenuButton<void>(
+            key: Key('life-fact-menu-${fact.id}'),
+            tooltip: l.more,
+            icon: const Icon(Icons.more_horiz_rounded, size: 18, color: AppColors.textTertiary),
+            padding: EdgeInsets.zero,
+            style: IconButton.styleFrom(
+              minimumSize: const Size(28, 28),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            itemBuilder: (_) => [
+              if (onEdit != null)
+                PopupMenuItem(
+                  key: const Key('fact-edit'),
+                  onTap: onEdit,
+                  child: Text(l.lifeFactEdit),
+                ),
+              if (onEnd != null)
+                PopupMenuItem(key: const Key('fact-end'), onTap: onEnd, child: Text(l.lifeFactEnd)),
+              if (onRestore != null)
+                PopupMenuItem(
+                  key: const Key('fact-restore'),
+                  onTap: onRestore,
+                  child: Text(l.lifeFactRestore),
+                ),
+              PopupMenuItem(
+                key: const Key('fact-delete'),
+                onTap: onDelete,
+                child: Text(l.delete, style: const TextStyle(color: AppColors.danger)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Adds a fact, or fixes one's wording and kind in place.
+class _FactDialog extends StatefulWidget {
+  const _FactDialog({required this.api, required this.fact, required this.maxFacts});
+
+  final SelfInfinityApi api;
+  final LifeFact? fact;
+  final int maxFacts;
+
+  @override
+  State<_FactDialog> createState() => _FactDialogState();
+}
+
+class _FactDialogState extends State<_FactDialog> {
+  late final TextEditingController _text = TextEditingController(text: widget.fact?.text ?? '');
+  late FactCategory _category = widget.fact?.category ?? FactCategory.other;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final text = _text.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final fact = widget.fact;
+      if (fact == null) {
+        await widget.api.addLifeFact(text, category: _category);
+      } else {
+        await widget.api.editLifeFact(fact.id, text: text, category: _category);
+      }
+      if (mounted) Navigator.of(context).pop(true);
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e is ApiException && e.statusCode == 409
+            ? context.l10n.lifeFactsFull(widget.maxFacts)
+            : (e is ApiException ? e.serverMessage : null) ?? '$e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    return AlertDialog(
+      key: const Key('life-fact-dialog'),
+      title: Text(widget.fact == null ? l.lifeFactNew : l.lifeFactEdit),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              key: const Key('fact-text'),
+              controller: _text,
+              autofocus: true,
+              maxLength: LifeFact.maxLength,
+              decoration: InputDecoration(hintText: l.lifeFactHint),
+              onSubmitted: (_) => unawaited(_save()),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              key: const Key('fact-category'),
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final c in FactCategory.values)
+                  ChoiceChip(
+                    key: Key('fact-category-${c.name}'),
+                    label: Text(factCategoryLabel(context, c)),
+                    selected: _category == c,
+                    showCheckmark: false,
+                    onSelected: (_) => setState(() => _category = c),
+                  ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(_error!, style: const TextStyle(color: AppColors.danger)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l.cancel)),
+        FilledButton(
+          key: const Key('fact-save'),
+          onPressed: _saving ? null : () => unawaited(_save()),
+          child: Text(l.lifeSave),
+        ),
+      ],
     );
   }
 }

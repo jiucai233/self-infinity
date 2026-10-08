@@ -550,6 +550,50 @@ def _life_coach(messages: list[Message]) -> str:
     return _dump({"advice": advice[:3]})
 
 
+# ---------------------------------------------------------------- Fact Keeper
+
+_LISTED_FACT_RE = re.compile(r"^\[(\d+)\] \w+ · since \S+ · (.*)$", re.M)
+_SAID_RE = re.compile(r"<said>\n(.*?)\n</said>", re.S)
+_INJURED_RE = re.compile(
+    r"\b(?:hurt|injured|sprained|broke|pulled) my (\w+)|\bmy (\w+) (?:is|got) (?:injured|hurt|sprained)", re.I
+)
+_HEALED_RE = re.compile(r"\bmy (\w+) (?:is|feels) (?:fine|better|healed|ok|okay)\b|\b(\w+) (?:has )?healed\b", re.I)
+_NIGHT_SHIFT_RE = re.compile(r"\bnight shifts?\b", re.I)
+_DIET_RE = re.compile(r"\b(vegetarian|vegan)\b", re.I)
+_EXAMS_RE = re.compile(r"\bexams? until ([^.,!?\n]+)", re.I)
+
+
+def _fact_keeper(messages: list[Message]) -> str:
+    """Injuries, healing, night shifts, a vegetarian or vegan diet and exam periods; nothing else."""
+    listed = {int(i): text for i, text in _LISTED_FACT_RE.findall(_system(messages))}
+    match = _SAID_RE.search(messages[-1]["content"])
+    said = match.group(1) if match else ""
+    changes: list[dict] = []
+
+    def holds(word: str) -> int | None:
+        return next((i for i, text in listed.items() if word.casefold() in text.casefold()), None)
+
+    def add(category: str, text: str) -> None:
+        if not any(t.casefold() == text.casefold() for t in listed.values()):
+            changes.append({"op": "add", "category": category, "text": text})
+
+    if m := _HEALED_RE.search(said):
+        part = m.group(1) or m.group(2)
+        if (i := holds(part)) is not None:
+            changes.append({"op": "end", "id": i})
+    elif m := _INJURED_RE.search(said):
+        part = (m.group(1) or m.group(2)).lower()
+        if holds(part) is None:
+            add("health", f"{part.capitalize()} injury")
+    if _NIGHT_SHIFT_RE.search(said):
+        add("schedule", "Works night shifts")
+    if m := _DIET_RE.search(said):
+        add("preference", m.group(1).capitalize())
+    if m := _EXAMS_RE.search(said):
+        add("schedule", f"Exams until {m.group(1).strip()}")
+    return _dump({"changes": changes})
+
+
 # ---------------------------------------------------------------- 4.6 Narrator / Recommender / Material Finder
 
 _FACTS_RE = re.compile(r"<facts>\n(.*?)\n</facts>", re.S)
@@ -687,6 +731,7 @@ _SCRIPTS = {
     "material_finder": _find_material,
     "front_desk": _front_desk,
     "life_coach": _life_coach,
+    "fact_keeper": _fact_keeper,
 }
 
 

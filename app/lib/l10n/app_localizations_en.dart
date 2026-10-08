@@ -1262,5 +1262,71 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lifePrivacy =>
-      'Stored in our database. For advice the AI gets averages and patterns, never your days.';
+      'Stored in our database. For advice the AI gets averages, patterns and your lasting facts, never your days.';
+
+  @override
+  String get lifeFacts => 'Lasting';
+
+  @override
+  String get lifeFactsEmpty =>
+      'Things that hold for weeks, like an injury, night shifts or exams. Mention them when you check in, or add one.';
+
+  @override
+  String get lifeFactAdd => 'Add';
+
+  @override
+  String get lifeFactNew => 'New lasting fact';
+
+  @override
+  String get lifeFactHint => 'e.g. Knee injury; no running until 19 Nov';
+
+  @override
+  String lifeFactSince(String date) {
+    return 'since $date';
+  }
+
+  @override
+  String lifeFactSpan(String start, String end) {
+    return '$start – $end';
+  }
+
+  @override
+  String get lifeFactSaid => 'from what you said';
+
+  @override
+  String get lifeFactEdit => 'Edit';
+
+  @override
+  String get lifeFactEnd => 'No longer true';
+
+  @override
+  String get lifeFactRestore => 'Still true';
+
+  @override
+  String get lifeFactDeleteConfirm => 'Delete this for good? “No longer true” keeps it as history.';
+
+  @override
+  String lifeFactPast(int n) {
+    return 'Past ($n)';
+  }
+
+  @override
+  String lifeFactsFull(int n) {
+    return 'You can keep $n. End or delete one first.';
+  }
+
+  @override
+  String get factHealth => 'Health';
+
+  @override
+  String get factSchedule => 'Schedule';
+
+  @override
+  String get factConstraint => 'Constraint';
+
+  @override
+  String get factPreference => 'Preference';
+
+  @override
+  String get factOther => 'Other';
 }

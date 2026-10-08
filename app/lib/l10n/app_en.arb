@@ -687,5 +687,55 @@
       }
     }
   },
-  "lifePrivacy": "Stored in our database. For advice the AI gets averages and patterns, never your days."
+  "lifePrivacy": "Stored in our database. For advice the AI gets averages, patterns and your lasting facts, never your days.",
+  "lifeFacts": "Lasting",
+  "lifeFactsEmpty": "Things that hold for weeks, like an injury, night shifts or exams. Mention them when you check in, or add one.",
+  "lifeFactAdd": "Add",
+  "lifeFactNew": "New lasting fact",
+  "lifeFactHint": "e.g. Knee injury; no running until 19 Nov",
+  "lifeFactSince": "since {date}",
+  "@lifeFactSince": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "lifeFactSpan": "{start} – {end}",
+  "@lifeFactSpan": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "lifeFactSaid": "from what you said",
+  "lifeFactEdit": "Edit",
+  "lifeFactEnd": "No longer true",
+  "lifeFactRestore": "Still true",
+  "lifeFactDeleteConfirm": "Delete this for good? “No longer true” keeps it as history.",
+  "lifeFactPast": "Past ({n})",
+  "@lifeFactPast": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "lifeFactsFull": "You can keep {n}. End or delete one first.",
+  "@lifeFactsFull": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "factHealth": "Health",
+  "factSchedule": "Schedule",
+  "factConstraint": "Constraint",
+  "factPreference": "Preference",
+  "factOther": "Other"
 }

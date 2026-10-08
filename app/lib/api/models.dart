@@ -1195,6 +1195,59 @@ class LifeAdvice {
   final DateTime generatedAt;
 }
 
+enum FactCategory {
+  health,
+  schedule,
+  constraint,
+  preference,
+  other;
+
+  /// An unknown category reads as [other].
+  static FactCategory fromJson(Object? v) =>
+      values.firstWhere((c) => c.name == v, orElse: () => FactCategory.other);
+}
+
+/// Something about the player that holds for weeks (contract #40): kept by
+/// the Fact Keeper from what they said, or typed by them. Ended ones stay as
+/// history; only the player deletes.
+@immutable
+class LifeFact {
+  const LifeFact({
+    required this.id,
+    required this.category,
+    required this.text,
+    required this.said,
+    required this.createdAt,
+    this.endedAt,
+    this.replacesId,
+  });
+
+  factory LifeFact.fromJson(Json json) => LifeFact(
+    id: _int(json, 'id'),
+    category: FactCategory.fromJson(json['category']),
+    text: _str(json, 'text'),
+    said: json['source'] == 'said',
+    createdAt: _time(json, 'created_at'),
+    endedAt: _timeN(json, 'ended_at'),
+    replacesId: _intN(json, 'replaces_id'),
+  );
+
+  /// The longest text the server takes.
+  static const int maxLength = 120;
+
+  final int id;
+  final FactCategory category;
+  final String text;
+
+  /// Kept from a check-in or chat; false when the player typed it.
+  final bool said;
+  final DateTime createdAt;
+  final DateTime? endedAt;
+
+  /// The fact this one replaced when it changed.
+  final int? replacesId;
+}
+
 /// `GET /life` (contract #39): the player's own record.
 @immutable
 class Life {
@@ -1204,6 +1257,9 @@ class Life {
     this.patterns = const [],
     this.patternMinDays = 5,
     this.advice,
+    this.facts = const [],
+    this.pastFacts = const [],
+    this.maxFacts = 20,
   });
 
   factory Life.fromJson(Json json) => Life(
@@ -1212,6 +1268,9 @@ class Life {
     patterns: _list(json, 'patterns', LifePattern.fromJson),
     patternMinDays: _intN(json, 'pattern_min_days') ?? 5,
     advice: json['advice'] == null ? null : LifeAdvice.fromJson(_obj(json, 'advice')),
+    facts: json['facts'] == null ? const [] : _list(json, 'facts', LifeFact.fromJson),
+    pastFacts: json['past_facts'] == null ? const [] : _list(json, 'past_facts', LifeFact.fromJson),
+    maxFacts: _intN(json, 'max_facts') ?? 20,
   );
 
   final LifeSummary summary;
@@ -1221,6 +1280,15 @@ class Life {
   final List<LifePattern> patterns;
   final int patternMinDays;
   final LifeAdvice? advice;
+
+  /// What holds now, newest first.
+  final List<LifeFact> facts;
+
+  /// Ended facts, most recently ended first.
+  final List<LifeFact> pastFacts;
+
+  /// How many facts can hold at once.
+  final int maxFacts;
 }
 
 /// Body of `POST /checkins`. Contract endpoint 12.

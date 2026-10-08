@@ -10,7 +10,7 @@ learn. No LLM: everything here is counted from DailyCheckIn and AuditSession.
   need not hold for one person anyway [Fisher et al., 2018].
 
 The Life Coach (app/agents/life_coach.py) gets `coach_facts`: these numbers rounded and
-summarised, never the daily rows.
+summarised, never the daily rows, and the lasting facts that hold now (app/services/facts.py).
 """
 
 import json
@@ -27,11 +27,13 @@ from app.schemas import (
     LifeAdviceItemOut,
     LifeAdviceOut,
     LifeDayOut,
+    LifeFactOut,
     LifeGroupOut,
     LifeOut,
     LifePatternOut,
     LifeSummaryOut,
 )
+from app.services import facts as facts_service
 from app.services.courses import live_nodes
 from app.utils import local_today
 
@@ -155,6 +157,9 @@ def overview(session: Session, window: int = 30) -> LifeOut:
         patterns=patterns(checkins, audits),
         pattern_min_days=PATTERN_MIN_DAYS,
         advice=latest_advice(session),
+        facts=[LifeFactOut.model_validate(f) for f in facts_service.current_facts(session)],
+        past_facts=[LifeFactOut.model_validate(f) for f in facts_service.past_facts(session)],
+        max_facts=facts_service.MAX_FACTS,
     )
 
 
@@ -194,6 +199,7 @@ def coach_facts(session: Session, window: int = 14) -> CoachFacts:
             "audits": {"finished": s.audits, "passed": s.passed},
             "patterns": [p.model_dump() for p in life.patterns],
             "learning": {"nodes_mastered_total": len(mastered)},
+            "lasting": facts_service.for_coach(session),
             "player": {
                 "identity": profile.identity,
                 "win_condition": profile.vision,

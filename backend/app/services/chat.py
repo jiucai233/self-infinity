@@ -4,6 +4,9 @@ AD-7: the front desk only classifies. This module runs the existing pipelines (c
 generation, check-in, study plan, briefing) by calling the same service functions the plain
 REST endpoints use. Audits never start from chat.
 
+What the user says in a check-in or a plain chat also goes to the Fact Keeper (`remember`, run
+after the response by the router; contract #40).
+
 A pipeline failure is not an error: the second assistant message explains it in English and the
 endpoint still answers 200. Only a front desk failure fails the request (FrontDeskUnavailable),
 and by then the user's message is already saved.
@@ -40,6 +43,7 @@ from app.services.planning import NoAvailableNode, PlanFailed
 logger = logging.getLogger(__name__)
 
 ProviderFor = Callable[[str], LLMProvider]
+Remember = Callable[[str], None]
 
 DEFAULT_DIFFICULTY = "standard"
 
@@ -245,6 +249,7 @@ def handle_message(
     search_provider_for: Callable[[], SearchProvider],
     uploads: list[Upload] | None = None,
     course_topic: str | None = None,
+    remember: Remember | None = None,
 ) -> list[ChatMessageOut]:
     """`course_topic` (the tutorial) builds a course straight away: no front desk call, so the
     result does not hang on how the message would be classified."""
@@ -268,6 +273,8 @@ def handle_message(
 
     content, action = routed.reply, None
     intent = routed.intent
+    if remember is not None and (intent == "checkin" or (intent == "none" and not uploads)):
+        remember(message)
     topic = str(routed.args.get("topic") or "").strip()
 
     if intent == "open_skill":
@@ -313,6 +320,7 @@ def handle_action(
     said: str,
     provider_for: ProviderFor,
     search_provider_for: Callable[[], SearchProvider],
+    remember: Remember | None = None,
 ) -> list[ChatMessageOut]:
     """One tool call of the realtime Guide: the intent is already chosen, so no front desk call.
 
@@ -345,6 +353,8 @@ def handle_action(
         if not words:
             raise ValueError("checkin needs what the user said")
         result.append(_run_checkin(session, words, provider_for))
+        if remember is not None:
+            remember(words)
     elif intent == "plan":
         result.append(_run_plan(session, provider_for))
     elif intent == "briefing":
@@ -352,13 +362,19 @@ def handle_action(
     return [message_out(m) for m in result]
 
 
-def log_voice(session: Session, lines: list[tuple[str, str]]) -> list[ChatMessageOut]:
-    """Keeps a spoken exchange with the realtime Guide in the history. No LLM."""
+def log_voice(
+    session: Session, lines: list[tuple[str, str]], remember: Remember | None = None
+) -> list[ChatMessageOut]:
+    """Keeps a spoken exchange with the realtime Guide in the history. No LLM here; what the user
+    said goes to `remember`."""
     saved = [
         _save(session, role, content.strip(), VOICE_AGENT if role == "assistant" else None)
         for role, content in lines
         if content.strip()
     ]
+    said = "\n".join(m.content for m in saved if m.role == "user")
+    if remember is not None and said:
+        remember(said)
     return [message_out(m) for m in saved]
 
 

@@ -93,6 +93,19 @@ class CheckInSource(StrEnum):
     manual = "manual"
 
 
+class FactCategory(StrEnum):
+    health = "health"
+    schedule = "schedule"
+    constraint = "constraint"
+    preference = "preference"
+    other = "other"
+
+
+class FactSource(StrEnum):
+    said = "said"  # kept by the Fact Keeper from a check-in or a chat
+    manual = "manual"  # typed on the life page
+
+
 class Course(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     # 用户输入的主题，连同澄清问题的回答（"{topic}\n\nQ: ...\nA: ..."）。
@@ -244,6 +257,21 @@ class LifeAdvice(SQLModel, table=True):
     # The summary the coach was given: what the advice is based on.
     facts_json: str
     generated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+
+
+class LifeFact(SQLModel, table=True):
+    """Something about the player that holds for weeks (contract #40): an injury, a work shift,
+    a constraint. A fact that changes or stops being true is ended (`ended_at`), never deleted,
+    so the history stays; only the player deletes one. A changed fact's new row points at the
+    one it replaced."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    category: FactCategory = FactCategory.other
+    text: str
+    source: FactSource = FactSource.said
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    ended_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
+    replaces_id: int | None = None
 
 
 class NarratorBriefing(SQLModel, table=True):

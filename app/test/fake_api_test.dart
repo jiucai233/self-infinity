@@ -1017,7 +1017,7 @@ void main() {
       for (final name in FakeApiClient.methodNames) {
         api.failNext(method: name); // asserts on unknown names
       }
-      expect(FakeApiClient.methodNames, hasLength(44));
+      expect(FakeApiClient.methodNames, hasLength(47));
       expect(() => api.failNext(method: 'nope'), throwsA(isA<AssertionError>()));
     });
   });
@@ -1091,4 +1091,53 @@ void main() {
       expect(watch.elapsedMilliseconds, greaterThanOrEqualTo(50));
     });
   });
+
+  group('lasting facts (#40)', () {
+    Future<List<String>> holding(FakeApiClient api) async =>
+        [for (final f in (await api.getLife()).facts) f.text];
+
+    test('a chat check-in or plain message is read; a plan request is not', () async {
+      final api = newApi();
+      await api.sendChat('how was today: slept 7 hours, I hurt my knee');
+      await api.sendChat('by the way I work night shifts');
+      await api.sendChat("what's my plan today?");
+      expect(await holding(api), ['Works night shifts', 'Knee injury']);
+    });
+
+    test('healed ends the fact and keeps it as history', () async {
+      final api = newApi();
+      await api.sendChat('I sprained my ankle');
+      await api.sendChat('my ankle is fine now');
+      final life = await api.getLife();
+      expect(life.facts, isEmpty);
+      expect(life.pastFacts.single.text, 'Ankle injury');
+    });
+
+    test('the voice log reads only what the user said', () async {
+      final api = newApi();
+      await api.chatLog([
+        (role: ChatRole.assistant, content: 'Are you vegan?'),
+        (role: ChatRole.user, content: 'I have exams until Friday.'),
+      ]);
+      expect(await holding(api), ['Exams until Friday']);
+    });
+
+    test('edits, a full list and unknown ids', () async {
+      final api = newApi();
+      final f = await api.addLifeFact('  Knee   injry ', category: FactCategory.health);
+      expect((f.text, f.said), ('Knee injry', false));
+      expect((await api.editLifeFact(f.id, text: 'Knee injury')).text, 'Knee injury');
+      expect((await api.editLifeFact(f.id, ended: true)).endedAt, isNotNull);
+      for (var i = 0; i < 20; i++) {
+        await api.addLifeFact('fact $i');
+      }
+      final full = await failure(() => api.addLifeFact('one more'));
+      expect(full.statusCode, 409);
+      expect((await failure(() => api.editLifeFact(f.id, ended: false))).statusCode, 409);
+      await api.deleteLifeFact(f.id);
+      expect((await failure(() => api.deleteLifeFact(f.id))).statusCode, 404);
+      expect((await failure(() => api.addLifeFact('   '))).statusCode, 422);
+    });
+  });
 }
+

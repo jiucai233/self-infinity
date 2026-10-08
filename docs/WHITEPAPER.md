@@ -55,7 +55,7 @@ backend/ (FastAPI + SQLModel + SQLite)
   search/    搜索抽象：Tavily | Mock（与 LLM 正交）
 ```
 
-### 3.1 Agent 一览（17 个）
+### 3.1 Agent 一览（19 个）
 
 | 组 | 角色 | 实现 | 职责 |
 |---|---|---|---|
@@ -75,6 +75,8 @@ backend/ (FastAPI + SQLModel + SQLite)
 | | Linker | LLM | 判断新卡与旧卡/节点的 related / contradicts 关系（后台运行） |
 | Analyst | Transcriber | OpenAI：输入框语音 `gpt-transcribe`，审计实时转写 `gpt-live-transcribe`（无 key 时用浏览器/手机自带 STT） | 语音转文字；审计追问由 `gpt-4o-mini-tts` 流式朗读；首页 Guide 的语音模式是端到端的 `gpt-realtime-2.1`（契约 #35、#36） |
 | | Check-in Converter | LLM | 自由文本打卡 → 结构化字段，缺的字段留空不猜 |
+| | Life Coach | LLM | 生活页上按需给三条本周建议，只看 14 天汇总和长期事实 |
+| | Fact Keeper | LLM（前置 Decisions 闸门） | 后台从打卡和对话里维护长期事实：新增 / 更新 / 结束 |
 | | Profile Builder | 代码 | 汇总画像：反复出现的误解、跨领域复发 |
 
 **AD-7**：agent 之间从不互相调用，只有代码按固定顺序调用它们。每个 prompt 以 `[agent: name]` 开头，Mock 按这个标签分派。
@@ -153,9 +155,11 @@ Planner 只决定结构，不生成教学内容。内容质量由审计把关：
 
 **Life Coach**：用户点一下，生成三条本周可做的小建议，每条写明依据的数字。它只看最近 14 天的粗粒度汇总（平均值、运动天数、体重变化、审计通过数、规律及其天数）和用户的身份、愿景、规则、主线任务，看不到任何一天的明细和饮食内容。不诊断、不提药物、不给卡路里或饮食方案；数字令人担心时建议找专业人士。
 
+**长期事实**（计划书 1.1.2(2)）：会持续几周的情况——受伤、夜班、考试期、一段时间内不能做的事、稳定的偏好——存成一条条短句，最多同时 20 条，这样可以整份放进 Life Coach 的 prompt，而不用把每天的记录交出去。做法综合了三个先例：Mem0 的操作集（新增 / 更新 / 结束 / 不变）[Chhikara et al., 2025]；Zep 的做法，过时的事实标上结束时间而不删除，历史保留，Fact Keeper 改错了也能恢复 [Rasmussen et al., 2025]；MemGPT 的常驻记忆上限 [Packer et al., 2023]。Fact Keeper 在响应发出之后后台运行，读打卡原文、路由到打卡或闲聊的消息、语音 Guide 里用户说的话。调用前先用 Decisions API 问一个是非题（"有没有说到长期的事"，约 0.3 秒、只计输入 token），把握大的"没有"直接跳过。每天的睡眠、心情、饮食、运动归打卡，不进事实；用户没说出口的病名不写；"六周内不跑步"这样的相对时间换算成日期，以后读也不失真。用户在生活页能看到每一条，可以改字、结束、恢复、删除（只有用户能真正删除）。
+
 刻意不做：卡路里、记账、HealthKit。这条线往"真实追踪"走就会长成三个独立 App，偏离核心。
 
-**隐私**：打卡存在应用的数据库里（部署版是 Supabase 上的 Postgres，每个账号一个 schema）；语音打卡的原文会发给配置的大模型来转换；生成建议时，大模型只拿到上面的汇总。
+**隐私**：打卡存在应用的数据库里（部署版是 Supabase 上的 Postgres，每个账号一个 schema）；语音打卡的原文会发给配置的大模型来转换；打卡和对话里说的话会交给 Fact Keeper，只存它记下的短句；生成建议时，大模型只拿到上面的汇总和当前有效的长期事实。
 
 ---
 
@@ -171,6 +175,8 @@ Planner 只决定结构，不生成教学内容。内容质量由审计把关：
 | RewardEvent | 奖励流水 |
 | BanditArm | 9 个臂的 Beta 参数 |
 | DailyCheckIn | 打卡字段，全部可空 |
+| LifeAdvice | Life Coach 的建议，连同当时给它的汇总一起保存 |
+| LifeFact | 长期事实：category、text、source（said / manual）、ended_at（为空表示仍成立）、replaces_id |
 | NarratorBriefing / StudyPlan / SearchPlan | 简报、今日任务、补充材料的缓存，避免重复调用 LLM |
 
 SQLite 起步，schema 不依赖 SQLite 特性。启动时检测到旧（DAG 之前）的库会拒绝加载并报错。
@@ -197,6 +203,7 @@ SQLite 起步，schema 不依赖 SQLite 特性。启动时检测到旧（DAG 之
 - **审计一致性**：30 条校准集（正确解释 / 含错解释 / 背诵式复述），测准确率与放水率（应 fail 却判 pass 的比例）。门槛：准确率 ≥ 80%，放水率 ≤ 10%。脚本：`backend/eval/run_calibration.py`，用 LLM 扮演学生续答，避免固定台词接不住深追问。
 - **测试**：后端 pytest 528 个，客户端 flutter test 273 个，全部在 Mock 下确定性运行；CI 每次 push 跑两边。
 - **成本与延迟**：单次审计 token 数、裁决延迟 P95。
+- **记忆一致性**：16 个固定场景，按 LongMemEval 的能力划分 [Wu et al., 2025]：抽取（长期事实被记下）、噪声（只说当天的事不记）、更新（新版本成立、旧版本进历史）、结束、保持（后续闲聊不重复、不误删）、不臆测（用户没说的病名不写）。中英韩混合。脚本：`backend/eval/run_memory.py`。2026-10-08 用应用的模型（gpt-6-luna）加 Decisions 闸门实跑：16/16；22 条消息里闸门跳过 5 条，Fact Keeper 调用 17 次，单次约 2 秒（后台运行，不占用户等待时间）。场景少，只说明行为对，不代表长期使用下的准确率。
 
 **用户维度**（n = 5–10，两周）
 - 自评掌握度 vs 审计通过率的差值——这个差值本身就是产品的存在性证明。
@@ -237,9 +244,13 @@ SQLite 起步，schema 不依赖 SQLite 特性。启动时检测到旧（DAG 之
 
 ## 附录 B · 参考文献
 
+- Chhikara, P., et al. (2025). Mem0: Building production-ready AI agents with scalable long-term memory. arXiv:2504.19413.
 - Fisher, A. J., Medaglia, J. D., & Jeronimus, B. F. (2018). Lack of group-to-individual generalizability is a threat to human subjects research. *PNAS, 115*(27), E6106–E6115.
 - Fong, C. J., Zaleski, D. J., & Leach, J. K. (2015). The challenge–skill balance and antecedents of flow: A meta-analytic investigation. *The Journal of Positive Psychology, 10*(5), 425–446. https://doi.org/10.1080/17439760.2014.967799
+- Packer, C., et al. (2023). MemGPT: Towards LLMs as operating systems. arXiv:2310.08560.
+- Rasmussen, P., et al. (2025). Zep: A temporal knowledge graph architecture for agent memory. arXiv:2501.13956.
 - Van Dongen, H. P. A., Baynard, M. D., Maislin, G., & Dinges, D. F. (2004). Systematic interindividual differences in neurobehavioral impairment from sleep loss: Evidence of trait-like differential vulnerability. *Sleep, 27*(3), 423–433.
+- Wu, D., et al. (2025). LongMemEval: Benchmarking chat assistants on long-term interactive memory. *ICLR 2025*. arXiv:2410.10813.
 
 ## 版本记录
 

@@ -503,4 +503,44 @@ void main() {
       expect(e.statusCode, 503);
     });
   });
+
+  group('lasting facts (#40)', () {
+    const fact = {
+      'id': 3,
+      'category': 'health',
+      'text': 'Knee injury',
+      'source': 'said',
+      'created_at': '2026-10-08T03:00:00Z',
+      'ended_at': null,
+      'replaces_id': null,
+    };
+
+    test('POST /life/facts', () async {
+      final h = ok(fact);
+      final r = await h.api.addLifeFact('Knee injury', category: FactCategory.health);
+      expect(h.last.method, 'POST');
+      expect(h.last.url.path, '/api/life/facts');
+      expect(h.lastBody, {'text': 'Knee injury', 'category': 'health'});
+      expect((r.id, r.category, r.said, r.endedAt), (3, FactCategory.health, true, null));
+    });
+
+    test('PATCH /life/facts/{id} sends only what is given', () async {
+      final h = ok({...fact, 'ended_at': '2026-10-09T03:00:00Z'});
+      final r = await h.api.editLifeFact(3, ended: true);
+      expect(h.last.method, 'PATCH');
+      expect(h.last.url.path, '/api/life/facts/3');
+      expect(h.lastBody, {'ended': true});
+      expect(r.endedAt, DateTime.utc(2026, 10, 9, 3));
+
+      await h.api.editLifeFact(3, text: 'Knee recovering', category: FactCategory.other);
+      expect(h.lastBody, {'text': 'Knee recovering', 'category': 'other'});
+    });
+
+    test('DELETE /life/facts/{id}', () async {
+      final h = Harness((_) => http.Response('', 204));
+      await h.api.deleteLifeFact(3);
+      expect(h.last.method, 'DELETE');
+      expect(h.last.url.path, '/api/life/facts/3');
+    });
+  });
 }

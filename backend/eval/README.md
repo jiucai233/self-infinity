@@ -183,3 +183,23 @@ next step is tightening the task protocol's leniency rule for
 follow-up-round answers (or accepting more runs / an averaged multi-run
 metric to separate genuine leniency from single-run variance) before
 claiming M2 passing — not yet done, flagging as the next actionable item.
+
+# Fact Keeper evaluation (memory consistency)
+
+`run_memory.py` checks the lasting-fact list (contract #40) on the 16 scenarios in
+`memory_set.json`, grouped like LongMemEval's abilities: extract, noise, update, end, keep
+(daily talk leaves a fact alone) and no_guess (a condition the player did not name is never
+written). Each scenario starts from an empty list and goes through the same `keep_facts` the app
+runs: the Decisions gate, then the keeper. Matching is by keywords, so it checks behaviour, not
+wording.
+
+```
+backend/.venv/bin/python backend/eval/run_memory.py                   # the app's model, gate on
+backend/.venv/bin/python backend/eval/run_memory.py --no-gate         # keeper on every message
+backend/.venv/bin/python backend/eval/run_memory.py --only update-knee
+backend/.venv/bin/python backend/eval/run_memory.py --provider mock   # offline (keyword heuristic)
+```
+
+The real run makes about 22 Decisions calls and 17 keeper calls (a few cents). 2026-10-08,
+gpt-6-luna with the gate: 16/16; the gate skipped 5 of 22 messages; ~42 s in all. The mock is a
+regex heuristic for tests, not a score.

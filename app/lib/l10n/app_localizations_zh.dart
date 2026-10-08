@@ -1249,5 +1249,70 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get lifePrivacy => '保存在我们的数据库里。生成建议时，AI 只拿到平均值和规律，看不到你每天的记录。';
+  String get lifePrivacy => '保存在我们的数据库里。生成建议时，AI 只拿到平均值、规律和你的长期情况，看不到你每天的记录。';
+
+  @override
+  String get lifeFacts => '长期情况';
+
+  @override
+  String get lifeFactsEmpty => '会持续几周的情况，比如受伤、夜班、考试。打卡时提到就会记下，也可以自己添加。';
+
+  @override
+  String get lifeFactAdd => '添加';
+
+  @override
+  String get lifeFactNew => '新的长期情况';
+
+  @override
+  String get lifeFactHint => '例如：膝盖受伤，11月19日前不跑步';
+
+  @override
+  String lifeFactSince(String date) {
+    return '$date 起';
+  }
+
+  @override
+  String lifeFactSpan(String start, String end) {
+    return '$start – $end';
+  }
+
+  @override
+  String get lifeFactSaid => '来自你说的话';
+
+  @override
+  String get lifeFactEdit => '编辑';
+
+  @override
+  String get lifeFactEnd => '已不再成立';
+
+  @override
+  String get lifeFactRestore => '仍然成立';
+
+  @override
+  String get lifeFactDeleteConfirm => '永久删除吗？选“已不再成立”会保留为历史。';
+
+  @override
+  String lifeFactPast(int n) {
+    return '过去的（$n）';
+  }
+
+  @override
+  String lifeFactsFull(int n) {
+    return '最多保留 $n 条。请先结束或删除一条。';
+  }
+
+  @override
+  String get factHealth => '健康';
+
+  @override
+  String get factSchedule => '作息';
+
+  @override
+  String get factConstraint => '限制';
+
+  @override
+  String get factPreference => '偏好';
+
+  @override
+  String get factOther => '其他';
 }

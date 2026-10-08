@@ -4,21 +4,21 @@ realtime Guide's POST /api/chat/act and /api/chat/log (#36).
 The orchestration lives in app/services/chat.py.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlmodel import Session
 
 from app.db import get_session
 from app.llm import get_provider
 from app.schemas import ChatActIn, ChatLogIn, ChatMessageOut, ChatRequest, ChatResponse, ChatSuggestionsResponse
 from app.search import get_search_provider
-from app.services import chat
+from app.services import chat, facts
 from app.services.chat import FrontDeskUnavailable
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 @router.post("", response_model=ChatResponse)
-def post_message(body: ChatRequest, session: Session = Depends(get_session)):
+def post_message(body: ChatRequest, background: BackgroundTasks, session: Session = Depends(get_session)):
     if body.reflection_prompt is not None:
         # Answering a reflection prompt: no LLM, no pipelines, uploads are not looked at.
         return ChatResponse(messages=chat.handle_reflection(session, body.reflection_prompt, body.message))
@@ -35,6 +35,7 @@ def post_message(body: ChatRequest, session: Session = Depends(get_session)):
             lambda: get_search_provider(),
             attached,
             course_topic=body.course_topic,
+            remember=facts.remember_later(background.add_task, session.get_bind()),
         )
     except FrontDeskUnavailable:
         raise HTTPException(502, "The assistant is temporarily unavailable. Please try again.")
@@ -52,10 +53,11 @@ def get_suggestions(session: Session = Depends(get_session)):
 
 
 @router.post("/act", response_model=ChatResponse)
-def post_action(body: ChatActIn, session: Session = Depends(get_session)):
+def post_action(body: ChatActIn, background: BackgroundTasks, session: Session = Depends(get_session)):
     try:
         messages = chat.handle_action(
-            session, body.intent, body.args, body.said, lambda agent: get_provider(agent), get_search_provider
+            session, body.intent, body.args, body.said, lambda agent: get_provider(agent), get_search_provider,
+            remember=facts.remember_later(background.add_task, session.get_bind()),
         )
     except ValueError as e:
         raise HTTPException(400, str(e)) from None
@@ -63,6 +65,8 @@ def post_action(body: ChatActIn, session: Session = Depends(get_session)):
 
 
 @router.post("/log", response_model=ChatResponse)
-def post_log(body: ChatLogIn, session: Session = Depends(get_session)):
-    return ChatResponse(messages=chat.log_voice(session, [(m.role, m.content) for m in body.messages]))
+def post_log(body: ChatLogIn, background: BackgroundTasks, session: Session = Depends(get_session)):
+    lines = [(m.role, m.content) for m in body.messages]
+    remember = facts.remember_later(background.add_task, session.get_bind())
+    return ChatResponse(messages=chat.log_voice(session, lines, remember=remember))
 

@@ -150,6 +150,18 @@ abstract class SelfInfinityApi {
   /// that day's, `null` clears one. 400 for a day still to come.
   Future<DailyCheckIn> editCheckIn(String date, Map<String, Object?> fields);
 
+  /// `POST /life/facts` — a lasting fact the player types (contract #40).
+  /// 409 when [Life.maxFacts] already hold.
+  Future<LifeFact> addLifeFact(String text, {FactCategory category = FactCategory.other});
+
+  /// `PATCH /life/facts/{id}` — fixes the wording or category in place;
+  /// [ended] `true` ends it now, `false` brings an ended one back (409 when
+  /// the list is full). 404 `fact not found`.
+  Future<LifeFact> editLifeFact(int id, {String? text, FactCategory? category, bool? ended});
+
+  /// `DELETE /life/facts/{id}` — gone for good. 404 `fact not found`.
+  Future<void> deleteLifeFact(int id);
+
   /// `GET /skills/{skillId}/overview` — node, course, parents, prerequisites,
   /// audit history and found materials. 404 `skill not found`.
   Future<SkillOverview> getSkillOverview(int skillId);

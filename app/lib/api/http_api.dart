@@ -210,6 +210,26 @@ class HttpApi implements SelfInfinityApi {
   );
 
   @override
+  Future<LifeFact> addLifeFact(String text, {FactCategory category = FactCategory.other}) =>
+      _post(
+        '/life/facts',
+        body: {'text': text, 'category': category.name},
+        parse: (j) => LifeFact.fromJson(_object(j)),
+      );
+
+  @override
+  Future<LifeFact> editLifeFact(int id, {String? text, FactCategory? category, bool? ended}) =>
+      _send(
+        'PATCH',
+        '/life/facts/$id',
+        body: {'text': ?text, 'category': ?category?.name, 'ended': ?ended},
+        parse: (j) => LifeFact.fromJson(_object(j)),
+      );
+
+  @override
+  Future<void> deleteLifeFact(int id) => _send('DELETE', '/life/facts/$id', parse: (_) {});
+
+  @override
   Future<DailyCheckIn?> getTodayCheckIn() => _get(
     '/checkins/today',
     parse: (j) => j == null ? null : DailyCheckIn.fromJson(_object(j)),
@@ -455,6 +475,12 @@ class HttpApi implements SelfInfinityApi {
         future = _client.delete(uri, headers: headers);
       } else if (method == 'PUT') {
         future = _client.put(
+          uri,
+          headers: headers,
+          body: body == null ? null : utf8.encode(jsonEncode(body)),
+        );
+      } else if (method == 'PATCH') {
+        future = _client.patch(
           uri,
           headers: headers,
           body: body == null ? null : utf8.encode(jsonEncode(body)),

@@ -1,17 +1,27 @@
-"""The life overview and the Life Coach (contract #39), and editing a day's check-in."""
+"""The life overview and the Life Coach (contract #39), editing a day's check-in, and the
+player's lasting facts (#40)."""
 
 import logging
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlmodel import Session
 
 from app.agents.life_coach import LifeCoach
 from app.db import get_session
 from app.llm import get_provider
-from app.schemas import CheckInEdit, DailyCheckInOut, LifeAdviceItemOut, LifeAdviceOut, LifeOut
+from app.schemas import (
+    CheckInEdit,
+    DailyCheckInOut,
+    LifeAdviceItemOut,
+    LifeAdviceOut,
+    LifeFactEdit,
+    LifeFactIn,
+    LifeFactOut,
+    LifeOut,
+)
 from app.services import checkin as checkin_service
-from app.services import life
+from app.services import facts, life
 
 logger = logging.getLogger(__name__)
 
@@ -45,3 +55,34 @@ def edit_checkin(day: date, body: CheckInEdit, session: Session = Depends(get_se
     except checkin_service.FutureDate:
         raise HTTPException(400, "That day has not come yet.") from None
     return DailyCheckInOut.model_validate(record)
+
+
+FACTS_FULL = f"You can keep {facts.MAX_FACTS} lasting facts. End or delete one first."
+
+
+@router.post("/life/facts", response_model=LifeFactOut)
+def add_fact(body: LifeFactIn, session: Session = Depends(get_session)):
+    try:
+        return facts.add_fact(session, body)
+    except facts.FactsFull:
+        raise HTTPException(409, FACTS_FULL) from None
+
+
+@router.patch("/life/facts/{fact_id}", response_model=LifeFactOut)
+def edit_fact(fact_id: int, body: LifeFactEdit, session: Session = Depends(get_session)):
+    """Fixes the wording or category in place; `ended` ends it now or brings it back."""
+    try:
+        return facts.edit_fact(session, fact_id, body)
+    except facts.FactNotFound:
+        raise HTTPException(404, "fact not found") from None
+    except facts.FactsFull:
+        raise HTTPException(409, FACTS_FULL) from None
+
+
+@router.delete("/life/facts/{fact_id}", status_code=204)
+def delete_fact(fact_id: int, session: Session = Depends(get_session)):
+    try:
+        facts.delete_fact(session, fact_id)
+    except facts.FactNotFound:
+        raise HTTPException(404, "fact not found") from None
+    return Response(status_code=204)
