@@ -18,6 +18,7 @@ from sqlmodel import Session, col, select
 
 from app.i18n import join_list, quote, t
 from app.agents.front_desk import FrontDesk, FrontDeskResult
+from app.llm import decisions
 from app.llm.base import LLMProvider
 from app.agents.planner import SyllabusText
 from app.models import AuditSession, ChatMessage, Course, EdgeKind, SkillNode, SkillStatus, Upload
@@ -262,7 +263,8 @@ def handle_message(
 
     nodes = _nodes_newest_course_first(session)
     try:
-        routed: FrontDeskResult = FrontDesk(provider_for("front_desk")).route(message, [n.title for n in nodes])
+        desk = FrontDesk(provider_for("front_desk"), decide=decisions.decide if decisions.available() else None)
+        routed: FrontDeskResult = desk.route(message, [n.title for n in nodes])
     except Exception as exc:
         logger.warning("front desk failed", exc_info=True)
         session.rollback()

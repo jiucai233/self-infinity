@@ -56,7 +56,7 @@
 
 | 变量 | 值 |
 |---|---|
-| `OPENAI_API_KEY` | 你的 key（现在线上用的是它，模型默认 `gpt-6-luna`） |
+| `OPENAI_API_KEY` | 你的 key（现在线上用的是它，模型默认 `gpt-6-luna`）。有它时聊天前台先用 Decisions API 分意图（约 0.3 秒），新建课程和闲聊才调大模型 |
 | `LLM_PROVIDER` | 可选：不设就用第一个配了 key 的 provider，一个 key 都没有就是 `mock` |
 | `LLM_MODEL` | 可选：换模型时才设 |
 | `LLM_TIMEOUT_SECONDS` | 可选：默认 90（推理模型生成一门课约 25 秒） |

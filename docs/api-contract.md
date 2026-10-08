@@ -393,6 +393,8 @@ The front desk (`[agent: front_desk]`) returns `{"intent", "args", "reply"}`; `r
 | `briefing` | — | narrate | agent `narrator`, `{"type": "briefing", ...}`, content = the narrative |
 | `open_map` | — | nothing | none; the first message gets `{"type": "navigate", "scene": "map"}` |
 
+**Fast path** (when `OPENAI_API_KEY` is set, whichever provider writes text): the front desk first asks the OpenAI Decisions API (`POST /v1/decisions`, gpt-6-luna, ~0.3 s) two choice questions: the intent (the seven above) and which node title the message names, if any. At confidence ≥ 0.75, `checkin` / `plan` / `briefing` / `open_map` reply with a fixed text (`Logging your day.` / `Let me pick today's quests.` / `Here is where you stand.` / `Here is your life tree.`, in the request language) and `open_skill` with a named node replies `Opening “{title}”.` with `args.skill` = that title, all without an LLM call. `generate_course` (the topic must be read out of the message), `none` (it needs a reply), lower confidence and any Decisions failure go to the LLM front desk as before.
+
 If a pipeline fails (400/404/502), the second message explains it in English (agent `front_desk`, action null); the endpoint still returns 200. If the front desk itself fails: 502 `The assistant is temporarily unavailable. Please try again.` and the user message is still saved.
 Audit answers go to endpoint 8, never here. Audit turns are not ChatMessages.
 
