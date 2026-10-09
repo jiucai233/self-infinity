@@ -12,6 +12,7 @@ import logging
 import re
 import time
 
+from app.utils import slugify
 from app.llm.base import JSON_RETRY_NOTICE, Message, agent_of
 
 logger = logging.getLogger(__name__)
@@ -40,16 +41,8 @@ _CHALLENGE_QUESTION = "Before I pass this: give one case where this idea does no
 _LINK_REASON = "Same concept, similar misconception"
 
 _SYLLABUS_COURSE = "High School Mathematics Curriculum (Ministry of Education)"
-_SYLLABUS_OUTLINE = [
-    "Algebra",
-    "Quadratic Equations",
-    "Sequences",
-    "Functions",
-    "Linear and Quadratic Functions",
-    "Calculus",
-    "Limits of Sequences",
-    "Derivatives",
-]
+# Its units: the math course's first level (the Planner keeps a syllabus's items as they are).
+_SYLLABUS_OUTLINE = ["Algebra", "Functions", "Calculus"]
 
 # slug, title, description, parents (first = main parent)
 _MATH_NODES = [
@@ -122,8 +115,8 @@ _MATH_REQUIRES = [
     ("linear-function", "quadratic-function", "You need the graph of a linear function first."),
     ("sequence-limit", "derivative", "The derivative is defined as a limit."),
 ]
-# A topic with "vision": a course in layers. One chapter is broken down; two are left for later
-# ("expand"), each of which breaks down into three parts (_expand).
+# A topic with "vision": a course in layers, two whole levels. Two categories on the second are
+# left for later ("expand"), each of which breaks down into three parts (_expand).
 _VISION_NODES = [
     ("computer-vision", "Computer Vision", "Seeing with cameras and code: features, geometry and recognition.", [], False),
     ("image-features", "Image Features", "Points and patches an algorithm can find again: corners and descriptors.",
@@ -133,9 +126,11 @@ _VISION_NODES = [
     ("sift", "SIFT", "Build scale-invariant keypoints and descriptors and explain how they are matched.",
      ["image-features"], False),
     ("geometry", "Geometric Vision", "Cameras and 3D: calibration, homography, epipolar geometry, triangulation.",
-     ["computer-vision"], True),
+     ["scene"], True),
     ("recognition", "Visual Recognition", "Telling what is in an image: classification, detection, segmentation.",
-     ["computer-vision"], True),
+     ["scene"], True),
+    ("scene", "Scene Understanding", "What a scene holds and where: its 3D geometry and the objects in it.",
+     ["computer-vision"], False),
 ]
 _ROOT_TITLE_CHARS = 24
 
@@ -251,10 +246,40 @@ def _expand(title: str, slug: str) -> str:
     return _dump({"nodes": nodes, "requires": []})
 
 
+_TREE_LINE_RE = re.compile(r"^\s*([^\s:]+): (.+)$", re.M)
+_OUTLINE_ITEM_RE = re.compile(r"^\d+\. (.+)$", re.M)
+
+
+def _fill_in(title: str, slug: str) -> str:
+    """Planner.expand on a node with parts: one part it was missing."""
+    return _dump({"nodes": [{
+        "slug": f"{slug}-more", "title": f"More {title}"[:_ROOT_TITLE_CHARS],
+        "description": f"What {title} still lacked.", "parents": [slug], "node_type": "concept",
+    }], "requires": []})
+
+
+def _revise(system: str, message: str) -> str:
+    """Planner.revise: each item of the reference outline the tree lacks, under the root."""
+    tree = _TREE_LINE_RE.findall(message.split("Tree:", 1)[-1])
+    root = tree[0][0] if tree else ""
+    have = {title.strip().casefold() for _, title in tree}
+    items = [i.strip() for i in _OUTLINE_ITEM_RE.findall(system) if i.strip().casefold() not in have]
+    nodes = [
+        {"slug": slugify(item), "title": item[:_ROOT_TITLE_CHARS], "description": f"{item}.", "parents": [root],
+         "node_type": "concept"}
+        for item in items
+    ]
+    return _dump({"nodes": nodes, "requires": []})
+
+
 def _plan(messages: list[Message]) -> str:
     topic = _first_user(messages).strip()
+    if topic.startswith("Course: ") and "\nTree:\n" in topic:
+        return _revise(_system(messages), topic)
     expanding = _EXPAND_RE.search(topic)
     if expanding:
+        if "Its parts so far" in topic:
+            return _fill_in(expanding.group(1), expanding.group(2))
         return _expand(expanding.group(1), expanding.group(2))
     if "vision" in topic.casefold():
         nodes = [
@@ -385,6 +410,7 @@ _NUMBER_WORDS = {
 _NUMBER = r"\d+(?:\.\d+)?|" + "|".join(_NUMBER_WORDS)
 _SLEEP_HOURS_RE = re.compile(rf"\b({_NUMBER})\s*(?:hours?|hrs?|h)\b", re.I)
 _SLEEP_WORD_RE = re.compile(r"\bsleep|\bslept", re.I)
+_SLEEP_SPAN_RE = re.compile(r"\bfrom (\d{1,2})(?::\d\d)?\s*(?:pm|am)? (?:to|until|till) (\d{1,2})\b", re.I)
 _NOT_EXERCISED_RE = re.compile(
     r"\b(?:didn't exercise|did not exercise|no exercise|skipped (?:the )?gym|didn't work out|did not work out)\b", re.I
 )
@@ -437,6 +463,10 @@ def _convert_checkin_english(text: str) -> dict:
             raw = m.group(1).lower()
             hours = _NUMBER_WORDS[raw] if raw in _NUMBER_WORDS else round(float(raw))
             out["sleep_hours"] = hours if 0 <= hours <= 14 else None
+            break
+        if m := _SLEEP_SPAN_RE.search(sentence):
+            # "slept from 11 to 7": the clock hours apart, on a 12-hour dial.
+            out["sleep_hours"] = (int(m.group(2)) - int(m.group(1))) % 12 or None
             break
 
     if _NOT_EXERCISED_RE.search(text):

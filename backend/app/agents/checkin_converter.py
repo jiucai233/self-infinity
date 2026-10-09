@@ -38,6 +38,9 @@ Rules:
 - Extract only what the user explicitly said. Never infer.
   "I'm a bit tired" says nothing about sleep hours, focus or stress.
 - Any field that was not mentioned is null.
+- Bed and wake times count as said: "slept from 11 to 7" is 8 hours,
+  "went to bed at 12:30 and got up at 7" is 7 (rounded). Use the times they
+  gave; never guess one they did not.
 - Round approximate numbers: "about six hours" becomes 6.
 - Write diet_note in English.
 

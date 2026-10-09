@@ -1,5 +1,8 @@
 // The life tree (docs/ux-chat.md §6): you → main quests → courses → nodes.
 
+import 'dart:math' as m;
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/api_exception.dart';
@@ -95,6 +98,80 @@ void main() {
       expect((await api.listGoals()).map((g) => g.id), isNot(contains(b.id)));
       await expectLater(api.updateGoal(99, title: 'x'), throwsA(isA<ApiException>()));
       await expectLater(api.createGoal('   '), throwsA(isA<ApiException>()));
+    });
+  });
+
+  group('a course inside another', () {
+    test('grows from the node that is it, not from you', () async {
+      final (api, math, writing) = await twoCourses();
+      await api.linkSkill(6, writing.course.id); // Discriminant is the writing course
+      final tree = LifeTree.build(maps: [await api.getCourseMap(writing.course.id), await api.getCourseMap(1)]);
+      final writingRoot = tree.bySkill(writing.nodes.first.id)!;
+      expect((writingRoot.kind, writingRoot.parent), (LifeKind.course, 's6'));
+      // Parents still come before their children.
+      final seen = <String>{};
+      for (final n in tree.nodes) {
+        if (n.parent != null) expect(seen, contains(n.parent));
+        seen.add(n.key);
+      }
+      expect(tree.depths['s${writing.nodes.first.id}'], tree.depths['s6']! + 1);
+      expect(math.nodes, isNotEmpty);
+    });
+  });
+
+  group('the sphere', () {
+    double dist(({double x, double y, double z}) a, [({double x, double y, double z})? b]) {
+      final o = b ?? (x: 0.0, y: 0.0, z: 0.0);
+      return m.sqrt(m.pow(a.x - o.x, 2) + m.pow(a.y - o.y, 2) + m.pow(a.z - o.z, 2));
+    }
+
+    test('each level is a shell further out; a course keeps to its own patch', () async {
+      final (_, math, writing) = await twoCourses();
+      final tree = LifeTree.build(maps: [math, writing]);
+      final at = lifeSphere(tree);
+      final depths = tree.depths;
+      expect(dist(at[LifeTree.selfKey]!), 0);
+      for (final n in tree.nodes.skip(1)) {
+        final parent = at[n.parent]!;
+        expect(dist(at[n.key]!), greaterThan(dist(parent) - 1e-9), reason: n.label);
+        // Same depth, same distance from you.
+        final peer = tree.nodes.firstWhere((o) => depths[o.key] == depths[n.key]);
+        expect(dist(at[n.key]!), closeTo(dist(at[peer.key]!), 1e-9));
+      }
+      // Not a flat disc: the nodes spread in all three directions.
+      final ys = [for (final p in at.values) p.y];
+      expect(ys.reduce(m.max) - ys.reduce(m.min), greaterThan(0.5));
+      // The math leaves are nearer each other than the writing ones.
+      final mathLeaves = [for (final n in tree.skillsOf(math.course.id)) at[n.key]!];
+      final writingLeaves = [for (final n in tree.skillsOf(writing.course.id)) at[n.key]!];
+      double mean(Iterable<double> xs) => xs.reduce((a, b) => a + b) / xs.length;
+      final inside = mean([for (final a in mathLeaves) for (final b in mathLeaves) dist(a, b)]);
+      final across = mean([for (final a in mathLeaves) for (final b in writingLeaves) dist(a, b)]);
+      expect(inside, lessThan(across));
+    });
+
+    testWidgets('it turns any way, zooms by scroll and buttons, and goes back', (tester) async {
+      final (api, _, _) = await twoCourses();
+      await pumpScene(tester, const MapScene(), api: api);
+      final state = tester.state<LifeConstellationState>(find.byType(LifeConstellation));
+      final centre = tester.getCenter(find.byType(LifeConstellation));
+      final before = state.positionOf('s6')!;
+
+      await tester.dragFrom(centre, const Offset(0, 120));
+      await tester.pump();
+      expect((state.positionOf('s6')! - before).distance, greaterThan(5));
+
+      tester.binding.handlePointerEvent(PointerScrollEvent(position: centre, scrollDelta: const Offset(0, -400)));
+      await tester.pump();
+      expect(state.zoom, closeTo(m.e, 0.01));
+
+      await tester.tap(find.byKey(const Key('zoom-out')));
+      await tester.pump();
+      expect(state.zoom, closeTo(m.e / 1.5, 0.01));
+      await tester.tap(find.byKey(const Key('zoom-reset')));
+      await tester.pump();
+      expect(state.zoom, 1);
+      expect((state.positionOf('s6')! - before).distance, lessThan(0.5));
     });
   });
 

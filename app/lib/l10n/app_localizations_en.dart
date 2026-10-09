@@ -257,7 +257,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dotReady => 'Ready';
 
   @override
-  String get dragToTurn => 'Drag to turn · tap a point';
+  String get dragToTurn => 'Drag to turn · scroll to zoom · tap a point';
 
   @override
   String get editUnderCharacter => 'Edit these under My character.';
@@ -1052,10 +1052,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devVoiceHint =>
-      'At list price. The realtime Guide is billed by tokens, so silence is free; GPT-Live bills every minute the session is open, its backend apart. Audit transcription counts the whole open session, an upper bound.';
+      'At list price. The Guide on GPT-Live bills every second the session is open, plus its text backend; on Realtime it bills tokens (silence is free) plus transcription. Each Guide session also shows the other voice: Realtime at this account\'s own cost per minute, GPT-Live at \$0.05 a minute. Audit transcription counts the whole open session, an upper bound.';
 
   @override
-  String get devVoiceGuide => 'Home Guide (realtime)';
+  String get devVoiceGuide => 'Home Guide';
 
   @override
   String get devVoiceAudits => 'Audits (live transcription)';
@@ -1329,4 +1329,139 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get factOther => 'Other';
+
+  @override
+  String get devVoiceGuideLive => 'Guide (GPT-Live)';
+
+  @override
+  String get devVoiceGuideRealtime => 'Guide (Realtime)';
+
+  @override
+  String get devVoiceOnRealtime => 'On Realtime ≈';
+
+  @override
+  String get devVoiceAllLive => 'All on GPT-Live';
+
+  @override
+  String get devVoiceAllRealtime => 'All on Realtime ≈';
+
+  @override
+  String get devVoiceRealtimeRate => 'Realtime per minute (measured)';
+
+  @override
+  String get devVoiceRealtimeRateDefault => 'Realtime per minute (one test)';
+
+  @override
+  String get nodeEdit => 'Edit';
+
+  @override
+  String get nodeEditTitle => 'Edit node';
+
+  @override
+  String get nodeTitleLabel => 'Name';
+
+  @override
+  String get nodeDescriptionLabel => 'What it covers';
+
+  @override
+  String get nodeSave => 'Save';
+
+  @override
+  String get nodeAddPart => 'Add a part';
+
+  @override
+  String nodeAddPartTitle(String title) {
+    return 'Add a part under “$title”';
+  }
+
+  @override
+  String get nodeFillIn => 'Fill in what\'s missing';
+
+  @override
+  String get nodeBreakDownFurther => 'Break it down further';
+
+  @override
+  String get nodeLink => 'It is one of my courses…';
+
+  @override
+  String nodeLinkTitle(String title) {
+    return 'Which of your courses is “$title”?';
+  }
+
+  @override
+  String get nodeLinkBody => 'Its parts become that course, and the two are cleared together.';
+
+  @override
+  String get nodeLinkNone => 'None: a plain node';
+
+  @override
+  String get nodeLinkNoCourses => 'You have no other course yet.';
+
+  @override
+  String get nodeApplySyllabus => 'Update from a syllabus…';
+
+  @override
+  String nodeApplySyllabusTitle(String course) {
+    return 'Update “$course” from a syllabus';
+  }
+
+  @override
+  String get nodeApplySyllabusBody =>
+      'What the syllabus covers and the course lacks is added where it belongs. Nothing is removed; your progress stays.';
+
+  @override
+  String get nodeSyllabusSearch => 'Search for one';
+
+  @override
+  String get nodeSyllabusUpload => 'Upload a file';
+
+  @override
+  String get nodeReadingSyllabus => 'Reading the syllabus… this can take up to a minute.';
+
+  @override
+  String nodeSyllabusAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count parts added.',
+      one: '1 part added.',
+      zero: 'The course already covers that syllabus.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nodeNoSyllabus => 'No syllabus found. Try uploading one.';
+
+  @override
+  String get nodeDelete => 'Delete node';
+
+  @override
+  String nodeDeleteTitle(String title) {
+    return 'Delete “$title”?';
+  }
+
+  @override
+  String get nodeDeleteBody =>
+      'Its parts go with it, with their attempts and lesson cards. A part that also belongs elsewhere stays there.';
+
+  @override
+  String nodeLinkedLine(String course) {
+    return 'This is your course “$course”.';
+  }
+
+  @override
+  String get nodeOpenCourse => 'Open the course';
+
+  @override
+  String get nodeEditFailed => 'Couldn\'t do that. Try again.';
+
+  @override
+  String get zoomIn => 'Zoom in';
+
+  @override
+  String get zoomOut => 'Zoom out';
+
+  @override
+  String get resetView => 'Back to the start';
 }

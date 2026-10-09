@@ -52,7 +52,6 @@ def test_ut02_non_json_output_raises():
     [
         "[]",
         '"nodes"',
-        '{"nodes": []}',
         '{"nodes": "algebra"}',
         '{"nodes": ["algebra"]}',
         '{"nodes": [{"slug": "a", "title": "  "}]}',
@@ -61,6 +60,12 @@ def test_ut02_non_json_output_raises():
 def test_ut02_wrong_shape_raises(bad):
     with pytest.raises(PlannerError):
         Planner(ScriptedProvider(planner=bad)).generate("Math")
+
+
+def test_an_empty_answer_parses_it_means_nothing_is_missing():
+    # Filling a node in or revising a course may find nothing to add; a new course without
+    # nodes fails later, in the Structure Validator (rule 5).
+    assert Planner.parse('{"nodes": []}').nodes == []
 
 
 def test_ut03_syllabus_section_is_in_the_prompt_when_provided():
@@ -72,7 +77,7 @@ def test_ut03_syllabus_section_is_in_the_prompt_when_provided():
     Planner(provider).generate("Linear Algebra", syllabus=syllabus)
 
     (prompt,) = provider.system_prompts("planner")
-    assert "Reference outline (State Univ. Linear Algebra (MATH101))" in prompt
+    assert "Reference syllabus (State Univ. Linear Algebra (MATH101))" in prompt
     assert "1. Vectors" in prompt and "3. Determinants" in prompt
 
 
@@ -82,7 +87,7 @@ def test_ut03_no_syllabus_section_without_a_syllabus():
     Planner(provider).generate("Linear Algebra")
 
     (prompt,) = provider.system_prompts("planner")
-    assert "Reference outline" not in prompt
+    assert "Reference syllabus" not in prompt
 
 
 def test_prompt_carries_the_course_settings_and_the_topic_goes_in_the_user_message():

@@ -258,8 +258,14 @@ class _VoiceCosts extends StatelessWidget {
           ('guide-sessions', l.devVoiceSessions, '${v.guideSessions}'),
           ('guide-minutes', l.devVoiceMinutes, _num(v.guideMinutes)),
           ('guide-cost', l.devVoiceCost, _usd(v.guideCost)),
-          ('guide-live', l.devVoiceLive, _usd(v.guideLiveEquivalent)),
           ('guide-per-minute', l.devVoicePerMinute, _usd(v.guideCostPerMinute)),
+          ('guide-all-live', l.devVoiceAllLive, _usd(v.guideAllLive)),
+          ('guide-all-realtime', l.devVoiceAllRealtime, _usd(v.guideAllRealtime)),
+          (
+            'realtime-rate',
+            v.realtimeRateMeasured ? l.devVoiceRealtimeRate : l.devVoiceRealtimeRateDefault,
+            _usd(v.realtimePerMinute),
+          ),
           ('guide-cached', l.devVoiceCached, _pct(v.guideCachedShare)),
         ]),
         const SizedBox(height: AppSpacing.lg),
@@ -280,7 +286,7 @@ class _VoiceCosts extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '${s.kind == 'guide' ? l.devVoiceGuide : l.devVoiceAudits} · '
+                      '${s.kind == 'guide' ? (s.isLive ? l.devVoiceGuideLive : l.devVoiceGuideRealtime) : l.devVoiceAudits} · '
                       '${MaterialLocalizations.of(context).formatShortDate(s.startedAt.toLocal())} '
                       '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(s.startedAt.toLocal()))}',
                       style: theme.bodyMedium,
@@ -288,7 +294,7 @@ class _VoiceCosts extends StatelessWidget {
                   ),
                   Text(
                     '${_num(s.minutes)} ${l.devVoiceMinutes} · ${s.turns} ${l.devVoiceTurns} · ${_usd(s.cost)}'
-                    '${s.liveEquivalent == null ? '' : ' · ${l.devVoiceLive} ${_usd(s.liveEquivalent)}'}',
+                    '${s.otherCost == null ? '' : ' · ${s.isLive ? l.devVoiceOnRealtime : l.devVoiceLive} ${_usd(s.otherCost)}'}',
                     style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
                   ),
                 ],

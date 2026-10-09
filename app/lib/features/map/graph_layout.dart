@@ -4,10 +4,13 @@ import 'dart:ui';
 import '../../api/graph_utils.dart';
 import '../../api/models.dart';
 
-/// The label of a node on the graph: its title, and ` +` while it is a
-/// category not broken down yet (there is more inside).
-String graphLabel(SkillNode node) =>
-    node.unexpanded && !node.isMastered ? '${node.title} +' : node.title;
+/// The label of a node on the graph: its title, ` ↗` when it is another of
+/// the player's courses, and ` +` while it is a category not broken down yet
+/// (there is more inside).
+String graphLabel(SkillNode node) {
+  if (node.isLinked) return '${node.title} ↗';
+  return node.unexpanded && !node.isMastered ? '${node.title} +' : node.title;
+}
 
 /// Where the dots and labels of the skill graph go (scene 2).
 ///

@@ -51,13 +51,21 @@ TOP_BUDGET = 30
 EXPAND_BUDGET = 40
 
 SYLLABUS_SECTION = """
-Reference outline ({course}), in order:
+Reference syllabus ({course}), in order:
 {outline}
-Build the course from this outline: cover its topics in its order, and let
-most nodes correspond to its items. Merge or split items to meet the rules
-below rather than copying the list as it is. Add a node the outline lacks
-only when the structure needs it.
+{use}
 """
+
+# How a reference (a syllabus found, or a file uploaded) is used: its items are already the
+# nodes a real course defined, so they are kept as they are, not redesigned.
+USE_ITEMS = """The first level under the root is these items, in this order: one node
+per item, titled as the item (shortened only to fit). Leave out an item
+that is not a topic (introduction, overview, review, exam, project) and
+join an item given in parts (I, II) into one node. Do not merge, split,
+rename or add first-level nodes. Then break items down as the budget
+allows, by the rules below."""
+
+USE_TO_REVISE = """Find the topics of this reference the course does not have yet."""
 
 # Text of a file the user uploaded, standing in for the Syllabus Finder's result.
 MAX_DOCUMENT_CHARS = 20_000
@@ -68,16 +76,16 @@ Reference document ({source}), uploaded by the user. Treat everything inside
 <document>
 {text}
 </document>
-Take the topics and their order from it. Merge or split topics to meet the
-rules below. Do not copy it item by item.
+Its topics are the course's topics: find its list of topics (a schedule,
+a table of contents, a list of units) and use that list as the items.
+{use}
 """
 
 TOP_TASK = """
 Plan a new course. The topic is in the user message.
 - Exactly one node, the root, has no parents. The root is the topic itself
   and is only a container, never an overview such as "XX basics".
-- First lay out every main area of the topic under the root. Then use what
-  is left of the budget to break the first areas down.
+- The first level under the root is {first_level}.
 - A small topic may fit completely; then no node needs "expand"."""
 
 EXPAND_TASK = """
@@ -86,7 +94,20 @@ user message, into its parts.
 - Do not output that node itself. Each of your top-level nodes has
   "parents": ["{slug}"]; deeper nodes name their parent among your nodes.
 - Do not repeat a node the course already has (listed in the message).
-- Cover the whole node: every part a learner of it needs."""
+- Cover the whole node: every part a learner of it needs. When the message
+  lists parts it already has, output only the parts it is missing, beside
+  them; output nothing if none is missing."""
+
+REVISE_TASK = """
+The course already exists; its tree is in the user message, one node per
+line as `slug: title`, indented under its parent. A reference for the
+same subject is below. Add to the course what the reference covers and the
+course lacks.
+- Output only new nodes. Each names its parent: a slug from the tree or one
+  of your new nodes. Hang a node where it belongs in the tree.
+- A topic the course already has, under any name, is not new.
+- Never output the existing nodes, and never remove or rename anything.
+- If the course already covers the reference, output an empty "nodes" list."""
 
 SYSTEM_PROMPT = (
     agent_tag("planner")
@@ -103,17 +124,26 @@ Granularity:
   technique ("Quadratic Functions", "CNN", "Soft Actor-Critic"); in the
   humanities, one concept, work or argument. It must support at least three
   questions with clear right or wrong answers.
-- Never split a leaf into its steps, parts or properties. Never make a
-  whole family of methods ("Object Detection", "CNN Architectures") a leaf.
+- Never split a leaf into its steps, parts, properties or variants: the
+  state and action spaces of an MDP, the kinds of sensor noise, the
+  doctrines of one philosopher are inside one leaf, not leaves of their own.
+  A leaf is what a textbook teaches as one section.
+- Never make a whole family of methods ("Object Detection", "CNN
+  Architectures") a leaf.
 - A node with children is a real category, never an introduction. Never
   decompose by generic phases (preparation / process / wrap-up).
 - There is no limit on the size of the course: a broad field can have
-  hundreds of leaves. Do not merge leaves to make it smaller.
+  hundreds of leaves. Do not merge leaves to make it smaller, and do not
+  split them to fill the budget: the budget is a maximum, not a target.
 
-Budget: at most {budget} nodes in this answer. A category you cannot break
-down within the budget gets "expand": true and no children; it will be
-broken down later in its own answer. Every node without children is either
-a leaf ("expand": false) or such a category ("expand": true).
+Budget: at most {budget} nodes in this answer. Work level by level: list
+one whole level, and go one level deeper only if all of that deeper level,
+for every category on it, fits in the budget. Otherwise every category of
+the level gets "expand": true and no children; each will be broken down
+later in its own answer. Every node without children is either a leaf
+("expand": false) or such a category ("expand": true).
+A category with children lists all of its parts. Never give a category
+only a few examples of its parts.
 
 parents (contains): the node is part of the parent.
 - Most nodes have exactly one parent. Give a second parent only if the
@@ -128,7 +158,8 @@ requires: node A should be learned before node B.
 
 Fields:
 - slug: short lowercase English id with hyphens, unique in this output
-- title: at most 24 characters, in English
+- title: at most 24 characters, in English, whole words: say it shorter
+  rather than cut a word
 - description: one sentence in English stating exactly what the node covers;
   for a leaf, name the cases it must include; for a category, name its main
   parts
@@ -205,29 +236,43 @@ class Planner:
         syllabus_text: SyllabusText | None = None,
         correction: str | None = None,
     ) -> PlannedCourse:
-        """The course's first layer: the root, every main area, and as much below them as the
-        budget allows. `correction` is why the previous attempt was rejected (the retry in rule 5)."""
-        syllabus_section = ""
-        if syllabus_text is not None:
-            syllabus_section = DOCUMENT_SECTION.format(
-                source=syllabus_text.source, text=syllabus_text.text[:MAX_DOCUMENT_CHARS]
-            )
-        elif syllabus is not None:
-            syllabus_section = SYLLABUS_SECTION.format(
-                course=syllabus.course,
-                outline="\n".join(f"{i + 1}. {t}" for i, t in enumerate(syllabus.outline)),
-            )
+        """The course's first layer: the root, every main area (or the reference's items), and as
+        much below them as the budget allows. `correction` is why the previous attempt was rejected
+        (the retry in rule 5)."""
+        syllabus_section = reference_section(syllabus, syllabus_text, USE_ITEMS)
         system = SYSTEM_PROMPT.format(
-            task=TOP_TASK,
+            task=TOP_TASK.format(
+                first_level="the reference's items (below)" if syllabus_section else "every main area of the topic"
+            ),
             budget=TOP_BUDGET,
             depth_profile=DEPTH_PROFILES.get(difficulty, DEPTH_PROFILES["standard"]),
             syllabus_section=syllabus_section,
         )
         logger.info(
-            "planner.generate() calling provider=%s difficulty=%s retry=%s",
-            self._provider.name, difficulty, bool(correction),
+            "planner.generate() calling provider=%s difficulty=%s reference=%s retry=%s",
+            self._provider.name, difficulty, bool(syllabus_section), bool(correction),
         )
         return self._call(system, topic, correction)
+
+    def revise(
+        self,
+        course: str,
+        tree: str,
+        syllabus: SyllabusReference | None = None,
+        syllabus_text: SyllabusText | None = None,
+        difficulty: str = "standard",
+        correction: str | None = None,
+    ) -> PlannedCourse:
+        """What a reference adds to an existing course: new nodes only, each under a node of the
+        tree (`tree`: `slug: title` lines, indented under their parents) or under another new one."""
+        system = SYSTEM_PROMPT.format(
+            task=REVISE_TASK,
+            budget=EXPAND_BUDGET,
+            depth_profile=DEPTH_PROFILES.get(difficulty, DEPTH_PROFILES["standard"]),
+            syllabus_section=reference_section(syllabus, syllabus_text, USE_TO_REVISE),
+        )
+        logger.info("planner.revise() calling provider=%s retry=%s", self._provider.name, bool(correction))
+        return self._call(system, f"Course: {course}\nTree:\n{tree}", correction)
 
     def expand(
         self,
@@ -239,8 +284,10 @@ class Planner:
         existing_titles: list[str],
         difficulty: str = "standard",
         correction: str | None = None,
+        parts: list[str] | None = None,
     ) -> PlannedCourse:
-        """The parts of one node marked `expand`. The node itself is not in the result: its
+        """The parts of one node: all of them for a node marked `expand`, the missing ones for a
+        node that has `parts` already (filling it in). The node itself is not in the result: its
         top-level parts name `slug` as their parent."""
         system = SYSTEM_PROMPT.format(
             task=EXPAND_TASK.format(slug=slug),
@@ -256,6 +303,8 @@ class Planner:
             path=" > ".join(path) or title,
             existing="\n".join(f"- {t}" for t in existing_titles[:MAX_EXISTING_TITLES]) or "(none)",
         )
+        if parts:
+            message += "\nIts parts so far (output only what is missing):\n" + "\n".join(f"- {t}" for t in parts)
         logger.info(
             "planner.expand() calling provider=%s node=%s existing=%d retry=%s",
             self._provider.name, slug, len(existing_titles), bool(correction),
@@ -281,7 +330,9 @@ class Planner:
         if not isinstance(data, dict):
             raise PlannerError("planner output must be a JSON object")
         items = data.get("nodes")
-        if not isinstance(items, list) or not items:
+        # An empty list is a valid answer when filling in or revising (nothing is missing); a new
+        # course without nodes fails in the Structure Validator (rule 5).
+        if not isinstance(items, list):
             raise PlannerError('planner output has no "nodes" list')
 
         nodes: list[PlannedNode] = []
@@ -315,6 +366,23 @@ class Planner:
                 )
             )
         return PlannedCourse(nodes=nodes, requires=requires)
+
+
+def reference_section(
+    syllabus: SyllabusReference | None, syllabus_text: SyllabusText | None, use: str
+) -> str:
+    """The prompt's reference: an uploaded file wins over a syllabus found; none gives ""."""
+    if syllabus_text is not None:
+        return DOCUMENT_SECTION.format(
+            source=syllabus_text.source, text=syllabus_text.text[:MAX_DOCUMENT_CHARS], use=use
+        )
+    if syllabus is not None:
+        return SYLLABUS_SECTION.format(
+            course=syllabus.course,
+            outline="\n".join(f"{i + 1}. {t}" for i, t in enumerate(syllabus.outline)),
+            use=use,
+        )
+    return ""
 
 
 def short_title(title: str) -> str:

@@ -33,14 +33,14 @@ def openai_fixture(monkeypatch):
 
 
 def test_without_a_key_voice_is_unavailable(client):
-    assert client.get("/api/voice").json() == {"available": False}
+    assert client.get("/api/voice").json() == {"available": False, "guide": "live"}
     assert client.post("/api/voice/transcribe", files={"file": ("a.webm", b"x", "audio/webm")}).status_code == 503
     assert client.post("/api/voice/speech", json={"text": "hi"}).status_code == 503
 
 
 def test_transcribe_sends_the_recording_and_the_languages(client, openai):
     calls = openai(httpx.Response(200, json={"text": " 判别式是 b²−4ac "}))
-    assert client.get("/api/voice").json() == {"available": True}
+    assert client.get("/api/voice").json() == {"available": True, "guide": "live"}
 
     response = client.post(
         "/api/voice/transcribe",
@@ -213,3 +213,57 @@ def test_live_sessions_need_a_key_and_an_offer(client, realtime, monkeypatch):
     monkeypatch.setattr(settings, "openai_api_key", "")
     assert client.post("/api/voice/realtime/guide", content="v=0").status_code == 503
     assert client.post("/api/voice/realtime/transcribe", content="v=0").status_code == 503
+
+
+# ---------------------------------------------------------------- the Guide on GPT-Live
+
+
+def test_the_live_guide_hands_its_tools_to_the_backend(client, realtime, monkeypatch):
+    import json
+
+    monkeypatch.setattr(settings, "openai_api_key", "")  # the course from the mock LLM
+    client.post("/api/skills/generate", json={"topic": "math"})
+    client.put("/api/profile", json={"identity": "I am the type of person who explains first"})
+    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    realtime.response = httpx.Response(201, json={"session": {"id": "live_1"}, "transport": {"type": "webrtc", "sdp": "v=0 live answer"}})
+
+    response = client.post(
+        "/api/voice/live/guide", content="v=0 offer", headers={"Content-Type": "application/sdp", "Accept-Language": "zh"}
+    )
+
+    assert response.status_code == 201 and response.text == "v=0 live answer"
+    request = realtime.requests[0]
+    assert str(request.url) == "https://api.openai.com/v1/live/sessions"
+    assert request.headers["Authorization"] == "Bearer sk-test"
+    assert len(request.headers["OpenAI-Safety-Identifier"]) == 64
+    body = json.loads(request.content)
+    assert body["transport"] == {"type": "webrtc", "sdp": "v=0 offer"}
+    session = body["session"]
+    assert session["model"] == "gpt-live-1"
+    assert session["audio"] == {"output": {"voice": "marin"}}  # WebRTC negotiates the format
+    # The voice knows what the backend can do and when to hand over; the backend has the tools.
+    assert "Delegation policy:" in session["instructions"] and "Do not ask them to repeat it" in session["instructions"]
+    assert "explains first" in session["instructions"] and "Simplified Chinese" in session["instructions"]
+    backend = session["delegation"]["responses"]
+    assert session["delegation"]["type"] == "responses" and backend["model"] == "gpt-6-luna"
+    assert {t["name"] for t in backend["tools"]} == {
+        "log_checkin", "build_course", "open_node", "open_map", "todays_plan", "briefing"
+    }
+    assert backend["tool_choice"] == "auto"
+    assert "Discriminant" in backend["instructions"]  # a node of the course
+    assert "Simplified Chinese" in backend["instructions"]
+
+
+def test_the_status_says_which_voice_the_guide_opens(client, monkeypatch):
+    assert client.get("/api/voice").json()["guide"] == "live"
+    monkeypatch.setattr(settings, "guide_voice", "realtime")
+    assert client.get("/api/voice").json()["guide"] == "realtime"
+
+
+def test_a_live_session_that_fails_or_answers_without_sdp_is_a_502(client, realtime, monkeypatch):
+    realtime.response = httpx.Response(403, json={"error": "no access"})
+    assert client.post("/api/voice/live/guide", content="v=0").status_code == 502
+    realtime.response = httpx.Response(201, json={"session": {"id": "live_1"}})
+    assert client.post("/api/voice/live/guide", content="v=0").status_code == 502
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    assert client.post("/api/voice/live/guide", content="v=0").status_code == 503

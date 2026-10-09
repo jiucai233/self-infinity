@@ -8,12 +8,15 @@
 - 课程不限大小，分层生成：第一次写骨架，Planner 标了 `expand` 的类别存成 unexpanded，之后
   `expand_node` 单独展开（用户点开或学到那里时）。展开的结果过同一个 Structure Validator：
   被展开的节点充当这次输出的根。
+- 每次回答只保留完整的层（whole_levels）：模型爱在部分类别下塞几个示例叶子，而有子节点的
+  类别会被当成已拆完。
 - 状态按学习顺序定（services/tree.py 的 open_next）：每章一个开放节点，根最后。
 """
 
 import json
 import logging
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
 
 from sqlalchemy import update
 from sqlmodel import Session, col, select
@@ -24,7 +27,9 @@ from app.llm.base import LLMProvider
 from app.models import Course, EdgeKind, SkillEdge, SkillNode, SkillStatus
 from app.search.base import SearchProvider
 from app.services.structure_validator import StructureError, ValidatedCourse, validate_structure
-from app.services.tree import contains_parents, course_graph, open_next
+from app.services import course_match
+from app.services.course_edit import auto_link
+from app.services.tree import contains_children, contains_parents, course_graph, open_next
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +57,10 @@ class GeneratedCourse:
     course: Course
     nodes: list[SkillNode]
     edges: list[SkillEdge]
+    # The topic asked for a course the player has: nothing new was built, and `added` nodes the
+    # reference had and the course lacked were added to it.
+    merged: bool = False
+    added: int = 0
 
 
 def find_syllabus(
@@ -76,11 +85,45 @@ def plan_course(
     return _validated(
         lambda correction: planner.generate(
             topic, difficulty=difficulty, syllabus=syllabus, syllabus_text=syllabus_text, correction=correction
-        )
+        ),
+        check=(lambda validated: missing_items(validated, syllabus.outline)) if syllabus and not syllabus_text else None,
     )
 
 
-def _validated(plan, root: PlannedNode | None = None) -> ValidatedCourse:
+_SKIPPABLE = re.compile(
+    r"\b(intro(duction)?|overview|review|exam|midterm|final|project|presentation|summary|conclusion|wrap)", re.I
+)
+_WORD = re.compile(r"[^\W_]{3,}")
+_STOP = {"and", "the", "for", "with", "its", "from", "into", "basics", "basic", "part", "parts"}
+
+
+def _words(text: str) -> list[str]:
+    return [w[:5] for w in _WORD.findall(text.casefold()) if w not in _STOP]
+
+
+def missing_items(validated: ValidatedCourse, outline: list[str]) -> str | None:
+    """The syllabus items the course's first level leaves out, as a correction for the Planner,
+    or None. An item is there when a first-level title holds at least half of its words (by
+    their first five letters, so "Deep RL: Value Methods" holds "Deep reinforcement learning:
+    value methods"); an introduction, review or exam may be left out."""
+    first = [set(_words(n.title)) for n in validated.nodes if validated.main_parent(n.slug) == validated.root_slug]
+    missing = []
+    for item in outline:
+        words = set(_words(item))
+        if not words or _SKIPPABLE.search(item):
+            continue
+        if not any(len(words & title) * 2 >= len(words) for title in first):
+            missing.append(item)
+    if not missing:
+        return None
+    return (
+        "the first level leaves out these syllabus items: "
+        + "; ".join(missing)
+        + ". Each syllabus item is one node on the first level, titled as the item"
+    )
+
+
+def _validated(plan, root: PlannedNode | None = None, keep_levels: bool = True, check=None) -> ValidatedCourse:
     """Runs `plan(correction)` until the Structure Validator accepts it (one retry). With `root`
     (an expansion), the output hangs under that node: it is added as the root, and output nodes
     that name no parent get it as their parent."""
@@ -97,11 +140,63 @@ def _validated(plan, root: PlannedNode | None = None) -> ValidatedCourse:
                     node.parents = [root.slug]
             planned = PlannedCourse(nodes=[root, *nodes], requires=planned.requires)
         try:
-            return validate_structure(planned, LEVELS_PER_ANSWER)
+            validated = validate_structure(planned, LEVELS_PER_ANSWER)
+            validated = whole_levels(validated) if keep_levels else validated
         except StructureError as exc:
             logger.warning("planner output rejected on attempt %d: %s", attempt + 1, exc)
             correction = str(exc)
+            continue
+        # A softer problem (`check`) is retried once too, but the last answer is kept anyway.
+        problem = check(validated) if check is not None and attempt + 1 < PLANNER_ATTEMPTS else None
+        if problem is None:
+            return validated
+        logger.warning("planner output retried on attempt %d: %s", attempt + 1, problem)
+        correction = problem
     raise CourseGenerationError(f"the planner output stayed unusable: {correction}")
+
+
+def whole_levels(validated: ValidatedCourse) -> ValidatedCourse:
+    """Keeps every level of the answer whole. Models fill their budget with a few sample leaves
+    under some categories ("Operating Systems" → Paging, Banker's Algorithm) and leave the rest
+    to expand, and a category with children counts as finished. So the first level holding a
+    category left to expand is the last one kept: everything below it is dropped, and every
+    category on it is left to expand, to be broken down whole in its own answer."""
+    depth = {validated.root_slug: 0}
+    pending = [validated.root_slug]
+    children: dict[str, list[str]] = {}
+    for node in validated.nodes:
+        main = validated.main_parent(node.slug)
+        if main is not None:
+            children.setdefault(main, []).append(node.slug)
+    while pending:
+        slug = pending.pop()
+        for child in children.get(slug, []):
+            depth[child] = depth[slug] + 1
+            pending.append(child)
+    # A category with children is broken down, whatever its flag says.
+    left = [n for n in validated.nodes if n.expand and n.slug in depth and not children.get(n.slug)]
+    cut = min((depth[n.slug] for n in left), default=None)
+    if cut is None:
+        return validated
+    kept = {slug for slug, d in depth.items() if d <= cut}
+    dropped = len(validated.nodes) - len(kept)
+    if dropped == 0:
+        return validated
+    logger.info("planner answer cut below level %d: %d nodes dropped", cut, dropped)
+    nodes = []
+    for node in validated.nodes:
+        if node.slug not in kept:
+            continue
+        if depth[node.slug] == cut and children.get(node.slug):
+            node.expand = True
+        nodes.append(node)
+    return replace(
+        validated,
+        nodes=nodes,
+        parents={slug: [p for p in plist if p in kept] for slug, plist in validated.parents.items() if slug in kept},
+        requires=[r for r in validated.requires if r.from_slug in kept and r.to_slug in kept],
+        levels=cut + 1,
+    )
 
 
 def generate_course(
@@ -122,6 +217,11 @@ def generate_course(
         if search_syllabus and syllabus_text is None
         else None
     )
+    existing = course_match.same_course(
+        session, topic, embed=course_match.default_embed(), decide=course_match.default_decide()
+    )
+    if existing is not None:
+        return merge_into(session, existing, planner_provider, syllabus=syllabus, syllabus_text=syllabus_text)
     validated = plan_course(
         planner_provider,
         topic,
@@ -140,23 +240,29 @@ def generate_course(
 
 
 def expand_node(session: Session, skill: SkillNode, planner_provider: LLMProvider) -> GeneratedCourse:
-    """Breaks an unexpanded node down into its parts and saves them under it.
+    """Breaks a node down into its parts and saves them under it: all of them for an unexpanded
+    node, the missing ones for a node that has parts (filling it in).
 
-    The node is claimed first in one statement, so two requests cannot both expand it; if the
-    Planner fails it is marked unexpanded again. Raises NotExpandable, CourseFull or
-    CourseGenerationError.
+    An unexpanded node is claimed first in one statement, so two requests cannot both expand
+    it; if the Planner fails it is marked unexpanded again. A node that is another course is
+    not broken down here. Raises NotExpandable, CourseFull or CourseGenerationError.
     """
+    if skill.linked_course_id is not None:
+        raise NotExpandable(skill.id)
     course = session.get(Course, skill.course_id)
     nodes = list(session.exec(select(SkillNode).where(SkillNode.course_id == skill.course_id)).all())
     if len(nodes) >= MAX_COURSE_NODES:
         raise CourseFull(skill.course_id)
-    claimed = session.execute(
-        update(SkillNode).where(col(SkillNode.id) == skill.id, col(SkillNode.unexpanded) == True).values(unexpanded=False)  # noqa: E712
-    )
-    session.commit()
-    if claimed.rowcount != 1:
-        raise NotExpandable(skill.id)
-    session.refresh(skill)
+    parts = [n.title for n in contains_children(session, skill.id)]
+    claimed = bool(skill.unexpanded)
+    if claimed:
+        result = session.execute(
+            update(SkillNode).where(col(SkillNode.id) == skill.id, col(SkillNode.unexpanded) == True).values(unexpanded=False)  # noqa: E712
+        )
+        session.commit()
+        if result.rowcount != 1:
+            raise NotExpandable(skill.id)
+        session.refresh(skill)
 
     root = PlannedNode(slug=skill.slug, title=skill.title, description=skill.description, node_type=skill.node_type)
     settings = json.loads(course.settings_json or "{}") if course else {}
@@ -172,33 +278,154 @@ def expand_node(session: Session, skill: SkillNode, planner_provider: LLMProvide
                 [n.title for n in nodes if n.id != skill.id],
                 difficulty=settings.get("difficulty", "standard"),
                 correction=correction,
+                parts=parts,
             ),
             root=root,
         )
     except CourseGenerationError:
-        skill.unexpanded = True
-        session.add(skill)
-        session.commit()
+        if claimed:
+            skill.unexpanded = True
+            session.add(skill)
+            session.commit()
         raise
 
+    _save_new(session, skill.course_id, validated, nodes, keep={skill.slug: skill})
+    return _finish(session, course)
+
+
+def merge_into(
+    session: Session,
+    course: Course,
+    planner_provider: LLMProvider,
+    *,
+    syllabus: SyllabusReference | None,
+    syllabus_text: SyllabusText | None,
+) -> GeneratedCourse:
+    """A course asked for again: what its reference adds goes into the course the player has;
+    without a reference nothing changes."""
+    before = len(session.exec(select(SkillNode.id).where(SkillNode.course_id == course.id)).all())
+    if syllabus is None and syllabus_text is None:
+        nodes, edges = course_graph(session, course.id)
+        return GeneratedCourse(course=course, nodes=nodes, edges=edges, merged=True)
+    revised = revise_course(session, course, planner_provider, syllabus=syllabus, syllabus_text=syllabus_text)
+    revised.merged = True
+    revised.added = max(0, len([n for n in revised.nodes if n.course_id == course.id]) - before)
+    return revised
+
+
+def revise_course(
+    session: Session,
+    course: Course,
+    planner_provider: LLMProvider,
+    *,
+    syllabus: SyllabusReference | None = None,
+    syllabus_text: SyllabusText | None = None,
+) -> GeneratedCourse:
+    """Adds what a reference (a syllabus found, or files uploaded) covers and the course lacks,
+    each part under the node it belongs to; nothing is removed or renamed, progress stays. The
+    course's source becomes the reference. Raises CourseFull or CourseGenerationError."""
+    nodes = list(session.exec(select(SkillNode).where(SkillNode.course_id == course.id).order_by(SkillNode.id)).all())
+    if len(nodes) >= MAX_COURSE_NODES:
+        raise CourseFull(course.id)
+    by_slug = {n.slug: n for n in nodes}
+    parents = {n.slug: [p.slug for p in contains_parents(session, n.id)] for n in nodes}
+    existing = [
+        PlannedNode(slug=n.slug, title=n.title, description=n.description, parents=parents[n.slug], node_type=n.node_type)
+        for n in nodes
+    ]
+    settings = json.loads(course.settings_json or "{}")
+    planner = Planner(planner_provider)
+
+    def plan(correction: str | None) -> PlannedCourse:
+        planned = planner.revise(
+            course.topic,
+            _tree_lines(nodes, parents),
+            syllabus=syllabus,
+            syllabus_text=syllabus_text,
+            difficulty=settings.get("difficulty", "standard"),
+            correction=correction,
+        )
+        new = [n for n in planned.nodes if n.slug not in by_slug]
+        return PlannedCourse(nodes=[*existing, *new], requires=planned.requires)
+
+    validated = _validated(plan, keep_levels=False)
+    keep = {slug: by_slug[slug] for slug in by_slug}
+    _save_new(session, course.id, validated, nodes, keep=keep)
+    if syllabus is not None:
+        course.source_course, course.source_url = syllabus.course, syllabus.url
+    elif syllabus_text is not None:
+        course.source_course, course.source_url = syllabus_text.source, None
+    session.add(course)
+    return _finish(session, course)
+
+
+def _match(session: Session, course_id: int) -> None:
+    """After a course was built or grew: courses inside courses, by exact title, then judged
+    (app/services/course_match.py). A failure only leaves them unmatched."""
+    auto_link(session, course_id)
+    try:
+        course_match.place_around(
+            session, course_id, embed=course_match.default_embed(), decide=course_match.default_decide()
+        )
+    except Exception:
+        logger.warning("placing course %s among the others failed", course_id, exc_info=True)
+
+
+def _tree_lines(nodes: list[SkillNode], parents: dict[str, list[str]]) -> str:
+    """`slug: title` lines, indented under their main parent."""
+    children: dict[str | None, list[SkillNode]] = {}
+    for node in nodes:
+        main = parents[node.slug][0] if parents[node.slug] else None
+        children.setdefault(main, []).append(node)
+    lines: list[str] = []
+    pending = [(n, 0) for n in reversed(children.get(None, []))]
+    seen: set[str] = set()
+    while pending:
+        node, depth = pending.pop()
+        if node.slug in seen:
+            continue
+        seen.add(node.slug)
+        lines.append(f"{'  ' * depth}{node.slug}: {node.title}")
+        pending.extend((c, depth + 1) for c in reversed(children.get(node.slug, [])))
+    return "\n".join(lines)
+
+
+def _save_new(
+    session: Session,
+    course_id: int,
+    validated: ValidatedCourse,
+    nodes: list[SkillNode],
+    keep: dict[str, SkillNode],
+) -> None:
+    """Saves the validated nodes not in `keep` (the course's own, by slug) and the edges among
+    them and to the kept ones. A new node titled like one the course has, with no parts of its
+    own, is left out."""
     existing = {n.slug: n for n in nodes}
     titles = {n.title.casefold() for n in nodes}
-    rows: dict[str, SkillNode] = {skill.slug: skill}
+    # A plural, a hyphen or a casing away from a node the course has is that node.
+    near = course_match.near_titles(
+        [n.title for n in validated.nodes if n.slug not in keep], [n.title for n in nodes], course_match.default_embed()
+    )
+    rows: dict[str, SkillNode] = dict(keep)
     for node in validated.nodes:
-        if node.slug == skill.slug:
+        if node.slug in keep:
             continue
         has_children = any(node.slug in validated.parents.get(other.slug, []) for other in validated.nodes)
-        if node.title.casefold() in titles and not has_children:
+        if (node.title.casefold() in titles or node.title in near) and not has_children:
             continue  # already in the course
-        rows[node.slug] = _add_node(session, skill.course_id, _free_slug(node.slug, existing), node, has_children)
+        rows[node.slug] = _add_node(session, course_id, _free_slug(node.slug, existing), node, has_children)
         existing[rows[node.slug].slug] = rows[node.slug]
         titles.add(node.title.casefold())
-    _add_edges(session, validated, rows)
+    _add_edges(session, validated, rows, skip_between=set(keep))
+
+
+def _finish(session: Session, course: Course) -> GeneratedCourse:
     session.flush()
-    open_next(session, skill.course_id)
+    open_next(session, course.id)
+    _match(session, course.id)
     session.commit()
     session.refresh(course)
-    graph_nodes, edges = course_graph(session, skill.course_id)
+    graph_nodes, edges = course_graph(session, course.id)
     return GeneratedCourse(course=course, nodes=graph_nodes, edges=edges)
 
 
@@ -239,12 +466,15 @@ def _add_node(session: Session, course_id: int, slug: str, node: PlannedNode, ha
     return row
 
 
-def _add_edges(session: Session, validated: ValidatedCourse, rows: dict[str, SkillNode]) -> None:
+def _add_edges(
+    session: Session, validated: ValidatedCourse, rows: dict[str, SkillNode], skip_between: set[str] = frozenset()
+) -> None:
+    """The validated edges among `rows`; the ones between two `skip_between` nodes exist already."""
     for node in validated.nodes:
         if node.slug not in rows:
             continue
         for position, parent in enumerate(validated.parents[node.slug]):
-            if parent not in rows:
+            if parent not in rows or (parent in skip_between and node.slug in skip_between):
                 continue
             session.add(
                 SkillEdge(
@@ -255,6 +485,8 @@ def _add_edges(session: Session, validated: ValidatedCourse, rows: dict[str, Ski
                 )
             )
     for edge in validated.requires:
+        if edge.from_slug in skip_between and edge.to_slug in skip_between:
+            continue
         if edge.from_slug in rows and edge.to_slug in rows:
             session.add(
                 SkillEdge(
@@ -303,6 +535,7 @@ def save_course(
     # Ids follow the planner's order, which the learning order breaks ties by.
     session.flush()
     open_next(session, course.id)
+    _match(session, course.id)
     session.commit()
     session.refresh(course)
 

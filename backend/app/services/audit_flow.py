@@ -43,6 +43,7 @@ from app.i18n import join_list, quote, t
 from app.services import bandit
 from app.services.condition import audit_pacing
 from app.services.incentive import compute_reward
+from app.services.course_edit import sync_links
 from app.services.tree import child_titles, contains_children, descendant_ids, node_position, open_next
 
 logger = logging.getLogger(__name__)
@@ -291,6 +292,7 @@ def _finalize(session: Session, audit: AuditSession, skill: SkillNode, verdict: 
         session.flush()
 
         outcome.unlocked_skill_ids = open_next(session, skill.course_id)
+        sync_links(session)  # a course inside another one is mastered with its node
         outcome.reward_amount, outcome.reward_multiplier = compute_reward(session, skill)
         session.add(
             RewardEvent(session_id=audit.id, amount=outcome.reward_amount, multiplier=outcome.reward_multiplier)

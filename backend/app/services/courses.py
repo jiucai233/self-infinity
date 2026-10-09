@@ -75,12 +75,30 @@ def delete_course(session: Session, course_id: int, *, delete_nodes: bool) -> No
             session.add(plan)
 
     if not delete_nodes:
+        unlink_course(session, course_id)
         course.archived_at = utcnow()
         session.add(course)
         session.commit()
         return
 
     nodes = list(session.exec(select(SkillNode.id).where(SkillNode.course_id == course_id)).all())
+    purge_nodes(session, nodes)
+    unlink_course(session, course_id)
+    session.delete(course)
+    session.commit()
+
+
+def unlink_course(session: Session, course_id: int) -> None:
+    """Nodes of other courses that were this course become plain nodes again."""
+    for node in session.exec(select(SkillNode).where(SkillNode.linked_course_id == course_id)).all():
+        node.linked_course_id = None
+        session.add(node)
+
+
+def purge_nodes(session: Session, nodes: list[int]) -> None:
+    """Deletes the nodes and everything they produced: edges, audits and their turns and
+    rewards, the lesson cards those audits produced and every link to or from them, search
+    plans. Does not commit."""
     audits = list(session.exec(select(AuditSession.id).where(col(AuditSession.skill_id).in_(nodes))).all())
     lessons = list(session.exec(select(Principle.id).where(col(Principle.source_session_id).in_(audits))).all())
 
@@ -100,5 +118,3 @@ def delete_course(session: Session, course_id: int, *, delete_nodes: bool) -> No
     session.exec(delete(SearchPlan).where(col(SearchPlan.skill_id).in_(nodes)))
     session.exec(delete(SkillEdge).where(or_(col(SkillEdge.from_id).in_(nodes), col(SkillEdge.to_id).in_(nodes))))
     session.exec(delete(SkillNode).where(col(SkillNode.id).in_(nodes)))
-    session.delete(course)
-    session.commit()

@@ -559,7 +559,7 @@ abstract class AppLocalizations {
   /// No description provided for @dragToTurn.
   ///
   /// In en, this message translates to:
-  /// **'Drag to turn · tap a point'**
+  /// **'Drag to turn · scroll to zoom · tap a point'**
   String get dragToTurn;
 
   /// No description provided for @editUnderCharacter.
@@ -2059,13 +2059,13 @@ abstract class AppLocalizations {
   /// No description provided for @devVoiceHint.
   ///
   /// In en, this message translates to:
-  /// **'At list price. The realtime Guide is billed by tokens, so silence is free; GPT-Live bills every minute the session is open, its backend apart. Audit transcription counts the whole open session, an upper bound.'**
+  /// **'At list price. The Guide on GPT-Live bills every second the session is open, plus its text backend; on Realtime it bills tokens (silence is free) plus transcription. Each Guide session also shows the other voice: Realtime at this account\'s own cost per minute, GPT-Live at \$0.05 a minute. Audit transcription counts the whole open session, an upper bound.'**
   String get devVoiceHint;
 
   /// No description provided for @devVoiceGuide.
   ///
   /// In en, this message translates to:
-  /// **'Home Guide (realtime)'**
+  /// **'Home Guide'**
   String get devVoiceGuide;
 
   /// No description provided for @devVoiceAudits.
@@ -2547,6 +2547,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other'**
   String get factOther;
+
+  /// No description provided for @devVoiceGuideLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide (GPT-Live)'**
+  String get devVoiceGuideLive;
+
+  /// No description provided for @devVoiceGuideRealtime.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide (Realtime)'**
+  String get devVoiceGuideRealtime;
+
+  /// No description provided for @devVoiceOnRealtime.
+  ///
+  /// In en, this message translates to:
+  /// **'On Realtime ≈'**
+  String get devVoiceOnRealtime;
+
+  /// No description provided for @devVoiceAllLive.
+  ///
+  /// In en, this message translates to:
+  /// **'All on GPT-Live'**
+  String get devVoiceAllLive;
+
+  /// No description provided for @devVoiceAllRealtime.
+  ///
+  /// In en, this message translates to:
+  /// **'All on Realtime ≈'**
+  String get devVoiceAllRealtime;
+
+  /// No description provided for @devVoiceRealtimeRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Realtime per minute (measured)'**
+  String get devVoiceRealtimeRate;
+
+  /// No description provided for @devVoiceRealtimeRateDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Realtime per minute (one test)'**
+  String get devVoiceRealtimeRateDefault;
+
+  /// No description provided for @nodeEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get nodeEdit;
+
+  /// No description provided for @nodeEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit node'**
+  String get nodeEditTitle;
+
+  /// No description provided for @nodeTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get nodeTitleLabel;
+
+  /// No description provided for @nodeDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'What it covers'**
+  String get nodeDescriptionLabel;
+
+  /// No description provided for @nodeSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get nodeSave;
+
+  /// No description provided for @nodeAddPart.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a part'**
+  String get nodeAddPart;
+
+  /// No description provided for @nodeAddPartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a part under “{title}”'**
+  String nodeAddPartTitle(String title);
+
+  /// No description provided for @nodeFillIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in what\'s missing'**
+  String get nodeFillIn;
+
+  /// No description provided for @nodeBreakDownFurther.
+  ///
+  /// In en, this message translates to:
+  /// **'Break it down further'**
+  String get nodeBreakDownFurther;
+
+  /// No description provided for @nodeLink.
+  ///
+  /// In en, this message translates to:
+  /// **'It is one of my courses…'**
+  String get nodeLink;
+
+  /// No description provided for @nodeLinkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Which of your courses is “{title}”?'**
+  String nodeLinkTitle(String title);
+
+  /// No description provided for @nodeLinkBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Its parts become that course, and the two are cleared together.'**
+  String get nodeLinkBody;
+
+  /// No description provided for @nodeLinkNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None: a plain node'**
+  String get nodeLinkNone;
+
+  /// No description provided for @nodeLinkNoCourses.
+  ///
+  /// In en, this message translates to:
+  /// **'You have no other course yet.'**
+  String get nodeLinkNoCourses;
+
+  /// No description provided for @nodeApplySyllabus.
+  ///
+  /// In en, this message translates to:
+  /// **'Update from a syllabus…'**
+  String get nodeApplySyllabus;
+
+  /// No description provided for @nodeApplySyllabusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update “{course}” from a syllabus'**
+  String nodeApplySyllabusTitle(String course);
+
+  /// No description provided for @nodeApplySyllabusBody.
+  ///
+  /// In en, this message translates to:
+  /// **'What the syllabus covers and the course lacks is added where it belongs. Nothing is removed; your progress stays.'**
+  String get nodeApplySyllabusBody;
+
+  /// No description provided for @nodeSyllabusSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search for one'**
+  String get nodeSyllabusSearch;
+
+  /// No description provided for @nodeSyllabusUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload a file'**
+  String get nodeSyllabusUpload;
+
+  /// No description provided for @nodeReadingSyllabus.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the syllabus… this can take up to a minute.'**
+  String get nodeReadingSyllabus;
+
+  /// No description provided for @nodeSyllabusAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{The course already covers that syllabus.} =1{1 part added.} other{{count} parts added.}}'**
+  String nodeSyllabusAdded(int count);
+
+  /// No description provided for @nodeNoSyllabus.
+  ///
+  /// In en, this message translates to:
+  /// **'No syllabus found. Try uploading one.'**
+  String get nodeNoSyllabus;
+
+  /// No description provided for @nodeDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete node'**
+  String get nodeDelete;
+
+  /// No description provided for @nodeDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{title}”?'**
+  String nodeDeleteTitle(String title);
+
+  /// No description provided for @nodeDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Its parts go with it, with their attempts and lesson cards. A part that also belongs elsewhere stays there.'**
+  String get nodeDeleteBody;
+
+  /// No description provided for @nodeLinkedLine.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your course “{course}”.'**
+  String nodeLinkedLine(String course);
+
+  /// No description provided for @nodeOpenCourse.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the course'**
+  String get nodeOpenCourse;
+
+  /// No description provided for @nodeEditFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t do that. Try again.'**
+  String get nodeEditFailed;
+
+  /// No description provided for @zoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get zoomIn;
+
+  /// No description provided for @zoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get zoomOut;
+
+  /// No description provided for @resetView.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the start'**
+  String get resetView;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

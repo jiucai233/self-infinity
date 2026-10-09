@@ -80,6 +80,11 @@ _TEXTS: dict[str, dict[str, str]] = {
         "zh": "你的世界{title}准备好了——共 {count} 个节点。",
         "ko": "{title} 세계가 준비됐어요. 노드 {count}개.",
     },
+    "world_merged": {
+        "en": "You already have {title}, so I added to it instead: {added} new nodes.",
+        "zh": "你已经有{title}这门课了，所以没有新建，而是补进了原来的树：新增 {added} 个节点。",
+        "ko": "{title} 강좌가 이미 있어서 새로 만들지 않고 거기에 더했어요. 새 노드 {added}개.",
+    },
     "world_failed": {
         "en": "I couldn't build that world. Please try again in a moment.",
         "zh": "这个世界没能建好，请稍后再试。",

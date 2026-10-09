@@ -256,7 +256,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get dotReady => '도전 가능';
 
   @override
-  String get dragToTurn => '드래그해서 돌리기 · 점 탭하기';
+  String get dragToTurn => '드래그해서 돌리기 · 스크롤로 확대 · 점 탭하기';
 
   @override
   String get editUnderCharacter => '\'내 캐릭터\'에서 수정할 수 있어요.';
@@ -1045,10 +1045,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get devVoiceHint =>
-      '정가 기준입니다. 실시간 가이드는 토큰으로 과금되어 침묵은 무료이고, GPT-Live는 세션이 열려 있는 동안 분 단위로 과금됩니다(백엔드 별도). 감사 받아쓰기는 연결 시간 전체로 계산한 상한입니다.';
+      '정가 기준입니다. GPT-Live 가이드는 세션이 열려 있는 초 단위로 과금되고 텍스트 백엔드가 더해집니다. Realtime은 토큰으로 과금되며(침묵은 무료) 받아쓰기가 더해집니다. 각 가이드 세션 옆에 다른 음성이었을 때의 비용을 표시합니다: Realtime은 이 계정에서 측정한 분당 비용, GPT-Live는 분당 \$0.05. 감사 받아쓰기는 연결 시간 전체로 계산한 상한입니다.';
 
   @override
-  String get devVoiceGuide => '홈 가이드 (실시간)';
+  String get devVoiceGuide => '홈 가이드';
 
   @override
   String get devVoiceAudits => '감사 (실시간 받아쓰기)';
@@ -1319,4 +1319,136 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get factOther => '기타';
+
+  @override
+  String get devVoiceGuideLive => '가이드 (GPT-Live)';
+
+  @override
+  String get devVoiceGuideRealtime => '가이드 (Realtime)';
+
+  @override
+  String get devVoiceOnRealtime => 'Realtime이라면 약';
+
+  @override
+  String get devVoiceAllLive => '모두 GPT-Live';
+
+  @override
+  String get devVoiceAllRealtime => '모두 Realtime 약';
+
+  @override
+  String get devVoiceRealtimeRate => 'Realtime 분당 (측정)';
+
+  @override
+  String get devVoiceRealtimeRateDefault => 'Realtime 분당 (테스트 1회)';
+
+  @override
+  String get nodeEdit => '편집';
+
+  @override
+  String get nodeEditTitle => '노드 편집';
+
+  @override
+  String get nodeTitleLabel => '이름';
+
+  @override
+  String get nodeDescriptionLabel => '다루는 내용';
+
+  @override
+  String get nodeSave => '저장';
+
+  @override
+  String get nodeAddPart => '하위 노드 추가';
+
+  @override
+  String nodeAddPartTitle(String title) {
+    return '“$title” 아래에 추가';
+  }
+
+  @override
+  String get nodeFillIn => '빠진 부분 채우기';
+
+  @override
+  String get nodeBreakDownFurther => '더 나누기';
+
+  @override
+  String get nodeLink => '내 강좌로 연결…';
+
+  @override
+  String nodeLinkTitle(String title) {
+    return '“$title”은(는) 어느 강좌인가요?';
+  }
+
+  @override
+  String get nodeLinkBody => '그 강좌가 이 노드의 내용이 되고, 함께 클리어돼요.';
+
+  @override
+  String get nodeLinkNone => '강좌 아님 (일반 노드)';
+
+  @override
+  String get nodeLinkNoCourses => '아직 다른 강좌가 없어요.';
+
+  @override
+  String get nodeApplySyllabus => '강의계획서로 업데이트…';
+
+  @override
+  String nodeApplySyllabusTitle(String course) {
+    return '강의계획서로 “$course” 업데이트';
+  }
+
+  @override
+  String get nodeApplySyllabusBody => '강의계획서에 있고 강좌에 없는 부분을 알맞은 자리에 추가해요. 아무것도 지우지 않고 진행도는 그대로예요.';
+
+  @override
+  String get nodeSyllabusSearch => '검색해서 찾기';
+
+  @override
+  String get nodeSyllabusUpload => '파일 업로드';
+
+  @override
+  String get nodeReadingSyllabus => '강의계획서를 읽는 중… 1분쯤 걸릴 수 있어요.';
+
+  @override
+  String nodeSyllabusAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 부분을 추가했어요.',
+      zero: '강좌가 이미 그 강의계획서를 다 다뤄요.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nodeNoSyllabus => '강의계획서를 찾지 못했어요. 파일을 올려 보세요.';
+
+  @override
+  String get nodeDelete => '노드 삭제';
+
+  @override
+  String nodeDeleteTitle(String title) {
+    return '“$title”을(를) 삭제할까요?';
+  }
+
+  @override
+  String get nodeDeleteBody => '하위 노드도 도전 기록, 교훈 카드와 함께 삭제돼요. 다른 곳에도 속한 노드는 그대로 남아요.';
+
+  @override
+  String nodeLinkedLine(String course) {
+    return '이건 당신의 강좌 “$course”예요.';
+  }
+
+  @override
+  String get nodeOpenCourse => '강좌 열기';
+
+  @override
+  String get nodeEditFailed => '하지 못했어요. 다시 시도해 주세요.';
+
+  @override
+  String get zoomIn => '확대';
+
+  @override
+  String get zoomOut => '축소';
+
+  @override
+  String get resetView => '처음 시점으로';
 }

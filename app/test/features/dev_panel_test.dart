@@ -78,7 +78,7 @@ void main() {
     expect(find.textContaining(shortAnswer), findsWidgets);
   });
 
-  testWidgets('the voice tab: what live voice cost, next to GPT-Live', (tester) async {
+  testWidgets('the voice tab: what live voice cost, next to the other voice', (tester) async {
     final api = await seededFakeApi();
     await api.reportVoiceUsage(
       VoiceUsage(id: 'a', kind: 'guide', model: 'gpt-realtime-2.1')
@@ -86,17 +86,28 @@ void main() {
         ..turns = 6,
     );
     await api.reportVoiceUsage(VoiceUsage(id: 'b', kind: 'transcribe')..seconds = 300);
+    await api.reportVoiceUsage(
+      VoiceUsage(id: 'c', kind: 'guide', model: 'gpt-live-1')
+        ..seconds = 60
+        ..turns = 2,
+    );
     await openPanel(tester, api);
 
     await tester.tap(find.byKey(const Key('dev-tab-voice')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('dev-voice')), findsOneWidget);
-    expect(metric(tester, 'guide-sessions'), '1');
-    expect(metric(tester, 'guide-minutes'), '2.0');
-    expect(metric(tester, 'guide-live'), '\$0.100');
+    expect(metric(tester, 'guide-sessions'), '2');
+    expect(metric(tester, 'guide-minutes'), '3.0');
+    expect(metric(tester, 'guide-all-live'), '\$0.150');
+    expect(metric(tester, 'realtime-rate'), '\$0.072');
     expect(metric(tester, 'audit-minutes'), '5.0');
     expect(find.byKey(const Key('dev-voice-1')), findsOneWidget);
     expect(find.byKey(const Key('dev-voice-2')), findsOneWidget);
+    // Each Guide session names its voice and prices the other one.
+    expect(find.textContaining('Guide (Realtime)'), findsOneWidget);
+    expect(find.textContaining('On GPT-Live \$0.100'), findsOneWidget);
+    expect(find.textContaining('Guide (GPT-Live)'), findsOneWidget);
+    expect(find.textContaining('On Realtime ≈ \$0.072'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('dev-tab-audits')));
     await tester.pumpAndSettle();

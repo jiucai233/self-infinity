@@ -77,6 +77,8 @@ def start_audit(
     skill = session.get(SkillNode, skill_id)
     if skill is None:
         raise HTTPException(404, "skill not found")
+    if skill.linked_course_id is not None:
+        raise HTTPException(400, "This node is another course: learn it there.")
     if body.test_out:
         # A challenge skips what it covers, so it is open whether or not the node is.
         if skill.status == SkillStatus.mastered:

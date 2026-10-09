@@ -43,6 +43,7 @@ class _MapSceneState extends State<MapScene> {
   String? _searchError;
 
   _View _view = _View.constellation;
+  final GlobalKey<LifeConstellationState> _sky = GlobalKey();
   String? _selected;
   int? _outlineCourse;
 
@@ -155,7 +156,7 @@ class _MapSceneState extends State<MapScene> {
               children: [
                 Positioned.fill(
                   child: LifeConstellation(
-                    key: const Key('life-constellation'),
+                    key: _sky,
                     tree: tree,
                     selected: _selected,
                     highlighted: highlighted,
@@ -195,15 +196,27 @@ class _MapSceneState extends State<MapScene> {
                   bottom: AppSpacing.lg,
                   child: const _NightLegend(),
                 ),
-                if (!narrow)
-                  Positioned(
-                    right: AppSpacing.lg,
-                    bottom: AppSpacing.lg,
-                    child: Text(
-                      context.l10n.dragToTurn,
-                      style: theme.bodySmall?.copyWith(color: AppColors.nightMuted),
-                    ),
+                Positioned(
+                  right: AppSpacing.lg,
+                  bottom: narrow ? AppSpacing.lg + 64 : AppSpacing.lg,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      _ZoomButtons(
+                        onZoomIn: () => _sky.currentState?.zoomStep(1.5),
+                        onZoomOut: () => _sky.currentState?.zoomStep(1 / 1.5),
+                        onReset: () => _sky.currentState?.resetView(),
+                      ),
+                      if (!narrow) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          context.l10n.dragToTurn,
+                          style: theme.bodySmall?.copyWith(color: AppColors.nightMuted),
+                        ),
+                      ],
+                    ],
                   ),
+                ),
                 if (tree.isEmpty)
                   Positioned(
                     left: 0,
@@ -402,6 +415,41 @@ class _ViewToggle extends StatelessWidget {
             item(_View.outline, context.l10n.viewOutline),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Zoom in, zoom out and back to the start, on the night panel.
+class _ZoomButtons extends StatelessWidget {
+  const _ZoomButtons({required this.onZoomIn, required this.onZoomOut, required this.onReset});
+
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    Widget button(String key, IconData icon, String tip, VoidCallback onTap) => IconButton(
+      key: Key(key),
+      tooltip: tip,
+      onPressed: onTap,
+      visualDensity: VisualDensity.compact,
+      iconSize: 18,
+      color: AppColors.nightText,
+      icon: Icon(icon),
+    );
+    return DecoratedBox(
+      key: const Key('night-zoom'),
+      decoration: BoxDecoration(color: AppColors.nightHigh, borderRadius: AppRadius.pillBorder),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          button('zoom-out', Icons.remove_rounded, l.zoomOut, onZoomOut),
+          button('zoom-reset', Icons.center_focus_strong_rounded, l.resetView, onReset),
+          button('zoom-in', Icons.add_rounded, l.zoomIn, onZoomIn),
+        ],
       ),
     );
   }

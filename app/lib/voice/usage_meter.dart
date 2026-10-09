@@ -27,9 +27,13 @@ class UsageMeter {
     return List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
   }
 
+  /// The seconds the service says it billed (GPT-Live); until then, and for
+  /// the Realtime API, the time the session has been open here.
+  double? billedSeconds;
+
   /// Sends the totals so far; a failure only costs this one report.
   void report() {
-    usage.seconds = _clock.elapsedMilliseconds / 1000;
+    usage.seconds = billedSeconds ?? _clock.elapsedMilliseconds / 1000;
     unawaited(
       api.reportVoiceUsage(usage).catchError((Object e) {
         debugPrint('UsageMeter: could not report ($e)');

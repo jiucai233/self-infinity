@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/api.dart';
+import '../../api/api_exception.dart';
 import '../../api/graph_utils.dart';
 import '../../api/models.dart';
 import '../../app/app_state.dart';
@@ -16,7 +17,10 @@ import '../chat/chat_navigation.dart';
 import '../map/delete_course.dart';
 import '../stage/last_said.dart';
 import '../stage/stage_input_bar.dart';
+import '../stage/stage_controller.dart';
 import '../stage/stage_scaffold.dart';
+import '../../upload/file_picker_service.dart';
+import 'edit_node.dart';
 import '../../l10n/l10n.dart';
 
 /// Scene 4 of `docs/ux-chat.md`: the overview of one node — the node's name in
@@ -57,9 +61,13 @@ class _SkillSceneState extends State<SkillScene> {
   String? _reply;
   String _replyAgent = 'front_desk';
 
-  /// Breaking an unexpanded node down (one Planner call, up to a minute).
-  bool _expanding = false;
+  /// Breaking a node down or reading a syllabus (one Planner call, up to a
+  /// minute): the line the bubble shows meanwhile.
+  String? _working;
   bool _expandFailed = false;
+
+  /// The course this node is (contract #44): its map, for its name and root.
+  CourseMap? _linkedMap;
   String? _chatError;
 
   @override
@@ -115,10 +123,13 @@ class _SkillSceneState extends State<SkillScene> {
   Future<void> _findBoss(SkillOverview overview, int token) async {
     try {
       final map = await _api.getCourseMap(overview.skill.courseId);
+      final linked = overview.skill.linkedCourseId;
+      final linkedMap = linked == null ? null : await _api.getCourseMap(linked);
       if (!mounted || token != _token) return;
       setState(() {
         _boss = isBoss(overview.skill, map.edges);
         _courseMap = map;
+        _linkedMap = linkedMap;
       });
     } on Object {
       // no chip
@@ -135,27 +146,133 @@ class _SkillSceneState extends State<SkillScene> {
     if (deleted && mounted) context.go(AppRoutes.map);
   }
 
-  /// Breaks the node down into its parts; the page and the map reload.
+  /// Breaks the node down into its parts (or fills in the ones missing); the
+  /// page and the map reload, also when the player left the page while it ran
+  /// (it takes up to a minute).
   Future<void> _expand() async {
     final overview = _overview;
-    if (overview == null || _expanding) return;
+    if (overview == null || _working != null) return;
+    await _edit(() => _api.expandSkill(overview.skill.id), working: context.l10n.breakingDown, expand: true);
+  }
+
+  /// Runs one edit of the course: the bubble says [working] meanwhile and the
+  /// result (or what went wrong) after; the page and the map reload. Returns
+  /// the course map, or null when it failed.
+  Future<CourseMap?> _edit(
+    Future<CourseMap> Function() call, {
+    String? working,
+    bool expand = false,
+    String Function(ApiException e)? failure,
+  }) async {
+    final app = context.read<AppState>();
+    final failed = context.l10n.nodeEditFailed;
     setState(() {
-      _expanding = true;
+      _working = working;
       _expandFailed = false;
       _reply = null;
     });
     try {
-      await _api.expandSkill(overview.skill.id);
+      final map = await call();
+      app.markDataChanged();
+      if (mounted) {
+        setState(() {
+          _working = null;
+          _courseMap = map;
+        });
+      }
+      return map;
+    } on Object catch (e) {
+      if (mounted) {
+        setState(() {
+          _working = null;
+          _expandFailed = expand;
+          if (!expand) {
+            _reply = e is ApiException ? (failure?.call(e) ?? e.serverMessage ?? failed) : failed;
+            _replyAgent = 'front_desk';
+          }
+        });
+      }
+      return null;
+    }
+  }
+
+  Future<void> _editNode(SkillNode node) async {
+    final text = await askNodeText(
+      context,
+      dialogTitle: context.l10n.nodeEditTitle,
+      initial: (title: node.title, description: node.description),
+    );
+    if (text == null || !mounted) return;
+    await _edit(() => _api.editSkill(node.id, title: text.title, description: text.description));
+  }
+
+  Future<void> _addPart(SkillNode node) async {
+    final text = await askNodeText(context, dialogTitle: context.l10n.nodeAddPartTitle(node.title));
+    if (text == null || !mounted) return;
+    await _edit(
+      () => _api.addSkillPart(
+        node.id,
+        title: text.title,
+        description: text.description.isEmpty ? null : text.description,
+      ),
+    );
+  }
+
+  Future<void> _link(SkillNode node) async {
+    final maps = context.read<StageController>().courseMaps;
+    final choice = await askLinkedCourse(
+      context,
+      title: node.title,
+      courses: [
+        for (final m in maps)
+          if (m.course.id != node.courseId) (id: m.course.id, name: courseNameOf(m)),
+      ],
+      current: node.linkedCourseId,
+    );
+    if (choice == null || !mounted) return;
+    await _edit(
+      () => _api.linkSkill(node.id, switch (choice) {
+        LinkToCourse(:final courseId) => courseId,
+        Unlink() => null,
+      }),
+    );
+  }
+
+  Future<void> _applySyllabus(CourseMap map) async {
+    final l = context.l10n;
+    final picker = context.read<FilePickerService>();
+    final source = await askSyllabusSource(context, course: courseNameOf(map));
+    if (source == null || !mounted) return;
+    final uploads = <int>[];
+    if (source == SyllabusSource.upload) {
+      final file = await picker.pick();
+      if (file == null || !mounted) return;
+      try {
+        uploads.add((await _api.uploadFile(filename: file.name, bytes: file.bytes)).id);
+      } on ApiException catch (e) {
+        if (mounted) setState(() => _reply = e.serverMessage ?? l.nodeEditFailed);
+        return;
+      }
       if (!mounted) return;
-      setState(() => _expanding = false);
-      context.read<AppState>().markDataChanged();
-    } on Object {
-      if (!mounted) return;
+    }
+    final before = map.nodes.length;
+    final after = await _edit(
+      () => _api.applySyllabus(map.course.id, uploadIds: uploads),
+      working: l.nodeReadingSyllabus,
+      failure: (e) => e.statusCode == 404 && uploads.isEmpty ? l.nodeNoSyllabus : e.serverMessage ?? l.nodeEditFailed,
+    );
+    if (after != null && mounted) {
       setState(() {
-        _expanding = false;
-        _expandFailed = true;
+        _reply = l.nodeSyllabusAdded(after.nodes.length - before);
+        _replyAgent = 'front_desk';
       });
     }
+  }
+
+  Future<void> _deleteNode(SkillNode node) async {
+    if (!await confirmDeleteNode(context, title: node.title) || !mounted) return;
+    final map = await _edit(() => _api.deleteSkill(node.id));
+    if (map != null && mounted) context.go(AppRoutes.map);
   }
 
   // -- chat about the node ------------------------------------------------------
@@ -227,6 +344,7 @@ class _SkillSceneState extends State<SkillScene> {
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     itemBuilder: (_) => [
+                      ..._editItems(overview.skill, map),
                       PopupMenuItem(
                         key: const Key('skill-delete-course'),
                         onTap: () => unawaited(_deleteCourse(map)),
@@ -258,6 +376,30 @@ class _SkillSceneState extends State<SkillScene> {
         ],
       ),
     );
+  }
+
+  /// The `⋯` menu's edits of the course (contract #41–#45), above Delete
+  /// course. Nothing while an edit runs.
+  List<PopupMenuEntry<void>> _editItems(SkillNode node, CourseMap map) {
+    if (_working != null) return const [];
+    final l = context.l10n;
+    final root = isRootOf(node, map);
+    final parts = hasParts(node, map);
+    PopupMenuItem<void> item(String key, String label, VoidCallback onTap, {bool danger = false}) => PopupMenuItem(
+      key: Key(key),
+      onTap: onTap,
+      child: Text(label, style: danger ? const TextStyle(color: AppColors.danger) : null),
+    );
+    return [
+      item('skill-edit', l.nodeEdit, () => unawaited(_editNode(node))),
+      if (!node.isLinked) item('skill-add-part', l.nodeAddPart, () => unawaited(_addPart(node))),
+      if (!node.isLinked && !node.unexpanded)
+        item('skill-fill-in', parts ? l.nodeFillIn : l.nodeBreakDownFurther, () => unawaited(_expand())),
+      if (!root && !parts) item('skill-link', l.nodeLink, () => unawaited(_link(node))),
+      item('skill-syllabus', l.nodeApplySyllabus, () => unawaited(_applySyllabus(map))),
+      if (!root) item('skill-delete-node', l.nodeDelete, () => unawaited(_deleteNode(node)), danger: true),
+      const PopupMenuDivider(),
+    ];
   }
 
   /// Where the node stands: cleared, locked, failed last time or open.
@@ -292,13 +434,21 @@ class _SkillSceneState extends State<SkillScene> {
           reply: _reply,
           replyAgent: _replyAgent,
           thinking: chat.sending,
-          expanding: _expanding,
+          working: _working,
           expandFailed: _expandFailed,
-          canTestOut: !node.isMastered && (node.unexpanded || _boss),
+          linkedCourse: switch (_linkedMap) {
+            final linked? when node.isLinked => (
+              name: courseNameOf(linked),
+              rootId: rootNodes(linked.nodes, linked.edges).firstOrNull?.id,
+            ),
+            _ => null,
+          },
+          canTestOut: !node.isMastered && !node.isLinked && (node.unexpanded || _boss),
           size: (box.maxHeight * 0.3).clamp(120.0, 240.0),
           onStart: () => context.go(AppRoutes.audit(node.id)),
           onExpand: () => unawaited(_expand()),
           onTestOut: () => context.go(AppRoutes.challenge(node.id)),
+          onOpenCourse: (rootId) => context.go(AppRoutes.skill(rootId)),
         );
         final sideBySide = box.maxWidth >= 680;
         return SingleChildScrollView(
@@ -540,13 +690,15 @@ class _AvatarColumn extends StatelessWidget {
     required this.reply,
     required this.replyAgent,
     required this.thinking,
-    required this.expanding,
+    required this.working,
     required this.expandFailed,
+    required this.linkedCourse,
     required this.canTestOut,
     required this.size,
     required this.onStart,
     required this.onExpand,
     required this.onTestOut,
+    required this.onOpenCourse,
   });
 
   final SkillOverview overview;
@@ -557,8 +709,14 @@ class _AvatarColumn extends StatelessWidget {
   final String? reply;
   final String replyAgent;
   final bool thinking;
-  final bool expanding;
+
+  /// What the bubble says while the course is being edited (breaking down,
+  /// reading a syllabus); null when nothing runs.
+  final String? working;
   final bool expandFailed;
+
+  /// The course this node is, once read: its name and root.
+  final ({String name, int? rootId})? linkedCourse;
 
   /// A branch, root or unexpanded node not cleared yet: it can be challenged
   /// whole, locked or not.
@@ -567,14 +725,19 @@ class _AvatarColumn extends StatelessWidget {
   final VoidCallback onStart;
   final VoidCallback onExpand;
   final VoidCallback onTestOut;
+  final void Function(int rootId) onOpenCourse;
 
-  bool get _unexpanded => overview.skill.unexpanded && !overview.skill.isMastered;
+  bool get _unexpanded =>
+      overview.skill.unexpanded && !overview.skill.isMastered && !overview.skill.isLinked;
+  bool get _expanding => working != null;
+  bool get _linked => overview.skill.isLinked;
 
   String _line(AppLocalizations l) {
     final node = overview.skill;
-    if (expanding) return l.breakingDown;
+    if (working case final line?) return line;
     if (expandFailed) return l.breakDownFailed;
     if (reply != null) return reply!;
+    if (linkedCourse case (:final name, rootId: _)?) return l.nodeLinkedLine(name);
     if (_unexpanded) return l.unexpandedLine;
     if (node.isLocked) {
       final open = openNode;
@@ -588,8 +751,9 @@ class _AvatarColumn extends StatelessWidget {
     final node = overview.skill;
     final theme = Theme.of(context).textTheme;
     final agent = reply == null ? 'front_desk' : replyAgent;
-    final state = thinking || expanding ? AvatarState.thinking : AvatarState.idle;
-    final busy = thinking || expanding;
+    final state = thinking || _expanding ? AvatarState.thinking : AvatarState.idle;
+    final busy = thinking || _expanding;
+    final openCourse = linkedCourse?.rootId;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -607,7 +771,7 @@ class _AvatarColumn extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Flexible(child: Text(_line(context.l10n), style: theme.bodyLarge)),
-                    if (!node.isLocked && !_unexpanded && !expanding) ...[
+                    if (!node.isLocked && !_unexpanded && !_linked && !_expanding) ...[
                       const SizedBox(width: AppSpacing.md),
                       IconButton(
                         key: const Key('start-audit'),
@@ -628,13 +792,19 @@ class _AvatarColumn extends StatelessWidget {
                   ],
                 ),
         ),
-        if (!busy && (_unexpanded || canTestOut)) ...[
+        if (!busy && (_unexpanded || canTestOut || openCourse != null)) ...[
           const SizedBox(height: AppSpacing.md),
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
             alignment: WrapAlignment.center,
             children: [
+              if (openCourse != null)
+                FilledButton(
+                  key: const Key('open-linked-course'),
+                  onPressed: () => onOpenCourse(openCourse),
+                  child: Text(context.l10n.nodeOpenCourse),
+                ),
               if (_unexpanded)
                 FilledButton(
                   key: const Key('expand-node'),
@@ -655,7 +825,7 @@ class _AvatarColumn extends StatelessWidget {
           agent: agent,
           mood: AvatarMood.smile,
           state: state,
-          wave: !node.isLocked && !_unexpanded && reply == null,
+          wave: !node.isLocked && !_unexpanded && !_linked && reply == null,
           size: size,
         ),
       ],

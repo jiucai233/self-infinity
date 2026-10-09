@@ -1,11 +1,14 @@
 // Courses of any size: categories left to break down later (`unexpanded`),
 // breaking one down from its page, and challenging a whole branch.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/api.dart';
 import 'package:self_infinity/api/api_exception.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
+import 'package:self_infinity/app/app_state.dart';
 import 'package:self_infinity/features/audit/audit_scene.dart';
 import 'package:self_infinity/features/skill/skill_scene.dart';
 import 'package:self_infinity/testing/test_app.dart';
@@ -85,8 +88,12 @@ void main() {
       ]);
       final geometry = map.nodes.firstWhere((n) => n.id == 5);
       expect((geometry.unexpanded, geometry.status), (false, SkillStatus.locked));
-      expect((await failure(() => api.expandSkill(5))).statusCode, 400);
-      expect((await failure(() => api.expandSkill(3))).statusCode, 400);
+      // Again: it is filled in with what it misses. A leaf is broken down further.
+      final filled = await api.expandSkill(5);
+      expect(filled.nodes.last.title, 'More Geometric Vision');
+      final harris = await api.expandSkill(3);
+      expect(harris.nodes.where((n) => n.title.startsWith('Harris Corners ')), hasLength(3));
+      expect((await failure(() => api.expandSkill(99))).statusCode, 404);
     });
 
     test(
@@ -152,6 +159,22 @@ void main() {
       expect(find.byKey(const Key('test-out')), findsOneWidget);
     });
 
+    testWidgets('a break-down that ends after the page closed still reloads the map', (
+      tester,
+    ) async {
+      final api = _SlowExpand();
+      await api.generateCourse(const GenerateRequest(topic: 'Computer Vision'));
+      final state = AppState();
+      await pumpScene(tester, const SkillScene(skillId: 5), api: api, state: state);
+      await tester.tap(find.byKey(const Key('expand-node')));
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox()); // the player went elsewhere
+      final revision = state.dataRevision;
+      api.done.complete();
+      await tester.pumpAndSettle();
+      expect(state.dataRevision, revision + 1);
+    });
+
     testWidgets('a failed break-down says so and offers it again', (tester) async {
       final api = await visionApi();
       await pumpScene(tester, const SkillScene(skillId: 5), api: api);
@@ -203,4 +226,17 @@ void main() {
     expect(find.byKey(const Key('legend-unexpanded')), findsOneWidget);
     expect(find.text('Not broken down'), findsOneWidget);
   });
+}
+
+/// Its break-down waits for [done].
+class _SlowExpand extends FakeApiClient {
+  _SlowExpand() : super(latency: Duration.zero);
+
+  final Completer<void> done = Completer<void>();
+
+  @override
+  Future<CourseMap> expandSkill(int skillId) async {
+    await done.future;
+    return super.expandSkill(skillId);
+  }
 }

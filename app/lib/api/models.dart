@@ -446,6 +446,7 @@ class SkillNode {
     this.masteryScore,
     this.unexpanded = false,
     this.testedOut = false,
+    this.linkedCourseId,
   });
 
   factory SkillNode.fromJson(Json json) => SkillNode(
@@ -459,6 +460,7 @@ class SkillNode {
     masteryScore: _intN(json, 'mastery_score'),
     unexpanded: _boolN(json, 'unexpanded') ?? false,
     testedOut: _boolN(json, 'tested_out') ?? false,
+    linkedCourseId: _intN(json, 'linked_course_id'),
   );
 
   final int id;
@@ -472,34 +474,46 @@ class SkillNode {
   /// 0–100, written when an audit passes; otherwise null.
   final int? masteryScore;
 
-  /// A category not broken down yet: no children until `expandSkill`. It can
-  /// be broken down or challenged as a whole, not audited on its own.
+  /// A category whose parts are not all listed yet (none, or some): breaking
+  /// it down (`expandSkill`) adds them. It can be broken down or challenged as
+  /// a whole, not audited on its own.
   final bool unexpanded;
 
   /// Mastered by a challenge on a node above it, not by its own audit.
   final bool testedOut;
 
+  /// This node is another of the player's courses: its parts are that
+  /// course's tree, and it is mastered with that course. Null for a plain node.
+  final int? linkedCourseId;
+
+  bool get isLinked => linkedCourseId != null;
+
   bool get isLocked => status == SkillStatus.locked;
   bool get isAvailable => status == SkillStatus.available;
   bool get isMastered => status == SkillStatus.mastered;
 
+  /// [linkedCourseId]: a function, so that it can be set to null.
   SkillNode copyWith({
+    String? title,
+    String? description,
     SkillStatus? status,
     NodeType? nodeType,
     int? masteryScore,
     bool? unexpanded,
     bool? testedOut,
+    int? Function()? linkedCourseId,
   }) => SkillNode(
     id: id,
     courseId: courseId,
     slug: slug,
-    title: title,
-    description: description,
+    title: title ?? this.title,
+    description: description ?? this.description,
     status: status ?? this.status,
     nodeType: nodeType ?? this.nodeType,
     masteryScore: masteryScore ?? this.masteryScore,
     unexpanded: unexpanded ?? this.unexpanded,
     testedOut: testedOut ?? this.testedOut,
+    linkedCourseId: linkedCourseId == null ? this.linkedCourseId : linkedCourseId(),
   );
 }
 
@@ -2164,6 +2178,18 @@ class VoiceUsage {
     }
   }
 
+  /// Adds a GPT-Live backend response's usage (a Responses `usage` object):
+  /// its text tokens, which the server prices at the backend model's rates.
+  void addBackend(Object? usage) {
+    turns++;
+    if (usage is! Map) return;
+    int n(Object? v) => v is num ? v.toInt() : 0;
+    textIn += n(usage['input_tokens']);
+    textOut += n(usage['output_tokens']);
+    final details = usage['input_tokens_details'];
+    if (details is Map) textInCached += n(details['cached_tokens']);
+  }
+
   /// Adds an input transcription's usage (`{"type": "duration", "seconds": …}`).
   void addTranscription(Object? usage) {
     if (usage is Map && usage['seconds'] is num) transcribedSeconds += (usage['seconds'] as num).toDouble();
@@ -2199,7 +2225,8 @@ class DevVoiceSession {
     required this.audioOut,
     this.cachedShare,
     required this.cost,
-    this.liveEquivalent,
+    this.backendCost,
+    this.otherCost,
   });
 
   factory DevVoiceSession.fromJson(Json json) => DevVoiceSession(
@@ -2213,7 +2240,8 @@ class DevVoiceSession {
     audioOut: _int(json, 'audio_out'),
     cachedShare: _doubleN(json, 'cached_share'),
     cost: _double(json, 'cost'),
-    liveEquivalent: _doubleN(json, 'live_equivalent'),
+    backendCost: _doubleN(json, 'backend_cost'),
+    otherCost: _doubleN(json, 'other_cost'),
   );
 
   final int id;
@@ -2233,8 +2261,14 @@ class DevVoiceSession {
   /// Dollars.
   final double cost;
 
-  /// What the same minutes would cost on GPT-Live (Guide sessions only).
-  final double? liveEquivalent;
+  /// A GPT-Live session's text backend, part of [cost].
+  final double? backendCost;
+
+  /// What the Guide session would have cost on the other voice: on Realtime
+  /// for a GPT-Live session (estimated), on GPT-Live for a Realtime one.
+  final double? otherCost;
+
+  bool get isLive => model.startsWith('gpt-live');
 }
 
 /// `GET /dev/voice` (contract #37).
@@ -2244,7 +2278,10 @@ class DevVoice {
     required this.guideSessions,
     required this.guideMinutes,
     required this.guideCost,
-    required this.guideLiveEquivalent,
+    required this.guideAllLive,
+    required this.guideAllRealtime,
+    required this.realtimePerMinute,
+    this.realtimeRateMeasured = false,
     this.guideCostPerMinute,
     this.guideCachedShare,
     required this.auditSessions,
@@ -2259,7 +2296,10 @@ class DevVoice {
       guideSessions: _int(t, 'guide_sessions'),
       guideMinutes: _double(t, 'guide_minutes'),
       guideCost: _double(t, 'guide_cost'),
-      guideLiveEquivalent: _double(t, 'guide_live_equivalent'),
+      guideAllLive: _double(t, 'guide_all_live'),
+      guideAllRealtime: _double(t, 'guide_all_realtime'),
+      realtimePerMinute: _double(t, 'realtime_per_minute'),
+      realtimeRateMeasured: t['realtime_rate_measured'] == true,
       guideCostPerMinute: _doubleN(t, 'guide_cost_per_minute'),
       guideCachedShare: _doubleN(t, 'guide_cached_share'),
       auditSessions: _int(t, 'audit_sessions'),
@@ -2275,7 +2315,16 @@ class DevVoice {
   final int guideSessions;
   final double guideMinutes;
   final double guideCost;
-  final double guideLiveEquivalent;
+
+  /// Every Guide minute on one voice: what ran there as billed, the rest
+  /// estimated.
+  final double guideAllLive;
+  final double guideAllRealtime;
+
+  /// The Realtime rate the estimates use; measured on this account once it
+  /// has a minute on Realtime.
+  final double realtimePerMinute;
+  final bool realtimeRateMeasured;
   final double? guideCostPerMinute;
   final double? guideCachedShare;
   final int auditSessions;

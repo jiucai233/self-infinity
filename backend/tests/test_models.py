@@ -60,6 +60,7 @@ def test_skill_node_has_no_parent_id():
     assert "parent_id" not in columns
     assert columns == {
         "id", "course_id", "slug", "title", "description", "status", "node_type", "mastery_score", "unexpanded", "tested_out",
+        "linked_course_id",
     }
 
 

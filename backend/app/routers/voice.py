@@ -1,5 +1,6 @@
 """Voice (contract #35): speech to text and text to speech through OpenAI, and the WebRTC
-handshake of the live sessions (the home page's realtime Guide, the audit's live transcription)."""
+handshake of the live sessions (the home page's Guide on GPT-Live or Realtime, the audit's live
+transcription)."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -7,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session
 
 from app.auth import CurrentUser, current_user
+from app.config import settings
 from app.db import get_session
 from app.schemas import SpeechIn, TranscriptOut, VoiceStatusOut, VoiceUsageIn
 from app.services import realtime, voice, voice_usage
@@ -16,7 +18,7 @@ router = APIRouter(prefix="/api/voice", tags=["voice"], dependencies=[Depends(cu
 
 @router.get("", response_model=VoiceStatusOut)
 def voice_status():
-    return VoiceStatusOut(available=voice.available())
+    return VoiceStatusOut(available=voice.available(), guide="realtime" if settings.guide_voice == "realtime" else "live")
 
 
 @router.post("/transcribe", response_model=TranscriptOut)
@@ -70,9 +72,9 @@ async def _offer(request: Request) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
-async def _connect(offer: str, config: dict, user: CurrentUser) -> Response:
+async def _connect(offer: str, config: dict, user: CurrentUser, connect=realtime.connect) -> Response:
     try:
-        answer = await run_in_threadpool(realtime.connect, offer, config, user.id)
+        answer = await run_in_threadpool(connect, offer, config, user.id)
     except voice.VoiceUnavailable as e:
         raise HTTPException(503, str(e)) from None
     except voice.VoiceRejected as e:
@@ -91,6 +93,18 @@ async def realtime_guide(
         raise HTTPException(503, "voice is not configured")
     config = await run_in_threadpool(realtime.guide_session, session)
     return await _connect(offer, config, user)
+
+
+@router.post("/live/guide", status_code=201, responses={201: {"content": {"application/sdp": {}}}})
+async def live_guide(
+    request: Request, user: CurrentUser = Depends(current_user), session: Session = Depends(get_session)
+):
+    """The Guide on GPT-Live: same handshake as /realtime/guide, a Live session behind it."""
+    offer = await _offer(request)
+    if not voice.available():
+        raise HTTPException(503, "voice is not configured")
+    config = await run_in_threadpool(realtime.live_guide_session, session)
+    return await _connect(offer, config, user, connect=realtime.connect_live)
 
 
 @router.post("/realtime/transcribe", status_code=201, responses={201: {"content": {"application/sdp": {}}}})

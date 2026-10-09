@@ -1,5 +1,6 @@
 """课程相关接口：generate / courses / map / skills / recommendation（IT-01 ~ IT-04、IT-22、IT-23）。"""
 
+import json
 from datetime import datetime
 
 import pytest
@@ -29,12 +30,12 @@ def test_it01_generate_saves_the_course_and_opens_the_first_node_of_each_chapter
 def test_it01_the_response_matches_the_contract_shapes(client):
     body = generate(client, "Math")
 
-    assert set(body) == {"course", "nodes", "edges"}
+    assert set(body) == {"course", "nodes", "edges", "merged", "added"}
     assert set(body["course"]) == {"id", "topic", "source_course", "source_url", "created_at"}
     assert body["course"]["topic"] == "Math"
     assert set(body["nodes"][0]) == {
         "id", "course_id", "slug", "title", "description", "status", "node_type", "mastery_score",
-        "unexpanded", "tested_out",
+        "unexpanded", "tested_out", "linked_course_id",
     }
     assert all(n["course_id"] == 1 and n["mastery_score"] is None and n["node_type"] == "concept" for n in body["nodes"])
     assert not any(n["unexpanded"] or n["tested_out"] for n in body["nodes"])
@@ -142,7 +143,7 @@ def test_it01_the_syllabus_found_is_handed_to_the_planner(client, monkeypatch):
     client.post("/api/skills/generate", json={"topic": "Math"})
 
     (prompt,) = spy.system_prompts("planner")
-    assert "Reference outline (High School Mathematics Curriculum (Ministry of Education))" in prompt
+    assert "Reference syllabus (High School Mathematics Curriculum (Ministry of Education))" in prompt
 
 
 def test_it01_a_generic_course_has_ten_nodes_and_one_root(client):
@@ -277,8 +278,9 @@ def test_it22_graph_after_generation_has_contains_and_requires_in_the_right_dire
 
 
 def test_it23_two_courses_with_the_same_titles_have_independent_statuses(client):
+    # Another topic (the same one again would be the same course, see the test below).
     first = generate(client, "Math")
-    second = generate(client, "Math")
+    second = generate(client, "Math for engineers")
     assert [n["title"] for n in first["nodes"]] == [n["title"] for n in second["nodes"]]
     assert first["course"]["id"] == 1 and second["course"]["id"] == 2
 
@@ -403,3 +405,31 @@ def test_recommendation_on_an_empty_database(client):
 
     assert body["skill_tiers"] == {}
     assert body["suggested_tier"] in ("easy", "medium", "hard")
+
+
+def test_it01_syllabus_items_left_out_are_asked_for_once(client, monkeypatch):
+    def course(*titles):
+        nodes = [{"slug": "math", "title": "Math", "description": "Math.", "parents": []}]
+        nodes += [{"slug": t.lower(), "title": t, "description": f"{t}.", "parents": ["math"]} for t in titles]
+        return json.dumps({"nodes": nodes, "requires": []})
+
+    spy = ScriptedProvider(planner=[course("Algebra"), course("Algebra", "Functions")])
+    monkeypatch.setattr("app.routers.skills.get_provider", lambda agent=None: spy)
+
+    body = client.post("/api/skills/generate", json={"topic": "Math"}).json()
+
+    _, second = spy.calls_for("planner")
+    assert "leaves out these syllabus items: Functions; Calculus." in second[-1]["content"]
+    # The second answer still leaves out Calculus: it is kept all the same.
+    assert [n["title"] for n in body["nodes"]] == ["Math", "Algebra", "Functions"]
+
+
+def test_it01_the_same_course_asked_for_again_is_the_one_there(client):
+    first = generate(client, "Math", search_syllabus=False)
+
+    again = generate(client, "  math ", search_syllabus=False)
+
+    # Nothing new is built: the answer is the course the player has.
+    assert again["course"]["id"] == first["course"]["id"] and again["merged"] is True
+    assert len(client.get("/api/courses").json()) == 1
+    assert first["merged"] is False

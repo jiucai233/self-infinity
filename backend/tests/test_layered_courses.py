@@ -20,10 +20,12 @@ def node(slug, title, parents=(), expand=False, description=""):
             "node_type": "concept", "expand": expand}
 
 
-# Computer vision, first layer: one chapter broken down, one left for later.
+# Computer vision, first layer: two whole levels, one category on the second left for later.
 TOP = json.dumps({"nodes": [
     node("cv", "Computer Vision"),
-    node("detection", "Object Detection", ["cv"], expand=True, description="Two-stage and one-stage detectors."),
+    node("recognition", "Visual Recognition", ["cv"]),
+    node("detection", "Object Detection", ["recognition"], expand=True, description="Two-stage and one-stage detectors."),
+    node("classification", "Image Classification", ["recognition"]),
     node("features", "Image Features", ["cv"]),
     node("sift", "SIFT", ["features"]),
     node("hog", "HOG", ["features"]),
@@ -32,9 +34,10 @@ TOP = json.dumps({"nodes": [
 DETECTION = json.dumps({"nodes": [
     node("two-stage", "Two-Stage Detectors", ["detection"]),
     node("faster-rcnn", "Faster R-CNN", ["two-stage"]),
-    node("one-stage", "One-Stage Detectors", ["detection"], expand=True),
+    node("one-stage", "One-Stage Detectors", ["detection"]),
+    node("yolo", "YOLO Family", ["one-stage"], expand=True),
     node("sift", "SIFT", ["detection"]),  # already in the course: dropped
-], "requires": [{"from": "faster-rcnn", "to": "one-stage", "reason": "Anchors first."}]})
+], "requires": [{"from": "faster-rcnn", "to": "yolo", "reason": "Anchors first."}]})
 
 
 def use_planner(monkeypatch, *outputs):
@@ -72,6 +75,40 @@ def test_an_unexpanded_chapter_is_its_own_open_node(cv):
     assert {s for s, n in nodes.items() if n["status"] == "available"} == {"detection", "sift"}
 
 
+def test_sample_leaves_beside_a_category_left_for_later_are_dropped(client, monkeypatch):
+    # "Image Features" got two sample leaves while "Object Detection", on the same level, was left
+    # for later: the level is kept whole, and both are broken down later.
+    top = json.dumps({"nodes": [
+        node("cv", "Computer Vision"),
+        node("detection", "Object Detection", ["cv"], expand=True),
+        node("features", "Image Features", ["cv"]),
+        node("sift", "SIFT", ["features"]),
+        node("hog", "HOG", ["features"]),
+        node("tracking", "Optical Flow", ["cv"]),
+    ], "requires": [{"from": "sift", "to": "tracking", "reason": "Keypoints first."}]})
+    use_planner(monkeypatch, top)
+
+    body = generate(client, "Computer Vision", search_syllabus=False)
+
+    assert {s: n["unexpanded"] for s, n in by_slug(body).items()} == {
+        "cv": False, "detection": True, "features": True, "tracking": False,
+    }
+    assert not [e for e in body["edges"] if e["kind"] == "requires"]
+
+
+def test_a_level_cut_applies_to_a_break_down_too(client, monkeypatch):
+    top = json.dumps({"nodes": [node("r", "Root"), node("a", "A", ["r"], expand=True)]})
+    parts = json.dumps({"nodes": [
+        node("a1", "A1", ["a"]), node("a11", "A11", ["a1"]), node("a2", "A2", ["a"], expand=True),
+    ]})
+    use_planner(monkeypatch, top, parts)
+    a = by_slug(generate(client, "X", search_syllabus=False))["a"]["id"]
+
+    after = by_slug(client.post(f"/api/skills/{a}/expand").json())
+
+    assert {s: n["unexpanded"] for s, n in after.items()} == {"r": False, "a": False, "a1": True, "a2": True}
+
+
 def test_expand_true_on_a_node_with_children_is_ignored(client, monkeypatch):
     top = json.dumps({"nodes": [node("r", "Root"), node("a", "A", ["r"], expand=True), node("a1", "A1", ["a"])]})
     use_planner(monkeypatch, top)
@@ -90,15 +127,18 @@ def test_expanding_hangs_the_parts_under_the_node(client, cv):
 
     assert response.status_code == 200
     after = by_slug(response.json())
-    assert set(after) == {"cv", "detection", "features", "sift", "hog", "two-stage", "faster-rcnn", "one-stage"}
-    assert after["detection"]["unexpanded"] is False and after["one-stage"]["unexpanded"] is True
+    assert set(after) == {
+        "cv", "recognition", "detection", "classification", "features", "sift", "hog",
+        "two-stage", "faster-rcnn", "one-stage", "yolo",
+    }
+    assert after["detection"]["unexpanded"] is False and after["yolo"]["unexpanded"] is True
     contains = {(e["from_id"], e["to_id"]) for e in response.json()["edges"] if e["kind"] == "contains"}
     assert (detection, after["two-stage"]["id"]) in contains and (after["two-stage"]["id"], after["faster-rcnn"]["id"]) in contains
     requires = [e for e in response.json()["edges"] if e["kind"] == "requires"]
     assert [(e["from_id"], e["to_id"], e["reason"]) for e in requires] == [
-        (after["faster-rcnn"]["id"], after["one-stage"]["id"], "Anchors first."),
+        (after["faster-rcnn"]["id"], after["yolo"]["id"], "Anchors first."),
     ]
-    # The chapter's open node moves down to its first part.
+    # The chapter's open node moves down to the node's first part.
     assert {s for s, n in after.items() if n["status"] == "available"} == {"faster-rcnn", "sift"}
 
 
@@ -111,17 +151,32 @@ def test_the_expand_prompt_names_the_node_its_path_and_what_the_course_has(clien
     assert "Budget: at most 40 nodes" in messages[0]["content"]
     user = messages[1]["content"]
     assert user.startswith('Course: Computer Vision\nBreak down: Object Detection (slug "detection")')
-    assert "Where it sits: Computer Vision > Object Detection" in user
+    assert "Where it sits: Computer Vision > Visual Recognition > Object Detection" in user
     assert "- SIFT" in user and "- Object Detection" not in user
 
 
-def test_a_node_can_only_be_expanded_once(client, cv):
-    _, body = cv
-    detection = by_slug(body)["detection"]["id"]
-    client.post(f"/api/skills/{detection}/expand")
+def test_breaking_down_a_node_with_parts_fills_it_in(client, cv, monkeypatch):
+    provider = use_planner(monkeypatch, json.dumps({"nodes": [node("hog", "HOG"), node("orb", "ORB", ["features"])]}))
+    features = by_slug(cv[1])["features"]["id"]
 
-    assert client.post(f"/api/skills/{detection}/expand").status_code == 400
-    assert client.post(f"/api/skills/{by_slug(body)['sift']['id']}/expand").status_code == 400
+    after = by_slug(client.post(f"/api/skills/{features}/expand").json())
+
+    # Only what was missing is added; a part it has already is not repeated.
+    assert set(after) - set(by_slug(cv[1])) == {"orb"}
+    user = provider.calls_for("planner")[0][1]["content"]
+    assert user.endswith("Its parts so far (output only what is missing):\n- SIFT\n- HOG")
+
+
+def test_nothing_missing_adds_nothing(client, cv, monkeypatch):
+    use_planner(monkeypatch, '{"nodes": []}')
+    features = by_slug(cv[1])["features"]["id"]
+
+    response = client.post(f"/api/skills/{features}/expand")
+
+    assert response.status_code == 200 and set(by_slug(response.json())) == set(by_slug(cv[1]))
+
+
+def test_an_unknown_node_is_a_404(client):
     assert client.post("/api/skills/999/expand").status_code == 404
 
 
@@ -133,7 +188,7 @@ def test_a_failed_expansion_is_a_502_and_leaves_the_node_to_try_again(client, cv
     assert client.post(f"/api/skills/{detection}/expand").status_code == 502
     with Session(client_engine) as session:
         assert session.get(SkillNode, detection).unexpanded is True
-        assert len(session.exec(select(SkillNode)).all()) == 5
+        assert len(session.exec(select(SkillNode)).all()) == 7
 
 
 def test_parts_that_name_no_parent_hang_under_the_node_and_slugs_never_collide(client, monkeypatch):
@@ -152,7 +207,7 @@ def test_parts_that_name_no_parent_hang_under_the_node_and_slugs_never_collide(c
 
 def test_a_full_course_is_not_expanded(client, cv, monkeypatch):
     _, body = cv
-    monkeypatch.setattr(course_generation, "MAX_COURSE_NODES", 5)
+    monkeypatch.setattr(course_generation, "MAX_COURSE_NODES", 7)
 
     assert client.post(f"/api/skills/{by_slug(body)['detection']['id']}/expand").status_code == 409
 
@@ -258,7 +313,8 @@ def test_expand_flags_are_parsed():
     planned = Planner.parse(TOP)
 
     assert [(n.slug, n.expand) for n in planned.nodes] == [
-        ("cv", False), ("detection", True), ("features", False), ("sift", False), ("hog", False),
+        ("cv", False), ("recognition", False), ("detection", True), ("classification", False),
+        ("features", False), ("sift", False), ("hog", False),
     ]
     assert Planner.parse(json.dumps({"nodes": [{"title": "A", "expand": "yes"}]})).nodes[0].expand is False
 
@@ -268,7 +324,7 @@ def test_the_mock_vision_course_comes_in_layers(client):
     nodes = by_slug(body)
 
     assert [s for s, n in nodes.items() if n["unexpanded"]] == ["geometry", "recognition"]
-    assert sorted(s for s, n in nodes.items() if n["status"] == "available") == ["geometry", "harris", "recognition"]
+    assert sorted(s for s, n in nodes.items() if n["status"] == "available") == ["geometry", "harris"]
 
     after = by_slug(client.post(f"/api/skills/{nodes['geometry']['id']}/expand").json())
     assert [n["title"] for s, n in after.items() if s.startswith("geometry-part")] == [

@@ -311,7 +311,7 @@ def test_open_skill_puts_a_navigate_action_on_the_first_message(client):
 
 def test_open_skill_resolves_exact_before_contains_and_newest_course_first(client, monkeypatch):
     older = ids_by_slug(generate(client, "Math"))
-    newer = ids_by_slug(generate(client, "Math"))
+    newer = ids_by_slug(generate(client, "Math for engineers"))
     assert older["algebra"] != newer["algebra"]
 
     def skill_of(text):
@@ -369,12 +369,14 @@ def test_checkin_converter_failure_is_not_an_error(client, monkeypatch):
     assert messages[2]["action"]["result"]["checkin"]["sleep_hours"] is None
 
 
-def test_checkin_in_chat_replaces_the_day_record(client):
-    say(client, VOICE)
+def test_a_second_said_check_in_fills_in_the_day(client):
+    first = say(client, VOICE)[2]["action"]["result"]["checkin"]
     say(client, "I slept eight hours")
 
     today = client.get("/api/checkins/today").json()
-    assert today["sleep_hours"] == 8 and today["diet_note"] is None
+    # What it found overwrites; what it did not mention stays from the first one.
+    assert today["sleep_hours"] == 8 and today["diet_note"] == first["diet_note"] is not None
+    assert today["transcript"] == f"{VOICE}\nI slept eight hours"
 
 
 def test_plan_runs_the_recommender(client):

@@ -183,7 +183,7 @@ def test_overview_lists_parents_and_requires_with_reasons(client):
     assert set(body["requires"][0]) == {"skill", "reason"}
     assert set(body["requires"][0]["skill"]) == {
         "id", "course_id", "slug", "title", "description", "status", "node_type", "mastery_score",
-        "unexpanded", "tested_out",
+        "unexpanded", "tested_out", "linked_course_id",
     }
 
 

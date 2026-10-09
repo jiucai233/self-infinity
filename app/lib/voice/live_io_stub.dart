@@ -17,6 +17,7 @@ class _NoLiveIo implements LiveIo {
     LiveEndpoint endpoint, {
     required bool playReplies,
     void Function(double level)? onLevel,
+    void Function(double level)? onReplyLevel,
   }) async => throw UnsupportedError('no live voice here');
 
   @override

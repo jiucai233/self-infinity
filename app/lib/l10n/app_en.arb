@@ -125,7 +125,7 @@
   "dotCleared": "Cleared",
   "dotLocked": "Locked",
   "dotReady": "Ready",
-  "dragToTurn": "Drag to turn · tap a point",
+  "dragToTurn": "Drag to turn · scroll to zoom · tap a point",
   "editUnderCharacter": "Edit these under My character.",
   "email": "Email",
   "enterApp": "Enter Self-Infinity",
@@ -542,8 +542,8 @@
   "devRefresh": "Refresh",
   "devTabAudits": "Audits",
   "devTabVoice": "Voice cost",
-  "devVoiceHint": "At list price. The realtime Guide is billed by tokens, so silence is free; GPT-Live bills every minute the session is open, its backend apart. Audit transcription counts the whole open session, an upper bound.",
-  "devVoiceGuide": "Home Guide (realtime)",
+  "devVoiceHint": "At list price. The Guide on GPT-Live bills every second the session is open, plus its text backend; on Realtime it bills tokens (silence is free) plus transcription. Each Guide session also shows the other voice: Realtime at this account's own cost per minute, GPT-Live at $0.05 a minute. Audit transcription counts the whole open session, an upper bound.",
+  "devVoiceGuide": "Home Guide",
   "devVoiceAudits": "Audits (live transcription)",
   "devVoiceSessions": "Sessions",
   "devVoiceMinutes": "Minutes",
@@ -737,5 +737,85 @@
   "factSchedule": "Schedule",
   "factConstraint": "Constraint",
   "factPreference": "Preference",
-  "factOther": "Other"
+  "factOther": "Other",
+  "devVoiceGuideLive": "Guide (GPT-Live)",
+  "devVoiceGuideRealtime": "Guide (Realtime)",
+  "devVoiceOnRealtime": "On Realtime ≈",
+  "devVoiceAllLive": "All on GPT-Live",
+  "devVoiceAllRealtime": "All on Realtime ≈",
+  "devVoiceRealtimeRate": "Realtime per minute (measured)",
+  "devVoiceRealtimeRateDefault": "Realtime per minute (one test)",
+  "nodeEdit": "Edit",
+  "nodeEditTitle": "Edit node",
+  "nodeTitleLabel": "Name",
+  "nodeDescriptionLabel": "What it covers",
+  "nodeSave": "Save",
+  "nodeAddPart": "Add a part",
+  "nodeAddPartTitle": "Add a part under “{title}”",
+  "@nodeAddPartTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "nodeFillIn": "Fill in what's missing",
+  "nodeBreakDownFurther": "Break it down further",
+  "nodeLink": "It is one of my courses…",
+  "nodeLinkTitle": "Which of your courses is “{title}”?",
+  "@nodeLinkTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "nodeLinkBody": "Its parts become that course, and the two are cleared together.",
+  "nodeLinkNone": "None: a plain node",
+  "nodeLinkNoCourses": "You have no other course yet.",
+  "nodeApplySyllabus": "Update from a syllabus…",
+  "nodeApplySyllabusTitle": "Update “{course}” from a syllabus",
+  "@nodeApplySyllabusTitle": {
+    "placeholders": {
+      "course": {
+        "type": "String"
+      }
+    }
+  },
+  "nodeApplySyllabusBody": "What the syllabus covers and the course lacks is added where it belongs. Nothing is removed; your progress stays.",
+  "nodeSyllabusSearch": "Search for one",
+  "nodeSyllabusUpload": "Upload a file",
+  "nodeReadingSyllabus": "Reading the syllabus… this can take up to a minute.",
+  "nodeSyllabusAdded": "{count, plural, =0{The course already covers that syllabus.} =1{1 part added.} other{{count} parts added.}}",
+  "@nodeSyllabusAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "nodeNoSyllabus": "No syllabus found. Try uploading one.",
+  "nodeDelete": "Delete node",
+  "nodeDeleteTitle": "Delete “{title}”?",
+  "@nodeDeleteTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "nodeDeleteBody": "Its parts go with it, with their attempts and lesson cards. A part that also belongs elsewhere stays there.",
+  "nodeLinkedLine": "This is your course “{course}”.",
+  "@nodeLinkedLine": {
+    "placeholders": {
+      "course": {
+        "type": "String"
+      }
+    }
+  },
+  "nodeOpenCourse": "Open the course",
+  "nodeEditFailed": "Couldn't do that. Try again.",
+  "zoomIn": "Zoom in",
+  "zoomOut": "Zoom out",
+  "resetView": "Back to the start"
 }

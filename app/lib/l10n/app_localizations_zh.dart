@@ -253,7 +253,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dotReady => '可挑战';
 
   @override
-  String get dragToTurn => '拖动旋转 · 点选一个点';
+  String get dragToTurn => '拖动旋转 · 滚轮或双指缩放 · 点选一个点';
 
   @override
   String get editUnderCharacter => '可以在「我的角色」里编辑。';
@@ -1041,10 +1041,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get devVoiceHint =>
-      '按官方价格估算。实时 Guide 按 token 计费，静音不花钱；GPT-Live 只要会话开着就按分钟计费，后台模型另算。审计转写按整个连接时长算，是上限。';
+      '按官方价格估算。GPT-Live 上的 Guide 按会话开着的秒数计费，加上后台文本模型；Realtime 按 token 计费（静音不花钱），加上转写。每次 Guide 会话旁边都标出换成另一种语音的花费：Realtime 按本账号实测的每分钟花费估算，GPT-Live 按每分钟 \$0.05。审计转写按整个连接时长算，是上限。';
 
   @override
-  String get devVoiceGuide => '首页 Guide（实时）';
+  String get devVoiceGuide => '首页 Guide';
 
   @override
   String get devVoiceAudits => '审计（实时转写）';
@@ -1315,4 +1315,136 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get factOther => '其他';
+
+  @override
+  String get devVoiceGuideLive => 'Guide（GPT-Live）';
+
+  @override
+  String get devVoiceGuideRealtime => 'Guide（Realtime）';
+
+  @override
+  String get devVoiceOnRealtime => '换成 Realtime 约';
+
+  @override
+  String get devVoiceAllLive => '全用 GPT-Live';
+
+  @override
+  String get devVoiceAllRealtime => '全用 Realtime 约';
+
+  @override
+  String get devVoiceRealtimeRate => 'Realtime 每分钟（实测）';
+
+  @override
+  String get devVoiceRealtimeRateDefault => 'Realtime 每分钟（单次测试）';
+
+  @override
+  String get nodeEdit => '编辑';
+
+  @override
+  String get nodeEditTitle => '编辑节点';
+
+  @override
+  String get nodeTitleLabel => '名称';
+
+  @override
+  String get nodeDescriptionLabel => '包含什么';
+
+  @override
+  String get nodeSave => '保存';
+
+  @override
+  String get nodeAddPart => '添加子节点';
+
+  @override
+  String nodeAddPartTitle(String title) {
+    return '在「$title」下添加子节点';
+  }
+
+  @override
+  String get nodeFillIn => '补全缺少的部分';
+
+  @override
+  String get nodeBreakDownFurther => '继续拆开';
+
+  @override
+  String get nodeLink => '设为我的一门课程…';
+
+  @override
+  String nodeLinkTitle(String title) {
+    return '「$title」是你的哪门课程？';
+  }
+
+  @override
+  String get nodeLinkBody => '它的内容就是那门课，两边一起通关。';
+
+  @override
+  String get nodeLinkNone => '不是课程，普通节点';
+
+  @override
+  String get nodeLinkNoCourses => '你还没有别的课程。';
+
+  @override
+  String get nodeApplySyllabus => '按课纲更新…';
+
+  @override
+  String nodeApplySyllabusTitle(String course) {
+    return '按课纲更新「$course」';
+  }
+
+  @override
+  String get nodeApplySyllabusBody => '课纲里有、课程里缺的部分会补到对应的位置。不会删除任何东西，进度保留。';
+
+  @override
+  String get nodeSyllabusSearch => '在网上找一份';
+
+  @override
+  String get nodeSyllabusUpload => '上传文件';
+
+  @override
+  String get nodeReadingSyllabus => '正在读课纲……可能要一分钟左右。';
+
+  @override
+  String nodeSyllabusAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '补上了 $count 个部分。',
+      zero: '课程已经覆盖了这份课纲。',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nodeNoSyllabus => '没找到课纲，可以上传一份。';
+
+  @override
+  String get nodeDelete => '删除节点';
+
+  @override
+  String nodeDeleteTitle(String title) {
+    return '删除「$title」？';
+  }
+
+  @override
+  String get nodeDeleteBody => '它下面的部分会一起删除，连同挑战记录和教训卡。同时属于别处的部分会留在那里。';
+
+  @override
+  String nodeLinkedLine(String course) {
+    return '这是你的课程「$course」。';
+  }
+
+  @override
+  String get nodeOpenCourse => '打开课程';
+
+  @override
+  String get nodeEditFailed => '没能完成，再试一次。';
+
+  @override
+  String get zoomIn => '放大';
+
+  @override
+  String get zoomOut => '缩小';
+
+  @override
+  String get resetView => '回到初始视角';
 }

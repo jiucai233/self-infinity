@@ -17,6 +17,7 @@ from app.schemas import (
     CourseGraphOut,
     CourseOut,
     GenerateCourseRequest,
+    GeneratedCourseOut,
     RecommendationOut,
     RequiredSkillOut,
     ScoutOptionOut,
@@ -25,15 +26,18 @@ from app.schemas import (
     SearchPlanItemOut,
     SearchPlanOut,
     SearchPlanRequest,
+    SkillChildIn,
     SkillEdgeOut,
+    SkillEditIn,
+    SkillLinkIn,
     SkillNodeOut,
     SkillOverviewOut,
 )
 from app.search import get_search_provider
-from app.services import bandit, course_generation
+from app.services import bandit, course_edit, course_generation
 from app.services.course_generation import CourseFull, CourseGenerationError, NotExpandable
-from app.services.courses import live_nodes
-from app.services.tree import contains_parents, depth_map
+from app.services.courses import get_live_course, live_nodes
+from app.services.tree import contains_parents, course_graph, depth_map
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +114,7 @@ def scout_course(body: ScoutRequest, session: Session = Depends(get_session)):
     )
 
 
-@router.post("/generate", response_model=CourseGraphOut)
+@router.post("/generate", response_model=GeneratedCourseOut)
 def generate_course(body: GenerateCourseRequest, session: Session = Depends(get_session)):
     """编排一门课：节点 + contains 边 + requires 边。
 
@@ -130,24 +134,25 @@ def generate_course(body: GenerateCourseRequest, session: Session = Depends(get_
     except CourseGenerationError:
         logger.warning("course generation failed", exc_info=True)
         raise HTTPException(502, "Course generation failed. Please try again.")
-    return CourseGraphOut(
+    return GeneratedCourseOut(
         course=CourseOut.model_validate(generated.course),
         nodes=[SkillNodeOut.model_validate(n) for n in generated.nodes],
         edges=[SkillEdgeOut.model_validate(e) for e in generated.edges],
+        merged=generated.merged,
+        added=generated.added,
     )
 
 
 @router.post("/{skill_id}/expand", response_model=CourseGraphOut)
 def expand_skill(skill_id: int, session: Session = Depends(get_session)):
-    """Breaks a node the Planner left as a category (`unexpanded`) down into its parts; answers
-    the whole course map. Any node can be expanded, locked or not: looking inside is free."""
-    skill = session.get(SkillNode, skill_id)
-    if skill is None:
-        raise HTTPException(404, "skill not found")
+    """Breaks a node down into its parts: all of them for a node left as a category
+    (`unexpanded`), the missing ones for any other (filling it in). Answers the whole course map.
+    Any node can be expanded, locked or not: looking inside is free."""
+    skill = _editable(session, skill_id)
     try:
         expanded = course_generation.expand_node(session, skill, get_provider("planner"))
     except NotExpandable:
-        raise HTTPException(400, "This node is already broken down.") from None
+        raise HTTPException(400, "This node is another course, or is being broken down already.") from None
     except CourseFull:
         raise HTTPException(409, "This course has reached its size limit.") from None
     except CourseGenerationError:
@@ -158,6 +163,68 @@ def expand_skill(skill_id: int, session: Session = Depends(get_session)):
         nodes=[SkillNodeOut.model_validate(n) for n in expanded.nodes],
         edges=[SkillEdgeOut.model_validate(e) for e in expanded.edges],
     )
+
+
+def course_map(session: Session, course_id: int) -> CourseGraphOut:
+    course = session.get(Course, course_id)
+    nodes, edges = course_graph(session, course_id)
+    return CourseGraphOut(
+        course=CourseOut.model_validate(course),
+        nodes=[SkillNodeOut.model_validate(n) for n in nodes],
+        edges=[SkillEdgeOut.model_validate(e) for e in edges],
+    )
+
+
+def _editable(session: Session, skill_id: int) -> SkillNode:
+    """A node of a live course, or 404."""
+    skill = session.get(SkillNode, skill_id)
+    if skill is None or get_live_course(session, skill.course_id) is None:
+        raise HTTPException(404, "skill not found")
+    return skill
+
+
+@router.patch("/{skill_id}", response_model=CourseGraphOut)
+def edit_skill(skill_id: int, body: SkillEditIn, session: Session = Depends(get_session)):
+    """Renames a node or rewrites what it covers; answers the course map."""
+    skill = _editable(session, skill_id)
+    course_edit.rename(session, skill, body.title, body.description)
+    return course_map(session, skill.course_id)
+
+
+@router.delete("/{skill_id}", response_model=CourseGraphOut)
+def delete_skill(skill_id: int, session: Session = Depends(get_session)):
+    """Deletes a node and what is only under it, with their audits and lesson cards; answers the
+    course map. The root is the course: 400 (delete the course, #33)."""
+    skill = _editable(session, skill_id)
+    course_id = skill.course_id
+    try:
+        course_edit.delete_node(session, skill)
+    except course_edit.EditRefused as exc:
+        raise HTTPException(400, str(exc)) from None
+    return course_map(session, course_id)
+
+
+@router.post("/{skill_id}/children", response_model=CourseGraphOut)
+def add_skill_child(skill_id: int, body: SkillChildIn, session: Session = Depends(get_session)):
+    """Adds a part the player names under a node; answers the course map."""
+    skill = _editable(session, skill_id)
+    try:
+        course_edit.add_child(session, skill, body.title, body.description)
+    except course_edit.EditRefused as exc:
+        raise HTTPException(400, str(exc)) from None
+    return course_map(session, skill.course_id)
+
+
+@router.put("/{skill_id}/link", response_model=CourseGraphOut)
+def link_skill(skill_id: int, body: SkillLinkIn, session: Session = Depends(get_session)):
+    """Makes the node one of the player's other courses (`course_id`), or a plain node again
+    (null); answers the map of the node's course."""
+    skill = _editable(session, skill_id)
+    try:
+        course_edit.link(session, skill, body.course_id)
+    except course_edit.EditRefused as exc:
+        raise HTTPException(400, str(exc)) from None
+    return course_map(session, skill.course_id)
 
 
 @router.post("/{skill_id}/search-plan", response_model=SearchPlanOut)

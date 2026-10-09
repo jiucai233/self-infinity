@@ -51,11 +51,34 @@ abstract class SelfInfinityApi {
   /// [courseId]: the nodes of all courses.
   Future<List<SkillNode>> listSkills({int? courseId});
 
-  /// `POST /skills/{skillId}/expand` (LLM). Breaks an `unexpanded` node down
-  /// into its parts; answers the whole course map. 400 when it is already
-  /// broken down, 409 when the course is full, 502 when the Planner fails (it
-  /// stays `unexpanded`).
+  /// `POST /skills/{skillId}/expand` (LLM). Breaks a node down into its parts:
+  /// all of them for an `unexpanded` node, the missing ones for any other
+  /// (filling it in). Answers the whole course map. 400 for a node that is
+  /// another course, 409 when the course is full, 502 when the Planner fails
+  /// (an `unexpanded` node stays so).
   Future<CourseMap> expandSkill(int skillId);
+
+  /// `PATCH /skills/{skillId}` (#41). Renames a node or rewrites what it
+  /// covers; answers the course map.
+  Future<CourseMap> editSkill(int skillId, {String? title, String? description});
+
+  /// `DELETE /skills/{skillId}` (#42). Deletes a node and what is only under
+  /// it, with their audits; answers the course map. 400 for the root.
+  Future<CourseMap> deleteSkill(int skillId);
+
+  /// `POST /skills/{skillId}/children` (#43). Adds a part the player names;
+  /// answers the course map.
+  Future<CourseMap> addSkillPart(int skillId, {required String title, String? description});
+
+  /// `PUT /skills/{skillId}/link` (#44). Makes the node another of the
+  /// player's courses ([courseId]), or a plain node again (null); answers the
+  /// map of the node's course. 400 when the link makes no sense.
+  Future<CourseMap> linkSkill(int skillId, int? courseId);
+
+  /// `POST /courses/{courseId}/syllabus` (#45, LLM). Adds what a syllabus
+  /// covers and the course lacks: the uploaded files, or with none a syllabus
+  /// searched for (404 when none is found). Answers the course map.
+  Future<CourseMap> applySyllabus(int courseId, {List<int> uploadIds = const []});
 
   /// `POST /skills/{skillId}/audits`. Body `{"mode", "test_out"}`.
   ///
@@ -248,6 +271,10 @@ abstract class SelfInfinityApi {
   /// `GET /voice` (contract #35, no LLM): whether the server can hear and
   /// speak (it has an OpenAI key). False: use the device's own speech.
   Future<bool> voiceAvailable();
+
+  /// `GET /voice` (contract #35, no LLM): the voice the home Guide opens
+  /// first, `live` (GPT-Live) or `realtime`; null without voice.
+  Future<String?> guideVoice();
 
   /// `POST /voice/transcribe` (contract #35): the words in one recorded
   /// utterance ([audio] as recorded, [filename] with its format's extension:

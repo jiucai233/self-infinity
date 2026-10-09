@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # speech-to-speech model; the audit transcribes live with the other.
     realtime_model: str = "gpt-realtime-2.1"
     live_transcribe_model: str = "gpt-live-transcribe"
+    # Which voice the home Guide talks with: "live" (GPT-Live, a full-duplex voice that hands
+    # tools to a text backend) or "realtime" (one speech-to-speech model). The browser falls back
+    # from live to realtime when a Live session cannot be opened.
+    guide_voice: str = "live"
+    live_model: str = "gpt-live-1"
+    live_backend_model: str = "gpt-6-luna"
     # 留空则用离线搜索替身。搜索是独立于 LLM provider 的一层，互不影响。
     tavily_api_key: str = ""
     # POSTGRES_URL is what the Vercel ↔ Supabase integration sets (the transaction pooler);

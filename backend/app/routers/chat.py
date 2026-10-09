@@ -11,7 +11,7 @@ from app.db import get_session
 from app.llm import get_provider
 from app.schemas import ChatActIn, ChatLogIn, ChatMessageOut, ChatRequest, ChatResponse, ChatSuggestionsResponse
 from app.search import get_search_provider
-from app.services import chat, facts
+from app.services import chat, checkin, facts
 from app.services.chat import FrontDeskUnavailable
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -68,5 +68,6 @@ def post_action(body: ChatActIn, background: BackgroundTasks, session: Session =
 def post_log(body: ChatLogIn, background: BackgroundTasks, session: Session = Depends(get_session)):
     lines = [(m.role, m.content) for m in body.messages]
     remember = facts.remember_later(background.add_task, session.get_bind())
-    return ChatResponse(messages=chat.log_voice(session, lines, remember=remember))
+    log_said = checkin.said_later(background.add_task, session.get_bind())
+    return ChatResponse(messages=chat.log_voice(session, lines, remember=remember, log_said=log_said))
 

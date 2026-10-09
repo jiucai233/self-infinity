@@ -113,6 +113,11 @@ class FakeApiClient implements SelfInfinityApi {
     'getCourseMap',
     'listSkills',
     'expandSkill',
+    'editSkill',
+    'deleteSkill',
+    'addSkillPart',
+    'linkSkill',
+    'applySyllabus',
     'startAudit',
     'submitTurn',
     'submitReflection',
@@ -148,6 +153,7 @@ class FakeApiClient implements SelfInfinityApi {
     'getDevAudits',
     'reviewAudit',
     'voiceAvailable',
+    'guideVoice',
     'transcribe',
     'speech',
     'chatAct',
@@ -347,25 +353,222 @@ class FakeApiClient implements SelfInfinityApi {
     await _begin('expandSkill');
     final node = _nodes[skillId];
     if (node == null) throw const ApiException(404, 'skill not found');
-    if (!node.unexpanded) throw const ApiException(400, 'This node is already broken down.');
+    if (node.isLinked) {
+      throw const ApiException(400, 'This node is another course, or is being broken down already.');
+    }
+    final hasParts = _edges.any((e) => e.kind == SkillEdgeKind.contains && e.fromId == skillId);
     _nodes[skillId] = node.copyWith(unexpanded: false);
-    for (var i = 1; i <= 3; i++) {
-      final id = _nextNodeId++;
-      _nodes[id] = SkillNode(
-        id: id,
-        courseId: node.courseId,
-        slug: '${node.slug}-part-$i',
-        title: _shortTitle('${node.title} $i'),
-        description: 'Explain how part $i of ${node.title} works and why it holds.',
-        status: SkillStatus.locked,
-        nodeType: NodeType.concept,
-      );
-      _edges.add(
-        SkillEdge(fromId: skillId, toId: id, kind: SkillEdgeKind.contains, isPrimary: true),
+    // A node with parts is filled in: one part it was missing.
+    final titles = hasParts ? ['More ${node.title}'] : [for (var i = 1; i <= 3; i++) '${node.title} $i'];
+    for (final (i, title) in titles.indexed) {
+      _addPart(
+        node,
+        slug: hasParts ? '${node.slug}-more' : '${node.slug}-part-${i + 1}',
+        title: _shortTitle(title),
+        description: hasParts
+            ? 'What ${node.title} still lacked.'
+            : 'Explain how part ${i + 1} of ${node.title} works and why it holds.',
       );
     }
     _openNext(node.courseId);
-    return _mapOf(_courses.firstWhere((c) => c.id == node.courseId));
+    return _mapOf(_courseOf(node));
+  }
+
+  SkillNode _addPart(SkillNode parent, {required String slug, required String title, String description = ''}) {
+    final id = _nextNodeId++;
+    final taken = {
+      for (final n in _nodes.values)
+        if (n.courseId == parent.courseId) n.slug,
+    };
+    var free = slug;
+    for (var i = 2; taken.contains(free); i++) {
+      free = '$slug-$i';
+    }
+    final part = SkillNode(
+      id: id,
+      courseId: parent.courseId,
+      slug: free,
+      title: title,
+      description: description,
+      status: SkillStatus.locked,
+      nodeType: NodeType.concept,
+    );
+    _nodes[id] = part;
+    _edges.add(SkillEdge(fromId: parent.id, toId: id, kind: SkillEdgeKind.contains, isPrimary: true));
+    return part;
+  }
+
+  Course _courseOf(SkillNode node) => _courses.firstWhere((c) => c.id == node.courseId);
+
+  SkillNode _editable(int skillId) {
+    final node = _nodes[skillId];
+    if (node == null) throw const ApiException(404, 'skill not found');
+    return node;
+  }
+
+  /// The course's node with no contains parent.
+  SkillNode? _rootOf(int courseId) => _nodes.values
+      .where((n) => n.courseId == courseId)
+      .where((n) => !_edges.any((e) => e.kind == SkillEdgeKind.contains && e.toId == n.id))
+      .firstOrNull;
+
+  @override
+  Future<CourseMap> editSkill(int skillId, {String? title, String? description}) async {
+    await _begin('editSkill');
+    final node = _editable(skillId);
+    _nodes[skillId] = node.copyWith(title: title?.trim(), description: description?.trim());
+    return _mapOf(_courseOf(node));
+  }
+
+  @override
+  Future<CourseMap> deleteSkill(int skillId) async {
+    await _begin('deleteSkill');
+    final node = _editable(skillId);
+    if (_rootOf(node.courseId)?.id == skillId) {
+      throw const ApiException(400, 'This is the course itself: delete the course instead.');
+    }
+    final contains = _edges.where((e) => e.kind == SkillEdgeKind.contains).toList();
+    final gone = {skillId};
+    final pending = [skillId];
+    while (pending.isNotEmpty) {
+      final current = pending.removeLast();
+      for (final e in contains.where((e) => e.fromId == current)) {
+        final parents = contains.where((p) => p.toId == e.toId).map((p) => p.fromId);
+        if (!gone.contains(e.toId) && parents.every(gone.contains)) {
+          gone.add(e.toId);
+          pending.add(e.toId);
+        }
+      }
+    }
+    // A part that stays keeps its other parent, as its main one if need be.
+    final staying = {
+      for (final e in contains)
+        if (gone.contains(e.fromId) && !gone.contains(e.toId)) e.toId,
+    };
+    _edges.removeWhere((e) => gone.contains(e.fromId) || gone.contains(e.toId));
+    for (final id in staying) {
+      final edges = [
+        for (final e in _edges)
+          if (e.kind == SkillEdgeKind.contains && e.toId == id) e,
+      ];
+      if (edges.isNotEmpty && !edges.any((e) => e.isPrimary == true)) {
+        final first = edges.first;
+        _edges[_edges.indexOf(first)] = SkillEdge(
+          fromId: first.fromId,
+          toId: first.toId,
+          kind: first.kind,
+          isPrimary: true,
+        );
+      }
+    }
+    gone.forEach(_nodes.remove);
+    final audits = {
+      for (final a in _audits.values)
+        if (gone.contains(a.skillId)) a.id,
+    };
+    _audits.removeWhere((id, _) => audits.contains(id));
+    _principles.removeWhere((p) => audits.contains(p.sourceSessionId));
+    _openNext(node.courseId);
+    return _mapOf(_courseOf(node));
+  }
+
+  @override
+  Future<CourseMap> addSkillPart(int skillId, {required String title, String? description}) async {
+    await _begin('addSkillPart');
+    final node = _editable(skillId);
+    if (node.isLinked) throw const ApiException(400, 'This node is another course: add parts in that course.');
+    final slug = title.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-|-$'), '');
+    _addPart(node, slug: slug.isEmpty ? 'node' : slug, title: title.trim(), description: description?.trim() ?? '');
+    _openNext(node.courseId);
+    return _mapOf(_courseOf(node));
+  }
+
+  @override
+  Future<CourseMap> linkSkill(int skillId, int? courseId) async {
+    await _begin('linkSkill');
+    final node = _editable(skillId);
+    if (courseId != null) {
+      if (!_courses.any((c) => c.id == courseId)) throw const ApiException(400, 'No such course.');
+      if (courseId == node.courseId) throw const ApiException(400, 'A course cannot be inside itself.');
+      if (_rootOf(node.courseId)?.id == skillId) {
+        throw const ApiException(400, "This is a course's root: link one of its parts.");
+      }
+      if (_edges.any((e) => e.kind == SkillEdgeKind.contains && e.fromId == skillId)) {
+        throw const ApiException(
+          400,
+          'This node has parts of its own: delete them first, or link a node without parts.',
+        );
+      }
+      if (_coursesInside(courseId).contains(node.courseId)) {
+        throw const ApiException(400, 'That course already holds this one: the two would contain each other.');
+      }
+    }
+    _nodes[skillId] = node.copyWith(unexpanded: courseId == null ? null : false, linkedCourseId: () => courseId);
+    _syncLinks();
+    return _mapOf(_courseOf(node));
+  }
+
+  /// Every course reachable from [courseId] through its nodes' links.
+  Set<int> _coursesInside(int courseId) {
+    final seen = <int>{};
+    final pending = [courseId];
+    while (pending.isNotEmpty) {
+      final current = pending.removeLast();
+      for (final n in _nodes.values) {
+        final linked = n.linkedCourseId;
+        if (n.courseId == current && linked != null && seen.add(linked)) pending.add(linked);
+      }
+    }
+    return seen;
+  }
+
+  /// A linked node and its course are mastered together (contract #44).
+  void _syncLinks() {
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final node in _nodes.values.toList()) {
+        final linked = node.linkedCourseId;
+        final root = linked == null ? null : _rootOf(linked);
+        if (root == null) continue;
+        if (root.isMastered && !node.isMastered) {
+          _nodes[node.id] = node.copyWith(status: SkillStatus.mastered, masteryScore: root.masteryScore);
+          _openNext(node.courseId);
+          changed = true;
+        } else if (node.isMastered && !root.isMastered) {
+          for (final id in [root.id, ...descendantsOf(root.id, _edges)]) {
+            final n = _nodes[id];
+            if (n != null && !n.isMastered) {
+              _nodes[id] = n.copyWith(status: SkillStatus.mastered, testedOut: true);
+            }
+          }
+          _openNext(root.courseId);
+          changed = true;
+        }
+      }
+    }
+  }
+
+  @override
+  Future<CourseMap> applySyllabus(int courseId, {List<int> uploadIds = const []}) async {
+    await _begin('applySyllabus');
+    final course = _courses.where((c) => c.id == courseId).firstOrNull;
+    final root = _rootOf(courseId);
+    if (course == null || root == null) throw const ApiException(404, 'course not found');
+    final uploads = [for (final id in uploadIds) _uploads[id] ?? (throw const ApiException(404, 'upload not found'))];
+    // The fake reads no syllabus: each file adds one part named after it, a search adds one.
+    final titles = uploads.isEmpty ? ['${root.title} in Practice'] : [for (final u in uploads) _stem(u.filename)];
+    final have = {
+      for (final n in _nodes.values)
+        if (n.courseId == courseId) n.title.toLowerCase(),
+    };
+    for (final title in titles) {
+      if (have.add(title.toLowerCase())) {
+        _addPart(root, slug: title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-'), title: _shortTitle(title));
+      }
+    }
+    _openNext(courseId);
+    return _mapOf(course);
   }
 
   @override
@@ -547,22 +750,42 @@ class FakeApiClient implements SelfInfinityApi {
   Future<CheckInResult> checkInVoice(String transcript) async {
     await _begin('checkInVoice');
     _require(transcript.trim().isNotEmpty, 'transcript must not be blank');
+    return _saveCheckIn(_fillIn(transcript));
+  }
+
+  /// A said check-in fills in the day: what it found overwrites, the rest
+  /// stays (the server's `_fill_in`).
+  DailyCheckIn _fillIn(String transcript) {
+    final date = formatKstDate(_clock());
+    final old = _checkIns[date];
     final parsed = _parseTranscript(transcript);
-    return _saveCheckIn(
-      DailyCheckIn(
-        date: formatKstDate(_clock()),
-        sleepHours: parsed.sleepHours,
-        exercised: parsed.exercised,
-        dietNote: parsed.dietNote,
-        focus: parsed.focus,
-        stress: parsed.stress,
-        transcript: transcript,
-        source: CheckInSource.voice,
-        sleepQuality: _parseSleepQuality(transcript),
-        exerciseMinutes: _parseExerciseMinutes(transcript),
-        weightKg: _parseWeight(transcript),
-      ),
+    final minutes = _parseExerciseMinutes(transcript);
+    final earlier = old?.transcript;
+    return DailyCheckIn(
+      date: date,
+      sleepHours: parsed.sleepHours ?? old?.sleepHours,
+      exercised: parsed.exercised ?? ((minutes ?? 0) > 0 ? true : null) ?? old?.exercised,
+      dietNote: parsed.dietNote ?? old?.dietNote,
+      focus: parsed.focus ?? old?.focus,
+      stress: parsed.stress ?? old?.stress,
+      transcript: earlier == null || transcript.startsWith(earlier)
+          ? transcript
+          : '$earlier\n$transcript',
+      source: CheckInSource.voice,
+      sleepQuality: _parseSleepQuality(transcript) ?? old?.sleepQuality,
+      exerciseMinutes: minutes ?? old?.exerciseMinutes,
+      weightKg: _parseWeight(transcript) ?? old?.weightKg,
     );
+  }
+
+  /// The server's voice-log backstop: a check-in only when something was found.
+  void _logSaid(String said) {
+    final p = _parseTranscript(said);
+    final found = [
+      p.sleepHours, p.exercised, p.dietNote, p.focus, p.stress,
+      _parseSleepQuality(said), _parseExerciseMinutes(said), _parseWeight(said),
+    ].any((v) => v != null);
+    if (found) _saveCheckIn(_fillIn(said));
   }
 
   CheckInResult _saveCheckIn(DailyCheckIn checkIn) {
@@ -1479,6 +1702,12 @@ class FakeApiClient implements SelfInfinityApi {
   }
 
   @override
+  Future<String?> guideVoice() async {
+    await _begin('guideVoice');
+    return null;
+  }
+
+  @override
   Future<String> transcribe(Uint8List audio, {required String filename}) async {
     await _begin('transcribe');
     throw const ApiException(503, 'voice is not configured');
@@ -1523,7 +1752,10 @@ class FakeApiClient implements SelfInfinityApi {
     ];
     _chat.addAll(saved);
     final said = saved.where((m) => m.role == ChatRole.user).map((m) => m.content).join('\n');
-    if (said.isNotEmpty) _keepFacts(said);
+    if (said.isNotEmpty) {
+      _keepFacts(said);
+      _logSaid(said);
+    }
     return saved;
   }
 
@@ -1556,7 +1788,9 @@ class FakeApiClient implements SelfInfinityApi {
           audioIn: u['audio_in'] as int,
           audioOut: u['audio_out'] as int,
           cost: 0,
-          liveEquivalent: u['kind'] == 'guide' ? (u['seconds'] as num) / 60 * 0.05 : null,
+          otherCost: u['kind'] != 'guide'
+              ? null
+              : (u['seconds'] as num) / 60 * ('${u['model']}'.startsWith('gpt-live') ? 0.072 : 0.05),
         ),
     ];
     final guide = sessions.where((s) => s.kind == 'guide');
@@ -1566,7 +1800,9 @@ class FakeApiClient implements SelfInfinityApi {
       guideSessions: guide.length,
       guideMinutes: guideMinutes,
       guideCost: 0,
-      guideLiveEquivalent: guideMinutes * 0.05,
+      guideAllLive: guideMinutes * 0.05,
+      guideAllRealtime: guideMinutes * 0.072,
+      realtimePerMinute: 0.072,
       auditSessions: audits.length,
       auditMinutes: audits.fold(0.0, (t, s) => t + s.minutes),
       auditCost: 0,
@@ -1808,6 +2044,9 @@ class FakeApiClient implements SelfInfinityApi {
       if (!deleteNodes) _hiddenNodes[id] = node;
     }
     _edges.removeWhere((e) => nodes.contains(e.fromId) || nodes.contains(e.toId));
+    for (final n in _nodes.values.toList()) {
+      if (n.linkedCourseId == courseId) _nodes[n.id] = n.copyWith(linkedCourseId: () => null);
+    }
     if (deleteNodes) {
       final audits = {
         for (final a in _audits.values)
@@ -1966,6 +2205,7 @@ class FakeApiClient implements SelfInfinityApi {
     }
 
     final unlocked = _openNext(mastered.courseId);
+    _syncLinks();
 
     // Reward: base 10 × difficulty × 1.1^level (level = mastered nodes ~/ 5 + 1).
     final typeWeight = mastered.nodeType == NodeType.concept ? 2.0 : 1.0;
@@ -2559,9 +2799,20 @@ double? _parseSleepEn(String text) {
       final value = _englishNumbers[token] ?? double.tryParse(token);
       if (value != null && value >= 0 && value <= 14) return value;
     }
+    // "slept from 11 to 7": the clock hours apart, on a 12-hour dial.
+    final span = _sleepSpanPattern.firstMatch(sentence);
+    if (span != null) {
+      final hours = (int.parse(span.group(2)!) - int.parse(span.group(1)!)) % 12;
+      if (hours > 0) return hours.toDouble();
+    }
   }
   return null;
 }
+
+final RegExp _sleepSpanPattern = RegExp(
+  r'\bfrom (\d{1,2})(?::\d\d)?\s*(?:pm|am)? (?:to|until|till) (\d{1,2})\b',
+  caseSensitive: false,
+);
 
 /// `didn't exercise` / `no exercise` / `skipped the gym` / `didn't work out`
 /// → false; `exercised` / `worked out` / `went to the gym` / `went for a run`

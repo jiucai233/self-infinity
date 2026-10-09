@@ -104,6 +104,40 @@ class HttpApi implements SelfInfinityApi {
     parse: (j) => CourseMap.fromJson(_object(j)),
   );
 
+  @override
+  Future<CourseMap> editSkill(int skillId, {String? title, String? description}) => _send(
+    'PATCH',
+    '/skills/$skillId',
+    body: {'title': ?title, 'description': ?description},
+    parse: (j) => CourseMap.fromJson(_object(j)),
+  );
+
+  @override
+  Future<CourseMap> deleteSkill(int skillId) =>
+      _send('DELETE', '/skills/$skillId', parse: (j) => CourseMap.fromJson(_object(j)));
+
+  @override
+  Future<CourseMap> addSkillPart(int skillId, {required String title, String? description}) => _post(
+    '/skills/$skillId/children',
+    body: {'title': title, 'description': ?description},
+    parse: (j) => CourseMap.fromJson(_object(j)),
+  );
+
+  @override
+  Future<CourseMap> linkSkill(int skillId, int? courseId) => _send(
+    'PUT',
+    '/skills/$skillId/link',
+    body: {'course_id': courseId},
+    parse: (j) => CourseMap.fromJson(_object(j)),
+  );
+
+  @override
+  Future<CourseMap> applySyllabus(int courseId, {List<int> uploadIds = const []}) => _post(
+    '/courses/$courseId/syllabus',
+    body: {'upload_ids': uploadIds},
+    parse: (j) => CourseMap.fromJson(_object(j)),
+  );
+
   // -- 7–9: audits ------------------------------------------------------------
 
   @override
@@ -352,6 +386,15 @@ class HttpApi implements SelfInfinityApi {
   @override
   Future<bool> voiceAvailable() =>
       _get('/voice', parse: (j) => _object(j)['available'] == true);
+
+  @override
+  Future<String?> guideVoice() => _get(
+    '/voice',
+    parse: (j) {
+      final o = _object(j);
+      return o['available'] == true ? (o['guide'] == 'realtime' ? 'realtime' : 'live') : null;
+    },
+  );
 
   @override
   Future<String> transcribe(Uint8List audio, {required String filename}) => _send(

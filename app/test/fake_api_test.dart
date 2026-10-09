@@ -554,8 +554,7 @@ void main() {
     });
 
     test('sleep hours: digits, decimals and number words followed by hours / h', () async {
-      final api = newApi();
-      Future<double?> sleep(String t) async => (await api.checkInVoice(t)).checkin.sleepHours;
+      Future<double?> sleep(String t) async => (await newApi().checkInVoice(t)).checkin.sleepHours;
       expect(await sleep('I slept 7 hours'), 7);
       expect(await sleep('I slept 6.5 hours'), 6.5);
       expect(await sleep('I slept 8h'), 8);
@@ -569,8 +568,7 @@ void main() {
     });
 
     test('exercise: negative forms win, positive forms need a verb', () async {
-      final api = newApi();
-      Future<bool?> exercised(String t) async => (await api.checkInVoice(t)).checkin.exercised;
+      Future<bool?> exercised(String t) async => (await newApi().checkInVoice(t)).checkin.exercised;
       expect(await exercised("I didn't exercise"), isFalse);
       expect(await exercised('No exercise today'), isFalse);
       expect(await exercised('I skipped the gym'), isFalse);
@@ -584,8 +582,7 @@ void main() {
     });
 
     test('diet: the meal plus the food after had / ate', () async {
-      final api = newApi();
-      Future<String?> diet(String t) async => (await api.checkInVoice(t)).checkin.dietNote;
+      Future<String?> diet(String t) async => (await newApi().checkInVoice(t)).checkin.dietNote;
       expect(await diet('I had ramen for lunch'), 'lunch: ramen');
       expect(await diet('I ate a sandwich for breakfast'), 'breakfast: sandwich');
       expect(await diet('For dinner I had pizza with friends'), 'dinner: pizza with friends');
@@ -596,9 +593,8 @@ void main() {
     test(
       'focus: "focused well" → 4, "couldn\'t focus" → 2; stress: stressed → 4, relaxed → 2',
       () async {
-        final api = newApi();
-        Future<int?> focus(String t) async => (await api.checkInVoice(t)).checkin.focus;
-        Future<int?> stress(String t) async => (await api.checkInVoice(t)).checkin.stress;
+        Future<int?> focus(String t) async => (await newApi().checkInVoice(t)).checkin.focus;
+        Future<int?> stress(String t) async => (await newApi().checkInVoice(t)).checkin.stress;
         expect(await focus('I focused well today'), 4);
         expect(await focus("I couldn't focus"), 2);
         expect(await focus('Focus was average'), isNull);
@@ -1017,7 +1013,7 @@ void main() {
       for (final name in FakeApiClient.methodNames) {
         api.failNext(method: name); // asserts on unknown names
       }
-      expect(FakeApiClient.methodNames, hasLength(47));
+      expect(FakeApiClient.methodNames, hasLength(53));
       expect(() => api.failNext(method: 'nope'), throwsA(isA<AssertionError>()));
     });
   });
@@ -1137,6 +1133,24 @@ void main() {
       await api.deleteLifeFact(f.id);
       expect((await failure(() => api.deleteLifeFact(f.id))).statusCode, 404);
       expect((await failure(() => api.addLifeFact('   '))).statusCode, 422);
+    });
+  });
+
+  group('a day said in pieces (#12, #36)', () {
+    test('a later piece fills the day in; bed and wake times are hours', () async {
+      final api = newApi();
+      await api.checkInVoice('I slept from 11 to 7');
+      await api.checkInVoice('I ran for 20 minutes');
+      final day = (await api.getTodayCheckIn())!;
+      expect((day.sleepHours, day.exerciseMinutes, day.exercised), (8.0, 20, true));
+    });
+
+    test('the voice log logs what the Guide only talked about, and nothing else', () async {
+      final api = newApi();
+      await api.chatLog([(role: ChatRole.user, content: 'What is a convolution?')]);
+      expect(await api.getTodayCheckIn(), isNull);
+      await api.chatLog([(role: ChatRole.user, content: 'Morning! I slept from 11 to 7.')]);
+      expect((await api.getTodayCheckIn())!.sleepHours, 8.0);
     });
   });
 }

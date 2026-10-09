@@ -67,7 +67,7 @@ def load_uploads(session: Session, upload_ids: list[int] | None) -> list[Upload]
     return uploads
 
 
-def _syllabus_text(uploads: list[Upload]) -> SyllabusText:
+def syllabus_text(uploads: list[Upload]) -> SyllabusText:
     """One document for the Planner. A single file is passed as is; several are labelled by name."""
     if len(uploads) == 1:
         return SyllabusText(source=uploads[0].filename, text=uploads[0].text)
@@ -168,7 +168,9 @@ def _run_generate_course(
     return _save(
         session,
         "assistant",
-        t("world_ready", title=quote(root.title), count=len(generated.nodes)),
+        t("world_merged", title=quote(root.title), added=generated.added)
+        if generated.merged
+        else t("world_ready", title=quote(root.title), count=len(generated.nodes)),
         "planner",
         {
             "type": "course",
@@ -258,7 +260,7 @@ def handle_message(
     if course_topic is not None:
         topic = course_topic.strip() or PurePath(uploads[0].filename).stem
         first = _save(session, "assistant", t("build_world", topic=quote(topic)), "front_desk")
-        syllabus = _syllabus_text(uploads) if uploads else None
+        syllabus = syllabus_text(uploads) if uploads else None
         built = _run_generate_course(session, topic, provider_for, search_provider_for, syllabus)
         return [message_out(m) for m in (user, first, built)]
 
@@ -293,7 +295,7 @@ def handle_message(
     if uploads and intent in ("generate_course", "none"):
         # The file replaces the Syllabus Finder: the topic falls back to the first file's name.
         topic = topic or PurePath(uploads[0].filename).stem
-        result.append(_run_generate_course(session, topic, provider_for, search_provider_for, _syllabus_text(uploads)))
+        result.append(_run_generate_course(session, topic, provider_for, search_provider_for, syllabus_text(uploads)))
     elif intent == "generate_course" and topic:
         result.append(_run_generate_course(session, topic, provider_for, search_provider_for))
     elif intent == "checkin":
@@ -349,7 +351,10 @@ def handle_action(
     elif intent == "open_map":
         result.append(_save(session, "assistant", t("opening_map"), VOICE_AGENT, {"type": "navigate", "scene": "map"}))
     elif intent == "checkin":
-        words = said.strip() or str(args.get("said") or "").strip()
+        # The Guide's summary covers what was said earlier in the talk; the user's last words are
+        # their own. Both go to the converter, which keeps only what was said.
+        summary = str(args.get("said") or "").strip()
+        words = "\n".join(dict.fromkeys(w for w in (summary, said.strip()) if w))
         if not words:
             raise ValueError("checkin needs what the user said")
         result.append(_run_checkin(session, words, provider_for))
@@ -363,10 +368,14 @@ def handle_action(
 
 
 def log_voice(
-    session: Session, lines: list[tuple[str, str]], remember: Remember | None = None
+    session: Session,
+    lines: list[tuple[str, str]],
+    remember: Remember | None = None,
+    log_said: Remember | None = None,
 ) -> list[ChatMessageOut]:
     """Keeps a spoken exchange with the realtime Guide in the history. No LLM here; what the user
-    said goes to `remember`."""
+    said goes to `remember` (lasting facts) and `log_said` (a check-in when it reports the day and
+    the Guide did not log it: the client only sends lines no tool call has read)."""
     saved = [
         _save(session, role, content.strip(), VOICE_AGENT if role == "assistant" else None)
         for role, content in lines
@@ -375,6 +384,8 @@ def log_voice(
     said = "\n".join(m.content for m in saved if m.role == "user")
     if remember is not None and said:
         remember(said)
+    if log_said is not None and said:
+        log_said(said)
     return [message_out(m) for m in saved]
 
 

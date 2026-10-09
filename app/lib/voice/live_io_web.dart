@@ -55,6 +55,7 @@ class _WebLiveIo implements LiveIo {
     LiveEndpoint endpoint, {
     required bool playReplies,
     void Function(double level)? onLevel,
+    void Function(double level)? onReplyLevel,
   }) async {
     final microphone = await web.window.navigator.mediaDevices
         .getUserMedia(web.MediaStreamConstraints(audio: true.toJS))
@@ -66,8 +67,10 @@ class _WebLiveIo implements LiveIo {
         final speaker = _speaker ??= (web.HTMLAudioElement()..autoplay = true);
         peer.ontrack = ((web.RTCTrackEvent e) {
           final streams = e.streams.toDart;
-          speaker.srcObject = streams.isEmpty ? web.MediaStream([e.track].toJS) : streams.first;
+          final stream = streams.isEmpty ? web.MediaStream([e.track].toJS) : streams.first;
+          speaker.srcObject = stream;
           unawaited(speaker.play().toDart.then((_) {}, onError: (_) {}));
+          if (onReplyLevel != null) link._replyMeter = _WebLiveLink._meter(_audio, stream, onReplyLevel);
         }).toJS;
         link._speaker = speaker;
       }
@@ -88,6 +91,7 @@ class _WebLiveIo implements LiveIo {
 
       final offer = await peer.createOffer().toDart;
       await peer.setLocalDescription(web.RTCLocalSessionDescriptionInit(type: 'offer', sdp: offer!.sdp)).toDart;
+      await _gathered(peer);
       final response = await _post(endpoint, peer.localDescription!.sdp, 'application/sdp');
       final answer = (await response.text().toDart).toDart;
       if (response.status != 201 && response.status != 200) {
@@ -95,12 +99,26 @@ class _WebLiveIo implements LiveIo {
       }
       await peer.setRemoteDescription(web.RTCSessionDescriptionInit(type: 'answer', sdp: answer)).toDart;
       await opened.future.timeout(const Duration(seconds: 15));
-      if (onLevel != null) link._meter(_audio, onLevel);
+      if (onLevel != null) link._micMeter = _WebLiveLink._meter(_audio, microphone, onLevel);
       return link;
     } on Object {
       await link.close();
       rethrow;
     }
+  }
+
+  /// Waits until the offer holds its ICE candidates (GPT-Live answers only
+  /// the candidates it is sent); at most [iceWait], then goes with what it has.
+  static const Duration iceWait = Duration(seconds: 2);
+
+  Future<void> _gathered(web.RTCPeerConnection peer) async {
+    if (peer.iceGatheringState == 'complete') return;
+    final done = Completer<void>();
+    peer.onicegatheringstatechange = ((web.Event _) {
+      if (peer.iceGatheringState == 'complete' && !done.isCompleted) done.complete();
+    }).toJS;
+    await done.future.timeout(iceWait, onTimeout: () {});
+    peer.onicegatheringstatechange = null;
   }
 
   Future<web.Response> _post(LiveEndpoint endpoint, String body, String contentType, {web.AbortSignal? signal}) {
@@ -216,7 +234,8 @@ class _WebLiveLink implements LiveLink {
   final web.MediaStream _microphone;
   web.RTCDataChannel? _channel;
   web.HTMLAudioElement? _speaker;
-  Timer? _meterTimer;
+  Timer? _micMeter;
+  Timer? _replyMeter;
   final _events = StreamController<Map<String, Object?>>.broadcast();
   bool _isClosed = false;
 
@@ -236,11 +255,12 @@ class _WebLiveLink implements LiveLink {
     if (!_events.isClosed) unawaited(_events.close());
   }
 
-  void _meter(web.AudioContext context, void Function(double level) onLevel) {
+  /// Polls [stream]'s loudness every 50 ms into [onLevel], 0–1.
+  static Timer _meter(web.AudioContext context, web.MediaStream stream, void Function(double level) onLevel) {
     final analyser = context.createAnalyser()..fftSize = 1024;
-    context.createMediaStreamSource(_microphone).connect(analyser);
+    context.createMediaStreamSource(stream).connect(analyser);
     final samples = Float32List(1024).toJS;
-    _meterTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+    return Timer.periodic(const Duration(milliseconds: 50), (_) {
       analyser.getFloatTimeDomainData(samples);
       final data = samples.toDart;
       var sum = 0.0;
@@ -271,7 +291,8 @@ class _WebLiveLink implements LiveLink {
   Future<void> close() async {
     if (_isClosed) return;
     _isClosed = true;
-    _meterTimer?.cancel();
+    _micMeter?.cancel();
+    _replyMeter?.cancel();
     try {
       _channel?.close();
       _peer.close();

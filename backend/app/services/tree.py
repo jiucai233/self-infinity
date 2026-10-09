@@ -161,8 +161,9 @@ def course_graph(session: Session, course_id: int) -> tuple[list[SkillNode], lis
 #
 # Every course carries a learning order, a list laid over its tree: what a node contains comes
 # before it, so a chapter follows its sections and the root, the course itself, comes last; a
-# requires edge puts its prerequisite first; otherwise the planner's order (it follows the
-# outline) decides, which nodes keep as their ids.
+# requires edge puts its prerequisite first; otherwise the place in the tree decides: siblings
+# in the planner's order (it follows the outline, and nodes keep it as their ids), and the parts
+# of a node broken down later where that node stands, not after everything older.
 #
 # The root's children are the chapters, and the player picks which chapter to work on: each
 # chapter has one open node, the first one of it in that order not yet mastered (a chapter not
@@ -181,15 +182,33 @@ def course_order(session: Session, course_id: int) -> list[SkillNode]:
             before[edge.from_id].add(edge.to_id)  # the parts before what contains them
         else:
             before[edge.to_id].add(edge.from_id)  # the prerequisite first
+    place = _tree_places(session, nodes)
     order: list[SkillNode] = []
     left = set(nodes)
     while left:
         ready = [i for i in left if not before[i] & left]
         # A requires edge running against the tree can close a loop; the earliest node breaks it.
-        pick = min(ready or left)
+        pick = min(ready or left, key=lambda i: (place.get(i, len(place)), i))
         order.append(nodes[pick])
         left.remove(pick)
     return order
+
+
+def _tree_places(session: Session, nodes: dict[int, SkillNode]) -> dict[int, int]:
+    """node id -> its place in a pre-order walk of the main-parent tree, siblings by id."""
+    main = {c: p for c, p in _main_parents(session).items() if c in nodes and p in nodes}
+    children: dict[int, list[int]] = {}
+    for child, parent in main.items():
+        children.setdefault(parent, []).append(child)
+    place: dict[int, int] = {}
+    stack = sorted((i for i in nodes if i not in main), reverse=True)
+    while stack:
+        current = stack.pop()
+        if current in place:
+            continue
+        place[current] = len(place)
+        stack.extend(sorted(children.get(current, []), reverse=True))
+    return place
 
 
 def open_next(session: Session, course_id: int) -> list[int]:

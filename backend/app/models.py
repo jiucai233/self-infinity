@@ -134,10 +134,14 @@ class SkillNode(SQLModel, table=True):
     status: SkillStatus = SkillStatus.locked
     node_type: NodeType = NodeType.concept
     mastery_score: int | None = None
-    # A category the Planner left to break down later (POST /skills/{id}/expand); no children yet.
+    # A category whose parts are not all listed yet (POST /skills/{id}/expand adds them): the
+    # Planner left it for later, or a syllabus or the player added only some of its parts.
     unexpanded: bool | None = None
     # Mastered by passing a challenge on a node above it, not by its own audit.
     tested_out: bool | None = None
+    # This node is another of the player's courses ("Computer Vision" inside a CS course): its
+    # parts are that course's tree, and it is mastered with that course (app/services/course_edit.py).
+    linked_course_id: int | None = None
 
 
 class SkillEdge(SQLModel, table=True):

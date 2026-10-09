@@ -8,6 +8,7 @@ import 'package:self_infinity/api/api_exception.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
+import 'package:self_infinity/voice/live_guide.dart';
 import 'package:self_infinity/voice/live_link.dart';
 import 'package:self_infinity/voice/pause_detector.dart';
 import 'package:self_infinity/voice/realtime_guide.dart';
@@ -46,6 +47,9 @@ class _FakeLiveIo implements LiveIo {
   String? path;
   bool? playReplies;
   void Function(double level)? onLevel;
+  void Function(double level)? onReplyLevel;
+  /// A path whose sessions are refused (the others connect).
+  String? refusePath;
   /// Made by [connect], inside the test's zone.
   late _FakeLink link;
   Object? connectError;
@@ -62,12 +66,15 @@ class _FakeLiveIo implements LiveIo {
     LiveEndpoint endpoint, {
     required bool playReplies,
     void Function(double level)? onLevel,
+    void Function(double level)? onReplyLevel,
   }) async {
     connects++;
     path = endpoint.url.path;
     this.playReplies = playReplies;
     this.onLevel = onLevel;
+    this.onReplyLevel = onReplyLevel;
     if (connectError case final e?) throw e;
+    if (refusePath != null && endpoint.url.path.endsWith(refusePath!)) throw StateError('refused');
     return link = _FakeLink();
   }
 
@@ -95,6 +102,11 @@ class _LiveApi extends FakeApiClient {
 
   @override
   Future<bool> voiceAvailable() async => available;
+
+  String guide = 'live';
+
+  @override
+  Future<String?> guideVoice() async => available ? guide : null;
 
   @override
   LiveEndpoint? liveEndpoint(String path) =>
@@ -419,6 +431,159 @@ void main() {
       expect(io.link.closed, isTrue);
       expect(api.usage, hasLength(1));
       expect(guide.state, VoiceModeState.off);
+    });
+  });
+
+  group('the home page: the Guide on GPT-Live', () {
+    late List<List<ChatMessage>> shown;
+    late VoiceModeController turns;
+    late LiveGuideMode guide;
+    late DateTime now;
+
+    LiveGuideMode make(_LiveApi on) => LiveGuideMode(
+      api: on,
+      io: io,
+      onMessages: shown.add,
+      fallback: RealtimeGuideMode(api: on, io: io, fallback: turns, onMessages: shown.add),
+      clock: () => now,
+    );
+
+    setUp(() {
+      shown = [];
+      now = DateTime.utc(2026, 10, 8, 3);
+      turns = VoiceModeController(voice: device, onHeard: (_) async => (speak: null, keepGoing: true));
+      guide = make(api);
+    });
+
+    tearDown(() => guide.dispose());
+
+    Map<String, Object?> backend(String delegation, Map<String, Object?> event) =>
+        {'type': 'response.event', 'delegation_id': delegation, 'event': event};
+
+    test('it connects to GPT-Live and follows who is talking by the sound of her voice', () async {
+      expect(await guide.start(), isTrue);
+      expect(guide.isLive, isTrue);
+      expect(io.path, '/api/voice/live/guide');
+      expect(io.playReplies, isTrue);
+      expect(guide.state, VoiceModeState.listening);
+      io.link.emit({'type': 'session.input_transcript.delta', 'delta': 'Hello', 'start_ms': 0, 'end_ms': 300});
+      expect(guide.heard, 'Hello');
+      io.onReplyLevel!(0.5);
+      expect(guide.state, VoiceModeState.speaking);
+      io.onReplyLevel!(0.01); // a gap between words
+      expect(guide.state, VoiceModeState.speaking);
+      await guide.interrupt();
+      expect(io.link.sentTypes, ['session.instructions.append']);
+      now = now.add(const Duration(milliseconds: 800));
+      io.onReplyLevel!(0.01);
+      expect(guide.state, VoiceModeState.listening);
+    });
+
+    test('small talk is kept turn by turn, and the session is billed by its seconds', () async {
+      await guide.start();
+      final link = io.link;
+      link.emit({'type': 'session.input_transcript.delta', 'delta': 'Hi '});
+      link.emit({'type': 'session.input_transcript.delta', 'delta': 'there'});
+      link.emit({'type': 'session.output_transcript.delta', 'delta': 'Hi! What shall '});
+      link.emit({'type': 'session.output_transcript.delta', 'delta': 'we learn today?'});
+      expect(api.logs, isEmpty); // her turn may go on
+      link.emit({'type': 'session.input_transcript.delta', 'delta': 'Maths'});
+      await pumpEventQueue();
+      expect([for (final l in api.logs.single) l.content], ['Hi there', 'Hi! What shall we learn today?']);
+
+      link.emit({'type': 'session.usage.updated', 'usage': {'seconds': 12}});
+      final stopping = guide.stop();
+      link.emit({'type': 'session.closed', 'reason': 'close_requested', 'usage': {'seconds': 15}});
+      await stopping;
+      expect(link.sentTypes, contains('session.close'));
+      expect(link.closed, isTrue);
+      expect(api.usage.last, containsPair('model', 'gpt-live-1'));
+      expect(api.usage.last, containsPair('seconds', 15));
+      // Their last words, which she never answered, are kept on stop.
+      expect([for (final l in api.logs.last) l.content], ['Maths']);
+    });
+
+    test("the backend's tool call runs here with their words; the result goes back and it goes on", () async {
+      await guide.start();
+      final link = io.link;
+      link.emit({'type': 'session.input_transcript.delta', 'delta': 'I slept from 11 to 7'});
+      link.emit({'type': 'session.delegation.created', 'delegation': {'id': 'd1', 'target': 'responses'}});
+      expect(guide.state, VoiceModeState.thinking);
+      link.emit(backend('d1', {
+        'type': 'response.output_item.done',
+        'item': {
+          'type': 'function_call',
+          'name': 'log_checkin',
+          'call_id': 'c1',
+          'arguments': '{"said":"I slept from 11 to 7"}',
+        },
+      }));
+      link.emit(backend('d1', {
+        'type': 'response.completed',
+        'response': {
+          'id': 'r1',
+          'output': <Object>[],
+          'usage': {'input_tokens': 1500, 'input_tokens_details': {'cached_tokens': 1000}, 'output_tokens': 40},
+        },
+      }));
+      await pumpEventQueue();
+
+      final (intent, args, said) = api.acts.single;
+      expect((intent, args['said'], said), ('checkin', 'I slept from 11 to 7', 'I slept from 11 to 7'));
+      expect(shown.single.map((m) => m.content), ['I slept from 11 to 7', 'Logged: sleep 7 h']);
+      final output = link.sent.firstWhere((e) => e['type'] == 'response.item.create');
+      expect(output['item'], {
+        'type': 'function_call_output',
+        'call_id': 'c1',
+        'output': jsonEncode({'done': 'Logged: sleep 7 h', 'navigating': false}),
+      });
+      expect(link.sentTypes.last, 'response.create');
+      expect(api.usage.last, containsPair('text_in', 1500));
+      expect(api.usage.last, containsPair('text_in_cached', 1000));
+      expect(api.usage.last, containsPair('text_out', 40));
+
+      // Her answer is kept; their words, already saved by the tool, are not saved twice.
+      link.emit({'type': 'session.output_transcript.delta', 'delta': 'Eight hours, nice.'});
+      link.emit({'type': 'session.input_transcript.delta', 'delta': 'Thanks'});
+      await pumpEventQueue();
+      expect([for (final l in api.logs.single) l.content], ['Eight hours, nice.']);
+    });
+
+    test('it closes itself after a minute of silence', () async {
+      await guide.start();
+      now = now.add(const Duration(seconds: 59));
+      guide.checkIdle();
+      expect(guide.isLive, isTrue);
+      now = now.add(const Duration(seconds: 2));
+      guide.checkIdle();
+      await pumpEventQueue();
+      expect(io.link.sentTypes, contains('session.close'));
+      expect(guide.isLive, isFalse);
+    });
+
+    test('a server that prefers Realtime gets the Realtime Guide', () async {
+      api.guide = 'realtime';
+      expect(await guide.start(), isTrue);
+      expect(guide.isLive, isFalse);
+      expect(io.path, '/api/voice/realtime/guide');
+      expect(guide.state, VoiceModeState.listening);
+      await guide.stop();
+      expect(guide.state, VoiceModeState.off);
+    });
+
+    test('a GPT-Live session that cannot be opened falls back to Realtime', () async {
+      io.refusePath = '/voice/live/guide';
+      expect(await guide.start(), isTrue);
+      expect(guide.isLive, isFalse);
+      expect(io.connects, 2);
+      expect(io.path, '/api/voice/realtime/guide');
+    });
+
+    test("without live voice it takes turns over the app's voice", () async {
+      api.available = false;
+      expect(await guide.start(), isTrue);
+      expect(io.connects, 0);
+      expect(device.listenCalls, 1);
     });
   });
 }

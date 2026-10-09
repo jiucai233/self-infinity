@@ -6,8 +6,8 @@ library;
 /// the language).
 typedef LiveEndpoint = ({Uri url, Map<String, String> headers});
 
-/// One open session with the Realtime API: audio flows on its own; JSON
-/// events travel both ways here.
+/// One open session with the Realtime API or GPT-Live: audio flows on its
+/// own; JSON events travel both ways here.
 abstract class LiveLink {
   /// The server's events, decoded.
   Stream<Map<String, Object?>> get events;
@@ -32,11 +32,14 @@ abstract class LiveIo {
 
   /// Opens a session: the microphone goes in, and with [playReplies] the
   /// model's voice comes out of the speaker. [endpoint] takes the SDP offer and
-  /// answers with OpenAI's SDP. [onLevel] gets the microphone's loudness, 0–1.
+  /// answers with OpenAI's SDP. [onLevel] gets the microphone's loudness, 0–1;
+  /// [onReplyLevel] the loudness of the model's voice as it plays (GPT-Live
+  /// sends no event when it starts or stops speaking).
   Future<LiveLink> connect(
     LiveEndpoint endpoint, {
     required bool playReplies,
     void Function(double level)? onLevel,
+    void Function(double level)? onReplyLevel,
   });
 
   /// Plays the raw 24 kHz 16-bit PCM that [endpoint] streams back for the JSON

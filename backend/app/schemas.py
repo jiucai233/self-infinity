@@ -87,11 +87,68 @@ class SkillNodeOut(_Out):
     mastery_score: int | None
     unexpanded: bool = False
     tested_out: bool = False
+    linked_course_id: int | None = None
 
     @field_validator("unexpanded", "tested_out", mode="before")
     @classmethod
     def _null_is_false(cls, value):
         return bool(value)
+
+
+# ---------------------------------------------------------------- editing a course (#41-#45)
+
+NODE_TITLE_MAX = 48
+NODE_DESCRIPTION_MAX = 400
+
+
+def _node_title(value: str) -> str:
+    value = " ".join(_not_blank(value).split())
+    if len(value) > NODE_TITLE_MAX:
+        raise ValueError(f"at most {NODE_TITLE_MAX} characters")
+    return value
+
+
+def _node_description(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = " ".join(value.split())
+    if len(value) > NODE_DESCRIPTION_MAX:
+        raise ValueError(f"at most {NODE_DESCRIPTION_MAX} characters")
+    return value
+
+
+class SkillEditIn(BaseModel):
+    """PATCH /skills/{id}: what is given changes."""
+
+    title: str | None = None
+    description: str | None = None
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, value: str | None) -> str | None:
+        return None if value is None else _node_title(value)
+
+    _validate_description = field_validator("description")(_node_description)
+
+
+class SkillChildIn(BaseModel):
+    title: str
+    description: str | None = None
+
+    _validate_title = field_validator("title")(_node_title)
+    _validate_description = field_validator("description")(_node_description)
+
+
+class SkillLinkIn(BaseModel):
+    """PUT /skills/{id}/link: the course this node is, or null to unlink."""
+
+    course_id: int | None
+
+
+class CourseSyllabusIn(BaseModel):
+    """POST /courses/{id}/syllabus: uploaded files, or none to search for a syllabus."""
+
+    upload_ids: list[int] = []
 
 
 class SkillEdgeOut(_Out):
@@ -108,6 +165,14 @@ class CourseGraphOut(BaseModel):
     course: CourseOut
     nodes: list[SkillNodeOut]
     edges: list[SkillEdgeOut]
+
+
+class GeneratedCourseOut(CourseGraphOut):
+    """POST /skills/generate. `merged`: the topic asked for a course the player has, so that
+    course answers, with `added` nodes from the new reference."""
+
+    merged: bool = False
+    added: int = 0
 
 
 class RecommendationOut(BaseModel):
@@ -790,6 +855,8 @@ class JournalEntryOut(_Out):
 class VoiceStatusOut(BaseModel):
     # False: no OPENAI_API_KEY; the app uses the device's own speech.
     available: bool
+    # Which voice the home Guide opens first: "live" (GPT-Live) or "realtime".
+    guide: Literal["live", "realtime"] = "live"
 
 
 class TranscriptOut(BaseModel):
@@ -827,17 +894,24 @@ class DevVoiceSessionOut(BaseModel):
     audio_in: int
     audio_out: int
     cached_share: float | None
-    # Dollars at list price; live_equivalent: the same minutes on GPT-Live (Guide sessions only).
+    # Dollars at list price. backend_cost: a GPT-Live session's text backend (in `cost`).
+    # other_cost: the same Guide session on the other voice (GPT-Live ↔ Realtime); None for audits.
     cost: float
-    live_equivalent: float | None
+    backend_cost: float | None
+    other_cost: float | None
 
 
 class DevVoiceTotalsOut(BaseModel):
     guide_sessions: int
     guide_minutes: float
     guide_cost: float
-    guide_live_equivalent: float
     guide_cost_per_minute: float | None
+    # Every Guide minute on one voice: what ran there as billed, the rest estimated.
+    guide_all_live: float
+    guide_all_realtime: float
+    # The Realtime rate the estimates use, and whether it was measured on this account.
+    realtime_per_minute: float
+    realtime_rate_measured: bool
     guide_cached_share: float | None
     audit_sessions: int
     audit_minutes: float

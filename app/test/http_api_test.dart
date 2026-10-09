@@ -183,6 +183,38 @@ void main() {
       expect(r.nodes, hasLength(1));
     });
 
+    test('41–45: editing a course answers its map', () async {
+      final h = ok({
+        'course': courseJson,
+        'nodes': [
+          {...nodeJson, 'linked_course_id': 4},
+        ],
+        'edges': [edgeJson],
+      });
+      void sent(String method, String path, Object? body) {
+        expect((h.last.method, h.last.url.path), (method, path));
+        expect(h.lastBody, body);
+      }
+
+      final edited = await h.api.editSkill(3, title: 'Algebra II');
+      sent('PATCH', '/api/skills/3', {'title': 'Algebra II'});
+      expect(edited.nodes.single.linkedCourseId, 4);
+
+      await h.api.deleteSkill(3);
+      expect((h.last.method, h.last.url.path), ('DELETE', '/api/skills/3'));
+
+      await h.api.addSkillPart(3, title: 'Matrices');
+      sent('POST', '/api/skills/3/children', {'title': 'Matrices'});
+
+      await h.api.linkSkill(3, null);
+      sent('PUT', '/api/skills/3/link', {'course_id': null});
+
+      await h.api.applySyllabus(1, uploadIds: [7]);
+      sent('POST', '/api/courses/1/syllabus', {
+        'upload_ids': [7],
+      });
+    });
+
     test('5 listSkills: GET /skills with and without course_id', () async {
       final h = ok([nodeJson]);
       await h.api.listSkills(courseId: 3);
@@ -463,6 +495,13 @@ void main() {
   });
 
   group('voice (#35)', () {
+    test('GET /voice says which voice the Guide opens', () async {
+      expect(await ok({'available': true, 'guide': 'live'}).api.guideVoice(), 'live');
+      expect(await ok({'available': true, 'guide': 'realtime'}).api.guideVoice(), 'realtime');
+      expect(await ok({'available': true}).api.guideVoice(), 'live'); // a server from before
+      expect(await ok({'available': false, 'guide': 'live'}).api.guideVoice(), isNull);
+    });
+
     test('GET /voice', () async {
       final h = ok({'available': true});
       expect(await h.api.voiceAvailable(), isTrue);

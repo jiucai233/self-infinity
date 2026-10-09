@@ -1,5 +1,6 @@
 /// The life tree (`docs/ux-chat.md` §6): you in the middle, your courses
-/// around you and every node of those courses beyond that. Main quests are
+/// around you and every node of those courses beyond that. A course that is
+/// a node of another one (`SkillNode.linkedCourseId`) grows from that node. Main quests are
 /// not points on it — they live on the character sheet; a course only
 /// remembers the quest it serves ([LifeNode.goalId]).
 ///
@@ -106,7 +107,7 @@ class LifeStats {
 class LifeTree {
   const LifeTree._(this.nodes, this.stats);
 
-  /// Every node, `me` first, then breadth first (parents before children).
+  /// Every node, `me` first, parents before children.
   final List<LifeNode> nodes;
   final LifeStats stats;
 
@@ -155,8 +156,28 @@ class LifeTree {
       }
     }
 
-    for (final map in sorted) {
-      _addCourse(nodes, map, selfKey, owner[map.course.id]?.id, failed);
+    // A course inside another grows from the node that is it, once that
+    // node is placed; the others hang from you.
+    final host = <int, String>{};
+    for (final m in sorted) {
+      for (final n in m.nodes) {
+        final linked = n.linkedCourseId;
+        if (linked != null && known.contains(linked) && linked != m.course.id) {
+          host.putIfAbsent(linked, () => 's${n.id}');
+        }
+      }
+    }
+    final pending = [...sorted];
+    while (pending.isNotEmpty) {
+      final placed = {for (final n in nodes) n.key};
+      final next = pending.indexWhere((m) {
+        final at = host[m.course.id];
+        return at == null || placed.contains(at);
+      });
+      // A loop of courses (the server refuses one): the rest hang from you.
+      final map = pending.removeAt(next < 0 ? 0 : next);
+      final at = next < 0 ? null : host[map.course.id];
+      _addCourse(nodes, map, at ?? selfKey, owner[map.course.id]?.id, failed);
     }
 
     var total = 0;

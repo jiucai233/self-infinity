@@ -10,18 +10,28 @@ import 'avatar.dart';
 import '../l10n/l10n.dart';
 
 /// The life tree as a constellation on the night panel (`docs/DESIGN.md` §4):
-/// you in the middle, courses on the first ring, their nodes beyond. The disc
-/// floats inside a faint wire shell and turns slowly in 3D; cleared nodes burn
-/// gold and throw sparks.
+/// a sphere in 3D. You are its centre; each level of the tree is a shell
+/// further out (courses, then their chapters, then their parts), and every
+/// branch keeps to its own patch of the sky, so a course is one cluster and
+/// its chapters are clusters inside it. A faint wire shell holds it; it turns
+/// slowly; cleared nodes burn gold and throw sparks.
 ///
 /// * [compact]: the version inside the crystal ball — no labels, no input.
-/// * Hover a node: the drift pauses and its name shows. Drag sideways: turn
-///   the disc. Tap: [onSelect].
+/// * Drag: turn it any way. Scroll or pinch: zoom, around the pointer; zoomed
+///   in, the names of the nodes in front show. [LifeConstellationState.resetView]
+///   goes back to the start.
+/// * Hover a node: the drift pauses and its name shows. Tap: [onSelect].
 /// * [selected] gets a lime ring and its label; [highlighted] (search hits)
 ///   get their labels.
 ///
 /// Motion stops (final frame, fixed angle) when [animate] is false, when
 /// [Avatar.animationsEnabled] is false, or under reduced motion.
+/// Where every node of [tree] sits in the unit sphere (you at the centre).
+@visibleForTesting
+Map<String, ({double x, double y, double z})> lifeSphere(LifeTree tree) => {
+  for (final e in _Layout.of(tree, compact: false).pos.entries) e.key: (x: e.value.x, y: e.value.y, z: e.value.z),
+};
+
 class LifeConstellation extends StatefulWidget {
   const LifeConstellation({
     super.key,
@@ -109,6 +119,27 @@ class LifeConstellationState extends State<LifeConstellation> with SingleTickerP
     return best;
   }
 
+  /// Zoom by [factor] keeping the point under [focal] where it is.
+  void zoomBy(double factor, Offset focal) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    _clock.zoomAt(factor, focal - box.size.center(Offset.zero));
+  }
+
+  /// The view's zoom (1 = the whole sphere fits).
+  double get zoom => _clock.zoom;
+
+  /// Zoom around the middle (the buttons).
+  void zoomStep(double factor) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box != null && box.hasSize) zoomBy(factor, box.size.center(Offset.zero));
+  }
+
+  /// Back to the starting angle, zoom and place.
+  void resetView() => _clock.resetView();
+
+  double _lastScale = 1;
+
   @override
   Widget build(BuildContext context) {
     if (_still(context)) _clock.settle();
@@ -126,23 +157,42 @@ class LifeConstellationState extends State<LifeConstellation> with SingleTickerP
     );
     final paint = CustomPaint(painter: painter, size: Size.infinite);
     if (widget.compact || widget.onSelect == null) return paint;
-    return MouseRegion(
-      cursor: _hovered == null ? SystemMouseCursors.grab : SystemMouseCursors.click,
-      onHover: (e) {
-        final h = _hit(e.localPosition);
-        if (h != _hovered) setState(() => _hovered = h);
+    return Listener(
+      onPointerSignal: (e) {
+        if (e is PointerScrollEvent) {
+          GestureBinding.instance.pointerSignalResolver.register(e, (e) {
+            final scroll = (e as PointerScrollEvent).scrollDelta.dy;
+            zoomBy(math.exp(-scroll / 400), e.localPosition);
+          });
+        }
       },
-      onExit: (_) => setState(() => _hovered = null),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        dragStartBehavior: DragStartBehavior.down,
-        onHorizontalDragUpdate: (d) => _clock.drag(d.delta.dx / 260),
-        onTapUp: (d) {
-          final key = _hit(d.localPosition);
-          final node = key == null ? null : widget.tree.byKey(key);
-          if (node != null) widget.onSelect!(node);
+      child: MouseRegion(
+        cursor: _hovered == null ? SystemMouseCursors.grab : SystemMouseCursors.click,
+        onHover: (e) {
+          final h = _hit(e.localPosition);
+          if (h != _hovered) setState(() => _hovered = h);
         },
-        child: paint,
+        onExit: (_) => setState(() => _hovered = null),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          dragStartBehavior: DragStartBehavior.down,
+          onScaleStart: (_) => _lastScale = 1,
+          onScaleUpdate: (d) {
+            if (d.pointerCount > 1) {
+              zoomBy(d.scale / _lastScale, d.localFocalPoint);
+              _lastScale = d.scale;
+              _clock.pan(d.focalPointDelta);
+            } else {
+              _clock.turn(d.focalPointDelta.dx / 260, d.focalPointDelta.dy / 260);
+            }
+          },
+          onTapUp: (d) {
+            final key = _hit(d.localPosition);
+            final node = key == null ? null : widget.tree.byKey(key);
+            if (node != null) widget.onSelect!(node);
+          },
+          child: paint,
+        ),
       ),
     );
   }
@@ -150,34 +200,89 @@ class LifeConstellationState extends State<LifeConstellation> with SingleTickerP
 
 // ---------------------------------------------------------------------------
 
-/// Time, rotation and glow, shared with the painter.
+/// Time, the view (rotation, zoom, pan) and glow, shared with the painter.
 class _Clock extends ChangeNotifier {
   double t = 0;
-  double angle = 0.6;
   double energy = 0;
   bool still = false;
 
+  /// The sphere's rotation (row-major 3×3): a point p is seen at [rotation]·p.
+  List<double> rotation = _start();
+
+  /// 1 = the whole sphere fits; more is closer.
+  double zoom = 1;
+
+  /// Where the sphere's centre is moved on screen, in pixels.
+  Offset offset = Offset.zero;
+
   static const double _turnSeconds = 90;
+  static const double minZoom = 0.6;
+  static const double maxZoom = 6;
+
+  /// Tilted towards you a little, turned a little.
+  static List<double> _start() => _mul(_rx(-0.42), _ry(0.6));
 
   void advance(double dt, {required bool boost, required bool paused}) {
     still = false;
     t += dt;
     energy += ((boost ? 1.0 : 0.0) - energy) * math.min(1, dt * 6);
-    if (!paused) angle += dt * (2 * math.pi / _turnSeconds) * (1 + 2.5 * energy);
+    if (!paused) {
+      // The drift turns it about its own axis, whichever way it is tilted.
+      rotation = _mul(rotation, _ry(dt * (2 * math.pi / _turnSeconds) * (1 + 2.5 * energy)));
+    }
     notifyListeners();
   }
 
-  void drag(double radians) {
-    angle += radians;
+  /// A drag: sideways turns it about the screen's vertical, up and down about
+  /// the horizontal.
+  void turn(double yaw, double pitch) {
+    rotation = _mul(_mul(_rx(-pitch), _ry(yaw)), rotation);
     notifyListeners();
   }
 
+  void zoomAt(double factor, Offset fromCentre) {
+    final next = (zoom * factor).clamp(minZoom, maxZoom);
+    final k = next / zoom;
+    // The point under the pointer stays under it.
+    offset = fromCentre - (fromCentre - offset) * k;
+    if (next <= 1) offset = offset * ((next - minZoom) / (1 - minZoom)).clamp(0.0, 1.0);
+    zoom = next;
+    notifyListeners();
+  }
+
+  void pan(Offset delta) {
+    offset += delta;
+    notifyListeners();
+  }
+
+  void resetView() {
+    rotation = _start();
+    zoom = 1;
+    offset = Offset.zero;
+    notifyListeners();
+  }
+
+  /// The final frame, with no motion; the view stays where the player put it.
   void settle() {
     still = true;
     t = 100;
-    angle = 0.6;
     energy = 0;
   }
+
+  static List<double> _rx(double a) {
+    final c = math.cos(a), s = math.sin(a);
+    return [1, 0, 0, 0, c, -s, 0, s, c];
+  }
+
+  static List<double> _ry(double a) {
+    final c = math.cos(a), s = math.sin(a);
+    return [c, 0, s, 0, 1, 0, -s, 0, c];
+  }
+
+  static List<double> _mul(List<double> a, List<double> b) => [
+    for (var i = 0; i < 3; i++)
+      for (var j = 0; j < 3; j++) a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j],
+  ];
 }
 
 /// Screen positions of the last frame, for hit testing.
@@ -190,8 +295,13 @@ class _P3 {
   final double x, y, z;
 }
 
-/// 3D positions in a unit sphere: the tree on a disc (x–z plane) with a little
-/// height per node, and the wire shell around it.
+/// 3D positions in a unit sphere, and the wire shell around it.
+///
+/// Every node owns a cap of the sky (a direction and a half angle); its
+/// children share the cap by how many leaves each holds, laid out as a
+/// sunflower from its middle, each with a cap of its own. A node sits in the
+/// middle of its cap, on the shell of its depth, so the depths are distances
+/// from you.
 class _Layout {
   _Layout(this.tree, this.pos, this.depth, this.maxDepth, this.dust, this.wires, this.faces);
 
@@ -211,6 +321,8 @@ class _Layout {
     return (h % 10000) / 10000;
   }
 
+  static const double _golden = 2.399963229728653; // π (3 − √5)
+
   static _Layout of(LifeTree tree, {required bool compact}) {
     final depth = tree.depths;
     final maxDepth = math.max(1, tree.maxDepth);
@@ -229,23 +341,40 @@ class _Layout {
 
     count(LifeTree.selfKey);
 
+    // Square-root spacing keeps the outer shells (most nodes) roomy.
+    double shell(int d) => d == 0 ? 0.0 : 0.95 * math.sqrt(d / maxDepth);
+
     final pos = <String, _P3>{};
-    void place(String key, double from, double span) {
+    void place(String key, _P3 dir, double cap) {
       final d = depth[key]!;
-      // Square-root spacing keeps the outer rings (most nodes) roomy.
-      final r = d == 0 ? 0.0 : 0.92 * math.sqrt(d / maxDepth);
-      final a = from + span / 2;
-      final lift = d == 0 ? 0.0 : (_hash(key, 7) - 0.5) * (d == 1 ? 0.18 : 0.42) * r;
-      pos[key] = _P3(r * math.cos(a), lift, r * math.sin(a));
-      var at = from;
-      for (final c in kids[key] ?? const <String>[]) {
-        final s = span * leaves[c]! / leaves[key]!;
-        place(c, at, s);
-        at += s;
+      final r = shell(d);
+      pos[key] = _P3(dir.x * r, dir.y * r, dir.z * r);
+      final children = kids[key] ?? const <String>[];
+      if (children.isEmpty) return;
+      final (e1, e2) = _basis(dir);
+      // The cap's area, 2π(1 − cos cap), shared by leaves; a little kept free.
+      final area = 1 - math.cos(cap);
+      final start = _hash(key, 5) * 2 * math.pi;
+      var before = 0.0;
+      for (final (i, c) in children.indexed) {
+        final share = leaves[c]! / leaves[key]!;
+        // A lone child stays on the line from its parent; others spread out.
+        final rho = children.length == 1 ? 0.0 : math.acos(1 - area * (before + share / 2));
+        final psi = start + i * _golden;
+        final ca = math.cos(rho), sa = math.sin(rho);
+        final cp = math.cos(psi), sp = math.sin(psi);
+        final child = _P3(
+          ca * dir.x + sa * (cp * e1.x + sp * e2.x),
+          ca * dir.y + sa * (cp * e1.y + sp * e2.y),
+          ca * dir.z + sa * (cp * e1.z + sp * e2.z),
+        );
+        final childCap = math.acos((1 - area * share * 0.8).clamp(-1.0, 1.0));
+        place(c, child, children.length == 1 ? cap * 0.9 : childCap);
+        before += share;
       }
     }
 
-    place(LifeTree.selfKey, -math.pi / 2, 2 * math.pi);
+    place(LifeTree.selfKey, const _P3(0, 1, 0), math.pi);
 
     // The wire shell: points on a sphere, joined to their near neighbours.
     final rng = math.Random(11);
@@ -256,7 +385,7 @@ class _Layout {
       final th = rng.nextDouble() * 2 * math.pi;
       final rr = 1.02 + rng.nextDouble() * (compact ? 0.08 : 0.22);
       final s = math.sqrt(1 - u * u);
-      dust.add(_P3(rr * s * math.cos(th), rr * u * 0.82, rr * s * math.sin(th)));
+      dust.add(_P3(rr * s * math.cos(th), rr * u, rr * s * math.sin(th)));
     }
     double dist(_P3 a, _P3 b) =>
         math.sqrt(math.pow(a.x - b.x, 2) + math.pow(a.y - b.y, 2) + math.pow(a.z - b.z, 2));
@@ -280,6 +409,16 @@ class _Layout {
     }
     return _Layout(tree, pos, depth, maxDepth, dust, wires, faces);
   }
+}
+
+/// Two unit vectors at right angles to [d] and to each other.
+(_P3, _P3) _basis(_P3 d) {
+  final a = d.y.abs() < 0.9 ? const _P3(0, 1, 0) : const _P3(1, 0, 0);
+  var e1 = _P3(a.y * d.z - a.z * d.y, a.z * d.x - a.x * d.z, a.x * d.y - a.y * d.x);
+  final l = math.sqrt(e1.x * e1.x + e1.y * e1.y + e1.z * e1.z);
+  e1 = _P3(e1.x / l, e1.y / l, e1.z / l);
+  final e2 = _P3(d.y * e1.z - d.z * e1.y, d.z * e1.x - d.x * e1.z, d.x * e1.y - d.y * e1.x);
+  return (e1, e2);
 }
 
 class _NightPainter extends CustomPainter {
@@ -314,26 +453,20 @@ class _NightPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     projection.at.clear();
-    final center = size.center(Offset.zero);
-    // How far we look down onto the disc.
-    final sinT = compact ? 0.78 : 0.56;
-    final cosT = math.sqrt(1 - sinT * sinT);
-    final radius = compact
-        ? size.shortestSide * 0.40
-        : math.min(size.width * 0.40, size.height * 0.44 / (sinT + 0.22));
-    final u = compact ? size.shortestSide / 64 : radius / 64;
+    final center = size.center(Offset.zero) + (compact ? Offset.zero : clock.offset);
+    final zoom = compact ? 1.0 : clock.zoom;
+    final radius = (compact ? size.shortestSide * 0.40 : size.shortestSide * 0.42) * zoom;
+    final u = (compact ? size.shortestSide / 64 : size.shortestSide * 0.42 / 64) * math.sqrt(zoom);
     const camera = 3.2;
-    final ca = math.cos(clock.angle);
-    final sa = math.sin(clock.angle);
+    final m = clock.rotation;
 
     // (screen point, depth 0 = middle, + = far, scale)
     (Offset, double, double) project(_P3 p) {
-      final x1 = p.x * ca + p.z * sa;
-      final z1 = -p.x * sa + p.z * ca;
-      final sy = -z1 * sinT - p.y * cosT;
-      final depth = z1 * cosT - p.y * sinT;
+      final x = m[0] * p.x + m[1] * p.y + m[2] * p.z;
+      final y = m[3] * p.x + m[4] * p.y + m[5] * p.z;
+      final depth = m[6] * p.x + m[7] * p.y + m[8] * p.z;
       final k = camera / (camera + depth);
-      return (center + Offset(x1, sy) * radius * k, depth, k);
+      return (center + Offset(x, -y) * radius * k, depth, k);
     }
 
     // Far = dim, near = bright.
@@ -459,24 +592,46 @@ class _NightPainter extends CustomPainter {
 
     if (compact) return;
 
-    // Labels on top: you, courses; skills when hovered,
-    // selected or found.
-    for (final n in order.reversed) {
+    // Labels on top: you, courses; skills when hovered, selected or found,
+    // and, zoomed in, the ones in front (nearest first, none over another).
+    // Courses come before the skills in front; one that would cover another
+    // label is left out, unless it was asked for.
+    final taken = <Rect>[];
+    final front = zoom >= 1.6;
+    var named = 0;
+    final labelled = [
+      ...order.reversed.where((n) => n.kind != LifeKind.skill),
+      ...order.reversed.where((n) => n.kind == LifeKind.skill),
+    ];
+    for (final n in labelled) {
       final hit = projection.at[n.key];
       if (hit == null) continue;
-      final (_, depth, _) = proj[n.key]!;
-      final show = n.kind != LifeKind.skill ||
+      final (_, depth, k) = proj[n.key]!;
+      final asked = n.kind == LifeKind.self ||
           n.key == hovered ||
           n.key == selected ||
           highlighted.contains(n.key);
-      if (!show) continue;
+      final course = n.kind == LifeKind.course;
+      final near = front && depth < 0.35 && named < 60 && size.contains(hit);
+      if (!asked && !course && !near) continue;
       final f = n.key == hovered || n.key == selected ? 1.0 : fade(depth);
       final style = switch (n.kind) {
         LifeKind.self => titleStyle,
         _ => labelStyle,
       };
       final label = n.kind == LifeKind.self ? l10nNow.you : n.label;
-      _text(canvas, label, style.copyWith(color: style.color!.withValues(alpha: f)), hit + Offset(u * 2.4, 0), 200);
+      final tp = TextPainter(
+        text: TextSpan(text: label, style: style.copyWith(color: style.color!.withValues(alpha: f))),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '…',
+      )..layout(maxWidth: 200);
+      final at = hit + Offset(u * 2.4 * k, -tp.height / 2);
+      final box = (at & tp.size).inflate(2);
+      if (!asked && taken.any(box.overlaps)) continue;
+      taken.add(box);
+      if (!asked && !course) named++;
+      tp.paint(canvas, at);
     }
   }
 
@@ -563,27 +718,6 @@ class _NightPainter extends CustomPainter {
       ..quadraticBezierTo(c.dx, c.dy, c.dx, c.dy - r)
       ..close();
     canvas.drawPath(path, Paint()..color = color);
-  }
-
-  /// Paints [text] starting at [at] (vertically centred on it unless
-  /// [centered] is false) and returns its height.
-  static double _text(
-    Canvas canvas,
-    String text,
-    TextStyle style,
-    Offset at,
-    double maxWidth, {
-    int lines = 1,
-    bool centered = true,
-  }) {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-      maxLines: lines,
-      ellipsis: '…',
-    )..layout(maxWidth: maxWidth);
-    tp.paint(canvas, centered ? at - Offset(0, tp.height / 2) : at);
-    return tp.height;
   }
 
   @override
