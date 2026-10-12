@@ -89,7 +89,15 @@ abstract class SelfInfinityApi {
   /// [testOut]: a challenge on a whole branch, root or unexpanded node, locked
   /// or not (not a leaf, not a mastered node: 400). Passing it masters
   /// everything under the node.
-  Future<AuditStart> startAudit(int skillId, {String mode = 'day', bool testOut = false});
+  ///
+  /// An unfinished audit of the node is picked up again (`resumed`, with its
+  /// dialogue so far) unless [restart] asks for a new one.
+  Future<AuditStart> startAudit(
+    int skillId, {
+    String mode = 'day',
+    bool testOut = false,
+    bool restart = false,
+  });
 
   /// `POST /audits/{sessionId}/turns` (LLM). Body `{"content"}`.
   ///
@@ -201,7 +209,13 @@ abstract class SelfInfinityApi {
   // -- life as a game (contract Section 6, endpoints 16 and 25–27) -------------
 
   /// `GET /plan/current` — the latest study plan (today's quests), or `null`.
+  /// `stale`: it was made for another time of day or another day.
   Future<StudyPlan?> getCurrentPlan();
+
+  /// `POST /plan/generate` (LLM: Recommender) — today's quests for this time
+  /// of day, fitted to the focus left (contract #15). 400 when there is
+  /// nothing to learn or review, 502 when the Recommender fails.
+  Future<StudyPlan> generatePlan();
 
   /// `GET /profile` — the character sheet (empty strings and no rules on a
   /// fresh database).

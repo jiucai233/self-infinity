@@ -41,6 +41,21 @@ from tests.helpers import (
 )
 
 CHALLENGER_QUESTION = "Before I pass this: give one case where this idea does not hold, and explain why."
+PROBE_FEEDBACK = "That gives the outline. One part of it is still only named, not explained."
+PASS_FEEDBACK = "That is right, and you gave the reason for it."
+FAIL_FEEDBACK = "The conclusion is there, but the reason behind it is missing."
+# The script's knowledge points of the leaf “Discriminant” (the Point Lister, before its first audit).
+POINTS = ["What Discriminant is", "Why Discriminant holds", "Where Discriminant fails"]
+
+
+def held(*oks: bool | None, note: str | None = None) -> list[dict]:
+    """The points of “Discriminant” with these results; `note` goes on the first one missed."""
+    out = [{"title": title, "ok": ok, "note": None} for title, ok in zip(POINTS, oks)]
+    for point in out:
+        if point["ok"] is False:
+            point["note"] = note
+            break
+    return out
 
 
 def use_provider(monkeypatch, provider):
@@ -94,7 +109,8 @@ def test_it07_root_opening_question_and_position(client, client_engine, math):
     expected = "Which problems call for “High School Math”, and which don't? How do you decide?"
     assert body["opening_question"] == expected
     assert body["session"]["node_position"] == "root"
-    assert body["session"]["turns"] == [{"role": "auditor", "content": expected}]
+    assert body["session"]["turns"] == [{"role": "auditor", "content": expected, "feedback": None}]
+    assert body["session"]["points"] == []  # only a leaf has knowledge points
     assert stored_audit(client_engine, body["session"]["id"]).node_position == NodePosition.root
 
 
@@ -115,7 +131,12 @@ def test_it07_leaf_opening_question(client, client_engine, math):
 
     body = client.post(f"/api/skills/{math['discriminant']}/audits").json()
 
-    assert body["opening_question"] == "Explain “Discriminant” from scratch to someone who has never heard of it."
+    # A leaf is audited one knowledge point at a time, starting with the first.
+    assert body["opening_question"] == (
+        "Let's take “Discriminant” one piece at a time. Start with “What Discriminant is”: "
+        "what does it do, and why is it needed?"
+    )
+    assert body["session"]["points"] == held(None, None, None)
     assert body["session"]["node_position"] == "leaf"
     assert stored_audit(client_engine, body["session"]["id"]).node_position == NodePosition.leaf
 
@@ -161,8 +182,11 @@ def test_it07_task_nodes_get_the_task_question_at_any_position(client, client_en
 def test_the_session_response_matches_the_contract_shape(client, math):
     body = client.post(f"/api/skills/{math['discriminant']}/audits", json={"mode": "day"}).json()
 
-    assert set(body) == {"session", "opening_question"}
-    assert set(body["session"]) == {"id", "skill_id", "node_position", "status", "score", "gaps", "comment", "turns", "test_out"}
+    assert set(body) == {"session", "opening_question", "resumed"}
+    assert body["resumed"] is False
+    assert set(body["session"]) == {
+        "id", "skill_id", "node_position", "status", "score", "gaps", "comment", "turns", "test_out", "points",
+    }
     assert body["session"]["test_out"] is False
     assert body["session"]["skill_id"] == math["discriminant"]
     assert (body["session"]["status"], body["session"]["score"], body["session"]["gaps"], body["session"]["comment"]) == (
@@ -176,21 +200,24 @@ def test_the_mode_defaults_to_day_and_other_values_are_rejected(client, client_e
 
     assert no_body.status_code == 200
     assert bad.status_code == 422
-    assert stored_audit(client_engine, no_body.json()["session"]["id"]).max_turns == settings.audit_max_turns
+    assert stored_audit(client_engine, no_body.json()["session"]["id"]).max_turns == 6  # two a point
 
 
 @pytest.mark.parametrize(
-    ("mode", "concept", "task"),
-    [("day", 8, 4), ("night", 16, 8)],
+    ("mode", "points", "concept", "task"),
+    [("day", 6, 8, 4), ("night", 12, 16, 8)],
 )
-def test_turn_limits_are_eight_for_concepts_and_four_for_tasks_and_night_doubles(
-    client, client_engine, monkeypatch, math, mode, concept, task
+def test_turn_limits_are_two_a_point_eight_for_concepts_and_four_for_tasks_and_night_doubles(
+    client, client_engine, monkeypatch, math, mode, points, concept, task
 ):
-    concept_audit = start(client, math["discriminant"], mode)
+    leaf_audit = start(client, math["discriminant"], mode)  # three knowledge points
+    set_status_by_api(client_engine, math["algebra"])
+    concept_audit = start(client, math["algebra"], mode)  # a branch: no points
     monkeypatch.setattr("app.routers.skills.get_provider", lambda agent=None: ScriptedProvider(planner=TASK_COURSE))
     task_ids = ids_by_slug(generate(client, "Moving", search_syllabus=False))
     task_audit = start(client, task_ids["labels"], mode)  # the leaf opens first
 
+    assert stored_audit(client_engine, leaf_audit).max_turns == points
     assert stored_audit(client_engine, concept_audit).max_turns == concept
     assert stored_audit(client_engine, task_audit).max_turns == task
 
@@ -229,11 +256,15 @@ def test_it08_a_turn_can_return_a_probe_and_the_session_stays_active(client, cli
     assert probe == {
         "type": "probe",
         "question": "Pick the most important term in your explanation and tell me what it means and why it matters.",
+        "feedback": PROBE_FEEDBACK,
+        "point": POINTS[0],
     }
     assert [role for role, _ in stored_turns(client_engine, audit_id)] == ["auditor", "user", "auditor"]
     assert stored_turns(client_engine, audit_id)[1] == ("user", FIRST)
     assert stored_turns(client_engine, audit_id)[2] == ("auditor", probe["question"])
     assert stored_audit(client_engine, audit_id).status == AuditStatus.active
+    with Session(client_engine) as session:  # what she said about the answer is kept with her question
+        assert session.exec(select(AuditTurn.feedback).order_by(AuditTurn.id)).all() == [None, None, PROBE_FEEDBACK]
 
 
 def test_it09_pass_upheld_opens_the_next_node_masters_this_one_and_records_the_reward(client, client_engine, math):
@@ -248,6 +279,8 @@ def test_it09_pass_upheld_opens_the_next_node_masters_this_one_and_records_the_r
         "score": 91,  # min(95, 70 + 210 // 10)
         "gaps": [],
         "comment": "You explained the core idea and why it holds.",
+        "feedback": PASS_FEEDBACK,
+        "points": held(True, True, True),
         "unlocked_skill_ids": [math["root-coefficient"]],  # the next in the learning order
         "reward_amount": 55,
         "reward_multiplier": 1.1,
@@ -272,9 +305,10 @@ def test_the_probe_and_verdict_shapes_are_exactly_the_contract_keys(client, math
 
     probe, verdict = answer_turns(client, audit_id, FIRST, LONG)
 
-    assert set(probe) == {"type", "question"}
+    assert set(probe) == {"type", "question", "feedback", "point"}
     assert set(verdict) == {
-        "type", "passed", "score", "gaps", "comment", "unlocked_skill_ids", "reward_amount", "reward_multiplier",
+        "type", "passed", "score", "gaps", "comment", "feedback", "points",
+        "unlocked_skill_ids", "reward_amount", "reward_multiplier",
     }
 
 
@@ -284,7 +318,8 @@ def test_it13_a_pass_the_challenger_overturns_becomes_one_more_probe(client, cli
     first, challenge = answer_turns(client, audit_id, FIRST, MEDIUM)
 
     assert first["type"] == "probe"
-    assert challenge == {"type": "probe", "question": CHALLENGER_QUESTION}
+    # The Challenger's question, after what the Auditor said about the answer.
+    assert challenge == {"type": "probe", "question": CHALLENGER_QUESTION, "feedback": PASS_FEEDBACK, "point": None}
     audit = stored_audit(client_engine, audit_id)
     assert audit.challenged is True
     assert audit.status == AuditStatus.active
@@ -303,7 +338,7 @@ def test_it14_after_an_overturn_the_next_pass_is_final_and_the_challenger_is_not
 
     assert challenge["type"] == "probe"
     assert verdict["type"] == "verdict" and verdict["passed"] is True
-    assert provider.counts == {"auditor": 3, "challenger": 1}
+    assert provider.counts == {"point_lister": 1, "auditor": 3, "challenger": 1}
     assert node_status(client, math["discriminant"]) == "mastered"
     assert stored_audit(client_engine, audit_id).status == AuditStatus.passed
 
@@ -326,7 +361,7 @@ def test_it15_with_the_challenger_disabled_a_pass_is_final_at_once(client, monke
     _probe, verdict = answer_turns(client, audit_id, FIRST, MEDIUM)
 
     assert verdict["type"] == "verdict" and verdict["passed"] is True
-    assert provider.counts == {"auditor": 2}
+    assert provider.counts == {"point_lister": 1, "auditor": 2}
 
 
 def test_a_fail_is_never_sent_to_the_challenger(client, monkeypatch, math):
@@ -336,7 +371,7 @@ def test_a_fail_is_never_sent_to_the_challenger(client, monkeypatch, math):
 
     answer_turns(client, audit_id, FIRST, SHORT)
 
-    assert provider.counts == {"auditor": 2}
+    assert provider.counts == {"point_lister": 1, "auditor": 2}
 
 
 def test_a_challenger_that_errors_upholds_the_pass(client, monkeypatch, math):
@@ -368,6 +403,8 @@ def test_it16_a_fail_closes_the_session_and_leaves_the_node_status_alone(client,
             "You didn't cover the exceptions.",
         ],
         "comment": "The answer stops at the conclusion and lacks reasons.",
+        "feedback": FAIL_FEEDBACK,
+        "points": held(False, True, True, note="Named it without saying why it holds."),
         "unlocked_skill_ids": [],
         "reward_amount": None,
         "reward_multiplier": None,
@@ -440,7 +477,7 @@ def test_it18_after_the_outage_the_resent_answer_replaces_the_unanswered_one(cli
     # The client puts the text back in the input; the user sends it again (maybe edited).
     response = client.post(f"/api/audits/{audit_id}/turns", json={"content": "Sending again"})
 
-    assert response.json() == {"type": "probe", "question": "Shall we go on?"}
+    assert response.json() == {"type": "probe", "question": "Shall we go on?", "feedback": None, "point": None}
     (messages,) = spy.calls_for("auditor")
     assert [m["content"] for m in messages[1:] if m["role"] == "user"] == ["Sending again"]
     assert [role for role, _ in stored_turns(client_engine, audit_id)] == ["auditor", "user", "auditor"]
@@ -493,7 +530,12 @@ def test_a_malformed_auditor_answer_becomes_the_generic_probe(client, monkeypatc
 
     result = answer_turns(client, audit_id, FIRST)[0]
 
-    assert result == {"type": "probe", "question": "Could you explain that part a bit more specifically?"}
+    assert result == {
+        "type": "probe",
+        "question": "Could you explain that part a bit more specifically?",
+        "feedback": None,
+        "point": None,
+    }
 
 
 # ---------------------------------------------------------------- 轮数上限
@@ -503,12 +545,13 @@ def test_the_turn_limit_forces_a_failing_verdict_with_score_zero(client, client_
     use_provider(monkeypatch, ScriptedProvider(auditor=probe_json("Keep going")))
     audit_id = start(client, math["discriminant"])
 
-    results = answer_turns(client, audit_id, *["answer"] * 8)
+    results = answer_turns(client, audit_id, *["answer"] * 6)  # three points, two questions each
 
-    assert [r["type"] for r in results] == ["probe"] * 7 + ["verdict"]
+    assert [r["type"] for r in results] == ["probe"] * 5 + ["verdict"]
     assert results[-1]["passed"] is False
     assert results[-1]["score"] == 0
     assert results[-1]["unlocked_skill_ids"] == []
+    assert results[-1]["points"] == held(None, None, None)  # nothing settled: all stay open
     assert stored_audit(client_engine, audit_id).status == AuditStatus.failed
     assert node_status(client, math["discriminant"]) == "available"
 
@@ -517,9 +560,9 @@ def test_night_mode_doubles_the_turn_limit(client, monkeypatch, math):
     use_provider(monkeypatch, ScriptedProvider(auditor=probe_json()))
     audit_id = start(client, math["discriminant"], "night")
 
-    results = answer_turns(client, audit_id, *["answer"] * 16)
+    results = answer_turns(client, audit_id, *["answer"] * 12)
 
-    assert [r["type"] for r in results] == ["probe"] * 15 + ["verdict"]
+    assert [r["type"] for r in results] == ["probe"] * 11 + ["verdict"]
     assert results[-1]["score"] == 0
 
 
@@ -603,7 +646,7 @@ def test_a_low_condition_makes_the_auditor_pace_light_without_touching_the_limit
     answer_turns(client, audit_id, FIRST)
 
     assert "Pacing: light" in spy.system_prompts("auditor")[0]
-    assert stored_audit(client_engine, audit_id).max_turns == settings.audit_max_turns
+    assert stored_audit(client_engine, audit_id).max_turns == 6  # two a point, as when rested
 
 
 def test_a_normal_or_unknown_condition_paces_normally(client, client_engine, monkeypatch, math):

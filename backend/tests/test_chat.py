@@ -379,7 +379,8 @@ def test_a_second_said_check_in_fills_in_the_day(client):
     assert today["transcript"] == f"{VOICE}\nI slept eight hours"
 
 
-def test_plan_runs_the_recommender(client):
+def test_plan_runs_the_recommender(client, monkeypatch):
+    freeze_clock(monkeypatch, "2026-10-05 09:00")  # a morning: plans depend on the time of day
     generate(client, "Math")
 
     messages = say(client, "What should I do today?")
@@ -391,7 +392,11 @@ def test_plan_runs_the_recommender(client):
     plan = second["action"]["plan"]
     assert plan["id"] == client.get("/api/plan/current").json()["id"]
     assert [s["skill_title"] for s in plan["steps"]] == ["Discriminant", "Linear Functions", "Limits of Sequences"]
-    assert second["content"] == "Today's quests: “Discriminant”, “Linear Functions”, “Limits of Sequences”."
+    assert second["content"] == (
+        "Today's quests: “Discriminant”, “Linear Functions”, “Limits of Sequences”. "
+        "Morning: judgement first, new nodes and challenges; review waits for the evening. "
+        "No check-in yet, so I planned for three hours. About 3 h of focus left today (0 min done)."
+    )
 
 
 def test_plan_without_an_available_node_is_explained_with_200(client):
@@ -404,6 +409,7 @@ def test_plan_without_an_available_node_is_explained_with_200(client):
 
 
 def test_plan_failure_is_explained_with_200(client, monkeypatch):
+    freeze_clock(monkeypatch, "2026-10-05 09:00")  # a morning: plans depend on the time of day
     generate(client, "Math")
     use_provider(monkeypatch, ScriptedProvider(recommender="garbage"))
 

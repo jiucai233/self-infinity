@@ -176,13 +176,16 @@ void main() {
       expect(bubble(tester), isNot(opening));
       expect(bubble(tester), contains('most important term'));
       expect(find.text('Here is how I would explain it'), findsOneWidget); // once, in the column
+      // Her new line: what she says about the answer, then the question.
       expect(qaLines(tester), [
         'Auditor',
         opening,
         'Here is how I would explain it',
         'Auditor',
+        FakeApiClient.probeFeedback,
         bubble(tester),
       ]);
+      expect(textOf(tester, 'audit-feedback'), FakeApiClient.probeFeedback);
       // The answer is a bubble on the right; the earlier question is a plain line,
       // the current one the headline in the display serif.
       expect(find.byKey(const Key('audit-answer')), findsOneWidget);
@@ -744,13 +747,15 @@ void main() {
 
       voice.hear("I'm not sure");
       await tester.pumpAndSettle();
+      // What she says about the answer is read first, then the question.
+      expect(voice.spoken.single, startsWith(FakeApiClient.probeFeedback));
       expect(voice.spoken.single, contains('most important term'));
       expect(voice.listenCalls, 2);
       expect(find.byKey(const Key('voice-wave-row')), findsOneWidget);
 
       voice.hear("I'm not sure");
       await tester.pumpAndSettle();
-      expect(voice.spoken.last, startsWith('Not quite.'));
+      expect(voice.spoken.last, contains('Not quite.'));
       expect(textOf(tester, 'verdict-title'), 'Not yet.');
       expect(find.byKey(const Key('voice-wave-row')), findsNothing); // the loop ended
     });
@@ -790,9 +795,14 @@ class _SlowStartApi extends FakeApiClient {
   _SlowStartApi() : super(latency: Duration.zero);
 
   @override
-  Future<AuditStart> startAudit(int skillId, {String mode = 'day', bool testOut = false}) async {
+  Future<AuditStart> startAudit(
+    int skillId, {
+    String mode = 'day',
+    bool testOut = false,
+    bool restart = false,
+  }) async {
     await Future<void>.delayed(const Duration(milliseconds: 200));
-    return super.startAudit(skillId, mode: mode, testOut: testOut);
+    return super.startAudit(skillId, mode: mode, testOut: testOut, restart: restart);
   }
 }
 

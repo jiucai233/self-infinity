@@ -218,10 +218,12 @@ def _run_plan(session: Session, provider_for: ProviderFor) -> ChatMessage:
         session.rollback()
         return _save(session, "assistant", t("plan_failed"), "front_desk")
     titles = join_list([quote(s.skill_title) for s in plan.steps])
+    # With the focus used up there are no quests, only the line saying so.
+    line = f"{t('todays_quests', titles=titles)} {plan.summary}".strip() if plan.steps else plan.summary
     return _save(
         session,
         "assistant",
-        t("todays_quests", titles=titles),
+        line,
         "recommender",
         {"type": "plan", "plan": plan.model_dump(mode="json")},
     )

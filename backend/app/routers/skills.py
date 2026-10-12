@@ -35,7 +35,7 @@ from app.schemas import (
 )
 from app.search import get_search_provider
 from app.services import bandit, course_edit, course_generation
-from app.services.course_generation import CourseFull, CourseGenerationError, NotExpandable
+from app.services.course_generation import AlreadySmallest, CourseFull, CourseGenerationError, NotExpandable
 from app.services.courses import get_live_course, live_nodes
 from app.services.tree import contains_parents, course_graph, depth_map
 
@@ -147,10 +147,15 @@ def generate_course(body: GenerateCourseRequest, session: Session = Depends(get_
 def expand_skill(skill_id: int, session: Session = Depends(get_session)):
     """Breaks a node down into its parts: all of them for a node left as a category
     (`unexpanded`), the missing ones for any other (filling it in). Answers the whole course map.
-    Any node can be expanded, locked or not: looking inside is free."""
+    Any node can be expanded, locked or not: looking inside is free. A leaf that has knowledge
+    points is the smallest piece and is not broken down (400)."""
     skill = _editable(session, skill_id)
     try:
         expanded = course_generation.expand_node(session, skill, get_provider("planner"))
+    except AlreadySmallest:
+        raise HTTPException(
+            400, "This node is the smallest piece: its knowledge points are inside it."
+        ) from None
     except NotExpandable:
         raise HTTPException(400, "This node is another course, or is being broken down already.") from None
     except CourseFull:

@@ -103,6 +103,7 @@ scene 4-1（审计）没有右栏（2026-10-06 改）：整场问答就在舞台
 ```
 
 - contents：节点说明 + 资料链接（这个节点以往补充资料检索的结果）+ 课程大纲来源。链接多时右下角 `>` 翻页。
+- **知识点**（2026-10-12）：叶子节点在说明下面列出它的知识点，每个带标记：✓ 讲清过 / ✗ 上次没讲清（下面一行小字写错在哪）/ ○ 还没考。带知识点的叶子 `⋯` 菜单里没有“继续拆开”。
 - 锁住的节点：她说 `아직 잠겨 있어요. 「{父节点}」부터 클리어해요.`，没有 →。
 - 在这里输入的问题发给对话（端点 18），回答显示在她的气泡里。
 
@@ -111,19 +112,24 @@ scene 4-1（审计）没有右栏（2026-10-06 改）：整场问答就在舞台
 ```
  ← Calculus  [In progress]
         (avatar 76)  Auditor
-                     Asks like a beginner, judges like an expert
+                     Judges your answer first, then explains
         ───────────────────────────────────────────
+        Picked up where you left off.            Start over
         Auditor
         earlier question (small, grey)
                                    [ your answer ]
         Auditor
+        What she says about your answer: what was right, what to correct.
         The current question, large, in the display serif?
  [ Explain it in your own words…           →]  ∿
 ```
 
 - 一列居中（最宽 720），没有右栏。顶上钉着说话的人（小号形象 + 名字 + 在做什么），表情照旧：提问严肃、失败生气、通过开心；Recorder 出场时换成 Recorder。
 - 问答从上往下读：之前的问题小号灰字，**当前这一句是页面标题**（展示衬线、`headlineMedium` 字号），你的回答是右侧气泡。发出去的回答立刻出现在列里，下方是思考微光。出错时那一句红字代替当前问题，文字回到输入框。新内容出现时自动滚到底。
-- **裁决卡**（判定后出现在列里）：`VERDICT` → 结论 `Cleared.` / `Not yet.`（衬线 `displaySmall`）+ 分数（衬线大数字）→ 通过时 `+N XP` → 评语 → `What was missing` 列出每个 gap（通过但有 gap 时标题为 `Worth a second look`）→ 按钮。通过的卡是 ember 描边。
+- **点评在问题前面**（2026-10-12）：她的每一句先是对你上一个回答的点评（正文字号，哪句对、哪句要纠正、为什么），下面才是当前问题。之前的轮次里点评和问题一起退成小号灰字。裁决前的最后一段点评显示在裁决卡上方。
+- **接着上次**（2026-10-12）：这个节点有没结束的审计时，进来就是原来的对话，列首一行小字 `Picked up where you left off.` 和 `Start over`（开一场新的）。上次没等到回复的回答回到输入框。
+- **可复制**（2026-10-12）：整列文字都可以选中复制；裁决卡右上角有复制按钮（结论、评语、每个知识点和 gap）。
+- **裁决卡**（判定后出现在列里）：`VERDICT` → 结论 `Cleared.` / `Not yet.`（衬线 `displaySmall`）+ 分数（衬线大数字）→ 通过时 `+N XP` → 评语 → `Knowledge points` 逐个列出这场考的知识点（✓ 讲清 / ✗ 没讲清并带一句错在哪 / ○ 没考到）→ `What was missing` 列出每个 gap（通过但有 gap 时标题为 `Worth a second look`）→ 按钮。通过的卡是 ember 描边。
 - **答错**：裁决卡上有墨色按钮 `Make a lesson card`。点了 Recorder 出场问 `What did you misunderstand?`，按钮消失；你在输入栏回答 → `Lesson card created.`，教训卡在下面翻到正面。后台为第一个 gap 检索补充资料，结果出现在 scene 4 的 contents 里。
 - **答对**：庆祝卡浮在整个舞台上方（舞台半透明退后）；关掉后裁决卡留在列里。新解锁的节点在 scene 2 里变成可挑战。
 - 裁决卡上都有 `Back to node`（回 scene 4）。

@@ -28,15 +28,18 @@ import '../../l10n/l10n.dart';
 ///
 /// The speaker (the Auditor, later the Recorder) sits small at the top, with
 /// her mood. Below, the whole Q&A reads top to bottom: past turns small and
-/// grey, the current question large in the display serif, the user's answers
-/// as bubbles on the right. The verdict is a card in the column — outcome,
-/// score, comment and every gap. On a fail, "Make a lesson card" brings the
+/// grey, the current question large in the display serif — under what she
+/// said about the answer before — and the user's answers as bubbles on the
+/// right. The verdict is a card in the column — outcome, score, comment, each
+/// knowledge point and every gap. Everything in the column can be selected
+/// and copied. On a fail, "Make a lesson card" brings the
 /// Recorder (`What did you misunderstand?`); the answer becomes a lesson card
 /// that flips over in the column, and material is searched for the first gap
 /// in the background. A pass also floats a [CelebrationCard] up (XP, level up,
 /// the nodes it opened). To try again, go back to scene 4.
 ///
-/// Route `/skill/:id/audit`. Starts a session when opened.
+/// Route `/skill/:id/audit`. Starts a session when opened, or goes on with the
+/// node's unfinished one (`Start over` begins a new one).
 class AuditScene extends StatefulWidget {
   const AuditScene({super.key, required this.skillId, this.testOut = false});
 
@@ -59,12 +62,16 @@ class _Line {
   _Line({
     required this.fromUser,
     required this.text,
+    this.feedback,
     this.agent = 'auditor',
     this.kind = _Kind.say,
   });
 
   final bool fromUser;
   final String text;
+
+  /// What she said about the answer before, ahead of [text].
+  final String? feedback;
   final String agent;
 
   /// A verdict line is drawn as the [VerdictCard], a lesson line also gets the
@@ -101,6 +108,9 @@ class _AuditSceneState extends State<AuditScene> {
   Object? _startError;
   String _title = '';
   AuditSession? _session;
+
+  /// An unfinished audit was picked up: the column offers `Start over`.
+  bool _resumed = false;
 
   // Dialogue.
   final List<_Line> _lines = [];
@@ -145,11 +155,14 @@ class _AuditSceneState extends State<AuditScene> {
     super.dispose();
   }
 
-  Future<void> _start() async {
+  /// Opens the room: the node's unfinished audit with its dialogue so far, or
+  /// a new one ([restart]: always a new one).
+  Future<void> _start({bool restart = false}) async {
     setState(() {
       _starting = true;
       _startError = null;
       _session = null;
+      _resumed = false;
       _lines.clear();
       _sending = false;
       _problem = null;
@@ -163,15 +176,23 @@ class _AuditSceneState extends State<AuditScene> {
     });
     try {
       final overview = await _api.getSkillOverview(widget.skillId);
-      final start = await _api.startAudit(widget.skillId, testOut: widget.testOut);
+      final start = await _api.startAudit(
+        widget.skillId,
+        testOut: widget.testOut,
+        restart: restart,
+      );
       if (!mounted) return;
       setState(() {
         _title = overview.skill.title;
         _session = start.session;
+        _resumed = start.resumed;
         _lines.addAll([
-          for (final t in start.session.turns) _Line(fromUser: t.isUser, text: t.content),
+          for (final t in start.session.turns)
+            _Line(fromUser: t.isUser, text: t.content, feedback: t.feedback),
         ]);
         if (_lines.isEmpty) _lines.add(_Line(fromUser: false, text: start.openingQuestion));
+        // An answer that never got a reply goes back into the input, to send again.
+        if (_lines.last.fromUser) _input.text = _lines.removeLast().text;
         _starting = false;
       });
     } on Object catch (e) {
@@ -210,21 +231,28 @@ class _AuditSceneState extends State<AuditScene> {
       final result = await _api.submitTurn(session.id, text);
       if (!mounted) return null;
       switch (result) {
-        case ProbeResult(:final question):
+        case ProbeResult(:final question, :final feedback):
           setState(() {
-            _lines.add(_Line(fromUser: false, text: question));
+            _lines.add(_Line(fromUser: false, text: question, feedback: feedback));
             _sending = false;
           });
-          return question;
-        case VerdictResult():
+          return _spoken(feedback, question);
+        case VerdictResult(:final feedback):
           setState(() {
             _verdict = result;
-            _lines.add(_Line(fromUser: false, text: _verdictLine(result), kind: _Kind.verdict));
+            _lines.add(
+              _Line(
+                fromUser: false,
+                text: _verdictLine(result),
+                feedback: feedback,
+                kind: _Kind.verdict,
+              ),
+            );
             _sending = false;
           });
           _appState.markDataChanged();
           if (result.passed) unawaited(_celebrate(result, levelBefore));
-          return _verdictLine(result);
+          return _spoken(feedback, _verdictLine(result));
       }
     } on Object catch (e) {
       if (!mounted) return null;
@@ -325,6 +353,10 @@ class _AuditSceneState extends State<AuditScene> {
   }
 
   // -- her line ------------------------------------------------------------------------
+
+  /// What voice mode reads aloud: what she said about the answer, then her line.
+  String _spoken(String? feedback, String line) =>
+      feedback == null || feedback.isEmpty ? line : '$feedback $line';
 
   String _verdictLine(VerdictResult v) {
     if (v.passed) {
@@ -505,34 +537,39 @@ class _AuditSceneState extends State<AuditScene> {
                 ),
                 const Divider(height: 1, indent: AppSpacing.xl, endIndent: AppSpacing.xl),
                 Expanded(
-                  child: ListView(
-                    key: const Key('audit-qa'),
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.xl,
-                      AppSpacing.xl,
-                      AppSpacing.xl,
-                      AppSpacing.xl,
-                    ),
-                    children: [
-                      for (final (i, line) in _lines.indexed) ...[
-                        _lineView(context, line, current: i == current && _problem == null),
-                        const SizedBox(height: AppSpacing.lg),
+                  // Everything said here can be selected and copied.
+                  child: SelectionArea(
+                    child: ListView(
+                      key: const Key('audit-qa'),
+                      controller: _scroll,
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.xl,
+                        AppSpacing.xl,
+                        AppSpacing.xl,
+                        AppSpacing.xl,
+                      ),
+                      children: [
+                        if (_resumed && _verdict == null)
+                          _ResumedNote(onStartOver: () => unawaited(_start(restart: true))),
+                        for (final (i, line) in _lines.indexed) ...[
+                          _lineView(context, line, current: i == current && _problem == null),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
+                        if (_sending)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: AppSpacing.lg),
+                            child: Align(alignment: Alignment.centerLeft, child: ThinkingShimmer()),
+                          ),
+                        if (_problem != null)
+                          Text(
+                            _problem!,
+                            key: const Key('audit-bubble-text'),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyLarge?.copyWith(color: AppColors.danger),
+                          ),
                       ],
-                      if (_sending)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: AppSpacing.lg),
-                          child: Align(alignment: Alignment.centerLeft, child: ThinkingShimmer()),
-                        ),
-                      if (_problem != null)
-                        Text(
-                          _problem!,
-                          key: const Key('audit-bubble-text'),
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodyLarge?.copyWith(color: AppColors.danger),
-                        ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -549,10 +586,19 @@ class _AuditSceneState extends State<AuditScene> {
       case _Kind.verdict:
         final verdict = _verdict;
         if (verdict == null) return const SizedBox.shrink();
-        return VerdictCard(
-          verdict: verdict,
-          onLesson: verdict.passed || _recorderAsks ? null : _askRecorder,
-          onBack: () => context.go(AppRoutes.skill(widget.skillId)),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (line.feedback case final feedback? when feedback.isNotEmpty) ...[
+              _Feedback(text: feedback, current: true),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            VerdictCard(
+              verdict: verdict,
+              onLesson: verdict.passed || _recorderAsks ? null : _askRecorder,
+              onBack: () => context.go(AppRoutes.skill(widget.skillId)),
+            ),
+          ],
         );
       case _Kind.lesson:
         return Column(
@@ -571,8 +617,66 @@ class _AuditSceneState extends State<AuditScene> {
           ],
         );
       case _Kind.say:
-        return _Question(agent: line.agent, text: line.text, current: current);
+        return _Question(
+          agent: line.agent,
+          text: line.text,
+          feedback: line.feedback,
+          current: current,
+        );
     }
+  }
+}
+
+/// The first row of an audit picked up again: says so, and offers a new one.
+class _ResumedNote extends StatelessWidget {
+  const _ResumedNote({required this.onStartOver});
+
+  final VoidCallback onStartOver;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: const Key('audit-resumed'),
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              context.l10n.auditResumed,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+            ),
+          ),
+          TextButton(
+            key: const Key('audit-start-over'),
+            onPressed: onStartOver,
+            child: Text(context.l10n.startOver),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What she says about the answer before: plain reading text, ahead of her
+/// question (or of the verdict).
+class _Feedback extends StatelessWidget {
+  const _Feedback({required this.text, required this.current});
+
+  final String text;
+  final bool current;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+    return Text(
+      text,
+      key: current ? const Key('audit-feedback') : null,
+      style: current
+          ? theme.bodyLarge?.copyWith(height: 1.5)
+          : theme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+    );
   }
 }
 
@@ -627,10 +731,18 @@ class _SpeakerHeader extends StatelessWidget {
 /// One of her lines. The current one is the headline of the page; the ones
 /// before it step back.
 class _Question extends StatelessWidget {
-  const _Question({required this.agent, required this.text, required this.current});
+  const _Question({
+    required this.agent,
+    required this.text,
+    required this.current,
+    this.feedback,
+  });
 
   final String agent;
   final String text;
+
+  /// What she said about the answer before, shown ahead of [text].
+  final String? feedback;
   final bool current;
 
   @override
@@ -645,6 +757,10 @@ class _Question extends StatelessWidget {
           style: theme.labelSmall?.copyWith(color: AppColors.textTertiary, letterSpacing: 0.4),
         ),
         const SizedBox(height: AppSpacing.xs),
+        if (feedback case final feedback? when feedback.isNotEmpty) ...[
+          _Feedback(text: feedback, current: current),
+          SizedBox(height: current ? AppSpacing.lg : AppSpacing.xs),
+        ],
         Text(
           text,
           key: current ? const Key('audit-bubble-text') : null,

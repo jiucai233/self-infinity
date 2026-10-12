@@ -162,20 +162,37 @@ class _DailyQuestsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final stage = context.watch<StageController>();
     final steps = stage.plan?.steps ?? const <PlanStep>[];
+    final summary = stage.plan?.summary ?? '';
     final done = steps.where(stage.isQuestDone).length;
     return _PanelSection(
       id: 'quests',
       title: context.l10n.dailyQuests,
       trailing: steps.isEmpty ? null : '$done/${steps.length}',
-      child: steps.isEmpty
-          ? const _GetQuestsRow()
-          : Column(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // The time of day, the condition, the focus left (the server's line).
+          if (summary.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: AppSpacing.xs, bottom: AppSpacing.xs),
+              child: Text(
+                summary,
+                key: const Key('quests-summary'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              ),
+            ),
+          if (steps.isEmpty && summary.isEmpty)
+            const _GetQuestsRow()
+          else if (steps.isNotEmpty)
+            Column(
               key: const Key('daily-quests'),
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final step in steps) _QuestRow(step: step, done: stage.isQuestDone(step)),
               ],
             ),
+        ],
+      ),
     );
   }
 }
@@ -217,13 +234,30 @@ class _QuestRow extends StatelessWidget {
                   ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
-              child: Text(
-                step.skillTitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.bodyMedium?.copyWith(
-                  color: done ? AppColors.textTertiary : AppColors.textPrimary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    step.skillTitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.bodyMedium?.copyWith(
+                      color: done ? AppColors.textTertiary : AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    [
+                      switch (step.kind) {
+                        QuestKind.learn => context.l10n.questLearn,
+                        QuestKind.challenge => context.l10n.questChallenge,
+                        QuestKind.review => context.l10n.questReview,
+                      },
+                      if (step.minutes > 0) context.l10n.questMinutes(step.minutes),
+                    ].join(' · '),
+                    key: Key('quest-kind-${step.skillId}'),
+                    style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
+                  ),
+                ],
               ),
             ),
           ],

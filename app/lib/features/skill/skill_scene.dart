@@ -152,7 +152,21 @@ class _SkillSceneState extends State<SkillScene> {
   Future<void> _expand() async {
     final overview = _overview;
     if (overview == null || _working != null) return;
-    await _edit(() => _api.expandSkill(overview.skill.id), working: context.l10n.breakingDown, expand: true);
+    final l = context.l10n;
+    final before = _courseMap;
+    final hadParts = before != null && hasParts(overview.skill, before);
+    final after = await _edit(
+      () => _api.expandSkill(overview.skill.id),
+      working: l.breakingDown,
+      expand: true,
+    );
+    // The Planner found nothing to add: say so, or it looks as if nothing happened.
+    if (after != null && before != null && after.nodes.length == before.nodes.length && mounted) {
+      setState(() {
+        _reply = hadParts ? l.nodeNothingMissing : l.nodeAlreadySmallest;
+        _replyAgent = 'front_desk';
+      });
+    }
   }
 
   /// Runs one edit of the course: the bubble says [working] meanwhile and the
@@ -393,7 +407,8 @@ class _SkillSceneState extends State<SkillScene> {
     return [
       item('skill-edit', l.nodeEdit, () => unawaited(_editNode(node))),
       if (!node.isLinked) item('skill-add-part', l.nodeAddPart, () => unawaited(_addPart(node))),
-      if (!node.isLinked && !node.unexpanded)
+      // A leaf with knowledge points is the smallest node: nothing to break down.
+      if (!node.isLinked && !node.unexpanded && (parts || node.points.isEmpty))
         item('skill-fill-in', parts ? l.nodeFillIn : l.nodeBreakDownFurther, () => unawaited(_expand())),
       if (!root && !parts) item('skill-link', l.nodeLink, () => unawaited(_link(node))),
       item('skill-syllabus', l.nodeApplySyllabus, () => unawaited(_applySyllabus(map))),
@@ -421,9 +436,13 @@ class _SkillSceneState extends State<SkillScene> {
     }
     return LayoutBuilder(
       builder: (context, box) {
-        final contents = _ContentsCard(overview: overview);
         final node = overview.skill;
         final map = _courseMap;
+        final contents = _ContentsCard(
+          overview: overview,
+          // Knowledge points belong to a leaf; a node that got parts no longer shows them.
+          points: map != null && hasParts(node, map) ? const [] : node.points,
+        );
         final chapter = map == null ? null : chapterOf(node.id, map.edges);
         final avatar = _AvatarColumn(
           overview: overview,
@@ -489,13 +508,17 @@ class _SkillSceneState extends State<SkillScene> {
   }
 }
 
-/// The contents card: the description, one row per material (a letter badge,
-/// the title and the site), the course source. More than [pageSize] rows are
+/// The contents card: the description, the knowledge points of a leaf (what
+/// held, what was missed and why), one row per material (a letter badge, the
+/// title and the site), the course source. More than [pageSize] rows are
 /// paged with `>`.
 class _ContentsCard extends StatefulWidget {
-  const _ContentsCard({required this.overview});
+  const _ContentsCard({required this.overview, this.points = const []});
 
   final SkillOverview overview;
+
+  /// The node's knowledge points, when it is a leaf that has them.
+  final List<SkillPoint> points;
 
   @override
   State<_ContentsCard> createState() => _ContentsCardState();
@@ -542,6 +565,20 @@ class _ContentsCardState extends State<_ContentsCard> {
               key: const Key('skill-description'),
               style: theme.bodyLarge,
             ),
+            if (widget.points.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.lg),
+              const Divider(),
+              const SizedBox(height: AppSpacing.md),
+              Text(context.l10n.knowledgePoints, style: theme.labelMedium),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                context.l10n.knowledgePointsHint,
+                style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              for (final (i, point) in widget.points.indexed)
+                PointRow(key: Key('skill-point-$i'), point: point),
+            ],
             if (shown.isNotEmpty || course.hasSource) ...[
               const SizedBox(height: AppSpacing.lg),
               const Divider(),

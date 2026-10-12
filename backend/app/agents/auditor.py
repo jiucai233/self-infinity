@@ -1,15 +1,20 @@
 """Auditor：费曼审计的主考官。
 
-每一轮它要么问一个追问（probe），要么给出最终裁决（verdict），故意扮演两个角色：
+每一轮它先点评用户刚才的回答（feedback），然后要么再问一个问题（probe），要么给出最终裁决
+（verdict）。几条定下来的规矩：
 
-- **提问时是一个完全的初学者。** 只问用户说过但没解释的东西，绝不引入用户没提过的概念
-  或陷阱问题——真正的初学者做不到，而一个专家式的考官考的是考官自己的知识，不是用户的理解。
-- **只判，不教。** 问题、缺口、评语里都不说出答案：缺口只指出缺了什么、哪里错了，不写正确
-  版本——答案由用户自己想出来，否则审计就变成了讲课，用户也就不必真的理解。
-- **裁决时是专家，但考的是这个节点，不是整个领域。** 标准是节点的 Covers：说错的一律
-  算缺口（问没问到都算，提问时的克制不能变成对错误的放水）；漏掉的只有节点离了它就不成立
-  时才算——规格、数字、型号这类做的时候会去查的细节不算，除非 Covers 点了名。缺口最多三条。
-  只漏了一个关键步骤又不是最后一轮时，先问那一步，而不是直接判不通过。
+- **先判后教。** 点评里说清哪句对、哪句错，并把错的纠正过来（正确的说法和理由）——但只能
+  在用户答过之后。正在问的这道题，问题里不能带答案或暗示。被纠正过的知识点这一场记为没过：
+  它是听来的，不是自己讲出来的。
+- **问情境，不问定义。** 每个问题给一个具体情境，要一个判断和理由（"假设……会怎样、为什么"，
+  "这两个算法形式一样，为什么分工不同"，"你看到……，怎么验证是不是真问题"），并且一层比一层
+  深。背定义答得出来的问题分不出懂和没懂。
+- **按知识点考。** 叶子节点带着它的知识点（app/services/points.py）；这一场只考还没过的那些，
+  每个最多两问，裁决里逐个给出结果。上次过了的不再重考。
+- **裁决考的是这个节点，不是整个领域。** 标准是节点的 Covers：说错的一律算缺口；漏掉的只有
+  节点离了它就不成立时才算——规格、数字、型号这类做的时候会去查的细节不算，除非 Covers 点了名。
+  缺口最多三条。
+- **不逼问。** 用户说不会、顶不住了，就讲清楚、记为没过、往下走。
 
 第一个问题不由模型生成，来自按节点位置选的模板（app/services/audit_flow.py）。轮数上限由
 代码强制，不告诉模型还剩几轮（它只是安全阀，不是配额）。pacing 只影响提问的长短，不影响
@@ -46,73 +51,119 @@ FINAL_TURN_LINE = "This is the final turn: give the verdict now, do not ask anot
 SYSTEM_PROMPT = (
     agent_tag("auditor")
     + """
-You run a Feynman audit: the user explains a topic, and you decide
-whether they understand it.
+You run a Feynman audit as an oral exam: the user explains a topic in
+their own words, and you find out whether they really understand it, the
+way a good interviewer does.
 
 Node: {title}
 Covers: {description}
 Position: {position}
-{parts_line}The user's past lessons that may be relevant, most recent first:
+{parts_line}{points_block}The user's past lessons that may be relevant, most recent first:
 <lessons>
 {lessons}
 </lessons>
 Pacing: {pacing}
 
-Each turn, output either one question (probe) or the final verdict.
+Each turn, output feedback on the user's last answer, then either one
+question (probe) or the final verdict.
 
-You only judge; you never teach. Never give the answer anywhere, in a
-question, a gap or the comment: no correct fact, step, value, definition or
-explanation the user did not give. A question must not contain or hint at
-its own answer. A gap names what is missing or wrong ("how the board gets
-power"), never the right version of it.
+FEEDBACK: judge first, then teach.
+- Say which part of the answer was right and which part was wrong or
+  missing. Point at their own words ("your first claim is right; the
+  second needs correcting") so they know which claim you mean.
+- Correct what was wrong: give the right version and the reason for it,
+  in two to four sentences. An answer that was fully right gets one
+  sentence saying so and why.
+- You may explain something only after the user has answered about it.
+  Never reveal or hint at the answer to the question you are asking now.
+- No praise for its own sake, no filler, no summary of the whole topic.
+- If the user says they do not know, or that they have had enough: do not
+  push. Explain it briefly, count it as missed and go on, or give the
+  verdict if nothing is left to ask.
 
-QUESTIONING: act as a complete beginner.
-- Ask one question per turn.
-- Ask only when (a) the user used a term or step they have not explained,
-  (b) two things the user said do not connect or seem to contradict, or
-  (c) the user skipped something "Covers" names that the node cannot work
-  without: ask what happens there, rather than failing them for it.
-- Never introduce a concept, term, example or hypothetical that neither
-  the user nor "Covers" mentions. Never set traps.
+QUESTIONING: one question per turn, each one a layer deeper.
+- Ask about a specific situation and for a judgement with its reason,
+  never for a definition to recite: "Suppose X is removed, shuffled or
+  pushed to an extreme: what happens, and why?", "A and B are computed the
+  same way: why do they end up doing different jobs?", "You observe Y in
+  practice: is it a real problem, and how would you check?"
+- Build on what the user just said. When they were right, go one layer
+  deeper (what it does, then why it is built that way, then what breaks
+  when it changes, then how to check it in practice) or move on. When
+  they were wrong, correct it in the feedback and ask something
+  different. Never ask the same question twice.
+- {scope_line}
+- The situation must be one that can really happen in the mechanism, with
+  a definite answer that follows from the node: no trick questions, and
+  nothing that needs knowledge outside "Covers".
+- Close the question by saying what a good answer has to tell apart or
+  justify, without giving it away. At most three sentences in all.
 - If the user's explanation touches the situation of a past lesson above,
-  you may ask about that point.
-- If you could repeat the explanation back without gaps, stop asking and
+  you may build a question on that point.
+- At most two questions on one point. When there is nothing left to ask,
   give the verdict. Never ask questions just to fill turns.
-- Light pacing: keep each question to one short sentence.
+- Light pacing: a one-sentence situation and a one-sentence question.
 
-VERDICT: switch to an expert mentor, and grade this node, not the field.
-- The question is: from everything they said, would an expert mentor
-  believe this person understands this node, or can do this step? Not:
-  could a stranger follow their words as a manual.
+VERDICT: grade this node, not the field.
+- The question is: from their own answers, would an expert mentor believe
+  this person understands this node, or can do this step? Not: could a
+  stranger follow their words as a manual.
+- What you explained in feedback does not count for them. Something is
+  understood only if their own answer had its core right before you
+  corrected it, or a later answer applied it correctly to a new question.
 - Credit what they did and the result they got: a working result they
   report (it runs, it moves, it prints the right thing) counts as knowing
   how to tell it is done. Following the official guide for routine commands
   and configuration counts as knowing those steps.
-- A gap is (a) a claim that is wrong or plausible-sounding but wrong, even
-  if you never asked about it, or (b) an essential part of "Covers" they
-  show they do not know. Brevity is not a gap. Details one would look up
-  while doing it (exact specs, numbers, part names, commands, every
-  sub-step) are not gaps unless "Covers" names them.
-- Restraint while questioning must not become leniency about errors.
-- At most three gaps, the most important first.
-- pass is true when nothing stated is wrong and nothing shows an essential
-  part is not understood. If unsure whether they know a part, ask about it;
-  on the final turn, give the benefit of the doubt.
+- A gap is (a) a claim that was wrong or plausible-sounding but wrong,
+  even if you never asked about it, or (b) an essential part of "Covers"
+  they showed they do not know. Brevity is not a gap. Details one would
+  look up while doing it (exact specs, numbers, part names, commands,
+  every sub-step) are not gaps unless "Covers" names them.
+- A gap names what was wrong or missing in a few words. At most three
+  gaps, the most important first.
+- pass is true when nothing they said still stands wrong and nothing
+  shows an essential part is not understood. If unsure whether they know
+  a part, ask about it; on the final turn, give the benefit of the doubt.
 - Pacing never changes this standard.
-
+{points_verdict}
 {position_block}
 {final_line}
-The comment explains the verdict in the same way, without the answer.
-score: 0 to 100, how much of the node the explanation got right. It is
+The comment says in one or two sentences what holds and what to work on
+next.
+score: 0 to 100, how much of the node their own answers got right. It is
 reported to the user; it does not decide pass, the gaps do.
 
-Write questions, gaps and comment in English.
+Write feedback, questions, gaps and comment in English. If the user
+answers in another language, write in theirs.
 
 Output only JSON, one of:
-{{"action": "probe", "question": "..."}}
-{{"action": "verdict", "pass": false, "score": 60, "gaps": ["..."], "comment": "one or two sentences explaining the verdict"}}
+{{"action": "probe", "feedback": "...", "point": "the point this question examines, or null", "question": "..."}}
+{{"action": "verdict", "feedback": "...", "pass": false, "score": 60, "points": [{{"point": "...", "ok": false, "note": "..."}}], "gaps": ["..."], "comment": "..."}}
 """
 )
+
+POINTS_BLOCK = """Points, the knowledge points inside this node; this audit examines these
+(after a dash: what the user got wrong about it last time; ask about it
+again with a different question):
+{points}
+{settled}"""
+
+SETTLED_LINE = "Explained right in an earlier audit, do not ask about them again: {titles}\n"
+
+SCOPE_POINTS = (
+    'Ask about one point from Points at a time, in their order, and name it in "point". '
+    "Ask about every point before the verdict."
+)
+SCOPE_COVERS = 'What a question tests is in "Covers" (and in Parts, when listed).'
+
+POINTS_VERDICT = """- "points" has one entry for each point in Points: ok is true when their own
+  answers showed they understand it, false when they got it wrong, did
+  not know it or needed your correction, and null when it never came up.
+  For a point that is not ok, "note" says in one sentence what they got
+  wrong or could not say; it is kept on the node for next time.
+  pass is true only when every point is ok.
+"""
 
 POSITION_BLOCKS = {
     "leaf": (
@@ -183,11 +234,17 @@ def format_lessons(lessons: Sequence[Lesson] | None) -> str:
 @dataclass
 class AuditorTurnResult:
     is_verdict: bool
+    # What she says about the answer before, ahead of the question or the verdict.
+    feedback: str | None = None
     question: str | None = None
+    # The knowledge point the question examines (one of the audit's points), if any.
+    point: str | None = None
     passed: bool | None = None
     score: int | None = None
     gaps: list[str] | None = None
     comment: str | None = None
+    # On a verdict of an audit with points: `[{"title", "ok", "note"}]`, one per point examined.
+    points: list[dict] | None = None
 
 
 class Auditor:
@@ -207,10 +264,15 @@ class Auditor:
         pacing: str = "normal",
         after_challenge: bool = False,
         test_out: bool = False,
+        points: list[dict] | None = None,
+        settled: list[str] | None = None,
     ) -> AuditorTurnResult:
         """`after_challenge`: the last answer replied to the Challenger's question, so this
         turn must be the verdict (like a turn at the limit). `test_out`: a challenge on a whole
-        branch; `child_titles` are then the parts under it to sample from."""
+        branch; `child_titles` are then the parts under it to sample from. `points`: the
+        knowledge points this audit examines (`{"title", "note"}`, the note being what was
+        wrong last time); `settled`: the node's other points, explained right before and not
+        asked again."""
         if max_turns is None:
             max_turns = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
         if pacing not in PACINGS:
@@ -220,6 +282,17 @@ class Auditor:
         parts_line = ""
         if (test_out or position in (NodePosition.root, NodePosition.branch)) and child_titles:
             parts_line = f"Parts: {', '.join(child_titles)}\n"
+
+        noted = list(points or [])
+        points = [p["title"] for p in noted]
+        points_block = ""
+        if points:
+            points_block = POINTS_BLOCK.format(
+                points="\n".join(
+                    f"- {p['title']}" + (f" — {_one_line(p['note'])}" if p.get("note") else "") for p in noted
+                ),
+                settled=SETTLED_LINE.format(titles=", ".join(settled)) if settled else "",
+            )
 
         user_turn_count = sum(1 for m in history if m["role"] == "user")
         final = after_challenge or user_turn_count >= max_turns
@@ -232,6 +305,9 @@ class Auditor:
             description=skill_description,
             position="challenge on the whole area" if test_out else position.value,
             parts_line=parts_line,
+            points_block=points_block,
+            scope_line=SCOPE_POINTS if points else SCOPE_COVERS,
+            points_verdict=POINTS_VERDICT if points else "",
             lessons=format_lessons(lessons),
             pacing=pacing,
             position_block=POSITION_BLOCKS["test_out"] if test_out else position_block(node_type, position),
@@ -249,13 +325,22 @@ class Auditor:
         data = self._parse(raw, final=final, after_challenge=after_challenge)
 
         if data["action"] == "probe":
-            return AuditorTurnResult(is_verdict=False, question=data["question"])
+            return AuditorTurnResult(
+                is_verdict=False,
+                feedback=data.get("feedback"),
+                question=data["question"],
+                point=_named(data.get("point"), points),
+            )
+        results = point_results(data.get("points"), points, data["pass"]) if points else None
         return AuditorTurnResult(
             is_verdict=True,
-            passed=data["pass"],
+            feedback=data.get("feedback"),
+            # Every point has to hold: a pass with a point marked wrong is not one.
+            passed=data["pass"] and all(r["ok"] for r in results or []),
             score=data["score"],
             gaps=data["gaps"],
             comment=data["comment"],
+            points=results,
         )
 
     @staticmethod
@@ -272,7 +357,12 @@ class Auditor:
                     # 必须裁决的一轮还执意追问：它没被说服，系统强制收敛为不通过。
                     if final:
                         return Auditor._forced_verdict(after_challenge)
-                    return {"action": "probe", "question": question}
+                    return {
+                        "action": "probe",
+                        "question": question,
+                        "feedback": _text(data.get("feedback")),
+                        "point": data.get("point"),
+                    }
             elif data.get("action") == "verdict":
                 verdict = Auditor._clean_verdict(data)
                 if verdict is not None:
@@ -305,6 +395,8 @@ class Auditor:
             "score": max(0, min(100, score)),
             "gaps": gaps[:MAX_GAPS],
             "comment": str(data.get("comment") or "").strip(),
+            "feedback": _text(data.get("feedback")),
+            "points": data.get("points"),
         }
 
     @staticmethod
@@ -316,3 +408,35 @@ class Auditor:
             "gaps": list(CHALLENGE_GAPS if after_challenge else FORCED_GAPS),
             "comment": CHALLENGE_COMMENT if after_challenge else FORCED_COMMENT,
         }
+
+
+def _text(value) -> str | None:
+    text = str(value).strip() if isinstance(value, str) else ""
+    return text or None
+
+
+def _named(value, points: list[str]) -> str | None:
+    """The point of `points` the model named, matched without case; None for anything else."""
+    name = " ".join(str(value or "").split()).casefold()
+    return next((p for p in points if p.casefold() == name), None) if name else None
+
+
+def point_results(raw, points: list[str], passed: bool) -> list[dict]:
+    """The verdict's result for each point examined, in their order, with the note of what was
+    wrong. A point the model left out or left open counts as held on a pass (she vouched for
+    the whole node) and stays open (null) on a fail, so the next audit asks about it."""
+    given: dict[str, dict] = {}
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict):
+            continue
+        title = _named(item.get("point") or item.get("title"), points)
+        if title is not None and title not in given:
+            given[title] = item
+    results = []
+    for title in points:
+        item = given.get(title, {})
+        ok = item.get("ok") if isinstance(item.get("ok"), bool) else None
+        if ok is None and passed:
+            ok = True
+        results.append({"title": title, "ok": ok, "note": None if ok else _text(item.get("note"))})
+    return results

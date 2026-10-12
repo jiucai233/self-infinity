@@ -141,9 +141,14 @@ class HttpApi implements SelfInfinityApi {
   // -- 7–9: audits ------------------------------------------------------------
 
   @override
-  Future<AuditStart> startAudit(int skillId, {String mode = 'day', bool testOut = false}) => _post(
+  Future<AuditStart> startAudit(
+    int skillId, {
+    String mode = 'day',
+    bool testOut = false,
+    bool restart = false,
+  }) => _post(
     '/skills/$skillId/audits',
-    body: {'mode': mode, if (testOut) 'test_out': true},
+    body: {'mode': mode, if (testOut) 'test_out': true, if (restart) 'restart': true},
     parse: (j) => AuditStart.fromJson(_object(j)),
   );
 
@@ -297,6 +302,9 @@ class HttpApi implements SelfInfinityApi {
     '/plan/current',
     parse: (j) => j == null ? null : StudyPlan.fromJson(_object(j)),
   );
+
+  @override
+  Future<StudyPlan> generatePlan() => _post('/plan/generate', parse: (j) => StudyPlan.fromJson(_object(j)));
 
   @override
   Future<Profile> getProfile() => _get('/profile', parse: (j) => Profile.fromJson(_object(j)));

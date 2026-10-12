@@ -286,6 +286,36 @@ enum Tier {
   static Tier fromJson(Object? raw) => _enumFrom(values, (e) => e.value, raw, 'Tier');
 }
 
+/// What a daily quest asks (contract #15): explain an open node, prove a
+/// category not broken down yet whole, or explain a mastered node again.
+enum QuestKind {
+  learn('learn'),
+  challenge('challenge'),
+  review('review');
+
+  const QuestKind(this.value);
+  final String value;
+
+  /// Plans older than 2026-10-09 have no kind: they were all [learn].
+  static QuestKind fromJson(Object? raw) =>
+      raw == null ? learn : _enumFrom(values, (e) => e.value, raw, 'QuestKind');
+}
+
+/// The time of day a plan was made for (KST): morning 5–12, afternoon 12–18,
+/// evening 18–23, night 23–5.
+enum DaySlot {
+  morning('morning'),
+  afternoon('afternoon'),
+  evening('evening'),
+  night('night');
+
+  const DaySlot(this.value);
+  final String value;
+
+  static DaySlot? fromJson(Object? raw) =>
+      raw == null ? null : _enumFrom(values, (e) => e.value, raw, 'DaySlot');
+}
+
 /// `context_bucket` of the recommender.
 enum ContextBucket {
   low('low'),
@@ -447,6 +477,7 @@ class SkillNode {
     this.unexpanded = false,
     this.testedOut = false,
     this.linkedCourseId,
+    this.points = const [],
   });
 
   factory SkillNode.fromJson(Json json) => SkillNode(
@@ -461,6 +492,7 @@ class SkillNode {
     unexpanded: _boolN(json, 'unexpanded') ?? false,
     testedOut: _boolN(json, 'tested_out') ?? false,
     linkedCourseId: _intN(json, 'linked_course_id'),
+    points: json['points'] == null ? const [] : _list(json, 'points', SkillPoint.fromJson),
   );
 
   final int id;
@@ -486,6 +518,11 @@ class SkillNode {
   /// course's tree, and it is mastered with that course. Null for a plain node.
   final int? linkedCourseId;
 
+  /// The knowledge points inside a leaf, with what held and what was missed.
+  /// A leaf that has them is the smallest node: it is audited point by point
+  /// and not broken down. Empty for every other node.
+  final List<SkillPoint> points;
+
   bool get isLinked => linkedCourseId != null;
 
   bool get isLocked => status == SkillStatus.locked;
@@ -502,6 +539,7 @@ class SkillNode {
     bool? unexpanded,
     bool? testedOut,
     int? Function()? linkedCourseId,
+    List<SkillPoint>? points,
   }) => SkillNode(
     id: id,
     courseId: courseId,
@@ -514,7 +552,33 @@ class SkillNode {
     unexpanded: unexpanded ?? this.unexpanded,
     testedOut: testedOut ?? this.testedOut,
     linkedCourseId: linkedCourseId == null ? this.linkedCourseId : linkedCourseId(),
+    points: points ?? this.points,
   );
+}
+
+/// One knowledge point inside a leaf. Contract: `Point`.
+@immutable
+class SkillPoint {
+  const SkillPoint({required this.title, this.ok, this.note});
+
+  factory SkillPoint.fromJson(Json json) =>
+      SkillPoint(title: _str(json, 'title'), ok: _boolN(json, 'ok'), note: _strN(json, 'note'));
+
+  final String title;
+
+  /// Explained right in an audit (true), missed in the last one (false) or
+  /// not asked yet (null).
+  final bool? ok;
+
+  /// What was wrong when it was missed; null otherwise.
+  final String? note;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SkillPoint && other.title == title && other.ok == ok && other.note == note;
+
+  @override
+  int get hashCode => Object.hash(title, ok, note);
 }
 
 /// An edge between two skill nodes. Contract: `SkillEdge`.
@@ -725,13 +789,20 @@ class Recommendation {
 /// One message of an audit dialogue. Contract: `AuditSession.turns[]`.
 @immutable
 class AuditTurn {
-  const AuditTurn({required this.role, required this.content});
+  const AuditTurn({required this.role, required this.content, this.feedback});
 
-  factory AuditTurn.fromJson(Json json) =>
-      AuditTurn(role: AuditRole.fromJson(json['role']), content: _str(json, 'content'));
+  factory AuditTurn.fromJson(Json json) => AuditTurn(
+    role: AuditRole.fromJson(json['role']),
+    content: _str(json, 'content'),
+    feedback: _strN(json, 'feedback'),
+  );
 
   final AuditRole role;
   final String content;
+
+  /// On the Auditor's turns: what she said about the answer before, ahead of
+  /// her question.
+  final String? feedback;
 
   bool get isUser => role == AuditRole.user;
 }
@@ -749,6 +820,7 @@ class AuditSession {
     this.comment,
     this.turns = const [],
     this.testOut = false,
+    this.points = const [],
   });
 
   factory AuditSession.fromJson(Json json) => AuditSession(
@@ -761,6 +833,7 @@ class AuditSession {
     comment: _strN(json, 'comment'),
     turns: _list(json, 'turns', AuditTurn.fromJson),
     testOut: _boolN(json, 'test_out') ?? false,
+    points: json['points'] == null ? const [] : _list(json, 'points', SkillPoint.fromJson),
   );
 
   final int id;
@@ -776,20 +849,28 @@ class AuditSession {
 
   /// A challenge on a whole branch: pass it and everything under it is mastered.
   final bool testOut;
+
+  /// The knowledge points this audit examines; their results once it is closed.
+  final List<SkillPoint> points;
 }
 
 /// Body of `POST /skills/{id}/audits`. Contract endpoint 7.
 @immutable
 class AuditStart {
-  const AuditStart({required this.session, required this.openingQuestion});
+  const AuditStart({required this.session, required this.openingQuestion, this.resumed = false});
 
   factory AuditStart.fromJson(Json json) => AuditStart(
     session: AuditSession.fromJson(_obj(json, 'session')),
     openingQuestion: _str(json, 'opening_question'),
+    resumed: _boolN(json, 'resumed') ?? false,
   );
 
   final AuditSession session;
   final String openingQuestion;
+
+  /// An unfinished audit of the node picked up again: [session] holds the
+  /// dialogue so far.
+  final bool resumed;
 }
 
 /// Result of `POST /audits/{id}/turns` — exactly one of [ProbeResult] or
@@ -814,11 +895,22 @@ sealed class TurnResult {
 
 /// The auditor asks a follow-up question.
 final class ProbeResult extends TurnResult {
-  const ProbeResult({required this.question});
+  const ProbeResult({required this.question, this.feedback, this.point});
 
-  factory ProbeResult.fromJson(Json json) => ProbeResult(question: _str(json, 'question'));
+  factory ProbeResult.fromJson(Json json) => ProbeResult(
+    question: _str(json, 'question'),
+    feedback: _strN(json, 'feedback'),
+    point: _strN(json, 'point'),
+  );
 
   final String question;
+
+  /// What she says about the answer just given, before the question.
+  final String? feedback;
+
+  /// The knowledge point the question examines, when the audit goes point by
+  /// point.
+  final String? point;
 }
 
 /// The final verdict of an audit.
@@ -828,6 +920,8 @@ final class VerdictResult extends TurnResult {
     required this.score,
     this.gaps = const [],
     this.comment,
+    this.feedback,
+    this.points = const [],
     this.unlockedSkillIds = const [],
     this.rewardAmount,
     this.rewardMultiplier,
@@ -838,6 +932,8 @@ final class VerdictResult extends TurnResult {
     score: _int(json, 'score'),
     gaps: _strList(json, 'gaps'),
     comment: _strN(json, 'comment'),
+    feedback: _strN(json, 'feedback'),
+    points: json['points'] == null ? const [] : _list(json, 'points', SkillPoint.fromJson),
     unlockedSkillIds: _intList(json, 'unlocked_skill_ids'),
     rewardAmount: _intN(json, 'reward_amount'),
     rewardMultiplier: _doubleN(json, 'reward_multiplier'),
@@ -851,6 +947,12 @@ final class VerdictResult extends TurnResult {
   /// Empty on a pass.
   final List<String> gaps;
   final String? comment;
+
+  /// What she says about the last answer, before the verdict.
+  final String? feedback;
+
+  /// One per knowledge point examined: what held, what was missed and why.
+  final List<SkillPoint> points;
 
   /// Nodes that changed from locked to available (pass only).
   final List<int> unlockedSkillIds;
@@ -1514,6 +1616,8 @@ class PlanStep {
     required this.nodeType,
     required this.rationale,
     required this.focusHint,
+    this.kind = QuestKind.learn,
+    this.minutes = 0,
   });
 
   factory PlanStep.fromJson(Json json) => PlanStep(
@@ -1523,6 +1627,8 @@ class PlanStep {
     nodeType: NodeType.fromJson(json['node_type']),
     rationale: _str(json, 'rationale'),
     focusHint: _str(json, 'focus_hint'),
+    kind: QuestKind.fromJson(json['kind']),
+    minutes: _intN(json, 'minutes') ?? 0,
   );
 
   final int skillId;
@@ -1531,6 +1637,10 @@ class PlanStep {
   final NodeType nodeType;
   final String rationale;
   final String focusHint;
+  final QuestKind kind;
+
+  /// About how long it takes; 0 on plans older than 2026-10-09.
+  final int minutes;
 }
 
 /// Contract: `StudyPlan`. Up to five steps, in study order.
@@ -1542,6 +1652,12 @@ class StudyPlan {
     required this.contextBucket,
     required this.createdAt,
     required this.steps,
+    this.slot,
+    this.focusBudget,
+    this.focusSpent,
+    this.focusLeft,
+    this.summary = '',
+    this.stale = false,
   });
 
   factory StudyPlan.fromJson(Json json) => StudyPlan(
@@ -1550,6 +1666,12 @@ class StudyPlan {
     contextBucket: ContextBucket.fromJson(json['context_bucket']),
     createdAt: _time(json, 'created_at'),
     steps: _list(json, 'steps', PlanStep.fromJson),
+    slot: DaySlot.fromJson(json['slot']),
+    focusBudget: _intN(json, 'focus_budget'),
+    focusSpent: _intN(json, 'focus_spent'),
+    focusLeft: _intN(json, 'focus_left'),
+    summary: _strN(json, 'summary') ?? '',
+    stale: _boolN(json, 'stale') ?? false,
   );
 
   final int id;
@@ -1559,6 +1681,22 @@ class StudyPlan {
   /// UTC.
   final DateTime createdAt;
   final List<PlanStep> steps;
+
+  /// The time of day it was made for; null on plans older than 2026-10-09.
+  final DaySlot? slot;
+
+  /// Minutes of focus for the day (by the condition), what today's audits
+  /// took, and what was left when it was made.
+  final int? focusBudget;
+  final int? focusSpent;
+  final int? focusLeft;
+
+  /// The line above the quests: the time of day, the condition, the
+  /// player's own numbers for a day like today, the focus left.
+  final String summary;
+
+  /// Made for another time of day or another day: it is made again.
+  final bool stale;
 }
 
 /// One search result. The URL always comes from a search result, never from

@@ -6,6 +6,7 @@
 - 日历日期（DailyCheckIn.date）按 APP_TIMEZONE 计算，不在这里处理。
 """
 
+import json
 from datetime import date as date_
 from datetime import datetime, timezone
 from enum import StrEnum
@@ -43,6 +44,28 @@ class UTCDateTime(TypeDecorator):
         if value is None:
             return None
         return as_utc(value)
+
+
+def parse_points(raw: str | None) -> list[dict]:
+    """A `points_json` column as `[{"title": str, "ok": bool | None, "note": str | None}]`;
+    [] when empty or broken."""
+    try:
+        items = json.loads(raw) if raw else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+    points = []
+    for item in items if isinstance(items, list) else []:
+        if isinstance(item, dict) and str(item.get("title") or "").strip():
+            ok = item.get("ok")
+            note = str(item.get("note") or "").strip()
+            points.append(
+                {
+                    "title": str(item["title"]).strip(),
+                    "ok": ok if isinstance(ok, bool) else None,
+                    "note": note or None,
+                }
+            )
+    return points
 
 
 class SkillStatus(StrEnum):
@@ -142,6 +165,15 @@ class SkillNode(SQLModel, table=True):
     # This node is another of the player's courses ("Computer Vision" inside a CS course): its
     # parts are that course's tree, and it is mastered with that course (app/services/course_edit.py).
     linked_course_id: int | None = None
+    # The knowledge points inside a leaf (app/services/points.py): `[{"title", "ok", "note"}]`. ok
+    # is true (explained right in an audit), false (missed in the last one) or null (not asked
+    # yet); note says what was wrong when it was missed. A leaf that has them is the smallest
+    # node: it is audited point by point, not broken down.
+    points_json: str | None = None
+
+    @property
+    def points(self) -> list[dict]:
+        return parse_points(self.points_json)
 
 
 class SkillEdge(SQLModel, table=True):
@@ -182,7 +214,14 @@ class AuditSession(SQLModel, table=True):
     review_leaked: bool | None = None
     # A challenge on a whole branch (or course): pass it and every node under it is mastered.
     test_out: bool | None = None
+    # The knowledge points this audit examines, `[{"title", "ok", "note"}]`: the node's points
+    # still open when it started, with their result once it is closed.
+    points_json: str | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+
+    @property
+    def points(self) -> list[dict]:
+        return parse_points(self.points_json)
 
 
 class AuditTurn(SQLModel, table=True):
@@ -190,6 +229,8 @@ class AuditTurn(SQLModel, table=True):
     session_id: int = Field(foreign_key="auditsession.id", index=True)
     role: TurnRole
     content: str
+    # On the Auditor's turns: what she said about the answer before, ahead of her question.
+    feedback: str | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 

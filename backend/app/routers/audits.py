@@ -22,7 +22,7 @@ from app.schemas import (
     TurnResult,
     VerdictResult,
 )
-from app.services import audit_flow, linking
+from app.services import audit_flow, linking, points
 from app.services.audit_flow import AuditClosed, AuditorUnavailable, ProbeOutcome
 
 logger = logging.getLogger(__name__)
@@ -39,8 +39,12 @@ def _session_out(session: Session, audit: AuditSession) -> AuditSessionOut:
         score=audit.score,
         gaps=json.loads(audit.gaps_json) if audit.gaps_json else [],
         comment=audit.comment,
-        turns=[AuditTurnOut(role=t.role.value, content=t.content) for t in audit_flow.audit_turns(session, audit.id)],
+        turns=[
+            AuditTurnOut(role=t.role.value, content=t.content, feedback=t.feedback)
+            for t in audit_flow.audit_turns(session, audit.id)
+        ],
         test_out=bool(audit.test_out),
+        points=audit.points,
     )
 
 
@@ -92,8 +96,15 @@ def start_audit(
         if skill.unexpanded:
             raise HTTPException(400, "Break this node down first, or challenge it as a whole.")
 
-    audit, question = audit_flow.start_audit(session, skill, body.mode, test_out=body.test_out)
-    return StartAuditResponse(session=_session_out(session, audit), opening_question=question)
+    # A leaf without knowledge points yet (an older course, a node added by hand) gets them
+    # before its first audit: one LLM call, once per node.
+    if not body.test_out and (body.restart or audit_flow.unfinished_audit(session, skill) is None):
+        points.ensure_points(session, skill, get_provider("point_lister"))
+
+    audit, question, resumed = audit_flow.start_audit(
+        session, skill, body.mode, test_out=body.test_out, restart=body.restart
+    )
+    return StartAuditResponse(session=_session_out(session, audit), opening_question=question, resumed=resumed)
 
 
 @router.post("/audits/{audit_id}/turns", response_model=TurnResult)
@@ -120,12 +131,14 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
         raise HTTPException(400, "audit session is already closed")
 
     if isinstance(outcome, ProbeOutcome):
-        return ProbeResult(question=outcome.question)
+        return ProbeResult(question=outcome.question, feedback=outcome.feedback, point=outcome.point)
     return VerdictResult(
         passed=outcome.passed,
         score=outcome.score,
         gaps=outcome.gaps,
         comment=outcome.comment,
+        feedback=outcome.feedback,
+        points=outcome.points,
         unlocked_skill_ids=outcome.unlocked_skill_ids,
         reward_amount=outcome.reward_amount,
         reward_multiplier=outcome.reward_multiplier,

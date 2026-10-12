@@ -39,6 +39,10 @@ class StageController extends ChangeNotifier {
   List<Principle> _lessons = const [];
   LifeTree _tree = LifeTree.build();
   Set<int> _doneToday = const {};
+  Set<int> _reviewedSincePlan = const {};
+
+  /// The plan made again because it was stale (one try per stale plan).
+  int? _remadeFrom;
   bool _loaded = false;
 
   /// The briefing facts (null until loaded or when the call failed).
@@ -69,9 +73,12 @@ class StageController extends ChangeNotifier {
   /// The current study plan (GET /plan/current), or null.
   StudyPlan? get plan => _plan;
 
-  /// Whether the daily quest [step] is done: its node is mastered or was
-  /// audited (finished) today, KST.
-  bool isQuestDone(PlanStep step) => _doneToday.contains(step.skillId);
+  /// Whether the daily quest [step] is done: a review when its node was
+  /// audited again after the plan was made; any other when its node is
+  /// mastered or was audited (finished) today, KST.
+  bool isQuestDone(PlanStep step) => step.kind == QuestKind.review
+      ? _reviewedSincePlan.contains(step.skillId)
+      : _doneToday.contains(step.skillId);
 
   /// Whether the first load finished.
   bool get loaded => _loaded;
@@ -111,8 +118,36 @@ class StageController extends ChangeNotifier {
       _audits,
       (results[5] as List<SkillNode>?) ?? const [],
     );
+    _reviewedSincePlan = _reviewed(_plan, _audits);
     _loaded = true;
     notifyListeners();
+    unawaited(_remakeIfStale(token));
+  }
+
+  /// A plan made for another time of day or another day is made again, once,
+  /// in the background (the server's plan follows the time of day).
+  Future<void> _remakeIfStale(int token) async {
+    final plan = _plan;
+    if (plan == null || !plan.stale || _remadeFrom == plan.id) return;
+    _remadeFrom = plan.id;
+    try {
+      final fresh = await api.generatePlan();
+      if (_disposed || token != _token) return;
+      _plan = fresh;
+      _reviewedSincePlan = _reviewed(fresh, _audits);
+      notifyListeners();
+    } on Object {
+      // Keep the old one: it still lists something to do.
+    }
+  }
+
+  /// Nodes audited (finished) after [plan] was made.
+  static Set<int> _reviewed(StudyPlan? plan, List<AuditSummary> audits) {
+    if (plan == null) return const {};
+    return {
+      for (final a in audits)
+        if (a.status != AuditStatus.active && !a.createdAt.isBefore(plan.createdAt)) a.skillId,
+    };
   }
 
   Set<int> _questsDone(StudyPlan? plan, List<AuditSummary> audits, List<SkillNode> skills) {

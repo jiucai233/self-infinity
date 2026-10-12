@@ -35,7 +35,7 @@ def test_it01_the_response_matches_the_contract_shapes(client):
     assert body["course"]["topic"] == "Math"
     assert set(body["nodes"][0]) == {
         "id", "course_id", "slug", "title", "description", "status", "node_type", "mastery_score",
-        "unexpanded", "tested_out", "linked_course_id",
+        "unexpanded", "tested_out", "linked_course_id", "points",
     }
     assert all(n["course_id"] == 1 and n["mastery_score"] is None and n["node_type"] == "concept" for n in body["nodes"])
     assert not any(n["unexpanded"] or n["tested_out"] for n in body["nodes"])

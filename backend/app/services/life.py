@@ -47,7 +47,7 @@ def _mean(values: list[float | int | None]) -> float | None:
     return round(sum(present) / len(present), 1) if present else None
 
 
-def _audits_by_day(session: Session) -> dict[date, tuple[int, int]]:
+def audits_by_day(session: Session) -> dict[date, tuple[int, int]]:
     """Finished audits per local day: (finished, passed)."""
     zone = ZoneInfo(settings.app_timezone)
     counts: dict[date, tuple[int, int]] = {}
@@ -131,7 +131,7 @@ def overview(session: Session, window: int = 30) -> LifeOut:
     first = today - timedelta(days=window - 1)
     checkins = list(session.exec(select(DailyCheckIn).order_by(DailyCheckIn.date)).all())
     by_day = {c.date: c for c in checkins}
-    audits = _audits_by_day(session)
+    audits = audits_by_day(session)
 
     days: list[LifeDayOut] = []
     for offset in range(window):

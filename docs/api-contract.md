@@ -36,7 +36,9 @@ Related plan sections: 4 (course structure), 5 (schema), 6 (API), 7.4 (agents), 
 ```json
 {"id": 5, "course_id": 1, "slug": "quadratic-equation", "title": "Quadratic Equations",
  "description": "...", "status": "available", "node_type": "concept", "mastery_score": null,
- "unexpanded": false, "tested_out": false, "linked_course_id": null}
+ "unexpanded": false, "tested_out": false, "linked_course_id": null,
+ "points": [{"title": "Discriminant", "ok": true, "note": null},
+            {"title": "Vieta's formulas", "ok": false, "note": "Swapped the sum and the product."}]}
 ```
 - `status`: `locked` | `available` | `mastered`
 - `node_type`: `concept` | `task`
@@ -44,6 +46,8 @@ Related plan sections: 4 (course structure), 5 (schema), 6 (API), 7.4 (agents), 
 - `unexpanded` **(added 2026-10-08)**: a category whose parts are not all listed yet: the Planner left it to break down later (no children), or a syllabus (endpoint 45) or the player (endpoint 43) added only some of them **(2026-10-09)**. Break it down with endpoint 38 (it adds the rest), or challenge it as a whole (endpoint 7, `test_out`). It cannot be audited on its own.
 - `tested_out` **(added 2026-10-08)**: mastered by passing a challenge on a node above it, not by its own audit.
 - `linked_course_id` **(added 2026-10-09)**: this node is another of the player's courses (“Computer Vision” inside a CS course), or null. Its parts are that course's tree, so it has no children of its own and is not broken down (38) or audited (7: 400 `This node is another course: learn it there.`); it is mastered with that course (endpoint 44).
+
+- `points` **(added 2026-10-12)**: the **knowledge points** inside a leaf, `Point[]`; `[]` for every other node. A leaf is the smallest node: below it are not more nodes but its three to six points (“Transformer Basics”: self-attention, feed-forward layer, positional encoding). The Planner gives a concept leaf its points when it writes it; a leaf that has none (an older course, a node added by hand) gets them from the Point Lister before its first audit (endpoint 7). `Point` = `{"title", "ok", "note"}`: `ok` is `true` (explained right in an audit), `false` (missed in the last one) or `null` (not asked yet); `note` says in a sentence what was wrong when it was missed, else null. A leaf that has points is audited point by point (endpoints 7–8) and is not broken down (endpoint 38: 400). Points only count on a leaf: a node that gets parts keeps the list, and clients do not show it.
 
 ### SkillEdge
 ```json
@@ -59,9 +63,11 @@ no contains parent → `root`; contains parent but no contains child → `leaf`;
 ```json
 {"id": 31, "skill_id": 5, "node_position": "leaf", "status": "active", "score": null,
  "gaps": [], "comment": null,
- "turns": [{"role": "auditor", "content": "Explain “Quadratic Equations” from scratch to someone who has never heard of it."}],
- "test_out": false}
+ "turns": [{"role": "auditor", "content": "Explain “Quadratic Equations” from scratch to someone who has never heard of it.", "feedback": null}],
+ "test_out": false, "points": []}
 ```
+- `turns[].feedback` **(added 2026-10-12)**: on an auditor turn, what she said about the answer before, ahead of her question (`content`); null on the opening question, on a user turn, and when the model gave none.
+- `points` **(added 2026-10-12)**: the knowledge points this audit examines (`Point[]`, `SkillNode.points`): the node's points still open when it started, each with the `note` of its last miss; once the audit is closed, their results. `[]` for an audit without points (a branch, a root, a task, a challenge).
 - `test_out` **(added 2026-10-08)**: a challenge on a whole branch (endpoint 7).
 - `node_position`: `root` | `branch` | `leaf`. (The example copies plan 6.3, where Quadratic Equations is a leaf. In the Section 4.2 demo course it has children, so there it is a `branch` and gets the branch opening question.)
 - `status`: `active` | `passed` | `failed`
@@ -70,16 +76,22 @@ no contains parent → `root`; contains parent but no contains child → `leaf`;
 ### TurnResult — exactly one of two shapes
 Probe:
 ```json
-{"type": "probe", "question": "What is the discriminant, and why does a negative one mean no real solutions?"}
+{"type": "probe", "feedback": "Your first claim is right; the second needs correcting: ...",
+ "point": "Discriminant",
+ "question": "Suppose the discriminant is exactly zero: what happens to the two roots, and why?"}
 ```
 Verdict:
 ```json
 {"type": "verdict", "passed": false, "score": 45, "gaps": ["..."], "comment": "...",
+ "feedback": "...", "points": [{"title": "Discriminant", "ok": false, "note": "..."}],
  "unlocked_skill_ids": [], "reward_amount": null, "reward_multiplier": null}
 ```
+- `feedback` **(added 2026-10-12)**: what the Auditor says about the answer just given, before her question or the verdict: which part was right, which was wrong, and the correction (the right version and the reason). She judges first, then teaches: she explains a point only after the user answered about it, never in the question she is asking. Null when the model gave none (and on a forced verdict).
+- `point` **(added 2026-10-12)**, probe only: the knowledge point the question examines (one of the audit's `points`), or null.
+- `points` **(added 2026-10-12)**, verdict only: one `Point` per knowledge point the audit examined; `[]` for an audit without points. `passed` is true only when every one is `ok`: a verdict that says pass with a point marked wrong is a fail. A point the Auditor left out or left open counts as held on a pass and stays `null` (open) on a fail.
 - A Challenger overturn is returned as a **probe** whose `question` is the Challenger's question.
 - On a pass: `unlocked_skill_ids` lists nodes that changed from locked to available; `reward_amount` (int) and `reward_multiplier` (float) are set. On a fail both reward fields are null and `unlocked_skill_ids` is `[]`.
-- A probe response contains only `type` and `question`.
+- A Challenger's probe carries the Auditor's `feedback` on the answer (her verdict's) and `point: null`.
 
 ### Principle
 ```json
@@ -124,11 +136,14 @@ Ranges: `sleep_hours` 0–14, `focus` 1–5, `stress` 1–5; each may be null. `
 
 ### StudyPlan
 ```json
-{"id": 3, "suggested_tier": "medium", "context_bucket": "mid", "created_at": "2026-10-05T03:31:00Z",
+{"id": 3, "suggested_tier": "medium", "context_bucket": "mid", "created_at": "2026-10-05T00:31:00Z",
  "steps": [{"skill_id": 9, "course_id": 1, "skill_title": "Quadratic Functions", "node_type": "concept",
-            "rationale": "...", "focus_hint": "..."}]}
+            "rationale": "...", "focus_hint": "...", "kind": "learn", "minutes": 25}],
+ "slot": "morning", "condition_flag": "normal", "focus_budget": 240, "focus_spent": 0, "focus_left": 240,
+ "summary": "Morning: judgement first, new nodes and challenges; review waits for the evening. About 4 h of focus left today (0 min done).",
+ "stale": false}
 ```
-3–5 steps, in study order. `steps[].course_id` **(added)**.
+Up to 5 steps, in study order (none once the day's focus is used up). `steps[].course_id` **(added)**. **The day's plan (added 2026-10-09)**: `steps[].kind` `learn` (audit an open node) | `challenge` (a category not broken down, whole) | `review` (explain a mastered node again), `steps[].minutes` about how long it takes; `slot` the KST time of day it was made for, `morning` 5–12 | `afternoon` 12–18 | `evening` 18–23 | `night` 23–5; `focus_budget` / `focus_spent` / `focus_left` minutes; `summary` the line above the daily quests; `stale` it was made for another slot or another day. Plans made before have none of these (`kind` reads as `learn`).
 
 ### SearchPlan
 ```json
@@ -199,7 +214,7 @@ Request:
 {"topic": "Math", "difficulty": "standard", "search_syllabus": true}
 ```
 Validation (422): topic not blank; `difficulty` `intro`|`standard`|`deep` (default `standard`); `search_syllabus` bool (default true). `node_count` / `max_depth` **(removed 2026-10-08)** are ignored if sent: a course is as big as its topic.
-**Size and layers**: there is no limit on the number of nodes or levels, only on the smallest unit: a leaf is one model, method, algorithm, theorem or technique (“Quadratic Functions”, “CNN”, “Soft Actor-Critic”), in the humanities one concept. **With a syllabus** **(2026-10-09)** — one found (`search_syllabus`) or a file uploaded through the chat — its items are already the nodes a real course defined, so they are the first level as they are: one node per item, in its order, titled as the item (shortened only to fit). The Planner leaves out only what is not a topic (introduction, review, exam, project) and joins an item given in parts (I, II); it merges, splits, renames and adds nothing on that level. When a found syllabus's item is missing from the first level (a first-level title holds fewer than half of its words), the Planner is asked once more, naming the items; its second answer is kept either way. An introductory syllabus thus gives a course of mid-level nodes, each broken down later if wanted. Without one, one Planner call writes at most 30 nodes, level by level: the root and every main area, and a deeper level only when all of it fits; a category it cannot break down within that budget is saved with `unexpanded: true` and broken down later (endpoint 38, up to 40 nodes a call). Every answer keeps whole levels only: below the first level holding an `unexpanded` category nothing is kept, and every category on that level is saved `unexpanded` (a model tends to put a few sample leaves under some categories, and a category with children counts as finished). A safety stop keeps a course under 500 nodes.
+**Size and layers**: there is no limit on the number of nodes or levels, only on the smallest unit: a leaf is one model, method, algorithm, theorem or technique (“Quadratic Functions”, “CNN”, “Soft Actor-Critic”), in the humanities one concept; sized as one textbook section (an hour or two of study, about ten minutes to explain), so cases that each take minutes are inside one leaf (binary, octal and hexadecimal are the leaf “Number Systems”), and when unsure the Planner makes a leaf **(2026-10-09)**. What is inside a leaf is its knowledge points, which the Planner writes with it (`SkillNode.points`, 3–6 for a concept leaf), never more nodes **(2026-10-12)**. **With a syllabus** **(2026-10-09)** — one found (`search_syllabus`) or a file uploaded through the chat — its items are already the nodes a real course defined, so they are the first level as they are: one node per item, in its order, titled as the item (shortened only to fit). The Planner leaves out only what is not a topic (introduction, review, exam, project) and joins an item given in parts (I, II); it merges, splits, renames and adds nothing on that level. When a found syllabus's item is missing from the first level (a first-level title holds fewer than half of its words), the Planner is asked once more, naming the items; its second answer is kept either way. An introductory syllabus thus gives a course of mid-level nodes, each broken down later if wanted. Without one, one Planner call writes at most 30 nodes, level by level: the root and every main area, and a deeper level only when all of it fits; a category it cannot break down within that budget is saved with `unexpanded: true` and broken down later (endpoint 38, up to 40 nodes a call). Every answer keeps whole levels only: below the first level holding an `unexpanded` category nothing is kept, and every category on that level is saved `unexpanded` (a model tends to put a few sample leaves under some categories, and a category with children counts as finished). A safety stop keeps a course under 500 nodes.
 Response: `{"course": Course, "nodes": SkillNode[], "edges": SkillEdge[]}`. **Unlocking**: the root's children are chapters, and the player picks the chapter. Each chapter has one `available` node, the first of it in the learning order that is not mastered (a chapter not broken down yet is its own first node); the root opens once every chapter is mastered; everything else is `locked`. The learning order lays a list over the tree: what a node contains comes before it (so the root comes last), a requires edge puts its prerequisite first, and otherwise the planner's order decides.
 **The same course asked for again** **(2026-10-09)**: before anything is planned, the topic is matched against the player's courses: an exact title or topic (case, punctuation and bracketed asides aside) is that course; otherwise the three nearest by embedding (`text-embedding-3-small`) are put to the Decisions API (“is it one of these, under any name or language? a broader or narrower subject is not”), and a choice at confidence ≥ 0.6 is that course. Then nothing new is built: with a reference (a syllabus found, or a file) what it adds goes into that course as endpoint 45 does; without one the course answers unchanged. The response then has `merged: true` and `added` (nodes added); otherwise `merged: false`, `added: 0`. Without an OpenAI key only the exact match applies.
 Errors: 502 `Course generation failed. Please try again.`
@@ -222,15 +237,18 @@ Response:
 `context_bucket`: `low`|`mid`|`high`. Tiers: `easy`|`medium`|`hard`. `skill_tiers` has one entry per skill node; keys are skill ids as strings.
 
 ### 7. `POST /api/skills/{id}/audits`
-Request `{"mode": "day", "test_out": false}` — `mode` `day`|`night`, default `day` (422 otherwise).
+Request `{"mode": "day", "test_out": false, "restart": false}` — `mode` `day`|`night`, default `day` (422 otherwise).
+**Picking an audit up again** **(added 2026-10-12)**: when the node's newest audit is still `active`, of the same kind (`test_out`) and less than 24 hours old, no new audit starts: the response is that session with its whole dialogue (`turns`) and `resumed: true`, and no model is called. `restart: true` always starts a new one (the old one stays `active` and is never picked up again, the new one being newer). If the last turn of a session picked up is a user turn (its reply never came), the client puts that text back in the input; sending it replaces the turn (endpoint 8).
 **`test_out: true` — a challenge** **(added 2026-10-08)**: on a branch, a root or an unexpanded node, the player says they already know the whole area. The Auditor samples three of the smallest units under it (up to 12 are listed to it; for an unexpanded node, its description) and asks one per question, then how two relate; one part not known fails it. Opening: `So you already know “{title}”. Prove it, one part at a time. Start with “{first part}”: how does it work?`, or, with no parts yet, `So you already know “{title}”. Prove it: what are its main parts, and how does the most important one work?`. It always gets a concept's turn limit. Allowed on locked nodes (that is what it is for), not on a leaf (400 `Only a branch or a whole course can be challenged.`) or a mastered node (400 `skill is already mastered`). A pass masters the node (`mastery_score`) and every node under it not yet mastered (`tested_out: true`), then unlocks as usual; a fail changes nothing.
-Response `{"session": AuditSession, "opening_question": "..."}`.
+Response `{"session": AuditSession, "opening_question": "...", "resumed": false}`.
+- **Knowledge points** **(added 2026-10-12)**: a concept leaf is audited on its points (`SkillNode.points`). If it has none yet, the Point Lister lists them first (one LLM call, once per node; if it fails or gives fewer than two, the audit goes on without points, as before). The audit examines the points not `ok` yet; for a node already mastered (a review), or with nothing left open, all of them. They are stored on the session (`points`).
 - Opening question by position (Section 17.2), in English:
-  - leaf: `Explain “{title}” from scratch to someone who has never heard of it.`
+  - leaf with points: `Let's take “{title}” one piece at a time. Start with “{first point}”: what does it do, and why is it needed?`; when some of its points held before: `What you already explained right stays cleared. This time only {points}. Start with “{first point}”: what does it do, and why is it needed?`
+  - leaf without points: `Explain “{title}” from scratch to someone who has never heard of it.`
   - branch: `“{title}” covers {children}. Why do these belong together, and when do you use which?` — `{children}` = contains-children titles joined by `, `
   - root: `Which problems call for “{title}”, and which don't? How do you decide?`
   - task node (any position): `How exactly will you do “{title}”?`
-- Turn limit: concept 8, task 4; `night` doubles it. Stored in `max_turns`, never shown to the model.
+- Turn limit: an audit with points gets two turns a point, at least 4 and at most 10; otherwise concept 8, task 4; `night` doubles it. Stored in `max_turns`, never shown to the model.
 - Allowed on `available` and `mastered` nodes, even with unmet requires; not on an `unexpanded` node (400 `Break this node down first, or challenge it as a whole.`).
 
 Errors: 404 `skill not found`; 400 `skill is locked`.
@@ -240,6 +258,8 @@ Request `{"content": "..."}` — not blank (422).
 Response: `TurnResult`. Behavior follows Section 6.6 and 8.4:
 - The user turn is saved before the Auditor is called (kept even if the Auditor fails). If the last saved turn is a user turn with no reply after it (the previous attempt failed, or the client stopped waiting), the new content **replaces** it instead of adding a second user turn, so a resend never uses up the turn limit.
 - Memory Retriever passes ≤3 lessons to the Auditor.
+- **How the Auditor asks** **(2026-10-12)**: every turn is feedback on the last answer, then one question or the verdict (`TurnResult`). A question sets up a specific situation and asks for a judgement with its reason (“Suppose X is removed or pushed to an extreme: what happens, and why?”), never for a definition, each one a layer deeper; it never repeats a question, sets no traps, and stays inside what the node covers. With points, she asks about one point at a time (at most two questions each) and is told which of the node's points held before (not asked again) and what was wrong last time about the ones examined. A user who says they do not know, or have had enough, is not pushed: she explains it, counts it as missed and goes on or gives the verdict. What she explained does not count for the user: a point is `ok` only if their own answer had it right before her correction, or a later answer applied it to a new question. Her earlier turns go back to her as `feedback` + question.
+- **Point results** **(2026-10-12)**: a verdict writes each examined point's result onto the node (`SkillNode.points`: `ok`, and `note` for a miss; a point left `null` keeps what it had) and onto the session. The next audit of the node therefore starts from what was missed.
 - Pass + Challenger enabled + not yet challenged → Challenger. Overturn → `challenged = true`, its question saved as an auditor turn and returned as a probe. Uphold or Challenger error → final pass.
 - Final pass: session `passed`, `score` saved, node `mastered` with `mastery_score`, the next node of its chapter in the learning order that is not mastered → `available` (one open node per chapter, endpoint 2), reward recorded.
 - Fail: session `failed`, gaps and comment saved; node status unchanged.
@@ -286,11 +306,16 @@ Response: `Briefing` with a new narrative (≤400 characters).
 Errors: 502 `Briefing generation failed. Please try again.`
 
 ### 15. `POST /api/plan/generate`
-Response: `StudyPlan`.
-Errors: 400 `No node is available yet. Generate a course or pass an existing node first.`; 502 `Plan generation failed. Please try again.`
+Response: `StudyPlan`. **How the day is planned (2026-10-09)**:
+- **Focus**: 240 minutes a day, ×0.5 when the condition is `low`, ×0.75 when `unknown`; minus what today's (KST) audits took, each from its start to its last turn, counted 2–60 minutes. Under 10 minutes left: no steps, the summary says the day's focus is used up.
+- **Time of day** splits the focus between judgement (learn, challenge) and review: morning 80 / 20, afternoon 60 / 40, evening 25 / 75, night review only, at most one step. A `low` condition takes 40 % off the judgement share. What one side does not use goes to the other.
+- **Judgement**: the Recommender orders the open nodes (it is told the time of day, each node's kind and minutes); code keeps its order while the minutes fit (the first one even if up to 1.5× over). Minutes: a leaf 25, a task leaf 15, a branch 30, a challenge 35. No challenge in the evening, at night or on a `low` day, and then only leaves when there are any.
+- **Review**: mastered nodes the player passed an audit on (not ones a challenge cleared), due 1, 3, 7, 14, then every 30 days after the last audit, by how many times they passed; in the evening and at night also a node first passed earlier today, 2 h or more ago (“before sleep”). The most pressing first, 10 minutes each; at most round(5 × the review share) of the steps.
+- **Summary**: the time of day; the condition when `low` or `unknown`; when today's check-in is on the worse side of one of the player's own patterns (life page), its numbers; the focus left.
+Errors: 400 `No node is available yet. Generate a course or pass an existing node first.` (nothing to learn and nothing due for review); 502 `Plan generation failed. Please try again.`
 
 ### 16. `GET /api/plan/current`
-Response: the latest `StudyPlan`, or `null`.
+Response: the latest `StudyPlan`, or `null`. `stale: true` when it was made for another time of day or another day: the client makes a new one (endpoint 15) in the background.
 
 ### 17. `POST /api/skills/{id}/search-plan`
 Request: `{"gap": "..."}` or `{"misconception_id": 7}`.
@@ -334,6 +359,9 @@ Any other topic → a generic course: root = topic (first line, through the Plan
 
 ### 4.3 Audit
 Let `answers` = all user turns of the session joined together, `n` = its character count.
+- **Point Lister**: a leaf titled `{title}` gets the points `What {title} is`, `Why {title} holds`, `Where {title} fails` (each cut to 40 characters).
+- **Feedback**: a probe carries `That gives the outline. One part of it is still only named, not explained.` and names the first point examined; a pass `That is right, and you gave the reason for it.`; a fail `The conclusion is there, but the reason behind it is missing.`
+- **Points in a verdict**: a pass holds every point examined; a fail misses the first one (`note`: `Named it without saying why it holds.`) and holds the others, so the next audit asks about that one only.
 - **First user turn** → probe. If the Memory Retriever returned lessons, the probe refers to the most recent one:
   `You once thought “{misconception}”. How is this explanation different?`
   Otherwise: `Pick the most important term in your explanation and tell me what it means and why it matters.`
@@ -550,7 +578,7 @@ You in the middle → main quests → the courses that serve them → each cours
 ### Game framing (client labels, no API change)
 - The main quests are the goals above (endpoints 28–31); scene 2 title `Life tree`.
 - Root and branch nodes are **bosses** (`position` from contains edges): a `Boss` chip in scene 4, a double ring on the map, `Boss cleared!` in the celebration card.
-- The current `StudyPlan` steps are the **daily quests** in the left panel (`GET /plan/current`); a step is done when its node is mastered or was audited today (KST).
+- The current `StudyPlan` steps are the **daily quests** in the left panel (`GET /plan/current`); a step is done when its node is mastered or was audited today (KST); a `review` step only when its node was audited after the plan was made.
 
 
 ## 7. Accounts (added 2026-10-05)
@@ -596,7 +624,7 @@ Endpoints:
 - `GET /api/dev/voice?limit=50` (developers only, like #34) → `{"totals": {...}, "sessions": [{"id", "kind", "model", "started_at", "minutes", "turns", "audio_in", "audio_out", "cached_share", "cost", "backend_cost", "other_cost"}]}`. Dollars at list price (app/services/voice_usage.py): a GPT-Live Guide by its billed seconds ($0.05 a minute) plus its backend's tokens (`backend_cost`, gpt-6-luna $0.10 / $0.01 cached / $0.50 per million); a Realtime Guide by tokens (silence is free) plus its input transcription; an audit's live transcription by its open minutes ($0.017), an upper bound. `other_cost` is the same Guide session on the other voice: a GPT-Live one on Realtime at this account's own Realtime cost per minute (measured once it has a minute of Realtime sessions, $0.072 before that: one 2-minute test), a Realtime one on GPT-Live at $0.05 a minute (backend left out). Totals: `guide_sessions`, `guide_minutes`, `guide_cost`, `guide_cost_per_minute`, `guide_all_live`, `guide_all_realtime` (every Guide minute on one voice: what ran there as billed, the rest estimated), `realtime_per_minute`, `realtime_rate_measured`, `guide_cached_share` (Realtime sessions), `audit_sessions`, `audit_minutes`, `audit_cost`.
 
 ### 38. `POST /api/skills/{id}/expand`  (LLM: Planner, added 2026-10-08)
-Breaks a node down into its parts (endpoint 2, **Size and layers**). No request body. **Filling in** **(2026-10-09)**: a node that has parts already (a branch, or an `unexpanded` node a syllabus or the player gave some parts) gets only the ones it is missing: the Planner is told its parts so far, and may answer none. A leaf is broken down further, as a category. The Planner gets the course topic, the node's title, description and path from the root, and the titles already in the course (not to repeat); its output hangs under the node: parts that name no known parent become its children, a part whose title the course already has (and that has no parts of its own) is dropped — the same title after normalising, or with an OpenAI key one 0.9 or nearer by embedding (a plural, a hyphen) — and a slug the course already uses gets `-2`, `-3`. Parts it cannot break down within its budget come back `unexpanded` themselves. An `unexpanded` node is claimed first in one statement, so two requests never both expand it. Any node may be expanded, locked or not: looking inside is free. Then unlocking runs again (the chapter's open node moves down to its first part: ties in the learning order go by place in the tree, so the parts stand where the node stood).
+Breaks a node down into its parts (endpoint 2, **Size and layers**). No request body. **Filling in** **(2026-10-09)**: a node that has parts already (a branch, or an `unexpanded` node a syllabus or the player gave some parts) gets only the ones it is missing: the Planner is told its parts so far, and may answer none. A leaf without knowledge points is broken down further, as a category; **a leaf that has points is the smallest piece** **(2026-10-12)**: 400 `This node is the smallest piece: its knowledge points are inside it.`, and the Planner is not called (its parts can still be added by hand, endpoint 43). The Planner gets the course topic, the node's title, description and path from the root, and the titles already in the course (not to repeat); its output hangs under the node: parts that name no known parent become its children, a part whose title the course already has (and that has no parts of its own) is dropped — the same title after normalising, or with an OpenAI key one 0.9 or nearer by embedding (a plural, a hyphen) — and a slug the course already uses gets `-2`, `-3`. **One level per answer** **(2026-10-09)**: the parts are the node's direct parts only, each a leaf or a category left `unexpanded`; when the Planner goes deeper, what is below the first level is dropped and the parts it was under are left `unexpanded` (going deeper is the player's choice, part by part). An answer with no parts is valid: the node is already one leaf (or, filling in, misses nothing), and the client says so. **Leaf or category first** **(2026-10-12)**: the Planner decides what the node is before breaking it down. One model, architecture, method, algorithm or theorem, the basics of one, or one lecture of a course is a leaf, however much there is to say about it: it answers no nodes and, beside them, `"points"`: the node's three to six knowledge points, which are saved on it (`SkillNode.points`), so an `unexpanded` “Transformer Basics” becomes a leaf audited on self-attention, positional encoding and so on, and is the smallest piece from then on. Only a field or family holding several models or methods, each worth a lecture of its own, is given parts; `points` beside parts are ignored. An `unexpanded` node is claimed first in one statement, so two requests never both expand it. Any node may be expanded, locked or not: looking inside is free. Then unlocking runs again (the chapter's open node moves down to its first part: ties in the learning order go by place in the tree, so the parts stand where the node stood).
 Response: the whole course map, as endpoint 4.
 Errors: 404 `skill not found` (also for a node of a deleted course); 400 `This node is another course, or is being broken down already.`; 409 `This course has reached its size limit.` (500 nodes); 502 `Breaking this node down failed. Please try again.` (the node stays `unexpanded`).
 

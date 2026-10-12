@@ -17,9 +17,16 @@ from tests.helpers import (
     link,
     make_course,
     make_skill,
+    freeze_clock,
     pass_node,
     set_status,
 )
+
+@pytest.fixture(autouse=True)
+def morning(monkeypatch):
+    """Plans depend on the time of day (app/services/day_plan.py): these run on a morning."""
+    freeze_clock(monkeypatch, "2026-10-05 09:00")
+
 
 REASON = "Prerequisites checked — you can take this on now."
 HINT = "Explain the why before the definition."
@@ -72,8 +79,10 @@ def test_the_prompt_lists_nodes_tier_clusters_and_condition():
     (system,) = provider.system_prompts("recommender")
     assert system.startswith("[agent: recommender]")
     nodes = json.loads(system.split("<available_nodes>\n")[1].split("\n</available_nodes>")[0])
-    assert nodes == [{"skill_id": 1, "title": "Quadratic Functions", "position": "leaf", "tier": "hard", "unmet_requires": ["Quadratic Equations"]}]
+    assert nodes == [{"skill_id": 1, "title": "Quadratic Functions", "position": "leaf", "tier": "hard",
+                      "unmet_requires": ["Quadratic Equations"], "kind": "learn", "minutes": 25}]
     assert "Suggested difficulty tier: medium" in system and "Condition: low" in system
+    assert "Time of day: morning" in system
 
 
 # ---------------------------------------------------------------- the Mock script, contract 4.6
@@ -114,11 +123,14 @@ def test_plan_generation_returns_and_stores_a_study_plan(client):
 
     assert response.status_code == 200
     plan = response.json()
-    assert set(plan) == {"id", "suggested_tier", "context_bucket", "created_at", "steps"}
+    assert set(plan) == {
+        "id", "suggested_tier", "context_bucket", "created_at", "steps",
+        "slot", "condition_flag", "focus_budget", "focus_spent", "focus_left", "summary", "stale",
+    }
     assert plan["suggested_tier"] in ("easy", "medium", "hard") and plan["context_bucket"] in ("low", "mid", "high")
     assert [s["skill_id"] for s in plan["steps"]] == [ids["root-coefficient"], ids["linear-function"], ids["sequence-limit"]]
     assert plan["steps"][0] == {"skill_id": ids["root-coefficient"], "course_id": 1, "skill_title": "Roots and Coefficients",
-                                "node_type": "concept", "rationale": REASON, "focus_hint": HINT}
+                                "node_type": "concept", "rationale": REASON, "focus_hint": HINT, "kind": "learn", "minutes": 25}
     assert client.get("/api/plan/current").json() == plan
 
 

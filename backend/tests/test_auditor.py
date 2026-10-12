@@ -1,4 +1,4 @@
-"""Auditor：追问 / 裁决的解析、位置块、pacing、轮数上限（UT-06 ~ UT-11）。"""
+"""Auditor：点评 + 追问 / 裁决的解析、知识点、位置块、pacing、轮数上限（UT-06 ~ UT-11）。"""
 
 import json
 from types import SimpleNamespace
@@ -161,7 +161,7 @@ def test_ut11_light_pacing_puts_the_pacing_line_in_the_prompt_and_leaves_the_lim
 
     assert "Pacing: normal" in system_prompt(normal)
     assert "Pacing: light" in system_prompt(light)
-    assert "keep each question to one short sentence" in system_prompt(light)
+    assert "Light pacing: a one-sentence situation and a one-sentence question." in system_prompt(light)
     assert "Pacing never changes this standard." in system_prompt(light)
 
     # 轮数上限照旧：light 下同样在上限处被强制裁决，没到上限时不会。
@@ -235,10 +235,10 @@ def test_the_verdict_grades_the_node_against_covers_not_the_whole_field():
     prompt = system_prompt(provider)
 
     assert "grade this node, not the field" in prompt
-    assert "would an expert mentor" in prompt and "Not:\n  could a stranger follow their words" in prompt
-    assert "Details one would look up\n  while doing it" in prompt
+    assert "would an expert mentor believe" in prompt and "Not: could a\n  stranger follow their words" in prompt
+    assert "Details one would\n  look up while doing it" in prompt
     assert "Brevity is not a gap." in prompt
-    assert "At most three gaps" in prompt
+    assert "At most three\n  gaps" in prompt
     assert "on the final turn, give the benefit of the doubt" in prompt
 
 
@@ -248,12 +248,125 @@ def test_a_reported_working_result_counts_as_the_check():
     assert "a working result they\n  report" in system_prompt(provider)
 
 
-def test_the_auditor_only_judges_and_never_gives_the_answer():
+def test_the_auditor_judges_first_then_teaches_and_never_hints_at_the_open_question():
     _, provider = next_turn(probe_json())
     prompt = system_prompt(provider)
 
-    assert "You only judge; you never teach. Never give the answer anywhere" in prompt
-    assert "never the right version of it" in prompt
+    assert "FEEDBACK: judge first, then teach." in prompt
+    assert "give the right version and the reason for it" in prompt
+    assert "You may explain something only after the user has answered about it." in prompt
+    assert "Never reveal or hint at the answer to the question you are asking now." in prompt
+    # What she explained is not the user's own understanding.
+    assert "What you explained in feedback does not count for them." in prompt
+
+
+def test_questions_ask_for_a_judgement_in_a_situation_not_a_definition():
+    _, provider = next_turn(probe_json())
+    prompt = system_prompt(provider)
+
+    assert "Ask about a specific situation and for a judgement with its reason" in prompt
+    assert "never for a definition to recite" in prompt
+    assert "Never ask the same question twice." in prompt
+    assert "no trick questions" in prompt
+    assert "At most two questions on one point." in prompt
+
+
+def test_the_auditor_does_not_push_a_user_who_has_had_enough():
+    _, provider = next_turn(probe_json())
+
+    assert "do not\n  push. Explain it briefly, count it as missed and go on" in system_prompt(provider)
+
+
+def test_feedback_comes_with_the_probe_and_with_the_verdict():
+    probe, _ = next_turn(json.dumps({"action": "probe", "feedback": " Half right. ", "question": "Why?"}))
+    verdict, _ = next_turn(
+        json.dumps({"action": "verdict", "feedback": "Right.", "pass": True, "score": 90, "gaps": [], "comment": "c"})
+    )
+    bare, _ = next_turn(probe_json())
+
+    assert (probe.feedback, probe.question) == ("Half right.", "Why?")
+    assert verdict.feedback == "Right."
+    assert bare.feedback is None  # optional: a model that leaves it out still asks
+
+
+# ---------------------------------------------------------------- 知识点
+
+POINTS = [{"title": "Discriminant", "note": None}, {"title": "Vieta's formulas", "note": "Mixed up the signs."}]
+
+
+def test_without_points_the_prompt_has_no_points_block():
+    _, provider = next_turn(probe_json())
+    prompt = system_prompt(provider)
+
+    assert "Points, the knowledge points" not in prompt and '"points" has one entry' not in prompt
+    assert 'What a question tests is in "Covers"' in prompt
+
+
+def test_the_points_to_examine_are_listed_with_the_note_of_the_last_miss():
+    _, provider = next_turn(probe_json(), points=POINTS, settled=["Completing the square"])
+    prompt = system_prompt(provider)
+
+    assert "this audit examines these" in prompt
+    assert "- Discriminant\n- Vieta's formulas — Mixed up the signs.\n" in prompt
+    assert "do not ask about them again: Completing the square\n" in prompt
+    assert "Ask about one point from Points at a time" in prompt
+    assert "pass is true only when every point is ok." in prompt
+
+
+def test_a_probe_names_the_point_it_examines():
+    named, _ = next_turn(json.dumps({"action": "probe", "point": "discriminant", "question": "Why?"}), points=POINTS)
+    unknown, _ = next_turn(json.dumps({"action": "probe", "point": "Matrices", "question": "Why?"}), points=POINTS)
+
+    assert named.point == "Discriminant"  # matched without case, given back as the audit has it
+    assert unknown.point is None
+
+
+def points_verdict(passed: bool, points) -> str:
+    return json.dumps(
+        {"action": "verdict", "pass": passed, "score": 70, "points": points, "gaps": [], "comment": "c"}
+    )
+
+
+def test_a_verdict_gives_each_point_its_result_and_the_note_of_what_was_wrong():
+    output = points_verdict(
+        False,
+        [
+            {"point": "Vieta's formulas", "ok": False, "note": "Sum and product swapped."},
+            {"point": "Discriminant", "ok": True, "note": "ignored on a point that held"},
+        ],
+    )
+
+    result, _ = next_turn(output, points=POINTS)
+
+    assert result.passed is False
+    assert result.points == [
+        {"title": "Discriminant", "ok": True, "note": None},
+        {"title": "Vieta's formulas", "ok": False, "note": "Sum and product swapped."},
+    ]
+
+
+def test_a_pass_with_a_point_marked_wrong_is_not_a_pass():
+    output = points_verdict(True, [{"point": "Discriminant", "ok": True}, {"point": "Vieta's formulas", "ok": False}])
+
+    result, _ = next_turn(output, points=POINTS)
+
+    assert result.passed is False
+
+
+def test_a_point_left_open_holds_on_a_pass_and_stays_open_on_a_fail():
+    partial = [{"point": "Discriminant", "ok": True}]
+
+    passed, _ = next_turn(points_verdict(True, partial), points=POINTS)
+    failed, _ = next_turn(points_verdict(False, partial), points=POINTS)
+
+    assert passed.passed is True and [p["ok"] for p in passed.points] == [True, True]
+    assert [p["ok"] for p in failed.points] == [True, None]
+
+
+def test_a_verdict_without_points_has_none_when_the_audit_has_none():
+    result, _ = next_turn(verdict_json(True, 90))
+
+    assert result.points is None
 
 
 def test_pass_may_arrive_as_a_string():

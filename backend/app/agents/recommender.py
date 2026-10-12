@@ -31,15 +31,22 @@ Recurring misconceptions (JSON):
 {clusters}
 </clusters>
 Condition: {condition_flag}   (normal | low | unknown)
+Time of day: {slot}   (morning | afternoon | evening | night)
+
+Each node has a kind (learn: explain it; challenge: prove a whole area not
+broken down yet) and the minutes it takes. Code keeps your order while it
+fits the time the user has left, so put first what matters most now.
 
 Rules:
-- Choose 3 to 5 nodes, in the order they should be studied.
+- Order up to 5 nodes, in the order they should be studied.
 - Use only skill_id values from the list.
 - Rank nodes with no unmet requires before nodes with unmet requires.
 - Prefer nodes where a recurring misconception is likely to come up again,
   so it can be tested.
 - Prefer the suggested tier.
 - If the condition is low, prefer leaf nodes (smaller units).
+- In the morning put what takes the most judgement first (challenges,
+  branches, the hard tier); later in the day put smaller, easier nodes first.
 - rationale: one sentence on why this node now, based only on the inputs.
 - focus_hint: one concrete thing to pay attention to while explaining it.
 - Write rationale and focus_hint in English.
@@ -61,6 +68,8 @@ class Candidate:
     position: str  # root | branch | leaf
     tier: str  # easy | medium | hard
     unmet_requires: list[str] = field(default_factory=list)
+    kind: str = "learn"  # learn | challenge
+    minutes: int = 25
 
 
 @dataclass
@@ -80,6 +89,7 @@ class Recommender:
         suggested_tier: str,
         clusters: list[MisconceptionCluster] | list,
         condition_flag: str,
+        slot: str = "morning",
     ) -> list[PlanStep]:
         nodes = [
             {
@@ -88,6 +98,8 @@ class Recommender:
                 "position": c.position,
                 "tier": c.tier,
                 "unmet_requires": c.unmet_requires,
+                "kind": c.kind,
+                "minutes": c.minutes,
             }
             for c in candidates
         ]
@@ -96,6 +108,7 @@ class Recommender:
             SYSTEM_PROMPT,
             suggested_tier=suggested_tier,
             condition_flag=condition_flag,
+            slot=slot,
             available_nodes=json.dumps(nodes, ensure_ascii=False, indent=1),
             clusters=json.dumps(cluster_data, ensure_ascii=False, indent=1),
         )

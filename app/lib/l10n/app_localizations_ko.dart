@@ -87,7 +87,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get auditPassed => '통과';
 
   @override
-  String get auditorTagline => '초보자처럼 묻고, 전문가처럼 판단해요';
+  String get auditorTagline => '먼저 답을 평가하고, 그다음 설명해요';
 
   @override
   String get authAlreadyRegistered => '이미 가입된 이메일이에요. 로그인해 주세요.';
@@ -1451,4 +1451,51 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get resetView => '처음 시점으로';
+
+  @override
+  String get questLearn => '배우기';
+
+  @override
+  String get questChallenge => '도전';
+
+  @override
+  String get questReview => '복습';
+
+  @override
+  String questMinutes(int n) {
+    return '$n분';
+  }
+
+  @override
+  String get nodeAlreadySmallest => '이미 한 번에 설명할 수 있는 한 덩어리예요. 더 나눌 게 없어요.';
+
+  @override
+  String get nodeNothingMissing => '여기엔 빠진 부분이 없어요.';
+
+  @override
+  String get copy => '복사';
+
+  @override
+  String get copied => '복사했어요.';
+
+  @override
+  String get auditResumed => '지난번에 멈춘 곳에서 이어서 해요.';
+
+  @override
+  String get startOver => '처음부터 다시';
+
+  @override
+  String get knowledgePoints => '지식 포인트';
+
+  @override
+  String get knowledgePointsHint => '감사는 매번 이것들을 물어요. 제대로 설명한 건 다시 묻지 않아요.';
+
+  @override
+  String get pointHeld => '설명함';
+
+  @override
+  String get pointMissed => '놓침';
+
+  @override
+  String get pointNotAsked => '아직 안 물어봄';
 }

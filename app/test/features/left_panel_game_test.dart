@@ -509,9 +509,10 @@ void main() {
       });
 
       testWidgets('the day is the KST day (injected clock)', (tester) async {
-        // The audit was made at 14:30 UTC = 23:30 KST on the 5th; at 15:30 UTC
-        // it is already the 6th in Seoul.
-        final moment = DateTime.utc(2026, 10, 5, 14, 30);
+        // The plan and the audit were made at 13:30 UTC = 22:30 KST on the 5th
+        // (an evening: the plan still holds small nodes); at 15:30 UTC it is
+        // already the 6th in Seoul.
+        final moment = DateTime.utc(2026, 10, 5, 13, 30);
         final clocked = FakeApiClient(latency: Duration.zero, clock: () => moment);
         await clocked.generateCourse(const GenerateRequest(topic: 'math'));
         await clocked.sendChat('What should I do today?');
@@ -520,7 +521,7 @@ void main() {
           tester,
           const MapScene(),
           api: clocked,
-          clock: () => DateTime.utc(2026, 10, 5, 14, 50), // still the 5th in Seoul
+          clock: () => DateTime.utc(2026, 10, 5, 13, 50), // still the 5th in Seoul
         );
         expect(mark(9, 'quest-done'), findsOneWidget);
         await pumpScene(
@@ -534,6 +535,8 @@ void main() {
 
       testWidgets('tapping a quest opens its node (scene 4)', (tester) async {
         await pumpScene(tester, const MapScene(), api: api);
+        await tester.ensureVisible(key('quest-9')); // the left panel scrolls
+        await tester.pumpAndSettle();
         await tester.tap(key('quest-9'));
         await tester.pumpAndSettle();
         expect(find.text('route:/skill/9'), findsOneWidget);

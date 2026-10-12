@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../api/models.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/widgets.dart';
 import '../../l10n/l10n.dart';
 
 /// The Auditor's verdict, in the dialogue column of the audit (scene 4-1):
 /// the outcome in the display serif, the score, her comment and — the part
-/// to learn from — every gap she found.
+/// to learn from — each knowledge point (held or missed, and why) and every
+/// gap she found. The copy button takes all of it as text.
 ///
 /// A pass gets an ember edge and the XP; a fail offers [onLesson] (the
 /// Recorder turns the miss into a lesson card) until that has started.
@@ -20,6 +25,23 @@ class VerdictCard extends StatelessWidget {
 
   /// Back to the node (scene 4).
   final VoidCallback onBack;
+
+  /// The verdict as plain text, for the clipboard.
+  String _asText(BuildContext context) {
+    final l = context.l10n;
+    final comment = verdict.comment?.trim() ?? '';
+    return [
+      '${verdict.passed ? l.verdictCleared : l.verdictNotYet} · ${verdict.score}',
+      if (comment.isNotEmpty) comment,
+      for (final p in verdict.points)
+        '${p.ok == true
+            ? '✓'
+            : p.ok == false
+            ? '✗'
+            : '○'} ${p.title}${p.note == null ? '' : ' — ${p.note}'}',
+      for (final gap in verdict.gaps) '- $gap',
+    ].join('\n');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +62,28 @@ class VerdictCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(context.l10n.verdict, style: theme.labelSmall?.copyWith(letterSpacing: 1.6)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  context.l10n.verdict,
+                  style: theme.labelSmall?.copyWith(letterSpacing: 1.6),
+                ),
+              ),
+              IconButton(
+                key: const Key('verdict-copy'),
+                tooltip: context.l10n.copy,
+                visualDensity: VisualDensity.compact,
+                iconSize: 18,
+                color: AppColors.textTertiary,
+                icon: const Icon(Icons.copy_rounded),
+                onPressed: () {
+                  unawaited(Clipboard.setData(ClipboardData(text: _asText(context))));
+                  showToast(context, context.l10n.copied);
+                },
+              ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.sm),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -71,6 +114,15 @@ class VerdictCard extends StatelessWidget {
           if (comment.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             Text(comment, key: const Key('verdict-comment'), style: theme.bodyLarge),
+          ],
+          if (verdict.points.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            const Divider(height: 1),
+            const SizedBox(height: AppSpacing.lg),
+            Text(context.l10n.knowledgePoints, style: theme.labelMedium),
+            const SizedBox(height: AppSpacing.sm),
+            for (final (i, point) in verdict.points.indexed)
+              PointRow(key: Key('verdict-point-$i'), point: point),
           ],
           if (verdict.gaps.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.lg),

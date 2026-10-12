@@ -103,7 +103,8 @@ The whole product is English by default: client UI, backend replies, the Mock / 
 
 ## 5. Backend: audit (endpoint 7 opening questions, by position)
 
-- leaf: `Explain “{title}” from scratch to someone who has never heard of it.`
+- leaf with knowledge points: `Let's take “{title}” one piece at a time. Start with “{point}”: what does it do, and why is it needed?`; when some points held before: `What you already explained right stays cleared. This time only {points}. Start with “{point}”: what does it do, and why is it needed?`
+- leaf without points: `Explain “{title}” from scratch to someone who has never heard of it.`
 - branch: `“{title}” covers {children}. Why do these belong together, and when do you use which?` — `{children}` joined by `, `
 - root: `Which problems call for “{title}”, and which don't? How do you decide?`
 - task: `How exactly will you do “{title}”?`

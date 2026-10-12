@@ -23,6 +23,11 @@ _STATS_QUESTION = "Do you mean high-school probability and statistics, or univer
 
 _DEFAULT_PROBE = "Pick the most important term in your explanation and tell me what it means and why it matters."
 _LESSON_PROBE = "You once thought “{misconception}”. How is this explanation different?"
+_PROBE_FEEDBACK = "That gives the outline. One part of it is still only named, not explained."
+_PASS_FEEDBACK = "That is right, and you gave the reason for it."
+_FAIL_FEEDBACK = "The conclusion is there, but the reason behind it is missing."
+_FAIL_NOTE = "Named it without saying why it holds."
+_POINT_PARTS = ("What {title} is", "Why {title} holds", "Where {title} fails")
 _PASS_MIN_CHARS = 80
 # The latest answer fails the script if it admits not knowing. "모르" is the Korean fallback
 # (kept so Korean transcripts still work).
@@ -139,6 +144,7 @@ _GENERIC_BRANCHES = [("core-concepts", "Core Concepts"), ("main-methods", "Key M
 
 # ---------------------------------------------------------------- parsing helpers
 
+_POINTS_BLOCK_RE = re.compile(r"this audit examines these\n.*?:\n((?:- .*\n)+)", re.S)
 _LESSONS_BLOCK_RE = re.compile(r"<lessons>\n(.*?)\n</lessons>", re.S)
 _LESSON_LINE_RE = re.compile(r"^- .*\(misconception: (.*)\)\s*$")
 _RESULT_LINE_RE = re.compile(r"^\[(\d+)\] ")
@@ -341,17 +347,27 @@ def _plan(messages: list[Message]) -> str:
     return _dump({"nodes": nodes, "requires": requires})
 
 
+def _examined(messages: list[Message]) -> list[str]:
+    """The knowledge points the Auditor's prompt lists (without the note after a dash)."""
+    block = _POINTS_BLOCK_RE.search(_system(messages))
+    if not block:
+        return []
+    return [line[2:].split(" — ")[0].strip() for line in block.group(1).splitlines() if line.startswith("- ")]
+
+
 def _audit(messages: list[Message]) -> str:
     user_turns = _user_turns(messages)
+    examined = _examined(messages)
     if len(user_turns) <= 1:
+        probe = {"action": "probe", "feedback": _PROBE_FEEDBACK, "point": examined[0] if examined else None}
         lessons = _LESSONS_BLOCK_RE.search(_system(messages))
         if lessons:
             for line in lessons.group(1).splitlines():
                 match = _LESSON_LINE_RE.match(line.strip())
                 if match:
                     # Memory Retriever 最近的在前，取第一条带 misconception 的。
-                    return _dump({"action": "probe", "question": _LESSON_PROBE.format(misconception=match.group(1))})
-        return _dump({"action": "probe", "question": _DEFAULT_PROBE})
+                    return _dump({**probe, "question": _LESSON_PROBE.format(misconception=match.group(1))})
+        return _dump({**probe, "question": _DEFAULT_PROBE})
 
     n = len("".join(user_turns))
     latest = user_turns[-1].replace("’", "'").casefold()
@@ -359,15 +375,37 @@ def _audit(messages: list[Message]) -> str:
         return _dump(
             {
                 "action": "verdict",
+                "feedback": _PASS_FEEDBACK,
                 "pass": True,
                 "score": min(95, 70 + n // 10),
+                "points": [{"point": p, "ok": True} for p in examined],
                 "gaps": [],
                 "comment": _PASS_COMMENT,
             }
         )
+    # A fail misses the first point examined; the others held.
     return _dump(
-        {"action": "verdict", "pass": False, "score": _FAIL_SCORE, "gaps": _FAIL_GAPS, "comment": _FAIL_COMMENT}
+        {
+            "action": "verdict",
+            "feedback": _FAIL_FEEDBACK,
+            "pass": False,
+            "score": _FAIL_SCORE,
+            "points": [
+                {"point": p, "ok": i > 0, **({"note": _FAIL_NOTE} if i == 0 else {})} for i, p in enumerate(examined)
+            ],
+            "gaps": _FAIL_GAPS,
+            "comment": _FAIL_COMMENT,
+        }
     )
+
+
+def _list_points(messages: list[Message]) -> str:
+    return _dump({"points": mock_points(_first_user(messages).strip())})
+
+
+def mock_points(title: str) -> list[str]:
+    """The knowledge points the script gives a leaf: the same three for every one."""
+    return [part.format(title=title)[:40] for part in _POINT_PARTS]
 
 
 def _challenge(messages: list[Message]) -> str:
@@ -752,6 +790,7 @@ _SCRIPTS = {
     "syllabus_finder": _syllabus,
     "planner": _plan,
     "auditor": _audit,
+    "point_lister": _list_points,
     "challenger": _challenge,
     "recorder": _record,
     "linker": _link,

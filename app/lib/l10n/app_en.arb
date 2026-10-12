@@ -35,7 +35,7 @@
   "auditHistory": "Audit history",
   "auditInProgress": "In progress",
   "auditPassed": "Passed",
-  "auditorTagline": "Asks like a beginner, judges like an expert",
+  "auditorTagline": "Judges your answer first, then explains",
   "authAlreadyRegistered": "That email already has an account. Sign in instead.",
   "authConfirmEmailFirst": "Confirm your email first — check your inbox.",
   "authEnterPassword": "Enter your password.",
@@ -817,5 +817,27 @@
   "nodeEditFailed": "Couldn't do that. Try again.",
   "zoomIn": "Zoom in",
   "zoomOut": "Zoom out",
-  "resetView": "Back to the start"
+  "resetView": "Back to the start",
+  "questLearn": "Learn",
+  "questChallenge": "Challenge",
+  "questReview": "Review",
+  "questMinutes": "{n} min",
+  "@questMinutes": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "nodeAlreadySmallest": "It's already one piece you can explain in one go: nothing to break down.",
+  "nodeNothingMissing": "Nothing is missing here.",
+  "copy": "Copy",
+  "copied": "Copied.",
+  "auditResumed": "Picked up where you left off.",
+  "startOver": "Start over",
+  "knowledgePoints": "Knowledge points",
+  "knowledgePointsHint": "Each audit asks about these; what you explained right is not asked again.",
+  "pointHeld": "Explained",
+  "pointMissed": "Missed",
+  "pointNotAsked": "Not asked yet"
 }

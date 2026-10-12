@@ -196,15 +196,18 @@ void main() {
         '“Algebra” covers Quadratic Equations, Sequences. Why do these belong together, and when do you use which?',
       );
 
+      // A leaf is audited one knowledge point at a time, starting with the first.
       final leaf = await api.startAudit(6);
       expect(leaf.session.nodePosition, NodePosition.leaf);
       expect(
         leaf.openingQuestion,
-        'Explain “Discriminant” from scratch to someone who has never heard of it.',
+        "Let's take “Discriminant” one piece at a time. Start with “What Discriminant is”: "
+        'what does it do, and why is it needed?',
       );
+      expect(leaf.session.points.map((p) => p.title), FakeApiClient.fakePointTitles('Discriminant'));
 
       api.debugSetNodeType(6, NodeType.task);
-      final task = await api.startAudit(6);
+      final task = await api.startAudit(6, restart: true);
       expect(task.openingQuestion, 'How exactly will you do “Discriminant”?');
     });
 
@@ -222,15 +225,20 @@ void main() {
       await api.startAudit(6, mode: 'night'); // mastered again: still allowed
     });
 
-    test('turn limits: concept 8, task 4, night doubles', () async {
+    test('turn limits: two a point, concept 8, task 4, night doubles', () async {
       final api = await seededFakeApi();
-      final day = await api.startAudit(6);
-      final night = await api.startAudit(6, mode: 'night');
-      expect(api.debugMaxTurns(day.session.id), 8);
-      expect(api.debugMaxTurns(night.session.id), 16);
+      final day = await api.startAudit(6); // a leaf: three knowledge points
+      final night = await api.startAudit(6, mode: 'night', restart: true);
+      expect(api.debugMaxTurns(day.session.id), 6);
+      expect(api.debugMaxTurns(night.session.id), 12);
+      api.debugSetStatus(2, SkillStatus.available); // a branch: no points
+      final branch = await api.startAudit(2);
+      final branchNight = await api.startAudit(2, mode: 'night', restart: true);
+      expect(api.debugMaxTurns(branch.session.id), 8);
+      expect(api.debugMaxTurns(branchNight.session.id), 16);
       api.debugSetNodeType(6, NodeType.task);
-      final taskDay = await api.startAudit(6);
-      final taskNight = await api.startAudit(6, mode: 'night');
+      final taskDay = await api.startAudit(6, restart: true);
+      final taskNight = await api.startAudit(6, mode: 'night', restart: true);
       expect(api.debugMaxTurns(taskDay.session.id), 4);
       expect(api.debugMaxTurns(taskNight.session.id), 8);
     });
@@ -327,7 +335,7 @@ void main() {
       final s2 = await api.startAudit(6);
       expect(await playTwoAnswers(api, s2.session.id, text(39), text(40)), isA<ProbeResult>());
       // n = 160 → passes at once.
-      final s3 = await api.startAudit(6);
+      final s3 = await api.startAudit(6, restart: true);
       final pass = await playTwoAnswers(api, s3.session.id, text(80), text(79)) as VerdictResult;
       expect(pass.passed, isTrue);
       expect(pass.score, 86);

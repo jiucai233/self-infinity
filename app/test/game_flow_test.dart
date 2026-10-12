@@ -93,6 +93,8 @@ void main() {
       await api.generateCourse(const GenerateRequest(topic: 'math'));
       await api.sendChat('What should I do today?');
       await pumpApp(tester, api, initialLocation: '/map');
+      await tester.ensureVisible(key('quest-6')); // the left panel scrolls
+      await tester.pumpAndSettle();
       await tester.tap(key('quest-6'));
       await tester.pumpAndSettle();
       expect(GoRouter.of(tester.element(find.byType(Scaffold).first)).state.uri.path, '/skill/6');

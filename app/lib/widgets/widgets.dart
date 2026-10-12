@@ -12,6 +12,7 @@ export 'loading_view.dart';
 export 'life_constellation.dart';
 export 'morph_icon.dart';
 export 'panel.dart';
+export 'point_row.dart';
 export 'primary_button.dart';
 export 'speech_bubble.dart';
 export 'stat_bar.dart';

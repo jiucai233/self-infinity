@@ -27,6 +27,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 
+from app.agents.point_lister import clean_points
 from app.agents.syllabus import SyllabusReference
 from app.llm.base import LLMProvider, Message, agent_tag, complete_with_json_retry
 from app.models import NodeType
@@ -89,10 +90,20 @@ Plan a new course. The topic is in the user message.
 - A small topic may fit completely; then no node needs "expand"."""
 
 EXPAND_TASK = """
-The course already exists. Break down one of its nodes, described in the
-user message, into its parts.
-- Do not output that node itself. Each of your top-level nodes has
-  "parents": ["{slug}"]; deeper nodes name their parent among your nodes.
+The course already exists. One of its nodes, described in the user
+message, is to be broken down. First decide what that node is:
+- One model, architecture, method, algorithm or theorem, the basics of
+  one, or one lecture of a course: it is a leaf, however much there is
+  to say about it. Its components, steps and variants are its knowledge
+  points, not nodes. Do not split it: output an empty "nodes" list and,
+  beside it, a "points" list with its three to six knowledge points.
+- A field or a family that holds several models or methods, each of which
+  a course would give a lecture of its own: it is a category. Output its
+  parts, by the rules below.
+For a category:
+- Do not output that node itself. Output only its direct parts, one level:
+  each has "parents": ["{slug}"] and is a leaf, or a category with
+  "expand": true and no children (it is broken down in its own answer).
 - Do not repeat a node the course already has (listed in the message).
 - Cover the whole node: every part a learner of it needs. When the message
   lists parts it already has, output only the parts it is missing, beside
@@ -127,7 +138,17 @@ Granularity:
 - Never split a leaf into its steps, parts, properties or variants: the
   state and action spaces of an MDP, the kinds of sensor noise, the
   doctrines of one philosopher are inside one leaf, not leaves of their own.
-  A leaf is what a textbook teaches as one section.
+- Size a leaf as one textbook section: an hour or two of study, explained
+  in about ten minutes. Things that each take only a few minutes to learn
+  are cases inside one leaf, not leaves: binary, octal and hexadecimal are
+  one leaf "Number Systems"; ASCII, UTF-8 and UTF-16 are one leaf
+  "Character Encoding".
+- When unsure whether a node is a leaf or a category, make it a leaf.
+- What is inside a leaf is its knowledge points, never more nodes: the
+  leaf "Transformer Basics" has the points self-attention, feed-forward
+  layer and positional encoding, and is audited on them. A leaf is never
+  broken down later, so do not leave anything a leaf needs for a deeper
+  level.
 - Never make a whole family of methods ("Object Detection", "CNN
   Architectures") a leaf.
 - A node with children is a real category, never an introduction. Never
@@ -164,11 +185,15 @@ Fields:
   for a leaf, name the cases it must include; for a category, name its main
   parts
 - node_type: "concept" (must understand why) or "task" (an executable step)
+- points: for a concept leaf, its three to six knowledge points: the named
+  mechanisms, components, rules or cases a learner must be able to explain,
+  at most 40 characters each, in English, in learning order; together they
+  cover the description. An empty list for every other node
 - expand: true only for a category left to break down later
 - reason: one sentence in English explaining why A must come first
 
 Output only JSON:
-{{"nodes": [{{"slug": "", "title": "", "description": "", "parents": [""], "node_type": "concept", "expand": false}}],
+{{"nodes": [{{"slug": "", "title": "", "description": "", "parents": [""], "node_type": "concept", "expand": false, "points": [""]}}],
  "requires": [{{"from": "", "to": "", "reason": ""}}]}}
 """
 )
@@ -209,6 +234,8 @@ class PlannedNode:
     node_type: NodeType = NodeType.concept
     # A category left to break down later (Planner.expand); it has no children yet.
     expand: bool = False
+    # The knowledge points inside a concept leaf (app/services/points.py).
+    points: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -222,6 +249,8 @@ class PlannedRequire:
 class PlannedCourse:
     nodes: list[PlannedNode]
     requires: list[PlannedRequire] = field(default_factory=list)
+    # A break-down that found the node to be one leaf: its knowledge points, and no nodes.
+    points: list[str] = field(default_factory=list)
 
 
 class Planner:
@@ -350,6 +379,7 @@ class Planner:
                     parents=_parent_slugs(item.get("parents")),
                     node_type=_node_type(item.get("node_type")),
                     expand=item.get("expand") is True,
+                    points=clean_points(item.get("points")),
                 )
             )
 
@@ -365,7 +395,7 @@ class Planner:
                     reason=str(item.get("reason") or "").strip() or None,
                 )
             )
-        return PlannedCourse(nodes=nodes, requires=requires)
+        return PlannedCourse(nodes=nodes, requires=requires, points=clean_points(data.get("points")))
 
 
 def reference_section(

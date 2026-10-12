@@ -31,13 +31,12 @@ TOP = json.dumps({"nodes": [
     node("hog", "HOG", ["features"]),
 ], "requires": []})
 
+# One level: the node's direct parts.
 DETECTION = json.dumps({"nodes": [
     node("two-stage", "Two-Stage Detectors", ["detection"]),
-    node("faster-rcnn", "Faster R-CNN", ["two-stage"]),
-    node("one-stage", "One-Stage Detectors", ["detection"]),
-    node("yolo", "YOLO Family", ["one-stage"], expand=True),
+    node("one-stage", "One-Stage Detectors", ["detection"], expand=True),
     node("sift", "SIFT", ["detection"]),  # already in the course: dropped
-], "requires": [{"from": "faster-rcnn", "to": "yolo", "reason": "Anchors first."}]})
+], "requires": [{"from": "two-stage", "to": "one-stage", "reason": "Anchors first."}]})
 
 
 def use_planner(monkeypatch, *outputs):
@@ -128,18 +127,32 @@ def test_expanding_hangs_the_parts_under_the_node(client, cv):
     assert response.status_code == 200
     after = by_slug(response.json())
     assert set(after) == {
-        "cv", "recognition", "detection", "classification", "features", "sift", "hog",
-        "two-stage", "faster-rcnn", "one-stage", "yolo",
+        "cv", "recognition", "detection", "classification", "features", "sift", "hog", "two-stage", "one-stage",
     }
-    assert after["detection"]["unexpanded"] is False and after["yolo"]["unexpanded"] is True
+    assert after["detection"]["unexpanded"] is False and after["one-stage"]["unexpanded"] is True
     contains = {(e["from_id"], e["to_id"]) for e in response.json()["edges"] if e["kind"] == "contains"}
-    assert (detection, after["two-stage"]["id"]) in contains and (after["two-stage"]["id"], after["faster-rcnn"]["id"]) in contains
+    assert (detection, after["two-stage"]["id"]) in contains and (detection, after["one-stage"]["id"]) in contains
     requires = [e for e in response.json()["edges"] if e["kind"] == "requires"]
     assert [(e["from_id"], e["to_id"], e["reason"]) for e in requires] == [
-        (after["faster-rcnn"]["id"], after["yolo"]["id"], "Anchors first."),
+        (after["two-stage"]["id"], after["one-stage"]["id"], "Anchors first."),
     ]
     # The chapter's open node moves down to the node's first part.
-    assert {s for s, n in after.items() if n["status"] == "available"} == {"faster-rcnn", "sift"}
+    assert {s for s, n in after.items() if n["status"] == "available"} == {"two-stage", "sift"}
+
+
+def test_a_break_down_keeps_one_level(client, cv, monkeypatch):
+    # The Planner went a level deeper: those parts go, and the part they were under waits.
+    use_planner(monkeypatch, json.dumps({"nodes": [
+        node("two-stage", "Two-Stage Detectors", ["detection"]),
+        node("faster-rcnn", "Faster R-CNN", ["two-stage"]),
+        node("one-stage", "One-Stage Detectors", ["detection"]),
+    ]}))
+    detection = by_slug(cv[1])["detection"]["id"]
+
+    after = by_slug(client.post(f"/api/skills/{detection}/expand").json())
+
+    assert "faster-rcnn" not in after
+    assert (after["two-stage"]["unexpanded"], after["one-stage"]["unexpanded"]) == (True, False)
 
 
 def test_the_expand_prompt_names_the_node_its_path_and_what_the_course_has(client, cv):
@@ -147,7 +160,7 @@ def test_the_expand_prompt_names_the_node_its_path_and_what_the_course_has(clien
     client.post(f"/api/skills/{by_slug(body)['detection']['id']}/expand")
 
     messages = provider.calls_for("planner")[1]
-    assert "Break down one of its nodes" in messages[0]["content"]
+    assert "One of its nodes, described in the user\nmessage, is to be broken down." in messages[0]["content"]
     assert "Budget: at most 40 nodes" in messages[0]["content"]
     user = messages[1]["content"]
     assert user.startswith('Course: Computer Vision\nBreak down: Object Detection (slug "detection")')

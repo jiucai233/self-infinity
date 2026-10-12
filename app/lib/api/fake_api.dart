@@ -9,6 +9,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import '../voice/live_link.dart';
 import 'api.dart';
 import 'api_exception.dart';
@@ -57,8 +59,9 @@ import 'reflection_prompts.dart';
 ///   graph edge kinds can be seen.
 /// * **Check-ins**: only through the chat. Transcripts are parsed per Section
 ///   4.5; a second check-in on the same KST day replaces the first.
-///   [checkInVoice], [narrate] and [generatePlan] are the pipelines behind the
-///   chat; they are not part of the client API any more.
+///   [checkInVoice] and [narrate] are the pipelines behind the chat; they are
+///   not part of the client API any more. [generatePlan] is both: the chat's
+///   plan, and the client's when a plan went stale (another time of day).
 /// * **Briefing / search**: Section 4.6, computed from the state.
 /// * **Stage UI** (contract Section 5): `sendChat` runs the Mock front desk
 ///   (keyword rules, first match wins; `teach me` also counts as a learn request) and the same pipelines as the other
@@ -97,8 +100,14 @@ class FakeApiClient implements SelfInfinityApi {
     this.latency = const Duration(milliseconds: 300),
     DateTime Function()? clock,
     bool onboarded = true,
-  }) : _clock = clock ?? (() => DateTime.now().toUtc()),
+  }) : _clock = clock ?? defaultClock ?? (() => DateTime.now().toUtc()),
        _profile = Profile(onboarded: onboarded);
+
+  /// The clock of every fake made without one. Tests set it
+  /// (`test/flutter_test_config.dart`) so that plans, which follow the time of
+  /// day, do not change with the hour the tests run at.
+  @visibleForTesting
+  static DateTime Function()? defaultClock;
 
   /// Delay before every call.
   final Duration latency;
@@ -357,6 +366,12 @@ class FakeApiClient implements SelfInfinityApi {
       throw const ApiException(400, 'This node is another course, or is being broken down already.');
     }
     final hasParts = _edges.any((e) => e.kind == SkillEdgeKind.contains && e.fromId == skillId);
+    if (!hasParts && !node.unexpanded && node.points.isNotEmpty) {
+      throw const ApiException(
+        400,
+        'This node is the smallest piece: its knowledge points are inside it.',
+      );
+    }
     _nodes[skillId] = node.copyWith(unexpanded: false);
     // A node with parts is filled in: one part it was missing.
     final titles = hasParts ? ['More ${node.title}'] : [for (var i = 1; i <= 3; i++) '${node.title} $i'];
@@ -606,10 +621,15 @@ class FakeApiClient implements SelfInfinityApi {
   // ===========================================================================
 
   @override
-  Future<AuditStart> startAudit(int skillId, {String mode = 'day', bool testOut = false}) async {
+  Future<AuditStart> startAudit(
+    int skillId, {
+    String mode = 'day',
+    bool testOut = false,
+    bool restart = false,
+  }) async {
     await _begin('startAudit');
     _require(mode == 'day' || mode == 'night', 'mode must be "day" or "night"');
-    final node = _nodes[skillId];
+    var node = _nodes[skillId];
     if (node == null) throw const ApiException(404, 'skill not found');
     final position = positionOf(skillId, _edges, unexpanded: node.unexpanded);
     if (testOut) {
@@ -624,8 +644,45 @@ class FakeApiClient implements SelfInfinityApi {
       }
     }
 
-    final opening = testOut ? _testOutQuestion(node) : _openingQuestion(node, position);
-    final base = testOut || node.nodeType == NodeType.concept ? 8 : 4;
+    // An unfinished audit of the node goes on where it stopped.
+    final latest = _audits.values.where((a) => a.skillId == skillId).lastOrNull;
+    if (!restart &&
+        latest != null &&
+        latest.status == AuditStatus.active &&
+        latest.testOut == testOut &&
+        _clock().difference(latest.createdAt) < _resumeWindow) {
+      return AuditStart(
+        session: latest.toModel(),
+        openingQuestion: latest.turns.first.content,
+        resumed: true,
+      );
+    }
+
+    // A concept leaf is audited on its knowledge points; one that has none
+    // gets them before its first audit (the Point Lister).
+    var examined = const <SkillPoint>[];
+    if (!testOut && position == NodePosition.leaf && node.nodeType == NodeType.concept) {
+      if (node.points.isEmpty) {
+        node = node.copyWith(points: [for (final t in fakePointTitles(node.title)) SkillPoint(title: t)]);
+        _nodes[skillId] = node;
+      }
+      final open = node.points.where((p) => p.ok != true).toList();
+      examined = [
+        for (final p in node.isMastered || open.isEmpty ? node.points : open)
+          SkillPoint(title: p.title, note: p.note),
+      ];
+    }
+
+    final opening = testOut
+        ? _testOutQuestion(node)
+        : examined.isEmpty
+        ? _openingQuestion(node, position)
+        : _pointsQuestion(node, examined);
+    final base = examined.isNotEmpty
+        ? (2 * examined.length).clamp(4, 10)
+        : testOut || node.nodeType == NodeType.concept
+        ? 8
+        : 4;
     final audit = _FakeAudit(
       id: _nextAuditId++,
       skillId: skillId,
@@ -634,6 +691,7 @@ class FakeApiClient implements SelfInfinityApi {
       createdAt: _clock(),
       testOut: testOut,
     )..turns.add(AuditTurn(role: AuditRole.auditor, content: opening));
+    audit.points = examined;
     _audits[audit.id] = audit;
     return AuditStart(session: audit.toModel(), openingQuestion: opening);
   }
@@ -659,7 +717,13 @@ class FakeApiClient implements SelfInfinityApi {
           ? _genericProbe
           : 'You once thought “${withMisconception.first.misconception}”. '
                 'How is this explanation different?';
-      return _probeOrForcedFail(audit, question, userTurns.length);
+      return _probeOrForcedFail(
+        audit,
+        question,
+        userTurns.length,
+        feedback: probeFeedback,
+        point: audit.points.firstOrNull?.title,
+      );
     }
 
     // Later answers: verdict.
@@ -680,11 +744,18 @@ class FakeApiClient implements SelfInfinityApi {
           "You didn't cover the exceptions.",
         ],
         comment: 'The answer stops at the conclusion and lacks reasons.',
+        feedback: failFeedback,
+        // A fail misses the first point examined; the others held.
+        points: [
+          for (final (i, p) in audit.points.indexed)
+            SkillPoint(title: p.title, ok: i > 0, note: i == 0 ? failNote : null),
+        ],
       );
     }
     if (!audit.challenged && n < 160) {
       audit.challenged = true;
-      return _probeOrForcedFail(audit, _challengerQuestion, userTurns.length);
+      // The Challenger's question, after what the Auditor said about the answer.
+      return _probeOrForcedFail(audit, _challengerQuestion, userTurns.length, feedback: passFeedback);
     }
     return _finishPass(audit, n);
   }
@@ -828,45 +899,178 @@ class FakeApiClient implements SelfInfinityApi {
     return _briefing();
   }
 
-  /// The Planner behind the chat (no longer part of the client API).
+  @override
   Future<StudyPlan> generatePlan() async {
     await _begin('generatePlan');
-    final available = _nodes.values.where((n) => n.isAvailable).toList();
-    if (available.isEmpty) {
+    // The day's plan of the server (app/services/day_plan.py), simplified: the
+    // focus left by the condition, split by the time of day (KST) between
+    // judgement (learn, challenge) and review; an audit counts 10 minutes.
+    final now = _kstNow();
+    final slot = _slotOf(now);
+    final condition = _conditionFacts();
+    final flag = condition.flag;
+    final budget = (240 * switch (flag) {
+      ConditionFlag.normal => 1.0,
+      ConditionFlag.low => 0.5,
+      ConditionFlag.unknown => 0.75,
+    }).round();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final spent = 10 *
+        _audits.values
+            .where((a) => a.status != AuditStatus.active && !_kst(a.createdAt).isBefore(today))
+            .length;
+    final left = math.max(0, budget - spent);
+    // A node that is another course is learned in that course.
+    final available = _nodes.values.where((n) => n.isAvailable && !n.isLinked).toList();
+    final reviews = _reviewsDue(now, slot);
+    if (available.isEmpty && reviews.isEmpty) {
       throw const ApiException(
         400,
         'No node is available yet. Generate a course or pass an existing node first.',
       );
     }
-    final condition = _conditionFacts();
-    final low = condition.flag == ConditionFlag.low;
-    // Leaves first when the condition is low (a short, easy session), else by id.
-    final ordered = low
-        ? [
-            ...available.where((n) => positionOf(n.id, _edges) == NodePosition.leaf),
-            ...available.where((n) => positionOf(n.id, _edges) != NodePosition.leaf),
-          ]
-        : available;
+    final low = flag == ConditionFlag.low;
+    final share = {
+          DaySlot.morning: 0.8,
+          DaySlot.afternoon: 0.6,
+          DaySlot.evening: 0.25,
+          DaySlot.night: 0.0,
+        }[slot]! *
+        (low ? 0.6 : 1);
+    final steps = <PlanStep>[];
+    if (left >= 10) {
+      final reviewCap = slot == DaySlot.night ? 1 : math.max(1, (5 * (1 - share)).round());
+      var picked = reviews.take(math.min(reviewCap, (left * (1 - share)) ~/ 10)).toList();
+      final thinkBudget = slot == DaySlot.night ? 0 : left - picked.length * 10;
+      final challenges = !low && (slot == DaySlot.morning || slot == DaySlot.afternoon);
+      var thinking = [
+        for (final n in available)
+          if (challenges || !n.unexpanded) n,
+      ];
+      if (!challenges) {
+        final leaves = [
+          for (final n in thinking)
+            if (positionOf(n.id, _edges) == NodePosition.leaf) n,
+        ];
+        if (leaves.isNotEmpty) thinking = leaves;
+      }
+      final chosen = <PlanStep>[];
+      var used = 0;
+      for (final n in thinking) {
+        if (thinkBudget <= 0 || chosen.length >= 5 - picked.length) break;
+        final minutes = n.unexpanded
+            ? 35
+            : positionOf(n.id, _edges) != NodePosition.leaf
+            ? 30
+            : (n.nodeType == NodeType.task ? 15 : 25);
+        if (used + minutes <= thinkBudget || (chosen.isEmpty && minutes <= thinkBudget * 1.5)) {
+          used += minutes;
+          chosen.add(
+            PlanStep(
+              skillId: n.id,
+              courseId: n.courseId,
+              skillTitle: n.title,
+              nodeType: n.nodeType,
+              rationale: 'Prerequisites checked — you can take this on now.',
+              focusHint: 'Explain the why before the definition.',
+              kind: n.unexpanded ? QuestKind.challenge : QuestKind.learn,
+              minutes: minutes,
+            ),
+          );
+        }
+      }
+      if (chosen.isEmpty && slot != DaySlot.night) picked = reviews.take(math.min(5, left ~/ 10)).toList();
+      steps
+        ..addAll(chosen)
+        ..addAll([
+          for (final (n, tonight, days) in picked)
+            PlanStep(
+              skillId: n.id,
+              courseId: n.courseId,
+              skillTitle: n.title,
+              nodeType: n.nodeType,
+              rationale: tonight
+                  ? 'You learned it today: explain it once more before sleep so it sticks.'
+                  : 'You explained it $days days ago: tell it again before it fades.',
+              focusHint: 'Say it from memory first, then check what you left out.',
+              kind: QuestKind.review,
+              minutes: 10,
+            ),
+        ]);
+    }
+    String duration(int minutes) {
+      final h = minutes ~/ 60, m = minutes % 60;
+      return h > 0 && m > 0 ? '$h h $m min' : (h > 0 ? '$h h' : '$m min');
+    }
+
+    final summary = [
+      switch (slot) {
+        DaySlot.morning => 'Morning: judgement first, new nodes and challenges; review waits for the evening.',
+        DaySlot.afternoon => 'Afternoon: new nodes, with some review.',
+        DaySlot.evening => 'Evening: mostly review. Explaining again what you learned helps sleep keep it.',
+        DaySlot.night => "It's late: one short review at most, then sleep. Sleep does the consolidating.",
+      },
+      if (low)
+        "Your recent check-ins show a low condition, so today's load is halved: small nodes and review only.",
+      if (flag == ConditionFlag.unknown) 'No check-in yet, so I planned for three hours.',
+      left < 10
+          ? "Today's focus is used up (${duration(spent)}). The rest of the day is for rest and sleep."
+          : 'About ${duration(left)} of focus left today (${duration(spent)} done).',
+    ].join(' ');
     final bucket = _contextBucket(condition);
     final plan = StudyPlan(
       id: _nextPlanId++,
       suggestedTier: _suggestedTier(bucket),
       contextBucket: bucket,
       createdAt: _clock(),
-      steps: [
-        for (final n in ordered.take(low ? 3 : 5))
-          PlanStep(
-            skillId: n.id,
-            courseId: n.courseId,
-            skillTitle: n.title,
-            nodeType: n.nodeType,
-            rationale: 'Prerequisites checked — you can take this on now.',
-            focusHint: 'Explain the why before the definition.',
-          ),
-      ],
+      steps: steps,
+      slot: slot,
+      focusBudget: budget,
+      focusSpent: spent,
+      focusLeft: left,
+      summary: summary,
     );
     _plans.add(plan);
     return plan;
+  }
+
+  /// The fake clock as a KST wall-clock time (in a UTC DateTime).
+  DateTime _kstNow() => _kst(_clock());
+
+  static DateTime _kst(DateTime t) => t.toUtc().add(const Duration(hours: 9));
+
+  static DaySlot _slotOf(DateTime kst) => switch (kst.hour) {
+    >= 5 && < 12 => DaySlot.morning,
+    >= 12 && < 18 => DaySlot.afternoon,
+    >= 18 && < 23 => DaySlot.evening,
+    _ => DaySlot.night,
+  };
+
+  /// Mastered nodes with a passed audit due again: 1, 3, 7, 14, 30 days after
+  /// their passes; in the evening, what was first passed today 2 h before.
+  List<(SkillNode, bool, int)> _reviewsDue(DateTime kstNow, DaySlot slot) {
+    const intervals = [1, 3, 7, 14, 30];
+    final out = <(SkillNode, bool, int, double)>[];
+    for (final node in _nodes.values.where((n) => n.isMastered && !n.isLinked)) {
+      final audits = [
+        for (final a in _audits.values)
+          if (a.skillId == node.id && a.status != AuditStatus.active) a,
+      ]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      final passes = audits.where((a) => a.status == AuditStatus.passed).toList();
+      if (passes.isEmpty) continue;
+      final last = _kst(audits.last.createdAt);
+      final age = kstNow.difference(last);
+      final passedToday = passes.length == 1 && _kst(passes.first.createdAt).day == kstNow.day;
+      if ((slot == DaySlot.evening || slot == DaySlot.night) && passedToday && age.inMinutes >= 120) {
+        out.add((node, true, 0, double.infinity));
+        continue;
+      }
+      final interval = intervals[math.min(passes.length, intervals.length) - 1];
+      final days = age.inHours / 24;
+      if (days >= interval) out.add((node, false, days.round(), days - interval));
+    }
+    out.sort((a, b) => b.$4.compareTo(a.$4));
+    return [for (final (n, tonight, days, _) in out) (n, tonight, days)];
   }
 
   // ===========================================================================
@@ -1872,7 +2076,26 @@ class FakeApiClient implements SelfInfinityApi {
   @override
   Future<StudyPlan?> getCurrentPlan() async {
     await _begin('getCurrentPlan');
-    return _plans.lastOrNull;
+    final plan = _plans.lastOrNull;
+    if (plan == null) return null;
+    // Made for another time of day or another day: stale.
+    final now = _kstNow();
+    final made = _kst(plan.createdAt);
+    final stale = plan.slot != null &&
+        (made.day != now.day || made.month != now.month || made.year != now.year || plan.slot != _slotOf(now));
+    return StudyPlan(
+      id: plan.id,
+      suggestedTier: plan.suggestedTier,
+      contextBucket: plan.contextBucket,
+      createdAt: plan.createdAt,
+      steps: plan.steps,
+      slot: plan.slot,
+      focusBudget: plan.focusBudget,
+      focusSpent: plan.focusSpent,
+      focusLeft: plan.focusLeft,
+      summary: plan.summary,
+      stale: stale,
+    );
   }
 
   @override
@@ -2148,23 +2371,77 @@ class FakeApiClient implements SelfInfinityApi {
     }
   }
 
+  /// The opening of an audit that goes point by point: the first point still
+  /// open, and — when some held before — which ones this audit is about.
+  String _pointsQuestion(SkillNode node, List<SkillPoint> examined) {
+    final ask = 'Start with “${examined.first.title}”: what does it do, and why is it needed?';
+    if (examined.length < node.points.length) {
+      return 'What you already explained right stays cleared. This time only '
+          '${examined.map((p) => p.title).join(', ')}. $ask';
+    }
+    return "Let's take “${node.title}” one piece at a time. $ask";
+  }
+
+  /// The knowledge points the script gives a leaf titled [title].
+  static List<String> fakePointTitles(String title) => [
+    _cut('What $title is', 40),
+    _cut('Why $title holds', 40),
+    _cut('Where $title fails', 40),
+  ];
+
+  static const Duration _resumeWindow = Duration(hours: 24);
   static const String _genericProbe =
       'Pick the most important term in your explanation and tell me what it means and why it matters.';
   static const String _challengerQuestion =
       'Before I pass this: give one case where this idea does not hold, and explain why.';
 
+  /// What the scripted Auditor says about an answer before her next line.
+  static const String probeFeedback =
+      'That gives the outline. One part of it is still only named, not explained.';
+  static const String passFeedback = 'That is right, and you gave the reason for it.';
+  static const String failFeedback = 'The conclusion is there, but the reason behind it is missing.';
+  static const String failNote = 'Named it without saying why it holds.';
+
   /// Returns the probe, or — if the turn limit is reached — a failing verdict.
-  TurnResult _probeOrForcedFail(_FakeAudit audit, String question, int userTurns) {
+  TurnResult _probeOrForcedFail(
+    _FakeAudit audit,
+    String question,
+    int userTurns, {
+    String? feedback,
+    String? point,
+  }) {
     if (userTurns >= audit.maxTurns) {
       return _finishFail(
         audit,
         score: 0,
         gaps: const ["You couldn't explain the core idea within the turn limit."],
         comment: 'The turns ran out before the explanation was complete.',
+        // Nothing was settled: every point stays open.
+        points: audit.points,
       );
     }
-    audit.turns.add(AuditTurn(role: AuditRole.auditor, content: question));
-    return ProbeResult(question: question);
+    audit.turns.add(AuditTurn(role: AuditRole.auditor, content: question, feedback: feedback));
+    return ProbeResult(question: question, feedback: feedback, point: point);
+  }
+
+  /// Writes an audit's point results onto its node: what held, what was
+  /// missed and why. A point it did not settle keeps what it had.
+  void _recordPoints(_FakeAudit audit, List<SkillPoint> results) {
+    audit.points = results;
+    final node = _nodes[audit.skillId]!;
+    final settled = {
+      for (final r in results)
+        if (r.ok != null) r.title: r,
+    };
+    _nodes[node.id] = node.copyWith(
+      points: [
+        for (final p in node.points)
+          if (settled[p.title] case final r?)
+            SkillPoint(title: p.title, ok: r.ok, note: r.ok! ? null : r.note ?? p.note)
+          else
+            p,
+      ],
+    );
   }
 
   VerdictResult _finishFail(
@@ -2172,13 +2449,23 @@ class FakeApiClient implements SelfInfinityApi {
     required int score,
     required List<String> gaps,
     required String comment,
+    String? feedback,
+    List<SkillPoint> points = const [],
   }) {
     audit
       ..status = AuditStatus.failed
       ..score = score
       ..gaps = gaps
       ..comment = comment;
-    return VerdictResult(passed: false, score: score, gaps: gaps, comment: comment);
+    _recordPoints(audit, points);
+    return VerdictResult(
+      passed: false,
+      score: score,
+      gaps: gaps,
+      comment: comment,
+      feedback: feedback,
+      points: points,
+    );
   }
 
   VerdictResult _finishPass(_FakeAudit audit, int characters) {
@@ -2189,6 +2476,8 @@ class FakeApiClient implements SelfInfinityApi {
       ..score = score
       ..gaps = const []
       ..comment = comment;
+    final points = [for (final p in audit.points) SkillPoint(title: p.title, ok: true)];
+    _recordPoints(audit, points);
 
     final mastered = _nodes[audit.skillId]!.copyWith(
       status: SkillStatus.mastered,
@@ -2219,6 +2508,8 @@ class FakeApiClient implements SelfInfinityApi {
       passed: true,
       score: score,
       comment: comment,
+      feedback: passFeedback,
+      points: points,
       unlockedSkillIds: unlocked,
       rewardAmount: reward,
       rewardMultiplier: multiplier,
@@ -2474,6 +2765,9 @@ class _FakeAudit {
   final NodePosition position;
   int maxTurns;
   final List<AuditTurn> turns = [];
+
+  /// The knowledge points it examines; their results once it is closed.
+  List<SkillPoint> points = const [];
   AuditStatus status = AuditStatus.active;
   int? score;
   List<String> gaps = const [];
@@ -2493,6 +2787,7 @@ class _FakeAudit {
     comment: comment,
     turns: List.unmodifiable(turns),
     testOut: testOut,
+    points: List.unmodifiable(points),
   );
 }
 

@@ -11,6 +11,8 @@
 - 每次回答只保留完整的层（whole_levels）：模型爱在部分类别下塞几个示例叶子，而有子节点的
   类别会被当成已拆完。
 - 状态按学习顺序定（services/tree.py 的 open_next）：每章一个开放节点，根最后。
+- 叶子是最小的节点：Planner 给每个概念叶子带上它的知识点（services/points.py），带知识点的
+  叶子不再往下拆（AlreadySmallest）。
 """
 
 import json
@@ -24,10 +26,10 @@ from sqlmodel import Session, col, select
 from app.agents.planner import PlannedCourse, PlannedNode, Planner, SyllabusText
 from app.agents.syllabus import SyllabusFinder, SyllabusReference
 from app.llm.base import LLMProvider
-from app.models import Course, EdgeKind, SkillEdge, SkillNode, SkillStatus
+from app.models import Course, EdgeKind, NodeType, SkillEdge, SkillNode, SkillStatus
 from app.search.base import SearchProvider
 from app.services.structure_validator import StructureError, ValidatedCourse, validate_structure
-from app.services import course_match
+from app.services import course_match, points
 from app.services.course_edit import auto_link
 from app.services.tree import contains_children, contains_parents, course_graph, open_next
 
@@ -46,6 +48,10 @@ class CourseGenerationError(Exception):
 
 class NotExpandable(Exception):
     """The node is already broken down (or being broken down); the router answers 400."""
+
+
+class AlreadySmallest(Exception):
+    """The node is a leaf with knowledge points: what is inside it is those, not more nodes."""
 
 
 class CourseFull(Exception):
@@ -123,7 +129,9 @@ def missing_items(validated: ValidatedCourse, outline: list[str]) -> str | None:
     )
 
 
-def _validated(plan, root: PlannedNode | None = None, keep_levels: bool = True, check=None) -> ValidatedCourse:
+def _validated(
+    plan, root: PlannedNode | None = None, keep_levels: bool = True, check=None, deepest: int | None = None
+) -> ValidatedCourse:
     """Runs `plan(correction)` until the Structure Validator accepts it (one retry). With `root`
     (an expansion), the output hangs under that node: it is added as the root, and output nodes
     that name no parent get it as their parent."""
@@ -141,7 +149,7 @@ def _validated(plan, root: PlannedNode | None = None, keep_levels: bool = True, 
             planned = PlannedCourse(nodes=[root, *nodes], requires=planned.requires)
         try:
             validated = validate_structure(planned, LEVELS_PER_ANSWER)
-            validated = whole_levels(validated) if keep_levels else validated
+            validated = whole_levels(validated, deepest) if keep_levels else validated
         except StructureError as exc:
             logger.warning("planner output rejected on attempt %d: %s", attempt + 1, exc)
             correction = str(exc)
@@ -155,12 +163,13 @@ def _validated(plan, root: PlannedNode | None = None, keep_levels: bool = True, 
     raise CourseGenerationError(f"the planner output stayed unusable: {correction}")
 
 
-def whole_levels(validated: ValidatedCourse) -> ValidatedCourse:
+def whole_levels(validated: ValidatedCourse, deepest: int | None = None) -> ValidatedCourse:
     """Keeps every level of the answer whole. Models fill their budget with a few sample leaves
     under some categories ("Operating Systems" → Paging, Banker's Algorithm) and leave the rest
     to expand, and a category with children counts as finished. So the first level holding a
     category left to expand is the last one kept: everything below it is dropped, and every
-    category on it is left to expand, to be broken down whole in its own answer."""
+    category on it is left to expand, to be broken down whole in its own answer. `deepest`: no
+    level below it is kept either (a break-down keeps one level: its direct parts)."""
     depth = {validated.root_slug: 0}
     pending = [validated.root_slug]
     children: dict[str, list[str]] = {}
@@ -176,6 +185,8 @@ def whole_levels(validated: ValidatedCourse) -> ValidatedCourse:
     # A category with children is broken down, whatever its flag says.
     left = [n for n in validated.nodes if n.expand and n.slug in depth and not children.get(n.slug)]
     cut = min((depth[n.slug] for n in left), default=None)
+    if deepest is not None:
+        cut = deepest if cut is None else min(cut, deepest)
     if cut is None:
         return validated
     kept = {slug for slug, d in depth.items() if d <= cut}
@@ -243,12 +254,17 @@ def expand_node(session: Session, skill: SkillNode, planner_provider: LLMProvide
     """Breaks a node down into its parts and saves them under it: all of them for an unexpanded
     node, the missing ones for a node that has parts (filling it in).
 
+    A node the Planner finds to be one leaf gets no parts: it stays whole and gets its knowledge
+    points (services/points.py), after which it is the smallest node (AlreadySmallest).
+
     An unexpanded node is claimed first in one statement, so two requests cannot both expand
     it; if the Planner fails it is marked unexpanded again. A node that is another course is
     not broken down here. Raises NotExpandable, CourseFull or CourseGenerationError.
     """
     if skill.linked_course_id is not None:
         raise NotExpandable(skill.id)
+    if points.has_points(session, skill):
+        raise AlreadySmallest(skill.id)
     course = session.get(Course, skill.course_id)
     nodes = list(session.exec(select(SkillNode).where(SkillNode.course_id == skill.course_id)).all())
     if len(nodes) >= MAX_COURSE_NODES:
@@ -267,20 +283,29 @@ def expand_node(session: Session, skill: SkillNode, planner_provider: LLMProvide
     root = PlannedNode(slug=skill.slug, title=skill.title, description=skill.description, node_type=skill.node_type)
     settings = json.loads(course.settings_json or "{}") if course else {}
     planner = Planner(planner_provider)
+    own_points: list[str] = []
+
+    def plan(correction: str | None) -> PlannedCourse:
+        planned = planner.expand(
+            course.topic if course else skill.title,
+            skill.slug,
+            skill.title,
+            skill.description,
+            _path(session, skill),
+            [n.title for n in nodes if n.id != skill.id],
+            difficulty=settings.get("difficulty", "standard"),
+            correction=correction,
+            parts=parts,
+        )
+        own_points[:] = planned.points
+        return planned
+
     try:
         validated = _validated(
-            lambda correction: planner.expand(
-                course.topic if course else skill.title,
-                skill.slug,
-                skill.title,
-                skill.description,
-                _path(session, skill),
-                [n.title for n in nodes if n.id != skill.id],
-                difficulty=settings.get("difficulty", "standard"),
-                correction=correction,
-                parts=parts,
-            ),
+            plan,
             root=root,
+            # One level per break-down: going deeper is the player's choice, part by part.
+            deepest=1,
         )
     except CourseGenerationError:
         if claimed:
@@ -288,6 +313,11 @@ def expand_node(session: Session, skill: SkillNode, planner_provider: LLMProvide
             session.add(skill)
             session.commit()
         raise
+
+    # The Planner found the node to be one leaf: it stays whole, with its knowledge points.
+    if len(validated.nodes) == 1 and not parts and own_points and skill.node_type == NodeType.concept:
+        points.set_points(skill, own_points)
+        session.add(skill)
 
     _save_new(session, skill.course_id, validated, nodes, keep={skill.slug: skill})
     return _finish(session, course)
@@ -461,6 +491,9 @@ def _add_node(session: Session, course_id: int, slug: str, node: PlannedNode, ha
         # Only a node left without children can wait to be broken down.
         unexpanded=True if node.expand and not has_children else None,
     )
+    # Knowledge points belong to a leaf: the smallest node, audited on them.
+    if node.points and not has_children and not node.expand and node.node_type == NodeType.concept:
+        points.set_points(row, node.points)
     session.add(row)
     session.flush()
     return row

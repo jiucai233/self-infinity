@@ -195,6 +195,20 @@ void main() {
     });
   });
 
+  group('a break-down that finds nothing to add', () {
+    testWidgets('a leaf: it is already one piece', (tester) async {
+      await pumpScene(tester, const SkillScene(skillId: 6), api: _NothingToAdd());
+      await choose(tester, 'skill-fill-in');
+      expect(bubble(tester), "It's already one piece you can explain in one go: nothing to break down.");
+    });
+
+    testWidgets('a branch: nothing is missing', (tester) async {
+      await pumpScene(tester, const SkillScene(skillId: 2), api: _NothingToAdd());
+      await choose(tester, 'skill-fill-in');
+      expect(bubble(tester), 'Nothing is missing here.');
+    });
+  });
+
   test('the graph marks a node that is another course with ↗', () {
     const node = SkillNode(
       id: 1,
@@ -208,4 +222,15 @@ void main() {
     );
     expect(graphLabel(node), 'Computer Vision ↗');
   });
+}
+
+/// The math course, where breaking a node down adds nothing (the Planner
+/// answered no parts).
+class _NothingToAdd extends FakeApiClient {
+  _NothingToAdd() : super(latency: Duration.zero) {
+    generateCourse(const GenerateRequest(topic: 'math'));
+  }
+
+  @override
+  Future<CourseMap> expandSkill(int skillId) => getCourseMap(1);
 }

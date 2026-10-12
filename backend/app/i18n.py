@@ -123,6 +123,80 @@ _TEXTS: dict[str, dict[str, str]] = {
         "ko": "오늘의 퀘스트를 고르지 못했어요. 다시 시도해 주세요.",
     },
     "todays_quests": {"en": "Today's quests: {titles}.", "zh": "今天的任务：{titles}。", "ko": "오늘의 퀘스트: {titles}."},
+    # The day's plan (app/services/day_plan.py): the line above the daily quests.
+    "plan_morning": {
+        "en": "Morning: judgement first, new nodes and challenges; review waits for the evening.",
+        "zh": "早上：先做需要判断的，新内容和挑战；复习留到晚上。",
+        "ko": "아침: 판단이 필요한 것부터, 새 노드와 도전. 복습은 저녁에.",
+    },
+    "plan_afternoon": {
+        "en": "Afternoon: new nodes, with some review.",
+        "zh": "下午：新内容为主，夹一些复习。",
+        "ko": "오후: 새 노드 위주로, 복습 조금.",
+    },
+    "plan_evening": {
+        "en": "Evening: mostly review. Explaining again what you learned helps sleep keep it.",
+        "zh": "晚上：以复习为主。把学过的再讲一遍，睡眠会帮你记牢。",
+        "ko": "저녁: 복습 위주. 배운 걸 다시 설명하면 잠이 기억을 굳혀 줘요.",
+    },
+    "plan_night": {
+        "en": "It's late: one short review at most, then sleep. Sleep does the consolidating.",
+        "zh": "很晚了：最多做一个短复习，然后去睡，巩固交给睡眠。",
+        "ko": "늦었어요: 짧은 복습 하나만 하고 자요. 기억을 굳히는 건 잠이에요.",
+    },
+    "plan_focus_left": {
+        "en": "About {left} of focus left today ({spent} done).",
+        "zh": "今天还能专注约 {left}（已专注 {spent}）。",
+        "ko": "오늘 남은 집중 시간 약 {left} ({spent} 했어요).",
+    },
+    "plan_rest": {
+        "en": "Today's focus is used up ({spent}). The rest of the day is for rest and sleep.",
+        "zh": "今天的专注时间用完了（已专注 {spent}），剩下的交给休息和睡眠。",
+        "ko": "오늘 집중 시간을 다 썼어요 ({spent}). 남은 하루는 쉬고 자는 데 써요.",
+    },
+    "plan_low": {
+        "en": "Your recent check-ins show a low condition, so today's load is halved: small nodes and review only.",
+        "zh": "最近的打卡显示状态偏低，今天的量减半：只安排小节点和复习。",
+        "ko": "최근 체크인을 보면 컨디션이 낮아서 오늘 양을 절반으로 줄였어요: 작은 노드와 복습만.",
+    },
+    "plan_unknown": {
+        "en": "No check-in yet, so I planned for three hours.",
+        "zh": "还没有打卡，先按 3 小时安排。",
+        "ko": "아직 체크인이 없어서 3시간으로 잡았어요.",
+    },
+    "plan_pattern_sleep": {
+        "en": "On your days with under 6 h of sleep you passed {worse}% of audits; after 7 h or more, {better}% ({days} days).",
+        "zh": "你睡不满 6 小时的日子，审计通过率 {worse}%；睡满 7 小时的日子是 {better}%（共 {days} 天）。",
+        "ko": "6시간 미만 잔 날의 통과율은 {worse}%, 7시간 이상 잔 날은 {better}%예요 ({days}일).",
+    },
+    "plan_pattern_stress": {
+        "en": "On your stress 4–5 days you passed {worse}% of audits; on stress 1–2 days, {better}% ({days} days).",
+        "zh": "你压力 4–5 的日子，审计通过率 {worse}%；压力 1–2 的日子是 {better}%（共 {days} 天）。",
+        "ko": "스트레스 4–5인 날의 통과율은 {worse}%, 1–2인 날은 {better}%예요 ({days}일).",
+    },
+    "plan_pattern_exercise": {
+        "en": "On days you did not exercise you passed {worse}% of audits; on days you did, {better}% ({days} days).",
+        "zh": "你没运动的日子，审计通过率 {worse}%；运动的日子是 {better}%（共 {days} 天）。",
+        "ko": "운동 안 한 날의 통과율은 {worse}%, 운동한 날은 {better}%예요 ({days}일).",
+    },
+    "review_due": {
+        "en": "You explained it {days} days ago: tell it again before it fades.",
+        "zh": "{days} 天前讲过，趁快忘之前再讲一遍。",
+        "ko": "{days}일 전에 설명했어요. 잊기 전에 다시 해 봐요.",
+    },
+    "review_tonight": {
+        "en": "You learned it today: explain it once more before sleep so it sticks.",
+        "zh": "今天刚学的，睡前再讲一遍，记得更牢。",
+        "ko": "오늘 배운 거예요. 자기 전에 한 번 더 설명하면 오래 남아요.",
+    },
+    "review_hint": {
+        "en": "Say it from memory first, then check what you left out.",
+        "zh": "先凭记忆讲，再看漏了什么。",
+        "ko": "먼저 기억만으로 말하고, 빠뜨린 걸 확인해요.",
+    },
+    "duration_hm": {"en": "{h} h {m} min", "zh": "{h} 小时 {m} 分钟", "ko": "{h}시간 {m}분"},
+    "duration_h": {"en": "{h} h", "zh": "{h} 小时", "ko": "{h}시간"},
+    "duration_m": {"en": "{m} min", "zh": "{m} 分钟", "ko": "{m}분"},
     "briefing_failed": {
         "en": "I couldn't put your status together. Please try again.",
         "zh": "没能整理出你的状态，请再试一次。",
@@ -139,6 +213,17 @@ _TEXTS: dict[str, dict[str, str]] = {
         "en": "Explain {title} from scratch to someone who has never heard of it.",
         "zh": "向一个从没听说过{title}的人，从头讲清楚它。",
         "ko": "{title}에 대해 처음 듣는 사람에게 처음부터 설명해 보세요.",
+    },
+    # a leaf with knowledge points: one point at a time, starting with the first one still open
+    "opening_points": {
+        "en": "Let's take {title} one piece at a time. Start with {point}: what does it do, and why is it needed?",
+        "zh": "我们把{title}一块一块过。先说{point}：它是做什么的？为什么需要它？",
+        "ko": "{title}을 한 부분씩 살펴볼게요. {point}부터: 무슨 일을 하고, 왜 필요한가요?",
+    },
+    "opening_points_again": {
+        "en": "What you already explained right stays cleared. This time only {points}. Start with {point}: what does it do, and why is it needed?",
+        "zh": "上次讲清楚的不再考，这次只看{points}。先说{point}：它是做什么的？为什么需要它？",
+        "ko": "지난번에 제대로 설명한 건 다시 묻지 않아요. 이번엔 {points}만 볼게요. {point}부터: 무슨 일을 하고, 왜 필요한가요?",
     },
     "opening_branch": {
         "en": "{title} covers {children}. Why do these belong together, and when do you use which?",

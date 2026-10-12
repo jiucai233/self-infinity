@@ -5,7 +5,7 @@
 """
 
 from app.utils import local_today
-from tests.helpers import FIRST, LONG, SHORT, answer_turns, start
+from tests.helpers import FIRST, LONG, SHORT, answer_turns, freeze_clock, start
 
 SHORT_REFLECTION = "I thought no real roots meant no solutions."
 
@@ -82,10 +82,8 @@ def test_acceptance_scenario_end_to_end(client):
 
     quadratic_function = start(client, ids["Quadratic Functions"])
     (follow_up,) = answer_turns(client, quadratic_function, FIRST)
-    assert follow_up == {
-        "type": "probe",
-        "question": f"You once thought “{SHORT_REFLECTION}”. How is this explanation different?",
-    }
+    assert follow_up["type"] == "probe"
+    assert follow_up["question"] == f"You once thought “{SHORT_REFLECTION}”. How is this explanation different?"
 
     # 7. The knowledge graph shows the misconception linked to the skill where it originated.
     graph = client.get("/api/graph").json()
@@ -110,8 +108,9 @@ def test_acceptance_with_a_clarified_topic(client):
 VOICE_EXAMPLE = "I slept about six hours last night and didn't exercise. I had ramen for lunch and I'm a bit tired."
 
 
-def test_acceptance_check_in_briefing_plan_and_search(client):
+def test_acceptance_check_in_briefing_plan_and_search(client, monkeypatch):
     """The Analyst and Super Managing parts of the demo, offline: contract examples end to end."""
+    freeze_clock(monkeypatch, f"{local_today()} 09:00")
     ids = {n["slug"]: n["id"] for n in client.post("/api/skills/generate", json={"topic": "Math"}).json()["nodes"]}
 
     # Voice check-in of the contract example: sleep, exercise and diet filled, focus and stress asked for.
@@ -155,9 +154,11 @@ def test_acceptance_check_in_briefing_plan_and_search(client):
     assert len(after["narrative"]) <= 400 and after["narrative_generated_at"]
     assert client.get("/api/narrator/briefing").json() == after
 
-    # Study plan: the open node of each chapter; the condition is low, so leaves first.
+    # Study plan: the open node of each chapter; the condition is low, so only the leaves (the
+    # Quadratic Equations branch waits), on half a day's focus.
     plan = client.post("/api/plan/generate").json()
-    assert [s["skill_title"] for s in plan["steps"]] == ["Linear Functions", "Limits of Sequences", "Quadratic Equations"]
+    assert [s["skill_title"] for s in plan["steps"]] == ["Linear Functions", "Limits of Sequences"]
+    assert (plan["slot"], plan["condition_flag"], plan["focus_budget"]) == ("morning", "low", 120)
     assert all(s["rationale"] == "Prerequisites checked — you can take this on now." for s in plan["steps"])
     assert plan["steps"][0]["course_id"] == 1 and plan["steps"][0]["node_type"] == "concept"
     assert client.get("/api/plan/current").json() == plan

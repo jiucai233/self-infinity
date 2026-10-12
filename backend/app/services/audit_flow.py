@@ -14,11 +14,15 @@
   状态不动。
 - 整块挑战（test_out）：对一个分支或整门课，从它下面抽几个部分来问；通过则它和它下面所有
   没通过的节点都算 mastered（tested_out 标记它们不是自己审过的）。锁着的也能挑战。
+- 不用重来：一个节点上没结束的审计（RESUME_HOURS 小时内）再进来就接着来，原来的对话原样
+  还在；要从头来得明说（restart）。带知识点的叶子只考还没过的知识点，裁决后把每个知识点的
+  对错（和错在哪）写回节点（app/services/points.py），下一场从没过的那些开始。
 """
 
 import json
 import logging
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from sqlalchemy import update
 from sqlmodel import Session, col, select
@@ -38,9 +42,10 @@ from app.models import (
     SkillNode,
     SkillStatus,
     TurnRole,
+    utcnow,
 )
 from app.i18n import join_list, quote, t
-from app.services import bandit
+from app.services import bandit, points
 from app.services.condition import audit_pacing
 from app.services.incentive import compute_reward
 from app.services.course_edit import sync_links
@@ -64,6 +69,8 @@ class AuditClosed(Exception):
 @dataclass
 class ProbeOutcome:
     question: str
+    feedback: str | None = None
+    point: str | None = None
 
 
 @dataclass
@@ -72,6 +79,8 @@ class VerdictOutcome:
     score: int
     gaps: list[str]
     comment: str
+    feedback: str | None = None
+    points: list[dict] = field(default_factory=list)
     unlocked_skill_ids: list[int] = field(default_factory=list)
     reward_amount: int | None = None
     reward_multiplier: float | None = None
@@ -82,6 +91,14 @@ TurnOutcome = ProbeOutcome | VerdictOutcome
 
 # How many parts under a challenged node the Auditor is shown to sample from.
 TEST_OUT_PARTS = 12
+
+# An unfinished audit is picked up again for this long; after that a new one starts.
+RESUME_HOURS = 24
+
+# An audit with knowledge points gets two questions a point, within these bounds.
+POINT_TURNS = 2
+MIN_POINT_TURNS = 4
+MAX_POINT_TURNS = 10
 
 
 def can_test_out(session: Session, skill: SkillNode) -> bool:
@@ -102,8 +119,24 @@ def test_out_parts(session: Session, skill: SkillNode) -> list[str]:
 
 
 def opening_question(
-    skill: SkillNode, position: NodePosition, children: list[str], test_out: bool = False
+    skill: SkillNode,
+    position: NodePosition,
+    children: list[str],
+    test_out: bool = False,
+    examined: list[str] | None = None,
+    again: bool = False,
 ) -> str:
+    """`examined`: the knowledge points this audit asks about (a leaf that has them); `again`:
+    some of the node's points held before and are left out."""
+    if examined and not test_out:
+        if again:
+            return t(
+                "opening_points_again",
+                title=quote(skill.title),
+                points=join_list(examined),
+                point=quote(examined[0]),
+            )
+        return t("opening_points", title=quote(skill.title), point=quote(examined[0]))
     if test_out:
         if children:
             return t("opening_test_out", title=quote(skill.title), part=quote(children[0]))
@@ -117,8 +150,11 @@ def opening_question(
     return t("opening_leaf", title=quote(skill.title))
 
 
-def max_turns_for(node_type: NodeType, mode: str) -> int:
+def max_turns_for(node_type: NodeType, mode: str, examined: int = 0) -> int:
+    """`examined`: how many knowledge points the audit asks about (0: an audit without points)."""
     base = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
+    if examined:
+        base = max(MIN_POINT_TURNS, min(MAX_POINT_TURNS, POINT_TURNS * examined))
     return base * 2 if mode == "night" else base
 
 
@@ -132,25 +168,60 @@ def audit_turns(session: Session, audit_id: int) -> list[AuditTurn]:
     )
 
 
-def start_audit(session: Session, skill: SkillNode, mode: str, test_out: bool = False) -> tuple[AuditSession, str]:
+def unfinished_audit(session: Session, skill: SkillNode, test_out: bool = False) -> AuditSession | None:
+    """The audit of this node to go on with: its newest one, if it is still open and recent."""
+    latest = session.exec(
+        select(AuditSession)
+        .where(AuditSession.skill_id == skill.id)
+        .order_by(col(AuditSession.created_at).desc(), col(AuditSession.id).desc())
+        .limit(1)
+    ).first()
+    if latest is None or latest.status != AuditStatus.active or bool(latest.test_out) != test_out:
+        return None
+    if latest.created_at < utcnow() - timedelta(hours=RESUME_HOURS):
+        return None
+    return latest
+
+
+def start_audit(
+    session: Session, skill: SkillNode, mode: str, test_out: bool = False, restart: bool = False
+) -> tuple[AuditSession, str, bool]:
+    """The audit, its first question, and whether it is an unfinished one picked up again
+    (never with `restart`)."""
+    if not restart:
+        unfinished = unfinished_audit(session, skill, test_out)
+        if unfinished is not None:
+            first = next((t for t in audit_turns(session, unfinished.id) if t.role == TurnRole.auditor), None)
+            if first is not None:
+                return unfinished, first.content, True
+
     position = node_position(session, skill)
+    examined = points.to_examine(skill) if not test_out and points.has_points(session, skill) else []
     audit = AuditSession(
         skill_id=skill.id,
         node_position=position,
         status=AuditStatus.active,
         # A challenge samples several parts: it gets a concept's turns even over a task.
-        max_turns=max_turns_for(NodeType.concept if test_out else skill.node_type, mode),
+        max_turns=max_turns_for(NodeType.concept if test_out else skill.node_type, mode, len(examined)),
         test_out=True if test_out else None,
+        points_json=points.dump(examined) if examined else None,
     )
     session.add(audit)
     session.flush()
 
     parts = test_out_parts(session, skill) if test_out else child_titles(session, skill)
-    question = opening_question(skill, position, parts, test_out)
+    question = opening_question(
+        skill,
+        position,
+        parts,
+        test_out,
+        examined=[p["title"] for p in examined],
+        again=len(examined) < len(skill.points),
+    )
     session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=question))
     session.commit()
     session.refresh(audit)
-    return audit, question
+    return audit, question, False
 
 
 def submit_turn(
@@ -164,14 +235,20 @@ def submit_turn(
 ) -> TurnOutcome:
     _save_answer(session, audit, content)
 
+    # Her turns go back to her whole: what she already explained, then what she asked.
     history: list[Message] = [
-        {"role": "user" if t.role == TurnRole.user else "assistant", "content": t.content}
+        {
+            "role": "user" if t.role == TurnRole.user else "assistant",
+            "content": f"{t.feedback}\n\n{t.content}" if t.feedback else t.content,
+        }
         for t in audit_turns(session, audit.id)
     ]
 
     lessons = _lessons(session, skill)
     parts = test_out_parts(session, skill) if audit.test_out else child_titles(session, skill)
     pacing = _pacing(session)
+    examined = audit.points
+    asked = {p["title"] for p in examined}
     try:
         result = Auditor(auditor_provider).next_turn(
             skill.title,
@@ -186,12 +263,14 @@ def submit_turn(
             # The Challenger's question was the last one: this answer gets the verdict.
             after_challenge=audit.challenged,
             test_out=bool(audit.test_out),
+            points=examined,
+            settled=[p["title"] for p in skill.points if p["title"] not in asked] if examined else None,
         )
     except Exception as exc:
         raise AuditorUnavailable from exc
 
     if not result.is_verdict:
-        return _save_question(session, audit, result.question)
+        return _save_question(session, audit, result.question, result.feedback, result.point)
 
     # 只复核 pass，且每场审计至多一次（challenged 是那道收敛保证）。fail 不需要复核——
     # Challenger 的目标是推翻通过，对一个已经不通过的裁决无事可做。挑战不直接翻转裁决，
@@ -201,7 +280,8 @@ def submit_turn(
         if question is not None:
             audit.challenged = True
             session.add(audit)
-            return _save_question(session, audit, question)
+            # What she said about the last answer still stands; the question is the Challenger's.
+            return _save_question(session, audit, question, result.feedback)
 
     return _finalize(session, audit, skill, result)
 
@@ -221,10 +301,12 @@ def _save_answer(session: Session, audit: AuditSession, content: str) -> None:
     session.commit()
 
 
-def _save_question(session: Session, audit: AuditSession, question: str) -> ProbeOutcome:
-    session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=question))
+def _save_question(
+    session: Session, audit: AuditSession, question: str, feedback: str | None = None, point: str | None = None
+) -> ProbeOutcome:
+    session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=question, feedback=feedback))
     session.commit()
-    return ProbeOutcome(question=question)
+    return ProbeOutcome(question=question, feedback=feedback, point=point)
 
 
 def _lessons(session: Session, skill: SkillNode):
@@ -274,6 +356,11 @@ def _finalize(session: Session, audit: AuditSession, skill: SkillNode, verdict: 
     audit.score = verdict.score
     audit.gaps_json = json.dumps(verdict.gaps or [], ensure_ascii=False)
     audit.comment = verdict.comment
+    if verdict.points:
+        audit.points_json = points.dump(verdict.points)
+        # What held and what was missed stays on the node: the next audit starts from there.
+        points.record_results(skill, verdict.points)
+        session.add(skill)
     session.add(audit)
     bandit.update_arm(session, bucket, tier, reward=bool(verdict.passed))
 
@@ -282,6 +369,8 @@ def _finalize(session: Session, audit: AuditSession, skill: SkillNode, verdict: 
         score=verdict.score,
         gaps=list(verdict.gaps or []),
         comment=verdict.comment or "",
+        feedback=verdict.feedback,
+        points=list(verdict.points or []),
     )
     if verdict.passed:
         skill.status = SkillStatus.mastered

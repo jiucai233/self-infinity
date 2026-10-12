@@ -247,7 +247,7 @@ abstract class AppLocalizations {
   /// No description provided for @auditorTagline.
   ///
   /// In en, this message translates to:
-  /// **'Asks like a beginner, judges like an expert'**
+  /// **'Judges your answer first, then explains'**
   String get auditorTagline;
 
   /// No description provided for @authAlreadyRegistered.
@@ -2775,6 +2775,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to the start'**
   String get resetView;
+
+  /// No description provided for @questLearn.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn'**
+  String get questLearn;
+
+  /// No description provided for @questChallenge.
+  ///
+  /// In en, this message translates to:
+  /// **'Challenge'**
+  String get questChallenge;
+
+  /// No description provided for @questReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get questReview;
+
+  /// No description provided for @questMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} min'**
+  String questMinutes(int n);
+
+  /// No description provided for @nodeAlreadySmallest.
+  ///
+  /// In en, this message translates to:
+  /// **'It\'s already one piece you can explain in one go: nothing to break down.'**
+  String get nodeAlreadySmallest;
+
+  /// No description provided for @nodeNothingMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is missing here.'**
+  String get nodeNothingMissing;
+
+  /// No description provided for @copy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copy;
+
+  /// No description provided for @copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied.'**
+  String get copied;
+
+  /// No description provided for @auditResumed.
+  ///
+  /// In en, this message translates to:
+  /// **'Picked up where you left off.'**
+  String get auditResumed;
+
+  /// No description provided for @startOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Start over'**
+  String get startOver;
+
+  /// No description provided for @knowledgePoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Knowledge points'**
+  String get knowledgePoints;
+
+  /// No description provided for @knowledgePointsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Each audit asks about these; what you explained right is not asked again.'**
+  String get knowledgePointsHint;
+
+  /// No description provided for @pointHeld.
+  ///
+  /// In en, this message translates to:
+  /// **'Explained'**
+  String get pointHeld;
+
+  /// No description provided for @pointMissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed'**
+  String get pointMissed;
+
+  /// No description provided for @pointNotAsked.
+  ///
+  /// In en, this message translates to:
+  /// **'Not asked yet'**
+  String get pointNotAsked;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

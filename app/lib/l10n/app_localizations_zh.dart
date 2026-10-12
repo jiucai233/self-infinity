@@ -87,7 +87,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get auditPassed => '已通过';
 
   @override
-  String get auditorTagline => '像新手一样提问，像专家一样评判';
+  String get auditorTagline => '先评判你的回答，再讲解';
 
   @override
   String get authAlreadyRegistered => '这个邮箱已经注册过了，直接登录吧。';
@@ -1447,4 +1447,51 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetView => '回到初始视角';
+
+  @override
+  String get questLearn => '学新';
+
+  @override
+  String get questChallenge => '挑战';
+
+  @override
+  String get questReview => '复习';
+
+  @override
+  String questMinutes(int n) {
+    return '$n 分钟';
+  }
+
+  @override
+  String get nodeAlreadySmallest => '这已经是能一次讲清的一块了，不用再拆。';
+
+  @override
+  String get nodeNothingMissing => '这里没有缺的部分。';
+
+  @override
+  String get copy => '复制';
+
+  @override
+  String get copied => '已复制。';
+
+  @override
+  String get auditResumed => '接着上次没答完的继续。';
+
+  @override
+  String get startOver => '重新开始';
+
+  @override
+  String get knowledgePoints => '知识点';
+
+  @override
+  String get knowledgePointsHint => '每次审计就考这些；讲清楚的不再重考。';
+
+  @override
+  String get pointHeld => '已讲清';
+
+  @override
+  String get pointMissed => '没讲清';
+
+  @override
+  String get pointNotAsked => '还没考';
 }

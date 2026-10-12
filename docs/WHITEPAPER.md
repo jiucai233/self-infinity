@@ -67,9 +67,10 @@ backend/ (FastAPI + SQLModel + SQLite)
 | | Syllabus Finder | LLM + 搜索 | 找真实课程大纲或官方文档目录作为生成依据 |
 | | Planner | LLM | 生成课程图（节点 + contains / requires 边） |
 | | Structure Validator | 代码 | 11 条规则校验图结构，不合法则修正或拒绝 |
+| | Point Lister | LLM | 给没有知识点的叶子列出 3–6 个知识点（旧课程、手动加的节点；新课由 Planner 直接带出） |
 | | Material Finder | LLM + 搜索 | 针对某个 gap 找补充材料；URL 只来自搜索结果，绝不由 LLM 生成 |
 | Audit loop | Memory Retriever | 代码 | 取 ≤3 张相关原则卡交给 Auditor |
-| | Auditor | LLM | 多轮追问并裁决 |
+| | Auditor | LLM | 每轮先点评上一个回答，再出下一题或裁决；按知识点记录对错 |
 | | Challenger | LLM | 对"通过"做一次对抗复核 |
 | | Recorder | LLM | 把失败反思整理成原则卡 |
 | | Linker | LLM | 判断新卡与旧卡/节点的 related / contradicts 关系（后台运行） |
@@ -102,7 +103,8 @@ backend/ (FastAPI + SQLModel + SQLite)
 - **多父节点**：一个节点最多 3 个 contains 父节点，其中一个标 `is_primary`，决定它在地图上画在哪里。
 - **位置**：root / branch / leaf，由 contains 边算出，不由 LLM 声明。
 - **学习顺序**：树上叠一条线性顺序。一个节点包含的部分排在它前面（先学小节，再学整章，root 最后），`requires` 的前置排在前面，其余按 Planner 给出的大纲顺序。root 的子节点是“章”，章由用户自己挑：每章同一时间开放一个节点（该章顺序里第一个还没 mastered 的），所有章都通过后 root 才开放。已 mastered 的节点可以再审。
-- **大小不设上限，只定最小粒度**：叶子是一个能单独讲清楚的东西——一个模型、方法、算法或定理（二次函数、CNN、SAC），文科是一个概念。宽的领域（计算机视觉）可以有几百个节点。一次 Planner 调用写不出几百个节点，所以**分层生成**：第一次写骨架（root 和全部主要领域，至多 30 个节点；一层一层写，下一层能整层放进预算才往下），预算外的类别标 `unexpanded`。每次回答只保留完整的层：某一层出现待展开的类别，这层以下全部丢掉、这层的类别都标 `unexpanded`，因为模型爱在部分类别下塞几个示例叶子，而有子节点的类别会被当成已拆完。用户点开或学到那里时再单独展开（每次至多 40 个节点，展开结果过同一个 Structure Validator）。只设一个防失控的上限：一门课 500 个节点。实测（gpt-6-luna）：计算机视觉骨架 30 个节点约 30 秒，展开 Motion Analysis 得 37 个节点约 50 秒。
+- **大小不设上限，只定最小粒度**：叶子是一个能单独讲清楚的东西——一个模型、方法、算法或定理（二次函数、CNN、SAC），文科是一个概念。宽的领域（计算机视觉）可以有几百个节点。一次 Planner 调用写不出几百个节点，所以**分层生成**：第一次写骨架（root 和全部主要领域，至多 30 个节点；一层一层写，下一层能整层放进预算才往下），预算外的类别标 `unexpanded`。每次回答只保留完整的层：某一层出现待展开的类别，这层以下全部丢掉、这层的类别都标 `unexpanded`，因为模型爱在部分类别下塞几个示例叶子，而有子节点的类别会被当成已拆完。用户点开或学到那里时再单独展开（每次只展开一层，即它的直接组成部分，至多 40 个；更深一层由用户逐个点开，展开结果过同一个 Structure Validator）。叶子的大小按教材的一节算：学一两个小时、讲十分钟左右；只需几分钟就能学会的东西（二进制、八进制、十六进制）是同一个叶子里的几种情况，拿不准时就当叶子。之前允许一次展开两层时，模型会把预算用满，拆出“位值记数法”“八进制”这种单独审计只能问出抠字眼问题的节点。只设一个防失控的上限：一门课 500 个节点。实测（gpt-6-luna）：计算机视觉骨架 30 个节点约 30 秒，展开 Motion Analysis 得 37 个节点约 50 秒。
+- **叶子里是知识点，不是更小的节点**：叶子是最小的节点，再往下不再拆节点，而是它里面的 3–6 个**知识点**（“Transformer 基础”里是自注意力、前馈层、位置编码）。Planner 生成叶子时一并给出；旧课程和手动加的节点在第一次审计前由 Point Lister 补上（一次调用，失败就照旧按描述审）。“拆开”一个节点时 Planner 先判断它是什么：一个模型、架构、方法、算法或定理（或它的“基础”），或者课程里的一讲，就是叶子，不管能讲多少——它的组成部分、步骤、变体是知识点，不是节点，这时不产生子节点，只给出知识点；只有包含好几个模型或方法、每个都值得单独一讲的领域才拆。实测（gpt-6-luna，线上那门 VLA 课）：改之前“Transformer 基础”被拆成 9 个节点（输入嵌入、自注意力、多头注意力、交叉注意力、注意力掩码、位置编码……），改之后保持为一个节点、带 5 个知识点；“多模态融合与 VLM”“Operating Systems”仍正常拆成类别。带知识点的叶子不能再“继续拆开”（接口回 400，菜单里也不出现）；想改结构仍可手动加子节点，那时它成为分支，知识点不再使用。每个知识点在节点上记三样：对（讲清过）、错（上次没讲清）、还没考，以及错在哪的一句话。
 - **整块挑战**：已经会的分支不必逐个叶子审。对任意分支、root 或未展开的类别（锁着的也行）发起挑战：审计官从它下面最小的单元里抽三个各问一题，再问两者的关系，一个不会就不通过；通过则它和它下面所有节点记为 mastered（`tested_out` 标明不是逐个审过的）。
 - **节点类型**：`concept`（要讲清为什么）与 `task`（只确认做法具体），决定审计协议和轮次上限。
 - **手动编辑**：节点可以改名、加子节点、删除（连同只属于它的部分和它们的审计记录）、补全（Planner 只看已有的部分，补缺的）。新课纲也可以套到已有的课上：Planner 看到整棵树，只输出缺的节点并指明挂在哪个节点下，已有的不删不改，进度保留。
@@ -113,13 +115,21 @@ Planner 只决定结构，不生成教学内容。内容质量由审计把关：
 
 ### 4.2 费曼审计
 
-开场问题按节点位置选择（契约 §3.7）：leaf 要求从零讲给外行听；branch 要求说清子节点为什么是一组、何时用哪个；root 要求说清哪些问题该用它、哪些不该。task 节点只问具体怎么做。整块挑战另有开场：从它下面第一个最小单元问起。
+开场问题按节点位置选择（契约 §3.7）：带知识点的 leaf 从第一个还没过的知识点问起（“它是做什么的？为什么需要它？”）；没有知识点的 leaf 要求从零讲给外行听；branch 要求说清子节点为什么是一组、何时用哪个；root 要求说清哪些问题该用它、哪些不该。task 节点只问具体怎么做。整块挑战另有开场：从它下面第一个最小单元问起。
 
-**提问阶段：初学者人设。** 审计官只知道用户在本次对话里说过的话，只在"用了没解释的词"或"前后接不上"时追问，不主动引入外部概念带节奏。早期的"故意埋错"规则已移除：它要求审计官动用超出对话的专业知识，违背费曼法"听众必须无知"的设定。
+**每一轮：先点评，再出题（先判后教）。** 审计官的每句话分两段。先点评用户刚才的回答：指着原话说哪句对、哪句错，并把错的纠正过来（正确的说法和理由，两到四句）。再出下一题。约束只有一条：没答之前不提示——正在问的这道题，题面不能带答案或暗示；答过之后才讲。这取代了早期的“只判不教”：那时审计只在最后给一个结论和缺口清单，用户答错之后不知道错在哪，下一场还得从头讲一遍。检索练习之后立即给纠正性反馈，比只告知对错更有效 [Roediger & Karpicke, 2006; Hattie & Timperley, 2007]。为了不让“听来的”冒充“会的”，被纠正过的知识点这一场记为没过：只有用户自己的回答先答对，或者之后在新题里用对，才算。
 
-**裁决阶段：完整专业知识。** 裁决时切回专家视角，提问阶段没问到的错误也要写进 gaps。宁 fail 不放水。
+**问情境，不问定义。** 每道题给一个具体情境，要一个判断和理由，而且一层比一层深：它做什么 → 为什么这样设计 → 改掉会坏什么 → 实际中怎么验证。“假设把 V 打乱而 K 和注意力权重不变，输出会怎样？”“Q、K、V 都是可学习的矩阵，为什么最后分工不同？”“你看到某一层的注意力几乎均匀，怎么判断这是不是真问题？”背定义答得出来的题分不出懂和没懂。题面最后说明好的回答要区分什么或论证什么，但不给出答案。情境必须是机制里真能发生的、答案确定的，不出陷阱题，不超出节点的范围。早期的“初学者人设”（只追问用户说过但没解释的词）已移除：它问不出这种题，用户背一段流畅的定义就能通过。
 
-**轮次上限**：concept 8、task 4，夜间模式翻倍。上限只存在服务端，不写进 prompt，避免模型把它当配额。超限仍在追问 → 强制裁决 fail、score 0。
+**按知识点考，不用每次重来。** 叶子的审计只考还没过的知识点，一个一个来，每个最多两问。裁决逐个给出结果，写回节点：对的记为已讲清，错的记下错在哪。下一场只考没过的那些，考官能看到上次错在哪，换一道新题考同一个点；全部讲清才算通过。已通过的节点复习时全部重考。没结束的审计（24 小时内）再进来会接着来，对话原样还在，也可以选择重新开始；没等到回复的那条回答会放回输入框。
+
+**不逼问。** 用户说不会、或者说顶不住了，审计官讲清楚、把这个点记为没过，然后往下走或直接给裁决。
+
+**裁决阶段。** 标准是节点的描述（Covers）而不是整个领域：说错的一律算缺口，问没问到都算；做的时候会去查的细节不算。宁 fail 不放水。
+
+**轮次上限**：带知识点的叶子每个知识点两轮（最少 4、最多 10），其余 concept 8、task 4，夜间模式翻倍。上限只存在服务端，不写进 prompt，避免模型把它当配额。超限仍在追问 → 强制裁决 fail、score 0，知识点保持原状。
+
+**可复制。** 审计页里的问题、回答、点评、裁决卡和教训卡都可以选中复制；裁决卡和出错提示各有一个复制按钮（出错提示会带上状态码和服务端原话，方便反馈问题）。
 
 **Challenger**：Auditor 判通过时，Challenger 复核一次。推翻则把它的问题作为追问返回（每个会话最多一次）；维持或出错则最终通过。
 
@@ -149,6 +159,8 @@ Planner 只决定结构，不生成教学内容。内容质量由审计把关：
 **bandit**：上下文压成一个就绪度分桶（low / mid / high，来自近期通过率、搁置会话数、会话时长），动作是难度档位（easy / medium / hard），共 9 个 Beta-Bernoulli 臂，Thompson Sampling。选它而不是 LinUCB：单用户数据量喂不饱线性模型。
 
 **已知漏洞**：奖励信号是"通过 = 1"，策略会学到推简单题——通过率高、学习为零。设计目标是**挑战–技能平衡**：把用户维持在能力边缘。挑战–技能平衡是心流最稳健的前因之一 [Fong et al., 2015]，但该关联在教育情境下明显更弱，而且"平衡点 ≈ 50% 通过率"是本项目的推断，不是文献结论。因此用户评估要同时记录难度档位、结果和一条 1–5 分的主观投入度，用数据检验，而不是默认它成立。目标通过带尚未实现，落点在 `services/bandit.py`。
+
+**每日任务按时间和状态安排**（`services/day_plan.py`）：一天的专注时间按 4 小时算——即使是专家，刻意练习每天也就 4 小时左右 [Ericsson et al., 1993]；状态 `low` 时减半，没有打卡时按 3 小时；今天的审计已经用掉的时间（从开题到最后一轮）扣掉。剩下的时间按时段分给两类事：需要判断的（学新节点、整块挑战、分支）和回忆类的（复习已通过的节点）。早上 80/20，下午 60/40，晚上 25/75，深夜最多一个短复习。晚上偏复习，是因为学完后的睡眠帮助巩固记忆 [Gais et al., 2006; Diekelmann & Born, 2010]：今天通过的节点，睡前再讲一遍。复习本身是提取练习 [Roediger & Karpicke, 2006]，按间隔排期——通过后 1、3、7、14 天，之后每 30 天 [Cepeda et al., 2006]。状态低时不安排挑战，只排叶子节点。时段比例是默认值：人的最佳时段因作息类型而异 [Schmidt et al., 2007]，计划里记录了时段，之后可以用用户自己按时段的通过率来校正。每日任务上方有一句说明，今天的打卡如果落在用户自己某个规律的较差一组（比如今天睡不满 6 小时），就引用他自己的通过率。
 
 ### 4.5 每日打卡与 컨디션
 
@@ -247,11 +259,18 @@ SQLite 起步，schema 不依赖 SQLite 特性。启动时检测到旧（DAG 之
 
 ## 附录 B · 参考文献
 
+- Cepeda, N. J., Pashler, H., Vul, E., Wixted, J. T., & Rohrer, D. (2006). Distributed practice in verbal recall tasks: A review and quantitative synthesis. *Psychological Bulletin, 132*(3), 354–380.
 - Chhikara, P., et al. (2025). Mem0: Building production-ready AI agents with scalable long-term memory. arXiv:2504.19413.
+- Diekelmann, S., & Born, J. (2010). The memory function of sleep. *Nature Reviews Neuroscience, 11*(2), 114–126.
+- Ericsson, K. A., Krampe, R. T., & Tesch-Römer, C. (1993). The role of deliberate practice in the acquisition of expert performance. *Psychological Review, 100*(3), 363–406.
 - Fisher, A. J., Medaglia, J. D., & Jeronimus, B. F. (2018). Lack of group-to-individual generalizability is a threat to human subjects research. *PNAS, 115*(27), E6106–E6115.
 - Fong, C. J., Zaleski, D. J., & Leach, J. K. (2015). The challenge–skill balance and antecedents of flow: A meta-analytic investigation. *The Journal of Positive Psychology, 10*(5), 425–446. https://doi.org/10.1080/17439760.2014.967799
+- Gais, S., Lucas, B., & Born, J. (2006). Sleep after learning aids memory recall. *Learning & Memory, 13*(3), 259–262.
+- Hattie, J., & Timperley, H. (2007). The power of feedback. *Review of Educational Research, 77*(1), 81–112.
 - Packer, C., et al. (2023). MemGPT: Towards LLMs as operating systems. arXiv:2310.08560.
 - Rasmussen, P., et al. (2025). Zep: A temporal knowledge graph architecture for agent memory. arXiv:2501.13956.
+- Roediger, H. L., & Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. *Psychological Science, 17*(3), 249–255.
+- Schmidt, C., Collette, F., Cajochen, C., & Peigneux, P. (2007). A time to think: Circadian rhythms in human cognition. *Cognitive Neuropsychology, 24*(7), 755–789.
 - Van Dongen, H. P. A., Baynard, M. D., Maislin, G., & Dinges, D. F. (2004). Systematic interindividual differences in neurobehavioral impairment from sleep loss: Evidence of trait-like differential vulnerability. *Sleep, 27*(3), 423–433.
 - Wu, D., et al. (2025). LongMemEval: Benchmarking chat assistants on long-term interactive memory. *ICLR 2025*. arXiv:2410.10813.
 

@@ -76,6 +76,15 @@ class CourseOut(_Out):
     created_at: datetime
 
 
+class PointOut(BaseModel):
+    """One knowledge point of a leaf: explained right (true), missed (false, with `note`: what
+    was wrong) or not asked yet (null)."""
+
+    title: str
+    ok: bool | None = None
+    note: str | None = None
+
+
 class SkillNodeOut(_Out):
     id: int
     course_id: int
@@ -88,6 +97,9 @@ class SkillNodeOut(_Out):
     unexpanded: bool = False
     tested_out: bool = False
     linked_course_id: int | None = None
+    # The knowledge points inside a leaf, with what held and what was missed; a leaf that has
+    # them is the smallest node (it is not broken down). Empty for every other node.
+    points: list[PointOut] = []
 
     @field_validator("unexpanded", "tested_out", mode="before")
     @classmethod
@@ -188,11 +200,15 @@ class StartAuditRequest(BaseModel):
     mode: Literal["day", "night"] = "day"
     # Challenge a whole branch (or the course): pass it and everything under it is mastered.
     test_out: bool = False
+    # Start from the first question even when an unfinished audit of this node could go on.
+    restart: bool = False
 
 
 class AuditTurnOut(BaseModel):
     role: Literal["user", "auditor"]
     content: str
+    # On the Auditor's turns: what she said about the answer before, ahead of her question.
+    feedback: str | None = None
 
 
 class AuditSessionOut(BaseModel):
@@ -205,11 +221,15 @@ class AuditSessionOut(BaseModel):
     comment: str | None
     turns: list[AuditTurnOut]
     test_out: bool = False
+    # The knowledge points this audit examines; their results once it is closed.
+    points: list[PointOut] = []
 
 
 class StartAuditResponse(BaseModel):
     session: AuditSessionOut
     opening_question: str
+    # An unfinished audit of this node picked up again: `session.turns` is the dialogue so far.
+    resumed: bool = False
 
 
 class SubmitTurnRequest(BaseModel):
@@ -219,10 +239,14 @@ class SubmitTurnRequest(BaseModel):
 
 
 class ProbeResult(BaseModel):
-    """A probe carries only `type` and `question`; a Challenger overturn looks the same."""
+    """The next question, after `feedback` on the answer just given; a Challenger overturn
+    looks the same."""
 
     type: Literal["probe"] = "probe"
     question: str
+    feedback: str | None = None
+    # The knowledge point the question examines, when the audit goes point by point.
+    point: str | None = None
 
 
 class VerdictResult(BaseModel):
@@ -231,6 +255,10 @@ class VerdictResult(BaseModel):
     score: int
     gaps: list[str]
     comment: str
+    # What she said about the last answer, before the verdict.
+    feedback: str | None = None
+    # One per knowledge point examined: what held, what was missed and why.
+    points: list[PointOut] = []
     unlocked_skill_ids: list[int]
     # 通过时有值，失败时为 null。
     reward_amount: int | None
@@ -535,6 +563,10 @@ class PlanStepOut(BaseModel):
     node_type: NodeType
     rationale: str
     focus_hint: str
+    # learn: audit an open node; challenge: a category not broken down, whole; review: explain a
+    # mastered node again. Plans older than 2026-10-09 have no kind: they were all `learn`.
+    kind: Literal["learn", "challenge", "review"] = "learn"
+    minutes: int = 0  # about how long it takes
 
 
 class StudyPlanOut(BaseModel):
@@ -543,6 +575,14 @@ class StudyPlanOut(BaseModel):
     context_bucket: str
     created_at: datetime
     steps: list[PlanStepOut]
+    # The day's plan (app/services/day_plan.py); null on plans older than 2026-10-09.
+    slot: Literal["morning", "afternoon", "evening", "night"] | None = None
+    condition_flag: str | None = None
+    focus_budget: int | None = None  # minutes of focus for today, by the condition
+    focus_spent: int | None = None  # what today's audits took
+    focus_left: int | None = None
+    summary: str = ""  # the line above the quests
+    stale: bool = False  # made for another time of day or another day
 
 
 # ---------------------------------------------------------------- 资料检索（Material Finder）

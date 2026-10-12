@@ -87,7 +87,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auditPassed => 'Passed';
 
   @override
-  String get auditorTagline => 'Asks like a beginner, judges like an expert';
+  String get auditorTagline => 'Judges your answer first, then explains';
 
   @override
   String get authAlreadyRegistered => 'That email already has an account. Sign in instead.';
@@ -1464,4 +1464,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resetView => 'Back to the start';
+
+  @override
+  String get questLearn => 'Learn';
+
+  @override
+  String get questChallenge => 'Challenge';
+
+  @override
+  String get questReview => 'Review';
+
+  @override
+  String questMinutes(int n) {
+    return '$n min';
+  }
+
+  @override
+  String get nodeAlreadySmallest =>
+      'It\'s already one piece you can explain in one go: nothing to break down.';
+
+  @override
+  String get nodeNothingMissing => 'Nothing is missing here.';
+
+  @override
+  String get copy => 'Copy';
+
+  @override
+  String get copied => 'Copied.';
+
+  @override
+  String get auditResumed => 'Picked up where you left off.';
+
+  @override
+  String get startOver => 'Start over';
+
+  @override
+  String get knowledgePoints => 'Knowledge points';
+
+  @override
+  String get knowledgePointsHint =>
+      'Each audit asks about these; what you explained right is not asked again.';
+
+  @override
+  String get pointHeld => 'Explained';
+
+  @override
+  String get pointMissed => 'Missed';
+
+  @override
+  String get pointNotAsked => 'Not asked yet';
 }
