@@ -1018,13 +1018,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get devVoiceHint =>
-      '정가 기준입니다. GPT-Live 가이드는 세션이 열려 있는 초 단위로 과금되고 텍스트 백엔드가 더해집니다. Realtime은 토큰으로 과금되며(침묵은 무료) 받아쓰기가 더해집니다. 각 가이드 세션 옆에 다른 음성이었을 때의 비용을 표시합니다: Realtime은 이 계정에서 측정한 분당 비용, GPT-Live는 분당 \$0.05. 감사 받아쓰기는 연결 시간 전체로 계산한 상한입니다.';
+      '정가 기준입니다. GPT-Live 세션은 열려 있는 초 단위로 과금되고, 또 하나의 호출이 더해집니다: 가이드는 텍스트 백엔드, 감사는 세션 동안의 Auditor 호출입니다. Realtime 가이드는 토큰으로 과금되며(침묵은 무료) 받아쓰기가 더해집니다. 각 가이드 세션 옆에 다른 음성이었을 때의 비용을 표시합니다: Realtime은 이 계정에서 측정한 분당 비용, GPT-Live는 분당 \$0.05. 차례대로 진행한 감사는 연결 시간 전체의 받아쓰기로 계산한 상한이며, 답을 읽어 주는 음성 합성은 포함하지 않습니다.';
 
   @override
   String get devVoiceGuide => '홈 가이드';
 
   @override
-  String get devVoiceAudits => '감사 (실시간 받아쓰기)';
+  String get devVoiceAudits => '감사';
 
   @override
   String get devVoiceSessions => '세션';
@@ -1517,4 +1517,74 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get tourProveTitle => '설명하세요. 판단은 심사관이 해요.';
+
+  @override
+  String get aiModel => '모델';
+
+  @override
+  String get devTabLlm => '모델 비용';
+
+  @override
+  String get devLlmHint =>
+      '정가 기준입니다. 텍스트 에이전트(Planner, Auditor 등)의 모든 호출이 토큰 수와 함께 기록됩니다. 여기에 가격이 없는 모델은 횟수만 세고 금액에는 넣지 않습니다.';
+
+  @override
+  String get devLlmAll => '전체 호출';
+
+  @override
+  String get devLlmCalls => '호출';
+
+  @override
+  String get devLlmFailed => '실패';
+
+  @override
+  String get devLlmPerCall => '호출당';
+
+  @override
+  String get devLlmUnpriced => '가격 없음';
+
+  @override
+  String get devLlmPerAudit => '감사당';
+
+  @override
+  String get devLlmByModel => '모델별';
+
+  @override
+  String get devLlmByAgent => '에이전트별';
+
+  @override
+  String get devNoLlm => '아직 기록된 모델 호출이 없습니다.';
+
+  @override
+  String get devVoiceAuditLive => '감사 (GPT-Live)';
+
+  @override
+  String get devVoiceAuditTurns => '감사 (차례대로)';
+
+  @override
+  String get devVoicePerSession => '세션당';
+
+  @override
+  String get devVoicePerSessionLive => 'GPT-Live 세션당';
+
+  @override
+  String get devVoicePerSessionTurns => '차례대로 세션당';
+
+  @override
+  String get devVoiceLiveParts => 'GPT-Live의 두 부분: 음성과 또 하나의 호출';
+
+  @override
+  String get devVoiceGuideVoice => '가이드: 음성';
+
+  @override
+  String get devVoiceGuideBackend => '가이드: 백엔드';
+
+  @override
+  String get devVoiceAuditVoice => '감사: 음성';
+
+  @override
+  String get devVoiceAuditBackend => '감사: Auditor';
+
+  @override
+  String get devVoiceOtherCall => '또 하나의 호출';
 }

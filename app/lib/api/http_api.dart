@@ -405,6 +405,15 @@ class HttpApi implements SelfInfinityApi {
   );
 
   @override
+  Future<String?> auditVoice() => _get(
+    '/voice',
+    parse: (j) {
+      final o = _object(j);
+      return o['available'] == true ? (o['audit'] == 'turns' ? 'turns' : 'live') : null;
+    },
+  );
+
+  @override
   Future<String> transcribe(Uint8List audio, {required String filename}) => _send(
     'POST',
     '/voice/transcribe',
@@ -466,6 +475,16 @@ class HttpApi implements SelfInfinityApi {
     body: usage.toJson(),
     parse: (_) {},
   );
+
+  @override
+  Future<LlmStatus> getLlm() => _get('/llm', parse: (j) => LlmStatus.fromJson(_object(j)));
+
+  @override
+  Future<LlmStatus> setLlm(String provider) =>
+      _send('PUT', '/llm', body: {'provider': provider}, parse: (j) => LlmStatus.fromJson(_object(j)));
+
+  @override
+  Future<DevLlm> getDevLlm() => _get('/dev/llm', parse: (j) => DevLlm.fromJson(_object(j)));
 
   @override
   Future<DevVoice> getDevVoice({int limit = 50}) => _get(

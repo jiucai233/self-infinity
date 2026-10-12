@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/testing/fake_auth.dart';
 import 'package:self_infinity/api/fake_api.dart';
+import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/panel_layout.dart';
 import 'package:self_infinity/features/audit/audit_scene.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
@@ -264,6 +265,30 @@ void main() {
       expect(auth.signedIn, isFalse);
     });
 
+    testWidgets('OpenAI | Claude: the model the agents run on; a tap chooses, the menu stays', (tester) async {
+      await pumpScene(tester, const MapScene(), api: api);
+      await tester.tap(find.byKey(const Key('settings-button')));
+      await tester.pumpAndSettle();
+      SegmentedButton<String> model() => tester.widget(find.byKey(const Key('settings-model')));
+      expect(find.text('OpenAI'), findsOneWidget);
+      expect(find.text('Claude'), findsOneWidget);
+      expect(model().selected, {'openai'});
+
+      await tester.tap(find.byKey(const Key('settings-model-claude')));
+      await tester.pumpAndSettle();
+      expect((await api.getLlm()).provider, 'claude');
+      expect(model().selected, {'claude'});
+      expect(find.byKey(const Key('settings-tutorial')), findsOneWidget); // still open
+    });
+
+    testWidgets('a provider the server has no key for cannot be chosen', (tester) async {
+      await pumpScene(tester, const MapScene(), api: _OpenAiOnly());
+      await tester.tap(find.byKey(const Key('settings-button')));
+      await tester.pumpAndSettle();
+      final model = tester.widget<SegmentedButton<String>>(find.byKey(const Key('settings-model')));
+      expect([for (final s in model.segments) (s.value, s.enabled)], [('openai', true), ('claude', false)]);
+    });
+
     testWidgets('Replay the tutorial clears the onboarded flag', (tester) async {
       await pumpScene(tester, const MapScene(), api: api);
       expect((await api.getProfile()).onboarded, isTrue);
@@ -477,4 +502,19 @@ void main() {
       expect(find.byType(Chip), findsNothing);
     });
   });
+}
+
+/// A server with an OpenAI key only.
+class _OpenAiOnly extends FakeApiClient {
+  _OpenAiOnly() : super(latency: Duration.zero);
+
+  @override
+  Future<LlmStatus> getLlm() async => const LlmStatus(
+    provider: 'openai',
+    model: 'gpt-6-luna',
+    choices: [
+      LlmChoice(id: 'openai', model: 'gpt-6-luna', available: true),
+      LlmChoice(id: 'claude', model: 'claude-haiku-5-5', available: false),
+    ],
+  );
 }

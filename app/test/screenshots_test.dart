@@ -690,6 +690,47 @@ void main() {
         },
       );
     });
+    testWidgets(skip: dir == null, 'settings menu ($tag)', (tester) async {
+      await scene(
+        tester,
+        size: size,
+        name: '9-settings-$tag',
+        location: '/map',
+        act: (t) async {
+          if (find.byKey(const Key('open-left-drawer')).evaluate().isNotEmpty) {
+            await t.tap(find.byKey(const Key('open-left-drawer')));
+            await t.pumpAndSettle();
+          }
+          await t.tap(find.byKey(const Key('settings-button')));
+          await t.pumpAndSettle();
+        },
+      );
+    });
+    for (final tab in const ['voice', 'llm']) {
+      testWidgets(skip: dir == null, 'developer panel, $tab ($tag)', (tester) async {
+        final api = _ShotCosts();
+        await api.generateCourse(const GenerateRequest(topic: 'math'));
+        await scene(
+          tester,
+          size: size,
+          name: '9-dev-$tab-$tag',
+          location: '/map',
+          api: api,
+          act: (t) async {
+            if (find.byKey(const Key('open-left-drawer')).evaluate().isNotEmpty) {
+              await t.tap(find.byKey(const Key('open-left-drawer')));
+              await t.pumpAndSettle();
+            }
+            await t.tap(find.byKey(const Key('settings-button')));
+            await t.pumpAndSettle();
+            await t.tap(find.byKey(const Key('settings-dev')));
+            await t.pumpAndSettle();
+            await t.tap(find.byKey(Key('dev-tab-$tab')));
+            await t.pumpAndSettle();
+          },
+        );
+      });
+    }
     testWidgets(skip: dir == null, 'scene 4 a boss node ($tag)', (tester) async {
       await scene(tester, size: size, name: '4-boss-$tag', location: '/skill/2');
     });
@@ -770,4 +811,80 @@ void main() {
       );
     });
   }
+}
+
+/// Model calls and voice sessions with costs, for the developer panel's shots.
+class _ShotCosts extends FakeApiClient {
+  _ShotCosts() : super(latency: Duration.zero);
+
+  @override
+  Future<DevLlm> getDevLlm() async => const DevLlm(
+    calls: 96,
+    failed: 2,
+    cost: 0.0431,
+    avgCost: 0.00046,
+    providers: [
+      DevLlmRow(
+        provider: 'openai',
+        model: 'gpt-6-luna',
+        calls: 58,
+        failed: 2,
+        avgInputTokens: 2140,
+        avgOutputTokens: 420,
+        avgMs: 3100,
+        cost: 0.0246,
+        avgCost: 0.00044,
+      ),
+      DevLlmRow(
+        provider: 'claude',
+        model: 'claude-haiku-5-5',
+        calls: 38,
+        avgInputTokens: 2210,
+        avgOutputTokens: 510,
+        avgMs: 2300,
+        cost: 0.0185,
+        avgCost: 0.00049,
+      ),
+    ],
+    agents: [
+      DevLlmRow(provider: 'openai', model: 'gpt-6-luna', agent: 'auditor', calls: 31, avgInputTokens: 2600, avgOutputTokens: 380, avgMs: 2900, avgCost: 0.00045),
+      DevLlmRow(provider: 'claude', model: 'claude-haiku-5-5', agent: 'auditor', calls: 22, avgInputTokens: 2650, avgOutputTokens: 460, avgMs: 2100, avgCost: 0.0005),
+      DevLlmRow(provider: 'openai', model: 'gpt-6-luna', agent: 'planner', calls: 4, avgInputTokens: 3900, avgOutputTokens: 2800, avgMs: 21000, avgCost: 0.0018),
+    ],
+    audits: [
+      DevLlmRow(provider: 'openai', model: 'gpt-6-luna', audits: 6, avgCalls: 5.2, avgCost: 0.0023),
+      DevLlmRow(provider: 'claude', model: 'claude-haiku-5-5', audits: 4, avgCalls: 5.5, avgCost: 0.0027),
+    ],
+  );
+
+  @override
+  Future<DevVoice> getDevVoice({int limit = 50}) async => DevVoice(
+    guideSessions: 3,
+    guideMinutes: 6.9,
+    guideCost: 0.446,
+    guideCostPerMinute: 0.065,
+    guideAllLive: 0.347,
+    guideAllRealtime: 0.562,
+    realtimePerMinute: 0.082,
+    realtimeRateMeasured: true,
+    guideCachedShare: 0.75,
+    guideLiveVoiceCost: 0.188,
+    guideLiveBackendCost: 0.0036,
+    guideCostPerSession: 0.149,
+    auditSessions: 15,
+    auditMinutes: 59.4,
+    auditCost: 1.296,
+    auditLiveSessions: 2,
+    auditLiveMinutes: 8.4,
+    auditLiveVoiceCost: 0.42,
+    auditLiveBackendCost: 0.0051,
+    auditLiveCostPerSession: 0.213,
+    auditTurnsCostPerSession: 0.067,
+    sessions: [
+      DevVoiceSession(id: 18, kind: 'audit', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 12, 4), minutes: 4.6, turns: 6, audioIn: 0, audioOut: 0, cost: 0.233, backendCost: 0.0028),
+      DevVoiceSession(id: 17, kind: 'audit', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 12, 3), minutes: 3.8, turns: 5, audioIn: 0, audioOut: 0, cost: 0.192, backendCost: 0.0023),
+      DevVoiceSession(id: 16, kind: 'transcribe', model: 'gpt-live-transcribe', startedAt: DateTime.utc(2026, 10, 11, 21), minutes: 1.6, turns: 5, audioIn: 0, audioOut: 0, cost: 0.027),
+      DevVoiceSession(id: 7, kind: 'guide', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 9, 15), minutes: 1.1, turns: 2, audioIn: 0, audioOut: 0, cost: 0.053, backendCost: 0.0009, otherCost: 0.086),
+    ],
+  );
 }

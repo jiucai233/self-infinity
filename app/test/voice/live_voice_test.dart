@@ -7,86 +7,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/api_exception.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
+import 'package:self_infinity/testing/fake_live_io.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
+import 'package:self_infinity/voice/live_audit.dart';
 import 'package:self_infinity/voice/live_guide.dart';
 import 'package:self_infinity/voice/live_link.dart';
 import 'package:self_infinity/voice/pause_detector.dart';
 import 'package:self_infinity/voice/realtime_guide.dart';
 import 'package:self_infinity/voice/streaming_voice_service.dart';
 import 'package:self_infinity/voice/voice_mode.dart';
-
-class _FakeLink implements LiveLink {
-  final _events = StreamController<Map<String, Object?>>.broadcast(sync: true);
-  final List<Map<String, Object?>> sent = [];
-  bool mic = true;
-  bool closed = false;
-
-  void emit(Map<String, Object?> event) => _events.add(event);
-  List<String> get sentTypes => [for (final e in sent) '${e['type']}'];
-
-  @override
-  Stream<Map<String, Object?>> get events => _events.stream;
-
-  @override
-  void send(Map<String, Object?> event) => sent.add(event);
-
-  @override
-  set microphoneOn(bool on) => mic = on;
-
-  @override
-  Future<void> close() async {
-    closed = true;
-    await _events.close();
-  }
-}
-
-class _FakeLiveIo implements LiveIo {
-  @override
-  bool supported = true;
-  int connects = 0;
-  String? path;
-  bool? playReplies;
-  void Function(double level)? onLevel;
-  void Function(double level)? onReplyLevel;
-  /// A path whose sessions are refused (the others connect).
-  String? refusePath;
-  /// Made by [connect], inside the test's zone.
-  late _FakeLink link;
-  Object? connectError;
-  final List<String> streamed = [];
-  Object? streamError;
-
-  void level(double v) => onLevel?.call(v);
-
-  @override
-  void unlock() {}
-
-  @override
-  Future<LiveLink> connect(
-    LiveEndpoint endpoint, {
-    required bool playReplies,
-    void Function(double level)? onLevel,
-    void Function(double level)? onReplyLevel,
-  }) async {
-    connects++;
-    path = endpoint.url.path;
-    this.playReplies = playReplies;
-    this.onLevel = onLevel;
-    this.onReplyLevel = onReplyLevel;
-    if (connectError case final e?) throw e;
-    if (refusePath != null && endpoint.url.path.endsWith(refusePath!)) throw StateError('refused');
-    return link = _FakeLink();
-  }
-
-  @override
-  Future<void> playStream(LiveEndpoint endpoint, String body) async {
-    if (streamError case final e?) throw e;
-    streamed.add((jsonDecode(body) as Map)['text'] as String);
-  }
-
-  @override
-  Future<void> stopStream() async {}
-}
 
 class _LiveApi extends FakeApiClient {
   _LiveApi() : super(latency: Duration.zero);
@@ -107,6 +36,11 @@ class _LiveApi extends FakeApiClient {
 
   @override
   Future<String?> guideVoice() async => available ? guide : null;
+
+  String audit = 'live';
+
+  @override
+  Future<String?> auditVoice() async => available ? audit : null;
 
   @override
   LiveEndpoint? liveEndpoint(String path) =>
@@ -137,12 +71,12 @@ class _LiveApi extends FakeApiClient {
 }
 
 void main() {
-  late _FakeLiveIo io;
+  late FakeLiveIo io;
   late _LiveApi api;
   late FakeVoiceService device;
 
   setUp(() {
-    io = _FakeLiveIo();
+    io = FakeLiveIo();
     api = _LiveApi();
     device = FakeVoiceService();
   });
@@ -584,6 +518,211 @@ void main() {
       expect(await guide.start(), isTrue);
       expect(io.connects, 0);
       expect(device.listenCalls, 1);
+    });
+  });
+
+  group('the audit on GPT-Live', () {
+    late VoiceModeController turns;
+    late LiveAuditMode mode;
+    late DateTime now;
+    late List<String> answers;
+    late VoiceReply reply;
+    String? question;
+
+    setUp(() {
+      now = DateTime.utc(2026, 10, 12, 3);
+      answers = [];
+      reply = (speak: 'Right: weights come from a softmax. What would happen without it?', keepGoing: true);
+      question = 'How does self-attention weigh the tokens?';
+      turns = VoiceModeController(voice: device, onHeard: (_) async => (speak: null, keepGoing: true));
+      mode = LiveAuditMode(
+        api: api,
+        io: io,
+        fallback: turns,
+        onHeard: (heard) async {
+          answers.add(heard);
+          return reply;
+        },
+        opening: () => question,
+        settle: Duration.zero,
+        clock: () => now,
+      );
+    });
+
+    tearDown(() => mode.dispose());
+
+    List<Map<String, Object?>> sentOf(String type) => [
+      for (final e in io.link.sent)
+        if (e['type'] == type) e,
+    ];
+
+    void handOver(String id) =>
+        io.link.emit({'type': 'session.delegation.created', 'delegation': {'id': id, 'type': 'delegation', 'target': 'client'}});
+
+    test('it opens a GPT-Live session and she says the question on the table, once', () async {
+      expect(await mode.start(), isTrue);
+      expect(mode.isLive, isTrue);
+      expect(io.path, '/api/voice/live/audit');
+      expect(io.playReplies, isTrue);
+      expect(mode.state, VoiceModeState.listening);
+      io.link.emit({'type': 'session.started', 'session': {'model': 'gpt-live-1'}});
+      io.link.emit({'type': 'session.started', 'session': {'model': 'gpt-live-1'}});
+      final said = sentOf('session.instructions.append').single;
+      expect(said['delegation_id'], isNull);
+      expect(said['content'], contains('How does self-attention weigh the tokens?'));
+    });
+
+    test('a finished answer goes to the Auditor with their words, and she says what comes back', () async {
+      await mode.start();
+      final link = io.link;
+      link.emit({'type': 'session.started'});
+      link.emit({'type': 'session.input_transcript.delta', 'delta': 'It scores every pair '});
+      link.emit({'type': 'session.input_transcript.delta', 'delta': 'and normalises the scores'});
+      expect(mode.heard, 'It scores every pair and normalises the scores');
+      handOver('d1');
+      expect(mode.state, VoiceModeState.thinking);
+      await pumpEventQueue();
+
+      expect(answers, ['It scores every pair and normalises the scores']);
+      expect(sentOf('session.commentary.append').single, {
+        'type': 'session.commentary.append',
+        'delegation_id': 'd1',
+        'content': 'Right: weights come from a softmax. What would happen without it?',
+      });
+      expect(mode.heard, ''); // the next answer starts empty
+      expect(mode.state, VoiceModeState.listening);
+      expect(api.usage.last, containsPair('kind', 'audit'));
+      expect(api.usage.last, containsPair('turns', 1));
+    });
+
+    test('she can be cut short: while she speaks their words are still heard', () async {
+      await mode.start();
+      io.onReplyLevel!(0.5);
+      expect(mode.state, VoiceModeState.speaking);
+      io.link.emit({'type': 'session.input_transcript.delta', 'delta': 'Wait, I meant the keys'});
+      expect(mode.heard, 'Wait, I meant the keys');
+      await mode.interrupt(); // a tap on her face does it too
+      expect(sentOf('session.instructions.append').last['content'], contains('Stop speaking now'));
+    });
+
+    test('a hand-over with nothing said judges nothing', () async {
+      await mode.start();
+      io.link.emit({'type': 'session.started'});
+      handOver('d1');
+      await pumpEventQueue();
+      expect(answers, isEmpty);
+      expect(sentOf('session.commentary.append'), isEmpty);
+      final told = sentOf('session.instructions.append').last;
+      expect(told['delegation_id'], 'd1');
+      expect(told['content'], contains('has not answered yet'));
+    });
+
+    test('an answer that could not be judged: she says so instead of making something up', () async {
+      await mode.start();
+      reply = (speak: null, keepGoing: true);
+      io.link.emit({'type': 'session.input_transcript.delta', 'delta': 'It is a weighted sum'});
+      handOver('d1');
+      await pumpEventQueue();
+      expect(answers, ['It is a weighted sum']);
+      expect(sentOf('session.commentary.append'), isEmpty);
+      expect(sentOf('session.instructions.append').last['content'], contains('could not be judged'));
+    });
+
+    test('a hand-over while the Auditor is judging waits its turn', () async {
+      final judging = Completer<VoiceReply>();
+      final slow = LiveAuditMode(
+        api: api,
+        io: io,
+        fallback: VoiceModeController(voice: device, onHeard: (_) async => (speak: null, keepGoing: true)),
+        onHeard: (heard) {
+          answers.add(heard);
+          return answers.length == 1 ? judging.future : Future.value(reply);
+        },
+        opening: () => null,
+        settle: Duration.zero,
+        clock: () => now,
+      );
+      addTearDown(slow.dispose);
+      await slow.start();
+      final link = io.link;
+      link.emit({'type': 'session.input_transcript.delta', 'delta': 'First answer'});
+      handOver('d1');
+      await pumpEventQueue();
+      link.emit({'type': 'session.input_transcript.delta', 'delta': 'and one more thing'});
+      handOver('d2');
+      await pumpEventQueue();
+      expect(answers, ['First answer']);
+      judging.complete((speak: 'Good. Next question?', keepGoing: true));
+      await pumpEventQueue();
+      expect(answers, ['First answer', 'and one more thing']);
+      expect([for (final e in link.sent) if (e['type'] == 'session.commentary.append') e['delegation_id']], ['d1', 'd2']);
+    });
+
+    test('after the verdict she says her last line and the session closes', () async {
+      await mode.start();
+      final link = io.link;
+      reply = (speak: 'Not quite. The softmax was missing from your account.', keepGoing: false);
+      link.emit({'type': 'session.input_transcript.delta', 'delta': 'I do not know'});
+      handOver('d1');
+      await pumpEventQueue();
+      expect(sentOf('session.commentary.append'), hasLength(1));
+
+      // "One moment" ending is not her last line: it has not been said yet.
+      io.onReplyLevel!(0.5);
+      now = now.add(const Duration(seconds: 1));
+      io.onReplyLevel!(0.01);
+      expect(mode.isLive, isTrue);
+
+      link.emit({'type': 'session.output_transcript.delta', 'delta': 'Not quite. The softmax was missing.'});
+      io.onReplyLevel!(0.5);
+      now = now.add(const Duration(seconds: 1));
+      io.onReplyLevel!(0.01);
+      await pumpEventQueue();
+      expect(link.sentTypes, contains('session.close'));
+      expect(mode.isLive, isFalse);
+      link.emit({'type': 'session.closed', 'reason': 'close_requested', 'usage': {'seconds': 42}});
+      await pumpEventQueue();
+    });
+
+    test('it closes itself after a minute and a half of silence', () async {
+      await mode.start();
+      now = now.add(const Duration(seconds: 89));
+      mode.checkIdle();
+      expect(mode.isLive, isTrue);
+      now = now.add(const Duration(seconds: 2));
+      mode.checkIdle();
+      await pumpEventQueue();
+      expect(io.link.sentTypes, contains('session.close'));
+      expect(mode.isLive, isFalse);
+    });
+
+    test('a server that prefers turns, or no session: it takes turns', () async {
+      api.audit = 'turns';
+      expect(await mode.start(), isTrue);
+      expect(mode.isLive, isFalse);
+      expect(io.connects, 0);
+      expect(device.listenCalls, 1);
+      await mode.stop();
+      expect(mode.state, VoiceModeState.off);
+    });
+
+    test('a GPT-Live session that cannot be opened falls back to turns', () async {
+      io.refusePath = '/voice/live/audit';
+      expect(await mode.start(), isTrue);
+      expect(mode.isLive, isFalse);
+      expect(device.listenCalls, 1);
+    });
+
+    test('a line too long for one append is cut at the ends of sentences', () {
+      expect(LiveAuditMode.partsOf('Right. What next?'), ['Right. What next?']);
+      final long = List.filled(60, 'This sentence is about thirty-five chars.').join(' ');
+      final parts = LiveAuditMode.partsOf(long);
+      expect(parts.length, greaterThan(1));
+      expect(parts.join(' '), long);
+      expect(parts.every((p) => p.endsWith('.')), isTrue);
+      final chinese = List.filled(40, '这一句话大约有十五个汉字左右。').join();
+      expect(LiveAuditMode.partsOf(chinese).length, greaterThan(1));
+      expect(LiveAuditMode.partsOf(chinese).join(), chinese);
     });
   });
 }

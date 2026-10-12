@@ -290,6 +290,11 @@ abstract class SelfInfinityApi {
   /// first, `live` (GPT-Live) or `realtime`; null without voice.
   Future<String?> guideVoice();
 
+  /// `GET /voice` (contract #35, no LLM): the voice an audit opens first,
+  /// `live` (GPT-Live) or `turns` (live transcription, a pause ends the
+  /// turn); null without voice.
+  Future<String?> auditVoice();
+
   /// `POST /voice/transcribe` (contract #35): the words in one recorded
   /// utterance ([audio] as recorded, [filename] with its format's extension:
   /// `speech.webm`, `speech.mp4`, ...); '' for silence. 503 without a key,
@@ -320,6 +325,18 @@ abstract class SelfInfinityApi {
   /// `PUT /voice/sessions/{id}` (contract #37, no LLM): a live voice session's
   /// usage so far; the developer panel prices it.
   Future<void> reportVoiceUsage(VoiceUsage usage);
+
+  /// `GET /llm` (no LLM): the provider this account's agents run on, and the
+  /// ones it can choose (OpenAI, Claude).
+  Future<LlmStatus> getLlm();
+
+  /// `PUT /llm` (no LLM): chooses `openai` or `claude` for this account. 400
+  /// when the server has no key for it.
+  Future<LlmStatus> setLlm(String provider);
+
+  /// `GET /dev/llm` (developers only): what the text agents' calls cost, by
+  /// provider, by agent and per audit.
+  Future<DevLlm> getDevLlm();
 
   /// `GET /dev/voice?limit=` (contract #37; developers only): what live voice
   /// cost, and the newest [limit] sessions next to their GPT-Live price.

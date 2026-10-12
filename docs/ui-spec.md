@@ -83,7 +83,7 @@ On first launch with no vision saved, `/` redirects to `/onboarding` once (skipp
 - **Left panel**: stat bars `Lv.N` (level progress, total XP), `클리어` (mastered / total), `컨디션` — from `briefing.facts` (`xp`, `nodes`, `condition`); 오늘의 요약 from `GET /checkins/today`; ⚙ menu (도감, 컨디션 기록, 새 퀘스트 라인, 설정).
 - **Scene 1 / 5**: avatar + speech bubble (her latest line only), a mini skill-tree bubble (→ scene 2), suggestions from `GET /chat/suggestions` (a chip with `skill_id` opens scene 4; otherwise it sends its `message`). Messages go to `POST /chat`; actions: `course` → `월드맵 보기`, `checkin` → refresh 오늘의 요약, `plan` / `briefing` → shown in the bubble, `navigate` → switch scene. History panel = `GET /chat/history`.
 - The briefing and the study plan of the old home HUD are reached through chat (`지금 내 상태 보고`, `오늘의 퀘스트 받기`).
-- **Voice**: 🎙 dictates into the input; ▮▮▮ starts voice mode (listen → send on silence → speak the reply → listen). Tap the avatar to interrupt her. Unsupported platforms show a Korean snackbar.
+- **Voice**: 🎙 dictates into the input; ▮▮▮ starts voice mode: on GPT-Live (the Guide, the audits) she listens while she speaks, so speaking interrupts her; where it cannot run it takes turns (listen → send on silence → speak the reply → listen) and a tap on the avatar interrupts her. Unsupported platforms show a Korean snackbar.
 - **Proactive line**: at most once per 12 h, computed on the client (`ux-chat.md` §5).
 - **Avatar**: 2D pixel placeholder per agent with `mood` and `state` (owned by a teammate for 3D; do not implement 3D).
 

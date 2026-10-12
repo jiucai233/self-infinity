@@ -101,7 +101,7 @@ class _AuditSceneState extends State<AuditScene> {
   final ScrollController _scroll = ScrollController();
   final TextEditingController _input = TextEditingController();
   final FocusNode _focus = FocusNode();
-  late final VoiceModeController _voiceMode;
+  late final VoiceMode _voiceMode;
 
   // Loading of the room.
   bool _starting = true;
@@ -137,12 +137,15 @@ class _AuditSceneState extends State<AuditScene> {
   @override
   void initState() {
     super.initState();
-    _voiceMode = VoiceModeController(
+    final live = context.read<LiveVoice?>();
+    final turns = VoiceModeController(
       // Live transcription and streamed speech where there is live voice.
-      voice: context.read<LiveVoice?>()?.conversation ?? context.read<VoiceService>(),
+      voice: live?.conversation ?? context.read<VoiceService>(),
       onHeard: _onHeard,
       onUnavailable: () => showToast(context, context.l10n.voiceModeUnavailable),
     );
+    // She talks on GPT-Live where she can (and can be interrupted by speaking); turns elsewhere.
+    _voiceMode = live?.audit(fallback: turns, onHeard: _onHeard, opening: _lineOnTheTable) ?? turns;
     unawaited(_start());
   }
 
@@ -332,6 +335,12 @@ class _AuditSceneState extends State<AuditScene> {
       if (closed) _closed = true;
       if (restoreOnError) _input.text = text;
     });
+  }
+
+  /// Her line that waits for an answer, for a voice that has just come on.
+  String? _lineOnTheTable() {
+    final current = _currentIndex;
+    return !_inputOpen || current == null ? null : _lines[current].text;
   }
 
   Future<VoiceReply> _onHeard(String heard) async {

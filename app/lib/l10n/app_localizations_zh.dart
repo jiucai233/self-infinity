@@ -1015,13 +1015,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get devVoiceHint =>
-      '按官方价格估算。GPT-Live 上的 Guide 按会话开着的秒数计费，加上后台文本模型；Realtime 按 token 计费（静音不花钱），加上转写。每次 Guide 会话旁边都标出换成另一种语音的花费：Realtime 按本账号实测的每分钟花费估算，GPT-Live 按每分钟 \$0.05。审计转写按整个连接时长算，是上限。';
+      '按官方价格估算。GPT-Live 会话按开着的秒数计费，再加上它的另一份调用：Guide 是后台文本模型，审计是会话期间 Auditor 的调用。Realtime 上的 Guide 按 token 计费（静音不花钱），加上转写。每次 Guide 会话旁边都标出换成另一种语音的花费：Realtime 按本账号实测的每分钟花费估算，GPT-Live 按每分钟 \$0.05。轮流模式的审计按整个连接时长算转写，是上限，不含朗读回复的语音合成。';
 
   @override
   String get devVoiceGuide => '首页 Guide';
 
   @override
-  String get devVoiceAudits => '审计（实时转写）';
+  String get devVoiceAudits => '审计';
 
   @override
   String get devVoiceSessions => '会话';
@@ -1511,4 +1511,74 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get tourProveTitle => '讲出来，审核官来判定。';
+
+  @override
+  String get aiModel => '模型';
+
+  @override
+  String get devTabLlm => '模型花费';
+
+  @override
+  String get devLlmHint =>
+      '按官方价格估算。文本 agent（Planner、Auditor 等）的每一次调用都连同 token 数记了下来。这里没有标价的模型只计次数，不计入金额。';
+
+  @override
+  String get devLlmAll => '全部调用';
+
+  @override
+  String get devLlmCalls => '调用';
+
+  @override
+  String get devLlmFailed => '失败';
+
+  @override
+  String get devLlmPerCall => '每次调用';
+
+  @override
+  String get devLlmUnpriced => '无标价';
+
+  @override
+  String get devLlmPerAudit => '每次审计';
+
+  @override
+  String get devLlmByModel => '按模型';
+
+  @override
+  String get devLlmByAgent => '按 agent';
+
+  @override
+  String get devNoLlm => '还没有记录到模型调用。';
+
+  @override
+  String get devVoiceAuditLive => '审计（GPT-Live）';
+
+  @override
+  String get devVoiceAuditTurns => '审计（轮流）';
+
+  @override
+  String get devVoicePerSession => '每次会话';
+
+  @override
+  String get devVoicePerSessionLive => 'GPT-Live 每次会话';
+
+  @override
+  String get devVoicePerSessionTurns => '轮流模式每次会话';
+
+  @override
+  String get devVoiceLiveParts => 'GPT-Live 的两部分：语音和它的另一份调用';
+
+  @override
+  String get devVoiceGuideVoice => 'Guide：语音';
+
+  @override
+  String get devVoiceGuideBackend => 'Guide：后台模型';
+
+  @override
+  String get devVoiceAuditVoice => '审计：语音';
+
+  @override
+  String get devVoiceAuditBackend => '审计：Auditor';
+
+  @override
+  String get devVoiceOtherCall => '另一份调用';
 }

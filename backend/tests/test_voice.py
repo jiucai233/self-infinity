@@ -33,14 +33,14 @@ def openai_fixture(monkeypatch):
 
 
 def test_without_a_key_voice_is_unavailable(client):
-    assert client.get("/api/voice").json() == {"available": False, "guide": "live"}
+    assert client.get("/api/voice").json() == {"available": False, "guide": "live", "audit": "live"}
     assert client.post("/api/voice/transcribe", files={"file": ("a.webm", b"x", "audio/webm")}).status_code == 503
     assert client.post("/api/voice/speech", json={"text": "hi"}).status_code == 503
 
 
 def test_transcribe_sends_the_recording_and_the_languages(client, openai):
     calls = openai(httpx.Response(200, json={"text": " 判别式是 b²−4ac "}))
-    assert client.get("/api/voice").json() == {"available": True, "guide": "live"}
+    assert client.get("/api/voice").json() == {"available": True, "guide": "live", "audit": "live"}
 
     response = client.post(
         "/api/voice/transcribe",
@@ -258,6 +258,42 @@ def test_the_status_says_which_voice_the_guide_opens(client, monkeypatch):
     assert client.get("/api/voice").json()["guide"] == "live"
     monkeypatch.setattr(settings, "guide_voice", "realtime")
     assert client.get("/api/voice").json()["guide"] == "realtime"
+
+
+def test_the_live_audit_hands_each_answer_to_the_browser(client, realtime):
+    import json
+
+    realtime.response = httpx.Response(201, json={"session": {"id": "live_2"}, "transport": {"type": "webrtc", "sdp": "v=0 live answer"}})
+
+    response = client.post(
+        "/api/voice/live/audit", content="v=0 offer", headers={"Content-Type": "application/sdp", "Accept-Language": "zh"}
+    )
+
+    assert response.status_code == 201 and response.text == "v=0 live answer"
+    request = realtime.requests[0]
+    assert str(request.url) == "https://api.openai.com/v1/live/sessions"
+    session = json.loads(request.content)["session"]
+    assert session["model"] == "gpt-live-1"
+    assert session["audio"] == {"output": {"voice": "marin"}}
+    # No backend model: the browser answers each delegation with the Auditor's words.
+    assert session["delegation"] == {"type": "client"}
+    instructions = session["instructions"]
+    assert "Never judge, correct, explain, hint" in instructions
+    assert "Stop speaking at once when the learner interrupts" in instructions
+    assert "A pause to think is not the end of" in instructions
+    # It speaks the Auditor's language (the learner's), not the interface's.
+    assert "Never translate" in instructions and "Simplified Chinese" not in instructions
+
+
+def test_the_live_audit_needs_a_key(client, realtime, monkeypatch):
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    assert client.post("/api/voice/live/audit", content="v=0").status_code == 503
+
+
+def test_the_status_says_which_voice_an_audit_opens(client, monkeypatch):
+    assert client.get("/api/voice").json()["audit"] == "live"
+    monkeypatch.setattr(settings, "audit_voice", "turns")
+    assert client.get("/api/voice").json()["audit"] == "turns"
 
 
 def test_a_live_session_that_fails_or_answers_without_sdp_is_a_502(client, realtime, monkeypatch):

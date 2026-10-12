@@ -7,7 +7,7 @@ from sqlmodel import Session, col, select
 from app.agents.clarifier import Clarifier, ClarifyResult
 from app.agents.course_scout import CourseScout, PlayerContext
 from app.agents.material_finder import MaterialFinder
-from app.db import get_session
+from app.db import account_engine, get_session
 from app.llm import get_provider
 from app.models import AuditSession, Course, EdgeKind, Goal, Principle, Profile, SearchPlan, SkillEdge, SkillNode
 from app.routers.audits import audit_summary
@@ -81,7 +81,8 @@ def get_recommendation(session: Session = Depends(get_session)):
     return RecommendationOut(context_bucket=bucket, suggested_tier=tier, skill_tiers=tiers)
 
 
-@router.post("/clarify", response_model=ClarifyResponse)
+# No session, but the Clarifier's call belongs to an account like any other (app/llm/usage.py).
+@router.post("/clarify", response_model=ClarifyResponse, dependencies=[Depends(account_engine)])
 def clarify_topic(body: ClarifyRequest):
     # Clarifier 失败不是错误：当作"不需要澄清"，用户直接进入生成。
     try:

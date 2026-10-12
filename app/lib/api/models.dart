@@ -2280,7 +2280,7 @@ class VoiceUsage {
   /// The browser's id for the session; reports upsert on it.
   final String id;
 
-  /// `guide` or `transcribe`.
+  /// `guide`, `audit` or `transcribe`.
   final String kind;
   String model;
   final DateTime startedAt;
@@ -2384,7 +2384,8 @@ class DevVoiceSession {
 
   final int id;
 
-  /// `guide` (the home page's realtime Guide) or `transcribe` (an audit).
+  /// `guide` (the home page's Guide), `audit` (an audit on GPT-Live) or
+  /// `transcribe` (an audit taking turns over live transcription).
   final String kind;
   final String model;
   final DateTime startedAt;
@@ -2399,7 +2400,8 @@ class DevVoiceSession {
   /// Dollars.
   final double cost;
 
-  /// A GPT-Live session's text backend, part of [cost].
+  /// A GPT-Live session's other call, part of [cost]: the Guide's text
+  /// backend, or the Auditor's calls while an audit's session was open.
   final double? backendCost;
 
   /// What the Guide session would have cost on the other voice: on Realtime
@@ -2425,6 +2427,15 @@ class DevVoice {
     required this.auditSessions,
     required this.auditMinutes,
     required this.auditCost,
+    this.guideLiveVoiceCost = 0,
+    this.guideLiveBackendCost = 0,
+    this.guideCostPerSession,
+    this.auditLiveSessions = 0,
+    this.auditLiveMinutes = 0,
+    this.auditLiveVoiceCost = 0,
+    this.auditLiveBackendCost = 0,
+    this.auditLiveCostPerSession,
+    this.auditTurnsCostPerSession,
     required this.sessions,
   });
 
@@ -2443,6 +2454,15 @@ class DevVoice {
       auditSessions: _int(t, 'audit_sessions'),
       auditMinutes: _double(t, 'audit_minutes'),
       auditCost: _double(t, 'audit_cost'),
+      guideLiveVoiceCost: _doubleN(t, 'guide_live_voice_cost') ?? 0,
+      guideLiveBackendCost: _doubleN(t, 'guide_live_backend_cost') ?? 0,
+      guideCostPerSession: _doubleN(t, 'guide_cost_per_session'),
+      auditLiveSessions: (t['audit_live_sessions'] as num?)?.toInt() ?? 0,
+      auditLiveMinutes: _doubleN(t, 'audit_live_minutes') ?? 0,
+      auditLiveVoiceCost: _doubleN(t, 'audit_live_voice_cost') ?? 0,
+      auditLiveBackendCost: _doubleN(t, 'audit_live_backend_cost') ?? 0,
+      auditLiveCostPerSession: _doubleN(t, 'audit_live_cost_per_session'),
+      auditTurnsCostPerSession: _doubleN(t, 'audit_turns_cost_per_session'),
       sessions: [
         for (final s in (json['sessions'] as List? ?? const []))
           DevVoiceSession.fromJson(_asJson(s, 'sessions')),
@@ -2468,6 +2488,167 @@ class DevVoice {
   final int auditSessions;
   final double auditMinutes;
   final double auditCost;
+
+  /// The Guide's GPT-Live sessions in their two parts: the voice (every open
+  /// second) and its other call, the text backend's tokens.
+  final double guideLiveVoiceCost;
+  final double guideLiveBackendCost;
+  final double? guideCostPerSession;
+
+  /// The audits that ran on GPT-Live, and their two parts: the voice and its
+  /// other call, the Auditor's tokens while the session was open.
+  final int auditLiveSessions;
+  final double auditLiveMinutes;
+  final double auditLiveVoiceCost;
+  final double auditLiveBackendCost;
+
+  /// Dollars per audit session on each voice; null without sessions.
+  final double? auditLiveCostPerSession;
+  final double? auditTurnsCostPerSession;
   final List<DevVoiceSession> sessions;
+}
+
+/// One provider an account's agents can run on (`GET /llm`).
+@immutable
+class LlmChoice {
+  const LlmChoice({required this.id, required this.model, required this.available});
+
+  factory LlmChoice.fromJson(Json json) =>
+      LlmChoice(id: _str(json, 'id'), model: _strN(json, 'model') ?? '', available: json['available'] == true);
+
+  /// `openai` or `claude`.
+  final String id;
+  final String model;
+
+  /// The server has this provider's key.
+  final bool available;
+}
+
+/// `GET /llm`, `PUT /llm`: the provider this account's agents run on.
+@immutable
+class LlmStatus {
+  const LlmStatus({required this.provider, required this.model, required this.choices});
+
+  factory LlmStatus.fromJson(Json json) => LlmStatus(
+    provider: _str(json, 'provider'),
+    model: _strN(json, 'model') ?? '',
+    choices: [
+      for (final c in (json['choices'] as List? ?? const [])) LlmChoice.fromJson(_asJson(c, 'choices')),
+    ],
+  );
+
+  /// The provider in use now; not always one of [choices] (the server's own
+  /// default can be another).
+  final String provider;
+  final String model;
+  final List<LlmChoice> choices;
+}
+
+/// One row of `GET /dev/llm`: the calls of a provider's model, of one agent on
+/// it ([agent] set), or of the audits that ran on it ([audits] set).
+@immutable
+class DevLlmRow {
+  const DevLlmRow({
+    required this.provider,
+    required this.model,
+    this.agent,
+    this.audits,
+    this.calls = 0,
+    this.failed = 0,
+    this.avgCalls,
+    this.avgInputTokens,
+    this.avgOutputTokens,
+    this.avgMs,
+    this.cost,
+    this.avgCost,
+  });
+
+  factory DevLlmRow.fromJson(Json json) {
+    final calls = (json['calls'] as num?)?.toInt() ?? 0;
+    double? per(String total) {
+      final v = json[total];
+      return v is num && calls > 0 ? v / calls : null;
+    }
+
+    return DevLlmRow(
+      provider: _strN(json, 'provider') ?? '',
+      model: _strN(json, 'model') ?? '',
+      agent: _strN(json, 'agent'),
+      audits: (json['audits'] as num?)?.toInt(),
+      calls: calls,
+      failed: (json['failed'] as num?)?.toInt() ?? 0,
+      avgCalls: _doubleN(json, 'avg_calls'),
+      avgInputTokens: _doubleN(json, 'avg_input_tokens') ?? per('input_tokens'),
+      avgOutputTokens: _doubleN(json, 'avg_output_tokens') ?? per('output_tokens'),
+      avgMs: _doubleN(json, 'avg_ms'),
+      cost: _doubleN(json, 'cost'),
+      avgCost: _doubleN(json, 'avg_cost'),
+    );
+  }
+
+  final String provider;
+  final String model;
+  final String? agent;
+
+  /// How many audits (the per-audit rows).
+  final int? audits;
+  final int calls;
+  final int failed;
+
+  /// Calls per audit (the per-audit rows).
+  final double? avgCalls;
+  final double? avgInputTokens;
+  final double? avgOutputTokens;
+  final double? avgMs;
+
+  /// Dollars; null when the model has no list price here.
+  final double? cost;
+
+  /// Dollars per call, or per audit in the per-audit rows.
+  final double? avgCost;
+}
+
+/// `GET /dev/llm`: what the text agents' calls cost, by provider, by agent
+/// and per audit.
+@immutable
+class DevLlm {
+  const DevLlm({
+    this.calls = 0,
+    this.failed = 0,
+    this.cost = 0,
+    this.avgCost,
+    this.unpricedCalls = 0,
+    this.providers = const [],
+    this.agents = const [],
+    this.audits = const [],
+  });
+
+  factory DevLlm.fromJson(Json json) {
+    final t = _obj(json, 'totals');
+    List<DevLlmRow> rows(String key) => [
+      for (final r in (json[key] as List? ?? const [])) DevLlmRow.fromJson(_asJson(r, key)),
+    ];
+    return DevLlm(
+      calls: _int(t, 'calls'),
+      failed: (t['failed'] as num?)?.toInt() ?? 0,
+      cost: _doubleN(t, 'cost') ?? 0,
+      avgCost: _doubleN(t, 'avg_cost'),
+      unpricedCalls: (t['unpriced_calls'] as num?)?.toInt() ?? 0,
+      providers: rows('providers'),
+      agents: rows('agents'),
+      audits: rows('audits'),
+    );
+  }
+
+  final int calls;
+  final int failed;
+  final double cost;
+  final double? avgCost;
+
+  /// Calls of models without a list price here: counted, left out of the dollars.
+  final int unpricedCalls;
+  final List<DevLlmRow> providers;
+  final List<DevLlmRow> agents;
+  final List<DevLlmRow> audits;
 }
 

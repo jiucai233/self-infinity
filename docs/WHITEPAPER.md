@@ -51,7 +51,7 @@ backend/ (FastAPI + SQLModel + SQLite)
   routers/   24 个端点（18–24 为舞台界面新增）
   services/  确定性代码：course_generation · structure_validator · audit_flow · incentive · bandit · condition · profile · linking
   agents/    LLM 角色：clarifier · syllabus · planner · material_finder · auditor · challenger · recorder · linker · checkin_converter · narrator · recommender
-  llm/       Provider 抽象：DeepSeek | OpenAI | Kimi | Gemini | Mock
+  llm/       Provider 抽象：DeepSeek | OpenAI | Kimi | Gemini | Claude | Mock；每次调用的用量记进 LLMCall
   search/    搜索抽象：Tavily | Mock（与 LLM 正交）
 ```
 
@@ -74,7 +74,7 @@ backend/ (FastAPI + SQLModel + SQLite)
 | | Challenger | LLM | 对"通过"做一次对抗复核 |
 | | Recorder | LLM | 把失败反思整理成原则卡 |
 | | Linker | LLM | 判断新卡与旧卡/节点的 related / contradicts 关系（后台运行） |
-| Analyst | Transcriber | OpenAI：输入框语音 `gpt-transcribe`，审计实时转写 `gpt-live-transcribe`（无 key 时用浏览器/手机自带 STT） | 语音转文字；审计追问由 `gpt-4o-mini-tts` 流式朗读；首页 Guide 的语音模式默认是 GPT-Live（`gpt-live-1` 负责说话，工具交给后台 `gpt-6-luna`），连不上时退回端到端的 `gpt-realtime-2.1`（契约 #35、#36） |
+| Analyst | Transcriber | OpenAI：输入框语音 `gpt-transcribe`；语音模式 `gpt-live-1`（无 key 时用浏览器/手机自带 STT） | 语音转文字。两个语音模式默认都是 GPT-Live（全双工，她说话时你开口就能打断）：首页 Guide 由 `gpt-live-1` 说话，工具交给后台 `gpt-6-luna`，连不上时退回端到端的 `gpt-realtime-2.1`；审计里 `gpt-live-1` 只当耳朵和嘴，听出你答完了就把这一轮交给浏览器，判分和出题仍是 Auditor，连不上时退回实时转写 `gpt-live-transcribe` + `gpt-4o-mini-tts` 朗读的轮流模式（契约 #35、#36） |
 | | Check-in Converter | LLM | 自由文本打卡 → 结构化字段，缺的字段留空不猜 |
 | | Life Coach | LLM | 生活页上按需给三条本周建议，只看 14 天汇总和长期事实 |
 | | Fact Keeper | LLM（前置 Decisions 闸门） | 后台从打卡和对话里维护长期事实：新增 / 更新 / 结束 |
@@ -86,7 +86,7 @@ backend/ (FastAPI + SQLModel + SQLite)
 
 - **ADR-1 Flutter 一套代码。** 2026-10-01 起前端从 React 换成 Flutter：一套代码覆盖 web 演示和手机端，同时满足 Mobile Programming 课的要求。旧 React 客户端已删除。
 - **ADR-2 不做屏幕/传感器监控。** iOS 不允许读取其他 App 的屏幕，Screen Time 数据只能在沙盒扩展里渲染。컨디션只来自用户自报的打卡。
-- **ADR-3 LLM Provider 抽象。** 选择顺序：显式 `LLM_PROVIDER` → 第一个配置了 key 的 provider → Mock。`LLM_MODEL_OVERRIDES`（JSON）可按 agent 单独指定模型。DeepSeek / OpenAI / Kimi 共用一个 OpenAI 兼容实现。
+- **ADR-3 LLM Provider 抽象。** 选择顺序：显式 `LLM_PROVIDER` → 第一个配置了 key 的 provider → Mock。`LLM_MODEL_OVERRIDES`（JSON）可按 agent 单独指定模型。DeepSeek / OpenAI / Kimi 共用一个 OpenAI 兼容实现；Claude 走 Anthropic Messages API（默认 `claude-haiku-5-5`）。服务器同时配了 OpenAI 和 Claude 的 key 时，每个账号可以在设置里自己选其中一个（`PUT /api/llm`，契约 #46），语音始终走 OpenAI。每一次文本调用都连同 agent、模型、token 数和耗时记进账号自己的 `LLMCall` 表，开发者面板按模型、按 agent、按每次审计给出平均花费（契约 #47），换 provider 的代价因此是量出来的而不是估的。
 - **ADR-4 审计输出是强约束 JSON。** probe / verdict 二选一 + 服务端轮次上限 + 超限强制裁决，模型不守约时系统仍然收敛。
 - **ADR-5 搜索是 harness 的一层，不绑模型。** 不用模型自带的 grounding：换 provider 会让校准作废，且 grounding 配合结构化输出时拿不到来源 URL。
 - **ADR-6 API 契约先行。** `docs/api-contract.md` 是约束性契约；后端 Mock 与客户端 `FakeApiClient` 跑同一份演示脚本（契约 §4），有没有后端，界面行为都一样。

@@ -6,6 +6,7 @@ from concurrent.futures import TimeoutError as FutureTimeoutError
 from google import genai
 
 from app.config import settings
+from app.llm import usage
 from app.llm.base import Message, agent_of, strip_code_fence, with_language
 
 logger = logging.getLogger(__name__)
@@ -50,11 +51,16 @@ class GeminiProvider:
         ]
 
         agent = agent_of(messages) or "-"
+        model = self.model
+
+        def failed(elapsed_ms: float) -> None:
+            usage.record(provider=self.name, model=model, agent=agent, elapsed_ms=elapsed_ms, ok=False)
+
         start = time.perf_counter()
         logger.info(
             "gemini complete() start agent=%s model=%s timeout_s=%.1f",
             agent,
-            self.model,
+            model,
             settings.llm_timeout_seconds,
         )
         try:
@@ -66,21 +72,37 @@ class GeminiProvider:
                 elapsed_ms,
                 settings.llm_timeout_seconds,
             )
+            failed(elapsed_ms)
             raise GeminiTimeoutError(
                 f"Gemini 调用超过 {settings.llm_timeout_seconds}s 未返回"
             ) from None
         except Exception:
             elapsed_ms = (time.perf_counter() - start) * 1000
             logger.warning("gemini complete() failed after %.0fms", elapsed_ms, exc_info=True)
+            failed(elapsed_ms)
             raise
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         text = response.text
         if not text:
             logger.warning("gemini complete() returned empty text after %.0fms", elapsed_ms)
+            failed(elapsed_ms)
             raise GeminiEmptyResponseError("Gemini 返回了空响应，可能被安全过滤器拦截")
 
         logger.info("gemini complete() success elapsed_ms=%.0f", elapsed_ms)
+        # usageMetadata of the REST API; the SDK spells the fields in snake case.
+        # promptTokenCount already counts the cached ones.
+        used = getattr(response, "usage_metadata", None)
+        usage.record(
+            provider=self.name,
+            model=model,
+            agent=agent,
+            input_tokens=getattr(used, "prompt_token_count", 0),
+            cached_tokens=getattr(used, "cached_content_token_count", 0),
+            output_tokens=getattr(used, "candidates_token_count", 0),
+            elapsed_ms=elapsed_ms,
+            ok=True,
+        )
         return strip_code_fence(text)
 
     def _generate_with_timeout(self, contents: list[dict], system: str):

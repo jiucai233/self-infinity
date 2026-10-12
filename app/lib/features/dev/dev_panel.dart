@@ -23,7 +23,8 @@ Future<void> showDevPanel(BuildContext context) => showDialog<void>(
 /// The developer panel: how well the Auditor judges, from the developers'
 /// reviews of its verdicts, and how audits go overall; below, every finished
 /// audit with its transcript and the buttons to review it. A second tab shows
-/// what live voice costs, next to what GPT-Live would (contract #37).
+/// what live voice costs (contract #37), a third what the text agents' calls
+/// cost on each model.
 class DevPanel extends StatefulWidget {
   const DevPanel({super.key});
 
@@ -36,9 +37,11 @@ class _DevPanelState extends State<DevPanel> {
   DevAudits? _data;
   Object? _error;
   final Set<int> _open = {};
-  bool _voiceTab = false;
+  _Tab _tab = _Tab.audits;
   DevVoice? _voice;
   Object? _voiceError;
+  DevLlm? _llm;
+  Object? _llmError;
 
   @override
   void initState() {
@@ -74,10 +77,31 @@ class _DevPanelState extends State<DevPanel> {
     }
   }
 
-  void _showVoice(bool on) {
-    setState(() => _voiceTab = on);
-    if (on && _voice == null) unawaited(_loadVoice());
+  Future<void> _loadLlm() async {
+    try {
+      final llm = await _api.getDevLlm();
+      if (mounted) {
+        setState(() {
+          _llm = llm;
+          _llmError = null;
+        });
+      }
+    } on Object catch (e) {
+      if (mounted) setState(() => _llmError = e);
+    }
   }
+
+  void _show(_Tab tab) {
+    setState(() => _tab = tab);
+    if (tab == _Tab.voice && _voice == null) unawaited(_loadVoice());
+    if (tab == _Tab.llm && _llm == null) unawaited(_loadLlm());
+  }
+
+  Future<void> _refresh() => switch (_tab) {
+    _Tab.audits => _load(),
+    _Tab.voice => _loadVoice(),
+    _Tab.llm => _loadLlm(),
+  };
 
   Future<void> _review(DevAudit audit, AuditReview? review, bool leaked) async {
     try {
@@ -95,6 +119,28 @@ class _DevPanelState extends State<DevPanel> {
     final l = context.l10n;
     final theme = Theme.of(context).textTheme;
     final data = _data;
+    final tabs = SegmentedButton<_Tab>(
+      key: const Key('dev-tabs'),
+      showSelectedIcon: false,
+      segments: [
+        ButtonSegment(
+          value: _Tab.audits,
+          label: Text(l.devTabAudits, key: const Key('dev-tab-audits')),
+        ),
+        ButtonSegment(
+          value: _Tab.voice,
+          label: Text(l.devTabVoice, key: const Key('dev-tab-voice')),
+        ),
+        ButtonSegment(
+          value: _Tab.llm,
+          label: Text(l.devTabLlm, key: const Key('dev-tab-llm')),
+        ),
+      ],
+      selected: {_tab},
+      onSelectionChanged: (s) => _show(s.first),
+    );
+    // On a phone the three tabs do not fit beside the title: they get a line of their own.
+    final narrow = MediaQuery.sizeOf(context).width < AppLayout.wideBreakpoint;
     return ConstrainedBox(
       key: const Key('dev-panel'),
       constraints: const BoxConstraints(maxWidth: 960),
@@ -105,27 +151,12 @@ class _DevPanelState extends State<DevPanel> {
             child: Row(
               children: [
                 Expanded(child: Text(l.devTitle, style: theme.titleLarge)),
-                SegmentedButton<bool>(
-                  key: const Key('dev-tabs'),
-                  showSelectedIcon: false,
-                  segments: [
-                    ButtonSegment(
-                      value: false,
-                      label: Text(l.devTabAudits, key: const Key('dev-tab-audits')),
-                    ),
-                    ButtonSegment(
-                      value: true,
-                      label: Text(l.devTabVoice, key: const Key('dev-tab-voice')),
-                    ),
-                  ],
-                  selected: {_voiceTab},
-                  onSelectionChanged: (s) => _showVoice(s.first),
-                ),
+                if (!narrow) tabs,
                 const SizedBox(width: AppSpacing.sm),
                 IconButton(
                   key: const Key('dev-refresh'),
                   tooltip: l.devRefresh,
-                  onPressed: () => unawaited(_voiceTab ? _loadVoice() : _load()),
+                  onPressed: () => unawaited(_refresh()),
                   icon: const Icon(Icons.refresh_rounded),
                 ),
                 IconButton(
@@ -136,9 +167,17 @@ class _DevPanelState extends State<DevPanel> {
               ],
             ),
           ),
+          if (narrow)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, AppSpacing.sm),
+              child: tabs,
+            ),
           Expanded(
-            child: _voiceTab
+            child: _tab == _Tab.voice
                 ? _VoiceCosts(voice: _voice, error: _voiceError)
+                : _tab == _Tab.llm
+                ? _LlmCosts(llm: _llm, error: _llmError)
                 : data == null
                 ? Center(
                     child: _error == null
@@ -188,6 +227,18 @@ class _DevPanelState extends State<DevPanel> {
   }
 }
 
+enum _Tab { audits, voice, llm }
+
+/// Dollars for what costs fractions of a cent (one model call): two
+/// significant digits below a cent.
+String _usdFine(double? v) => v == null
+    ? '—'
+    : v == 0
+    ? '\$0'
+    : v < 0.01
+    ? '\$${v.toStringAsPrecision(2)}'
+    : _usd(v);
+
 String _pct(double? v) => v == null ? '—' : '${(v * 100).round()}%';
 String _usd(double? v) =>
     v == null ? '—' : '\$${v < 1 ? v.toStringAsFixed(3) : v.toStringAsFixed(2)}';
@@ -212,7 +263,12 @@ Widget _tiles(BuildContext context, String title, List<(String, String, String)>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(label, style: theme.labelSmall?.copyWith(color: AppColors.textTertiary)),
-                  Text(value, key: Key('dev-metric-$key'), style: theme.headlineMedium),
+                  // A long figure ($0.00046) shrinks to its tile instead of wrapping.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(value, key: Key('dev-metric-$key'), style: theme.headlineMedium),
+                  ),
                 ],
               ),
             ),
@@ -222,8 +278,9 @@ Widget _tiles(BuildContext context, String title, List<(String, String, String)>
   );
 }
 
-/// What live voice costs: the realtime Guide next to GPT-Live, the audits'
-/// transcription, and every session.
+/// What live voice costs: the Guide and the audits on each of their voices,
+/// a GPT-Live session's two parts (the voice, its other call), and every
+/// session.
 class _VoiceCosts extends StatelessWidget {
   const _VoiceCosts({required this.voice, required this.error});
 
@@ -259,6 +316,7 @@ class _VoiceCosts extends StatelessWidget {
           ('guide-minutes', l.devVoiceMinutes, _num(v.guideMinutes)),
           ('guide-cost', l.devVoiceCost, _usd(v.guideCost)),
           ('guide-per-minute', l.devVoicePerMinute, _usd(v.guideCostPerMinute)),
+          ('guide-per-session', l.devVoicePerSession, _usd(v.guideCostPerSession)),
           ('guide-all-live', l.devVoiceAllLive, _usd(v.guideAllLive)),
           ('guide-all-realtime', l.devVoiceAllRealtime, _usd(v.guideAllRealtime)),
           (
@@ -273,6 +331,15 @@ class _VoiceCosts extends StatelessWidget {
           ('audit-sessions', l.devVoiceSessions, '${v.auditSessions}'),
           ('audit-minutes', l.devVoiceMinutes, _num(v.auditMinutes)),
           ('audit-cost', l.devVoiceCost, _usd(v.auditCost)),
+          ('audit-live-per-session', l.devVoicePerSessionLive, _usd(v.auditLiveCostPerSession)),
+          ('audit-turns-per-session', l.devVoicePerSessionTurns, _usd(v.auditTurnsCostPerSession)),
+        ]),
+        const SizedBox(height: AppSpacing.lg),
+        _tiles(context, l.devVoiceLiveParts, [
+          ('guide-live-voice', l.devVoiceGuideVoice, _usd(v.guideLiveVoiceCost)),
+          ('guide-live-backend', l.devVoiceGuideBackend, _usdFine(v.guideLiveBackendCost)),
+          ('audit-live-voice', l.devVoiceAuditVoice, _usd(v.auditLiveVoiceCost)),
+          ('audit-live-backend', l.devVoiceAuditBackend, _usdFine(v.auditLiveBackendCost)),
         ]),
         const SizedBox(height: AppSpacing.xl),
         if (v.sessions.isEmpty)
@@ -286,7 +353,11 @@ class _VoiceCosts extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '${s.kind == 'guide' ? (s.isLive ? l.devVoiceGuideLive : l.devVoiceGuideRealtime) : l.devVoiceAudits} · '
+                      '${switch (s.kind) {
+                        'guide' => s.isLive ? l.devVoiceGuideLive : l.devVoiceGuideRealtime,
+                        'audit' => l.devVoiceAuditLive,
+                        _ => l.devVoiceAuditTurns,
+                      }} · '
                       '${MaterialLocalizations.of(context).formatShortDate(s.startedAt.toLocal())} '
                       '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(s.startedAt.toLocal()))}',
                       style: theme.bodyMedium,
@@ -294,6 +365,7 @@ class _VoiceCosts extends StatelessWidget {
                   ),
                   Text(
                     '${_num(s.minutes)} ${l.devVoiceMinutes} · ${s.turns} ${l.devVoiceTurns} · ${_usd(s.cost)}'
+                    '${s.backendCost == null ? '' : ' (${l.devVoiceOtherCall} ${_usdFine(s.backendCost)})'}'
                     '${s.otherCost == null ? '' : ' · ${s.isLive ? l.devVoiceOnRealtime : l.devVoiceLive} ${_usd(s.otherCost)}'}',
                     style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
                   ),
@@ -301,6 +373,113 @@ class _VoiceCosts extends StatelessWidget {
               ),
             ),
       ],
+    );
+  }
+}
+
+/// What the text agents' calls cost: all of them, per audit on each model,
+/// by model and by agent.
+class _LlmCosts extends StatelessWidget {
+  const _LlmCosts({required this.llm, required this.error});
+
+  final DevLlm? llm;
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context).textTheme;
+    final d = llm;
+    if (d == null) {
+      final e = error;
+      return Center(
+        child: e == null
+            ? const CircularProgressIndicator()
+            : Text(e is ApiException ? e.userMessage : '$e'),
+      );
+    }
+    String name(DevLlmRow r) => '${r.provider} · ${r.model}';
+    String tokens(DevLlmRow r) =>
+        '${_num(r.avgInputTokens, 0)} → ${_num(r.avgOutputTokens, 0)} tok · ${_num(r.avgMs == null ? null : r.avgMs! / 1000)} s';
+    return ListView(
+      key: const Key('dev-llm'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.xl,
+      ),
+      children: [
+        Text(l.devLlmHint, style: theme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+        const SizedBox(height: AppSpacing.lg),
+        _tiles(context, l.devLlmAll, [
+          ('llm-calls', l.devLlmCalls, '${d.calls}'),
+          ('llm-failed', l.devLlmFailed, '${d.failed}'),
+          ('llm-cost', l.devVoiceCost, _usd(d.cost)),
+          ('llm-per-call', l.devLlmPerCall, _usdFine(d.avgCost)),
+          if (d.unpricedCalls > 0) ('llm-unpriced', l.devLlmUnpriced, '${d.unpricedCalls}'),
+        ]),
+        const SizedBox(height: AppSpacing.xl),
+        if (d.calls == 0)
+          Text(l.devNoLlm, style: theme.bodyMedium)
+        else ...[
+          _rows(context, l.devLlmPerAudit, 'audit', [
+            for (final r in d.audits)
+              (name(r), '${r.audits} ${l.devAudits} · ${_num(r.avgCalls)} ${l.devLlmCalls} · ${_usdFine(r.avgCost)}'),
+          ]),
+          _rows(context, l.devLlmByModel, 'model', [
+            for (final r in d.providers)
+              (
+                name(r),
+                '${r.calls} ${l.devLlmCalls}${r.failed == 0 ? '' : ' (${r.failed} ${l.devLlmFailed})'} · '
+                    '${tokens(r)} · ${_usd(r.cost)} · ${l.devLlmPerCall} ${_usdFine(r.avgCost)}',
+              ),
+          ]),
+          _rows(context, l.devLlmByAgent, 'agent', [
+            for (final r in d.agents)
+              (
+                '${r.agent} · ${r.model}',
+                '${r.calls} ${l.devLlmCalls} · ${tokens(r)} · ${l.devLlmPerCall} ${_usdFine(r.avgCost)}',
+              ),
+          ]),
+        ],
+      ],
+    );
+  }
+
+  /// A titled list of `name … figures` lines, keyed `dev-llm-<key>-<index>`.
+  Widget _rows(BuildContext context, String title, String key, List<(String, String)> rows) {
+    final theme = Theme.of(context).textTheme;
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: theme.labelLarge),
+          const SizedBox(height: AppSpacing.sm),
+          for (final (i, (name, figures)) in rows.indexed)
+            Padding(
+              key: Key('dev-llm-$key-$i'),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: Text(name, style: theme.bodyMedium)),
+                  const SizedBox(width: AppSpacing.md),
+                  Flexible(
+                    flex: 2,
+                    child: Text(
+                      figures,
+                      textAlign: TextAlign.end,
+                      style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

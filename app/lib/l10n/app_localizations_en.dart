@@ -1022,13 +1022,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devVoiceHint =>
-      'At list price. The Guide on GPT-Live bills every second the session is open, plus its text backend; on Realtime it bills tokens (silence is free) plus transcription. Each Guide session also shows the other voice: Realtime at this account\'s own cost per minute, GPT-Live at \$0.05 a minute. Audit transcription counts the whole open session, an upper bound.';
+      'At list price. A GPT-Live session bills every second it is open, plus its other call: the Guide\'s text backend, or for an audit the Auditor\'s calls while the session was open. The Guide on Realtime bills tokens (silence is free) plus transcription. Each Guide session also shows the other voice: Realtime at this account\'s own cost per minute, GPT-Live at \$0.05 a minute. An audit taking turns counts its transcription for the whole open session, an upper bound, without the speech that reads the replies.';
 
   @override
   String get devVoiceGuide => 'Home Guide';
 
   @override
-  String get devVoiceAudits => 'Audits (live transcription)';
+  String get devVoiceAudits => 'Audits';
 
   @override
   String get devVoiceSessions => 'Sessions';
@@ -1534,4 +1534,74 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tourProveTitle => 'Explain it. The Auditor decides.';
+
+  @override
+  String get aiModel => 'Model';
+
+  @override
+  String get devTabLlm => 'Model cost';
+
+  @override
+  String get devLlmHint =>
+      'At list price. Every call the text agents make (Planner, Auditor and the rest) is logged with its tokens. A model without a list price here is counted but left out of the dollars.';
+
+  @override
+  String get devLlmAll => 'All calls';
+
+  @override
+  String get devLlmCalls => 'Calls';
+
+  @override
+  String get devLlmFailed => 'Failed';
+
+  @override
+  String get devLlmPerCall => 'Per call';
+
+  @override
+  String get devLlmUnpriced => 'No price';
+
+  @override
+  String get devLlmPerAudit => 'Per audit';
+
+  @override
+  String get devLlmByModel => 'By model';
+
+  @override
+  String get devLlmByAgent => 'By agent';
+
+  @override
+  String get devNoLlm => 'No model calls logged yet.';
+
+  @override
+  String get devVoiceAuditLive => 'Audit (GPT-Live)';
+
+  @override
+  String get devVoiceAuditTurns => 'Audit (turns)';
+
+  @override
+  String get devVoicePerSession => 'Per session';
+
+  @override
+  String get devVoicePerSessionLive => 'Per session on GPT-Live';
+
+  @override
+  String get devVoicePerSessionTurns => 'Per session taking turns';
+
+  @override
+  String get devVoiceLiveParts => 'GPT-Live in two parts: the voice and its other call';
+
+  @override
+  String get devVoiceGuideVoice => 'Guide: voice';
+
+  @override
+  String get devVoiceGuideBackend => 'Guide: backend';
+
+  @override
+  String get devVoiceAuditVoice => 'Audits: voice';
+
+  @override
+  String get devVoiceAuditBackend => 'Audits: Auditor';
+
+  @override
+  String get devVoiceOtherCall => 'other call';
 }

@@ -15,6 +15,7 @@ import time
 import httpx
 
 from app.config import settings
+from app.llm import usage
 from app.llm.base import Message, agent_of, strip_code_fence, with_language
 
 
@@ -59,8 +60,9 @@ class OpenAICompatibleProvider:
         messages = with_language(messages)
         logger = self._logger
         agent = agent_of(messages) or "-"
+        model = self.model
         body = {
-            "model": self.model,
+            "model": model,
             "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
             "response_format": {"type": "json_object"},
         }
@@ -68,8 +70,12 @@ class OpenAICompatibleProvider:
         start = time.perf_counter()
         logger.info(
             "%s complete() start agent=%s model=%s timeout_s=%.1f",
-            self.name, agent, self.model, self._timeout,
+            self.name, agent, model, self._timeout,
         )
+
+        def failed(elapsed_ms: float) -> None:
+            usage.record(provider=self.name, model=model, agent=agent, elapsed_ms=elapsed_ms, ok=False)
+
         try:
             response = self._client.post(
                 self.api_url,
@@ -82,6 +88,7 @@ class OpenAICompatibleProvider:
             logger.warning(
                 "%s complete() failed agent=%s after %.0fms", self.name, agent, elapsed_ms, exc_info=True
             )
+            failed(elapsed_ms)
             raise
 
         elapsed_ms = (time.perf_counter() - start) * 1000
@@ -91,6 +98,7 @@ class OpenAICompatibleProvider:
                 "%s complete() got status=%d agent=%s after %.0fms",
                 self.name, response.status_code, agent, elapsed_ms,
             )
+            failed(elapsed_ms)
             raise OpenAICompatibleAPIError(
                 f"{self.name} 调用失败 status={response.status_code} body={response.text[:500]}"
             )
@@ -102,11 +110,23 @@ class OpenAICompatibleProvider:
             logger.warning(
                 "%s complete() returned empty content agent=%s after %.0fms", self.name, agent, elapsed_ms
             )
+            failed(elapsed_ms)
             raise OpenAICompatibleEmptyResponseError(f"{self.name} 返回了空响应")
 
-        usage = data.get("usage") or {}
+        used = data.get("usage") or {}
         logger.info(
             "%s complete() success agent=%s elapsed_ms=%.0f tokens=%s/%s",
-            self.name, agent, elapsed_ms, usage.get("prompt_tokens", "?"), usage.get("completion_tokens", "?"),
+            self.name, agent, elapsed_ms, used.get("prompt_tokens", "?"), used.get("completion_tokens", "?"),
+        )
+        # prompt_tokens already counts the cached ones.
+        usage.record(
+            provider=self.name,
+            model=model,
+            agent=agent,
+            input_tokens=used.get("prompt_tokens"),
+            cached_tokens=(used.get("prompt_tokens_details") or {}).get("cached_tokens"),
+            output_tokens=used.get("completion_tokens"),
+            elapsed_ms=elapsed_ms,
+            ok=True,
         )
         return strip_code_fence(content)

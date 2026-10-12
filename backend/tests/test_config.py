@@ -9,7 +9,8 @@ ENV_NAMES = [
     "KIMI_API_KEY", "TAVILY_API_KEY", "DATABASE_URL", "APP_TIMEZONE", "AUDIT_MAX_TURNS", "TASK_MAX_TURNS",
     "CHALLENGER_ENABLED", "CHALLENGER_MISCONCEPTION_LIMIT", "LLM_TIMEOUT_SECONDS", "SEARCH_TIMEOUT_SECONDS",
     "AUTH_MODE", "SUPABASE_URL", "SUPABASE_JWT_SECRET", "TRANSCRIBE_MODEL", "SPEECH_MODEL", "SPEECH_VOICE",
-    "REALTIME_MODEL", "LIVE_TRANSCRIBE_MODEL",
+    "REALTIME_MODEL", "LIVE_TRANSCRIBE_MODEL", "LIVE_MODEL", "GUIDE_VOICE", "AUDIT_VOICE",
+    "ANTHROPIC_API_KEY", "CLAUDE_MODEL",
 ]
 
 
@@ -31,6 +32,7 @@ def test_defaults_match_the_plan(clean_env):
     assert s.challenger_misconception_limit == 5
     assert (s.llm_timeout_seconds, s.search_timeout_seconds) == (90, 15)
     assert (s.auth_mode, s.supabase_url, s.supabase_jwt_secret) == ("dev", "", "")
+    assert (s.anthropic_api_key, s.claude_model) == ("", "claude-haiku-5-5")
 
 
 def test_every_variable_in_the_plan_is_a_setting(clean_env):

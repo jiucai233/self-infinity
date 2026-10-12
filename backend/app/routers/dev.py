@@ -1,5 +1,5 @@
-"""The developer panel (contract #34, #37): audits, reviews and metrics, and what live voice
-costs. Only for developers: everyone in dev auth mode (local, no accounts), the emails in
+"""The developer panel (contract #34, #37, #47): audits, reviews and metrics, what live voice
+costs and what the text agents cost. Only for developers: everyone in dev auth mode (local, no accounts), the emails in
 DEV_EMAILS otherwise. No LLM."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,8 +8,8 @@ from sqlmodel import Session
 from app.auth import CurrentUser, current_user
 from app.config import settings
 from app.db import get_session
-from app.schemas import AuditReviewIn, DevAuditOut, DevAuditsOut, DevVoiceOut
-from app.services import audit_review, voice_usage
+from app.schemas import AuditReviewIn, DevAuditOut, DevAuditsOut, DevLLMOut, DevVoiceOut
+from app.services import audit_review, llm_usage, voice_usage
 
 router = APIRouter(prefix="/api/dev", tags=["dev"])
 
@@ -46,3 +46,7 @@ def review_audit(audit_id: int, body: AuditReviewIn, session: Session = Depends(
 def voice_costs(limit: int = Query(50, ge=1, le=200), session: Session = Depends(get_session)):
     return voice_usage.overview(session, limit)
 
+
+@router.get("/llm", response_model=DevLLMOut, dependencies=[Depends(require_dev)])
+def llm_costs(session: Session = Depends(get_session)):
+    return llm_usage.overview(session)

@@ -9,6 +9,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from app.auth import DEV_USER, CurrentUser, current_user
 from app.config import settings
+from app.llm import usage
 
 # Imported for its side effect: registering every table on SQLModel.metadata,
 # which both create_all() and _add_missing_columns() iterate over. Without it,
@@ -172,11 +173,25 @@ def _open_from_leaves(eng: Engine) -> None:
             session.commit()
 
 
-def get_session(user: CurrentUser = Depends(current_user)):
-    # 读模块级的 engine，所以测试里换掉 app.db.engine，请求、后台任务和 lifespan 就一起换。
-    # 后台任务拿 session.get_bind()，它带着同一个 schema_translate_map。
+def account_engine(user: CurrentUser = Depends(current_user)) -> Engine:
+    """The engine bound to the caller's account (its schema).
+
+    Also tells the request's LLM context (app/llm/usage.py) which account it is: its calls are
+    logged there and its provider is read from there. The context is filled in, not set: this
+    runs in a threadpool with a copy of the context variables. An endpoint that calls an LLM
+    without a session depends on this directly.
+    """
     # Called directly (not through FastAPI), `user` is still the Depends marker: the local user.
     schema = user.schema if isinstance(user, CurrentUser) else DEV_USER.schema
+    # 读模块级的 engine，所以测试里换掉 app.db.engine，请求、后台任务和 lifespan 就一起换。
     bind = engine if schema is None else ensure_schema(engine, schema)
-    with Session(bind) as session:
+    ctx = usage.current()
+    if ctx is not None:
+        ctx.bind = bind
+    return bind
+
+
+def get_session(user: CurrentUser = Depends(current_user)):
+    # 后台任务拿 session.get_bind()，它带着同一个 schema_translate_map。
+    with Session(account_engine(user)) as session:
         yield session

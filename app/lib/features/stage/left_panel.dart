@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/api.dart';
+import '../../api/api_exception.dart';
 import '../../api/models.dart';
 import '../../auth/auth_service.dart';
 import '../../app/panel_layout.dart';
@@ -479,6 +480,17 @@ class _SettingsButtonState extends State<_SettingsButton> {
             ),
           const PopupMenuDivider(),
           PopupMenuItem<String>(
+            enabled: false,
+            height: 32,
+            child: Text(
+              context.l10n.aiModel,
+              style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
+            ),
+          ),
+          // Not an entry to pick: the switch inside it takes the taps.
+          const PopupMenuItem<String>(enabled: false, child: _ModelSwitch()),
+          const PopupMenuDivider(),
+          PopupMenuItem<String>(
             key: const Key('settings-tutorial'),
             value: 'tutorial',
             child: Text(context.l10n.replayTutorial),
@@ -511,6 +523,79 @@ class _SettingsButtonState extends State<_SettingsButton> {
           child: const Icon(Icons.adjust_rounded, size: 20, color: AppColors.textSecondary),
         ),
       ),
+    );
+  }
+}
+
+/// OpenAI | Claude: which provider this account's agents (Planner, Auditor
+/// and the rest) run on. A provider the server has no key for cannot be
+/// chosen. Voice stays with OpenAI either way.
+class _ModelSwitch extends StatefulWidget {
+  const _ModelSwitch();
+
+  @override
+  State<_ModelSwitch> createState() => _ModelSwitchState();
+}
+
+class _ModelSwitchState extends State<_ModelSwitch> {
+  static const _names = {'openai': 'OpenAI', 'claude': 'Claude'};
+
+  late final SelfInfinityApi _api = context.read<SelfInfinityApi>();
+  LlmStatus? _status;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final status = await _api.getLlm();
+      if (mounted) setState(() => _status = status);
+    } on Object {
+      // the switch stays off: the server decides
+    }
+  }
+
+  Future<void> _choose(String provider) async {
+    setState(() => _saving = true);
+    try {
+      final status = await _api.setLlm(provider);
+      if (mounted) setState(() => _status = status);
+    } on ApiException catch (e) {
+      if (mounted) showToast(context, e.userMessage);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _status;
+    final choices =
+        status?.choices ??
+        [for (final id in _names.keys) LlmChoice(id: id, model: '', available: false)];
+    return SegmentedButton<String>(
+      key: const Key('settings-model'),
+      showSelectedIcon: false,
+      emptySelectionAllowed: true,
+      segments: [
+        for (final c in choices)
+          ButtonSegment(
+            value: c.id,
+            enabled: c.available && !_saving,
+            tooltip: c.model.isEmpty ? null : c.model,
+            label: Text(_names[c.id] ?? c.id, key: Key('settings-model-${c.id}')),
+          ),
+      ],
+      selected: {
+        if (status != null && choices.any((c) => c.id == status.provider)) status.provider,
+      },
+      onSelectionChanged: (s) {
+        if (s.isNotEmpty) unawaited(_choose(s.first));
+      },
     );
   }
 }

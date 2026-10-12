@@ -2005,7 +2005,7 @@ abstract class AppLocalizations {
   /// No description provided for @devVoiceHint.
   ///
   /// In en, this message translates to:
-  /// **'At list price. The Guide on GPT-Live bills every second the session is open, plus its text backend; on Realtime it bills tokens (silence is free) plus transcription. Each Guide session also shows the other voice: Realtime at this account\'s own cost per minute, GPT-Live at \$0.05 a minute. Audit transcription counts the whole open session, an upper bound.'**
+  /// **'At list price. A GPT-Live session bills every second it is open, plus its other call: the Guide\'s text backend, or for an audit the Auditor\'s calls while the session was open. The Guide on Realtime bills tokens (silence is free) plus transcription. Each Guide session also shows the other voice: Realtime at this account\'s own cost per minute, GPT-Live at \$0.05 a minute. An audit taking turns counts its transcription for the whole open session, an upper bound, without the speech that reads the replies.'**
   String get devVoiceHint;
 
   /// No description provided for @devVoiceGuide.
@@ -2017,7 +2017,7 @@ abstract class AppLocalizations {
   /// No description provided for @devVoiceAudits.
   ///
   /// In en, this message translates to:
-  /// **'Audits (live transcription)'**
+  /// **'Audits'**
   String get devVoiceAudits;
 
   /// No description provided for @devVoiceSessions.
@@ -2895,6 +2895,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Explain it. The Auditor decides.'**
   String get tourProveTitle;
+
+  /// No description provided for @aiModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get aiModel;
+
+  /// No description provided for @devTabLlm.
+  ///
+  /// In en, this message translates to:
+  /// **'Model cost'**
+  String get devTabLlm;
+
+  /// No description provided for @devLlmHint.
+  ///
+  /// In en, this message translates to:
+  /// **'At list price. Every call the text agents make (Planner, Auditor and the rest) is logged with its tokens. A model without a list price here is counted but left out of the dollars.'**
+  String get devLlmHint;
+
+  /// No description provided for @devLlmAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All calls'**
+  String get devLlmAll;
+
+  /// No description provided for @devLlmCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Calls'**
+  String get devLlmCalls;
+
+  /// No description provided for @devLlmFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get devLlmFailed;
+
+  /// No description provided for @devLlmPerCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Per call'**
+  String get devLlmPerCall;
+
+  /// No description provided for @devLlmUnpriced.
+  ///
+  /// In en, this message translates to:
+  /// **'No price'**
+  String get devLlmUnpriced;
+
+  /// No description provided for @devLlmPerAudit.
+  ///
+  /// In en, this message translates to:
+  /// **'Per audit'**
+  String get devLlmPerAudit;
+
+  /// No description provided for @devLlmByModel.
+  ///
+  /// In en, this message translates to:
+  /// **'By model'**
+  String get devLlmByModel;
+
+  /// No description provided for @devLlmByAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'By agent'**
+  String get devLlmByAgent;
+
+  /// No description provided for @devNoLlm.
+  ///
+  /// In en, this message translates to:
+  /// **'No model calls logged yet.'**
+  String get devNoLlm;
+
+  /// No description provided for @devVoiceAuditLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit (GPT-Live)'**
+  String get devVoiceAuditLive;
+
+  /// No description provided for @devVoiceAuditTurns.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit (turns)'**
+  String get devVoiceAuditTurns;
+
+  /// No description provided for @devVoicePerSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Per session'**
+  String get devVoicePerSession;
+
+  /// No description provided for @devVoicePerSessionLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Per session on GPT-Live'**
+  String get devVoicePerSessionLive;
+
+  /// No description provided for @devVoicePerSessionTurns.
+  ///
+  /// In en, this message translates to:
+  /// **'Per session taking turns'**
+  String get devVoicePerSessionTurns;
+
+  /// No description provided for @devVoiceLiveParts.
+  ///
+  /// In en, this message translates to:
+  /// **'GPT-Live in two parts: the voice and its other call'**
+  String get devVoiceLiveParts;
+
+  /// No description provided for @devVoiceGuideVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide: voice'**
+  String get devVoiceGuideVoice;
+
+  /// No description provided for @devVoiceGuideBackend.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide: backend'**
+  String get devVoiceGuideBackend;
+
+  /// No description provided for @devVoiceAuditVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Audits: voice'**
+  String get devVoiceAuditVoice;
+
+  /// No description provided for @devVoiceAuditBackend.
+  ///
+  /// In en, this message translates to:
+  /// **'Audits: Auditor'**
+  String get devVoiceAuditBackend;
+
+  /// No description provided for @devVoiceOtherCall.
+  ///
+  /// In en, this message translates to:
+  /// **'other call'**
+  String get devVoiceOtherCall;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -10,10 +10,14 @@ import 'package:self_infinity/app/app_state.dart';
 import 'package:self_infinity/features/audit/audit_scene.dart';
 import 'package:self_infinity/features/audit/celebration_card.dart';
 import 'package:self_infinity/features/audit/lesson_card.dart';
+import 'package:provider/provider.dart';
+import 'package:self_infinity/testing/fake_live_io.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
 import 'package:self_infinity/testing/test_app.dart';
 import 'package:self_infinity/theme/app_theme.dart';
 import 'package:self_infinity/theme/tokens.dart';
+import 'package:self_infinity/voice/live_link.dart';
+import 'package:self_infinity/voice/live_voice.dart';
 import 'package:self_infinity/widgets/widgets.dart';
 
 import '../support/scene_helpers.dart';
@@ -77,6 +81,18 @@ Future<void> failIt(WidgetTester tester) async {
 Future<void> passIt(WidgetTester tester) async {
   await say(tester, longAnswer);
   await say(tester, longAnswer);
+}
+
+/// A server with GPT-Live for audits.
+class _LiveVoiceApi extends FakeApiClient {
+  _LiveVoiceApi() : super(latency: Duration.zero);
+
+  @override
+  Future<String?> auditVoice() async => 'live';
+
+  @override
+  LiveEndpoint? liveEndpoint(String path) =>
+      (url: Uri.parse('http://127.0.0.1:8000/api$path'), headers: const <String, String>{});
 }
 
 void main() {
@@ -758,6 +774,43 @@ void main() {
       expect(voice.spoken.last, contains('Not quite.'));
       expect(textOf(tester, 'verdict-title'), 'Not yet.');
       expect(find.byKey(const Key('voice-wave-row')), findsNothing); // the loop ended
+    });
+
+    testWidgets('on GPT-Live she says the question, a finished answer is judged and her reply goes to the voice', (
+      tester,
+    ) async {
+      final io = FakeLiveIo();
+      final live = LiveVoice(api: _LiveVoiceApi(), device: FakeVoiceService(), io: io);
+      await pumpScene(
+        tester,
+        Provider<LiveVoice?>.value(value: live, child: const AuditScene(skillId: 1)),
+        api: api,
+      );
+      final question = bubble(tester);
+      await tester.tap(find.byKey(const Key('voice-mode')));
+      await tester.pumpAndSettle();
+      expect(io.path, '/api/voice/live/audit');
+      expect(find.byKey(const Key('voice-wave-row')), findsOneWidget);
+
+      final link = io.link;
+      link.emit({'type': 'session.started'});
+      expect(link.sent.single['type'], 'session.instructions.append');
+      expect(link.sent.single['content'], contains(question));
+
+      // She is speaking and they cut in: their words are heard all the same.
+      io.onReplyLevel!(0.5);
+      link.emit({'type': 'session.input_transcript.delta', 'delta': "I'm not sure"});
+      link.emit({'type': 'session.delegation.created', 'delegation': {'id': 'd1', 'target': 'client'}});
+      await tester.pump(const Duration(seconds: 5)); // the answer's last words settle
+      await tester.pumpAndSettle();
+
+      expect(find.text("I'm not sure"), findsOneWidget);
+      final reply = link.sent.last;
+      expect(reply['type'], 'session.commentary.append');
+      expect(reply['delegation_id'], 'd1');
+      expect(reply['content'], startsWith(FakeApiClient.probeFeedback));
+      expect(reply['content'], contains('most important term'));
+      expect(find.byKey(const Key('voice-wave-row')), findsOneWidget); // it goes on
     });
 
     testWidgets('Esc leaves voice mode', (tester) async {

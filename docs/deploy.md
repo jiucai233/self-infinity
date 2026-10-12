@@ -59,13 +59,16 @@
 | `OPENAI_API_KEY` | 你的 key（现在线上用的是它，模型默认 `gpt-6-luna`）。有它时聊天前台先用 Decisions API 分意图（约 0.3 秒），新建课程和闲聊才调大模型 |
 | `LLM_PROVIDER` | 可选：不设就用第一个配了 key 的 provider，一个 key 都没有就是 `mock` |
 | `LLM_MODEL` | 可选：换模型时才设 |
+| `ANTHROPIC_API_KEY` | 可选：Claude 的 key。配了以后每个账号可以自己选用 OpenAI 还是 Claude（`PUT /api/llm`），没选的账号照旧；它排在自动选择的最后，所以光加这个 key 不会改变现在用的 provider |
+| `CLAUDE_MODEL` | 可选：账号选了 Claude 时用的模型（默认 `claude-haiku-5-5`）。`LLM_MODEL` 只在 `LLM_PROVIDER=claude` 时才对 Claude 生效 |
 | `LLM_TIMEOUT_SECONDS` | 可选：默认 90（推理模型生成一门课约 25 秒） |
 | `TAVILY_API_KEY` | 可选，不填用离线搜索替身（没有网上课纲参考） |
 | `DEV_EMAILS` | 可选：能看到开发者面板（审计指标）的邮箱，逗号分隔 |
 | `TRANSCRIBE_MODEL` / `SPEECH_MODEL` / `SPEECH_VOICE` | 可选：语音转写和朗读（默认 `gpt-transcribe` / `gpt-4o-mini-tts` / `marin`）。语音只走 OpenAI，有 `OPENAI_API_KEY` 就开着；没有就用浏览器自带的识别和朗读 |
 | `GUIDE_VOICE` | 可选：首页 Guide 用哪种语音，`live`（默认，GPT-Live）或 `realtime`。GPT-Live 连不上时浏览器会自动退回 realtime |
+| `AUDIT_VOICE` | 可选：审计的语音模式用哪种，`live`（默认，GPT-Live：她说话时开口就能打断，判分仍是 Auditor）或 `turns`（实时转写 + 朗读，轮流说）。GPT-Live 连不上时浏览器会自动退回 turns |
 | `LIVE_MODEL` / `LIVE_BACKEND_MODEL` | 可选：GPT-Live 的语音模型和它调用工具的后台模型（默认 `gpt-live-1` / `gpt-6-luna`） |
-| `REALTIME_MODEL` / `LIVE_TRANSCRIBE_MODEL` | 可选：`GUIDE_VOICE=realtime` 时首页 Guide 的实时语音模型、审计的实时转写（默认 `gpt-realtime-2.1` / `gpt-live-transcribe`），走 WebRTC |
+| `REALTIME_MODEL` / `LIVE_TRANSCRIBE_MODEL` | 可选：GPT-Live 用不了时的两条退路——首页 Guide 的实时语音模型、审计轮流模式的实时转写（默认 `gpt-realtime-2.1` / `gpt-live-transcribe`），走 WebRTC |
 
    改了环境变量要 **Redeploy** 才生效。
 

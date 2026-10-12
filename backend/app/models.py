@@ -384,6 +384,9 @@ class Profile(SQLModel, table=True):
     updated_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
     # When the first-run tutorial was finished or skipped (contract section 7); NULL = not yet.
     onboarded_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
+    # The provider this account's agents run on: "openai" | "claude"; NULL or "" = the server's
+    # (app/llm/__init__.py). Nullable because it was added after the first release.
+    llm_provider: str | None = None
 
 
 class JournalEntry(SQLModel, table=True):
@@ -433,3 +436,24 @@ class VoiceSession(SQLModel, table=True):
     audio_out: int = 0
     # Speech the input transcription wrote down (its usage, in seconds).
     transcribed_seconds: float = 0
+
+
+class LLMCall(SQLModel, table=True):
+    """One call to a real LLM provider (app/llm/usage.py), written as it returns or fails. The
+    developer panel turns the tokens into dollars (app/services/llm_usage.py)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    # The sub-agent, from the prompt's "[agent: <name>]" tag; "-" without one.
+    agent: str = "-"
+    provider: str
+    model: str
+    # Every prompt token, the cached ones included.
+    input_tokens: int = 0
+    cached_tokens: int = 0
+    output_tokens: int = 0
+    elapsed_ms: int = 0
+    # False: the call failed (no tokens counted).
+    ok: bool = True
+    # The audit the call was made for, when it answered one (POST /api/audits/{id}/turns).
+    audit_id: int | None = Field(default=None, index=True)

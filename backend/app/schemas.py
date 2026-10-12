@@ -897,6 +897,8 @@ class VoiceStatusOut(BaseModel):
     available: bool
     # Which voice the home Guide opens first: "live" (GPT-Live) or "realtime".
     guide: Literal["live", "realtime"] = "live"
+    # Which voice an audit opens first: "live" (GPT-Live) or "turns" (live transcription).
+    audit: Literal["live", "turns"] = "live"
 
 
 class TranscriptOut(BaseModel):
@@ -910,7 +912,7 @@ class SpeechIn(BaseModel):
 class VoiceUsageIn(BaseModel):
     """A live voice session's running totals (contract #37)."""
 
-    kind: Literal["guide", "transcribe"]
+    kind: Literal["guide", "transcribe", "audit"]
     model: str = Field("", max_length=64)
     started_at: datetime | None = None
     seconds: float = Field(0, ge=0, le=6 * 3600)
@@ -934,7 +936,8 @@ class DevVoiceSessionOut(BaseModel):
     audio_in: int
     audio_out: int
     cached_share: float | None
-    # Dollars at list price. backend_cost: a GPT-Live session's text backend (in `cost`).
+    # Dollars at list price. backend_cost: a GPT-Live session's other call (in `cost`): a Guide's
+    # text backend, an audit's Auditor calls made while it was open (None when none has a price).
     # other_cost: the same Guide session on the other voice (GPT-Live ↔ Realtime); None for audits.
     cost: float
     backend_cost: float | None
@@ -946,6 +949,10 @@ class DevVoiceTotalsOut(BaseModel):
     guide_minutes: float
     guide_cost: float
     guide_cost_per_minute: float | None
+    guide_cost_per_session: float | None
+    # The two parts of the GPT-Live Guide sessions' cost: the voice, and its text backend.
+    guide_live_voice_cost: float
+    guide_live_backend_cost: float
     # Every Guide minute on one voice: what ran there as billed, the rest estimated.
     guide_all_live: float
     guide_all_realtime: float
@@ -953,11 +960,96 @@ class DevVoiceTotalsOut(BaseModel):
     realtime_per_minute: float
     realtime_rate_measured: bool
     guide_cached_share: float | None
+    # Both voices of the audit: GPT-Live (`audit`) and live transcription (`transcribe`).
     audit_sessions: int
     audit_minutes: float
     audit_cost: float
+    # The GPT-Live audits: the voice, and the Auditor's calls made meanwhile.
+    audit_live_sessions: int
+    audit_live_minutes: float
+    audit_live_voice_cost: float
+    audit_live_backend_cost: float
+    audit_live_cost_per_session: float | None
+    audit_turns_cost_per_session: float | None
 
 
 class DevVoiceOut(BaseModel):
     totals: DevVoiceTotalsOut
     sessions: list[DevVoiceSessionOut]
+
+
+class LLMChoiceOut(BaseModel):
+    id: Literal["openai", "claude"]
+    # The model an agent runs on with it.
+    model: str
+    # Its key is configured on the server.
+    available: bool
+
+
+class LLMOut(BaseModel):
+    """GET/PUT /api/llm (contract #46): the provider this account's agents run on."""
+
+    provider: str
+    model: str
+    choices: list[LLMChoiceOut]
+
+
+class LLMIn(BaseModel):
+    provider: Literal["openai", "claude"]
+
+
+class DevLLMTotalsOut(BaseModel):
+    """Dollars at list price (app/services/llm_usage.py). avg_cost: per call that succeeded on
+    a model with a price; unpriced_calls: the ones that succeeded on a model without one."""
+
+    calls: int
+    failed: int
+    cost: float
+    avg_cost: float | None
+    unpriced_calls: int
+
+
+class DevLLMProviderOut(BaseModel):
+    provider: str
+    model: str
+    calls: int
+    failed: int
+    # input_tokens counts every prompt token, the cached ones included.
+    input_tokens: int
+    cached_tokens: int
+    output_tokens: int
+    avg_ms: int | None
+    # None: the model has no price.
+    cost: float | None
+    avg_cost: float | None
+
+
+class DevLLMAgentOut(BaseModel):
+    agent: str
+    provider: str
+    model: str
+    calls: int
+    avg_input_tokens: int | None
+    avg_output_tokens: int | None
+    avg_ms: int | None
+    cost: float | None
+    avg_cost: float | None
+
+
+class DevLLMAuditsOut(BaseModel):
+    """The audits that ran on one provider and model: calls and dollars per audit."""
+
+    provider: str
+    model: str
+    audits: int
+    avg_calls: float
+    avg_cost: float | None
+
+
+class DevLLMOut(BaseModel):
+    """GET /api/dev/llm (contract #47)."""
+
+    totals: DevLLMTotalsOut
+    providers: list[DevLLMProviderOut]
+    agents: list[DevLLMAgentOut]
+    audits: list[DevLLMAuditsOut]

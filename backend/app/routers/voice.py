@@ -1,6 +1,6 @@
 """Voice (contract #35): speech to text and text to speech through OpenAI, and the WebRTC
-handshake of the live sessions (the home page's Guide on GPT-Live or Realtime, the audit's live
-transcription)."""
+handshake of the live sessions (the home page's Guide on GPT-Live or Realtime, the audit's voice
+on GPT-Live or its live transcription)."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -18,7 +18,11 @@ router = APIRouter(prefix="/api/voice", tags=["voice"], dependencies=[Depends(cu
 
 @router.get("", response_model=VoiceStatusOut)
 def voice_status():
-    return VoiceStatusOut(available=voice.available(), guide="realtime" if settings.guide_voice == "realtime" else "live")
+    return VoiceStatusOut(
+        available=voice.available(),
+        guide="realtime" if settings.guide_voice == "realtime" else "live",
+        audit="turns" if settings.audit_voice == "turns" else "live",
+    )
 
 
 @router.post("/transcribe", response_model=TranscriptOut)
@@ -105,6 +109,15 @@ async def live_guide(
         raise HTTPException(503, "voice is not configured")
     config = await run_in_threadpool(realtime.live_guide_session, session)
     return await _connect(offer, config, user, connect=realtime.connect_live)
+
+
+@router.post("/live/audit", status_code=201, responses={201: {"content": {"application/sdp": {}}}})
+async def live_audit(request: Request, user: CurrentUser = Depends(current_user)):
+    """An audit's voice on GPT-Live: it hands each finished answer to the browser."""
+    offer = await _offer(request)
+    if not voice.available():
+        raise HTTPException(503, "voice is not configured")
+    return await _connect(offer, realtime.live_audit_session(), user, connect=realtime.connect_live)
 
 
 @router.post("/realtime/transcribe", status_code=201, responses={201: {"content": {"application/sdp": {}}}})

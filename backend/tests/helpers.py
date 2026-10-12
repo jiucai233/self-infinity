@@ -9,6 +9,7 @@ import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import httpx
 from sqlmodel import Session
 
 from app.llm.base import Message, agent_of
@@ -278,3 +279,53 @@ def freeze_clock(monkeypatch, when: str = "2026-10-05 12:00", tz: str = "Asia/Se
         now["value"] = datetime.fromisoformat(new_when).replace(tzinfo=ZoneInfo(tz))
 
     return move
+
+
+# ---------------------------------------------------------------- real providers over fake HTTP
+
+def fake_llm_http(monkeypatch, handler) -> list[httpx.Request]:
+    """Every OpenAI-compatible or Claude provider built from now on sends its requests to
+    [handler] (request -> httpx.Response) instead of the network. Returns the requests sent."""
+    from app.llm.claude import ClaudeProvider
+    from app.llm.openai_compatible import OpenAICompatibleProvider
+
+    sent: list[httpx.Request] = []
+
+    def recorder(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        return handler(request)
+
+    def init(self, model: str | None = None) -> None:
+        self._client = httpx.Client(transport=httpx.MockTransport(recorder))
+        self._model = model or None
+
+    monkeypatch.setattr(OpenAICompatibleProvider, "__init__", init)
+    monkeypatch.setattr(ClaudeProvider, "__init__", init)
+    return sent
+
+
+def openai_reply(content: dict | str, prompt: int = 0, cached: int = 0, completion: int = 0) -> httpx.Response:
+    text = content if isinstance(content, str) else json.dumps(content)
+    usage = {"prompt_tokens": prompt, "completion_tokens": completion, "prompt_tokens_details": {"cached_tokens": cached}}
+    return httpx.Response(200, json={"choices": [{"message": {"content": text}}], "usage": usage})
+
+
+def claude_reply(content: dict | str, fresh: int = 0, cache_read: int = 0, cache_write: int = 0, output: int = 0) -> httpx.Response:
+    text = content if isinstance(content, str) else json.dumps(content)
+    usage = {
+        "input_tokens": fresh,
+        "cache_read_input_tokens": cache_read,
+        "cache_creation_input_tokens": cache_write,
+        "output_tokens": output,
+    }
+    return httpx.Response(
+        200, json={"content": [{"type": "text", "text": text}], "stop_reason": "end_turn", "usage": usage}
+    )
+
+
+def agent_in(request: httpx.Request) -> str | None:
+    """The sub-agent a faked provider request was made for."""
+    body = json.loads(request.content)
+    if isinstance(body.get("system"), str):  # Claude
+        return agent_of([{"role": "system", "content": body["system"]}])
+    return agent_of(body["messages"])

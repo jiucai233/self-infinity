@@ -16,6 +16,88 @@ class _NotADeveloper extends FakeApiClient {
   Future<Me> getMe() async => const Me(id: 'someone', isDev: false);
 }
 
+/// A server with model calls logged and an audit that ran on GPT-Live.
+class _WithCosts extends FakeApiClient {
+  _WithCosts() : super(latency: Duration.zero);
+
+  @override
+  Future<DevLlm> getDevLlm() async => const DevLlm(
+    calls: 12,
+    failed: 1,
+    cost: 0.0042,
+    avgCost: 0.00038,
+    unpricedCalls: 2,
+    providers: [
+      DevLlmRow(
+        provider: 'openai',
+        model: 'gpt-6-luna',
+        calls: 6,
+        failed: 1,
+        avgInputTokens: 2000,
+        avgOutputTokens: 300,
+        avgMs: 2400,
+        cost: 0.0024,
+        avgCost: 0.0004,
+      ),
+      DevLlmRow(provider: 'claude', model: 'claude-haiku-5-5', calls: 4, cost: 0.0018, avgCost: 0.00045),
+    ],
+    agents: [
+      DevLlmRow(provider: 'openai', model: 'gpt-6-luna', agent: 'auditor', calls: 5, avgCost: 0.0005),
+    ],
+    audits: [
+      DevLlmRow(provider: 'openai', model: 'gpt-6-luna', audits: 2, avgCalls: 3, avgCost: 0.0015),
+      DevLlmRow(provider: 'claude', model: 'claude-haiku-5-5', audits: 1, avgCalls: 4, avgCost: 0.0018),
+    ],
+  );
+
+  @override
+  Future<DevVoice> getDevVoice({int limit = 50}) async => DevVoice(
+    guideSessions: 1,
+    guideMinutes: 2,
+    guideCost: 0.102,
+    guideAllLive: 0.102,
+    guideAllRealtime: 0.144,
+    realtimePerMinute: 0.072,
+    guideLiveVoiceCost: 0.1,
+    guideLiveBackendCost: 0.002,
+    guideCostPerSession: 0.102,
+    auditSessions: 2,
+    auditMinutes: 9,
+    auditCost: 0.288,
+    auditLiveSessions: 1,
+    auditLiveMinutes: 4,
+    auditLiveVoiceCost: 0.2,
+    auditLiveBackendCost: 0.003,
+    auditLiveCostPerSession: 0.203,
+    auditTurnsCostPerSession: 0.085,
+    sessions: [
+      DevVoiceSession(
+        id: 3,
+        kind: 'audit',
+        model: 'gpt-live-1',
+        startedAt: DateTime.utc(2026, 10, 12, 3),
+        minutes: 4,
+        turns: 5,
+        audioIn: 0,
+        audioOut: 0,
+        cost: 0.203,
+        backendCost: 0.003,
+      ),
+      DevVoiceSession(
+        id: 2,
+        kind: 'transcribe',
+        model: 'gpt-live-transcribe',
+        startedAt: DateTime.utc(2026, 10, 11, 3),
+        minutes: 5,
+        turns: 6,
+        audioIn: 0,
+        audioOut: 0,
+        cost: 0.085,
+      ),
+    ],
+  );
+}
+
 String metric(WidgetTester tester, String key) =>
     tester.widget<Text>(find.byKey(Key('dev-metric-$key'))).data!;
 
@@ -101,6 +183,8 @@ void main() {
     expect(metric(tester, 'guide-all-live'), '\$0.150');
     expect(metric(tester, 'realtime-rate'), '\$0.072');
     expect(metric(tester, 'audit-minutes'), '5.0');
+    await tester.drag(find.byKey(const Key('dev-voice')), const Offset(0, -400)); // down to the sessions
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('dev-voice-1')), findsOneWidget);
     expect(find.byKey(const Key('dev-voice-2')), findsOneWidget);
     // Each Guide session names its voice and prices the other one.
@@ -113,5 +197,57 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('dev-voice')), findsNothing);
     expect(find.byKey(const Key('dev-metric-finished')), findsOneWidget);
+  });
+
+  testWidgets('the voice tab: a GPT-Live session in its two parts, an audit on each voice', (tester) async {
+    final api = _WithCosts();
+    await api.generateCourse(const GenerateRequest(topic: 'math'));
+    await openPanel(tester, api);
+    await tester.tap(find.byKey(const Key('dev-tab-voice')));
+    await tester.pumpAndSettle();
+
+    expect(metric(tester, 'guide-per-session'), '\$0.102');
+    expect(metric(tester, 'audit-live-per-session'), '\$0.203');
+    expect(metric(tester, 'audit-turns-per-session'), '\$0.085');
+    // The voice, and its other call beside it.
+    expect(metric(tester, 'guide-live-voice'), '\$0.100');
+    expect(metric(tester, 'guide-live-backend'), '\$0.0020');
+    expect(metric(tester, 'audit-live-voice'), '\$0.200');
+    expect(metric(tester, 'audit-live-backend'), '\$0.0030');
+    await tester.drag(find.byKey(const Key('dev-voice')), const Offset(0, -400)); // down to the sessions
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Audit (GPT-Live)'), findsOneWidget);
+    expect(find.textContaining('(other call \$0.0030)'), findsOneWidget);
+    expect(find.textContaining('Audit (turns)'), findsOneWidget);
+  });
+
+  testWidgets('the model cost tab: every call, per audit on each model, by model and by agent', (tester) async {
+    final api = _WithCosts();
+    await api.generateCourse(const GenerateRequest(topic: 'math'));
+    await openPanel(tester, api);
+    await tester.tap(find.byKey(const Key('dev-tab-llm')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('dev-llm')), findsOneWidget);
+    expect(metric(tester, 'llm-calls'), '12');
+    expect(metric(tester, 'llm-failed'), '1');
+    expect(metric(tester, 'llm-cost'), '\$0.004');
+    expect(metric(tester, 'llm-per-call'), '\$0.00038');
+    expect(metric(tester, 'llm-unpriced'), '2');
+    // One audit on OpenAI next to one on Claude.
+    expect(find.textContaining('2 Audits · 3.0 Calls · \$0.0015'), findsOneWidget);
+    expect(find.textContaining('1 Audits · 4.0 Calls · \$0.0018'), findsOneWidget);
+    expect(find.text('claude · claude-haiku-5-5'), findsNWidgets(2));
+    expect(find.textContaining('6 Calls (1 Failed) · 2000 → 300 tok · 2.4 s'), findsOneWidget);
+    expect(find.text('auditor · gpt-6-luna'), findsOneWidget);
+  });
+
+  testWidgets('the model cost tab offline: nothing was called', (tester) async {
+    final api = await seededFakeApi();
+    await openPanel(tester, api);
+    await tester.tap(find.byKey(const Key('dev-tab-llm')));
+    await tester.pumpAndSettle();
+    expect(metric(tester, 'llm-calls'), '0');
+    expect(find.text('No model calls logged yet.'), findsOneWidget);
   });
 }

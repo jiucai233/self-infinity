@@ -8,8 +8,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.db import init_db
 from app.i18n import parse_accept_language, reset_language, set_language
-from app.llm import get_provider
-from app.routers import audits, chat, checkins, courses, dev, goals, graph, journal, life, narrator, plan, principles, profile, skills, uploads, voice
+from app.llm import get_provider, usage
+from app.routers import audits, chat, checkins, courses, dev, goals, graph, journal, life, llm, narrator, plan, principles, profile, skills, uploads, voice
 
 logging.basicConfig(level=logging.INFO)
 
@@ -24,9 +24,10 @@ app = FastAPI(title="Self-Infinity API", lifespan=lifespan)
 
 
 class LanguageMiddleware:
-    """Accept-Language → the request's language (app/i18n.py), for the whole request.
+    """Accept-Language → the request's language (app/i18n.py), for the whole request, and a
+    fresh context for its LLM calls (app/llm/usage.py: where they are logged, on which provider).
 
-    Plain ASGI rather than BaseHTTPMiddleware, so the context variable is set in the task that
+    Plain ASGI rather than BaseHTTPMiddleware, so the context variables are set in the task that
     runs the endpoint and its background tasks.
     """
 
@@ -39,9 +40,11 @@ class LanguageMiddleware:
             return
         header = dict(scope.get("headers") or []).get(b"accept-language", b"").decode("latin-1")
         token = set_language(parse_accept_language(header))
+        llm_token = usage.begin()
         try:
             await self.inner(scope, receive, send)
         finally:
+            usage.end(llm_token)
             reset_language(token)
 
 
@@ -71,6 +74,7 @@ app.include_router(goals.router)
 app.include_router(dev.router)
 app.include_router(voice.router)
 app.include_router(life.router)
+app.include_router(llm.router)
 
 
 @app.get("/api/health")

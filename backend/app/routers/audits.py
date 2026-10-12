@@ -6,7 +6,7 @@ from sqlmodel import Session, col, select
 
 from app.agents.recorder import Recorder
 from app.db import get_session
-from app.llm import get_provider
+from app.llm import get_provider, usage
 from app.models import AuditSession, AuditStatus, Principle, SkillNode, SkillStatus
 from app.routers.principles import principle_out
 from app.schemas import (
@@ -109,6 +109,10 @@ def start_audit(
 
 @router.post("/audits/{audit_id}/turns", response_model=TurnResult)
 def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depends(get_session)):
+    # The Auditor's and the Challenger's calls for this answer are logged with the audit's id.
+    ctx = usage.current()
+    if ctx is not None:
+        ctx.audit_id = audit_id
     audit = session.get(AuditSession, audit_id)
     if audit is None:
         raise HTTPException(404, "audit session not found")

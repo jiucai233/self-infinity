@@ -163,11 +163,15 @@ class FakeApiClient implements SelfInfinityApi {
     'reviewAudit',
     'voiceAvailable',
     'guideVoice',
+    'auditVoice',
     'transcribe',
     'speech',
     'chatAct',
     'chatLog',
     'reportVoiceUsage',
+    'getLlm',
+    'setLlm',
+    'getDevLlm',
     'getDevVoice',
   };
 
@@ -1912,6 +1916,12 @@ class FakeApiClient implements SelfInfinityApi {
   }
 
   @override
+  Future<String?> auditVoice() async {
+    await _begin('auditVoice');
+    return null;
+  }
+
+  @override
   Future<String> transcribe(Uint8List audio, {required String filename}) async {
     await _begin('transcribe');
     throw const ApiException(503, 'voice is not configured');
@@ -1973,6 +1983,39 @@ class FakeApiClient implements SelfInfinityApi {
   Future<void> reportVoiceUsage(VoiceUsage usage) async {
     await _begin('reportVoiceUsage');
     _voiceUsage[usage.id] = usage.toJson();
+  }
+
+  // Offline both providers are the same mock; the choice is only kept.
+  String _llmProvider = 'openai';
+
+  LlmStatus get _llmStatus => LlmStatus(
+    provider: _llmProvider,
+    model: _llmProvider == 'claude' ? 'claude-haiku-5-5' : 'gpt-6-luna',
+    choices: const [
+      LlmChoice(id: 'openai', model: 'gpt-6-luna', available: true),
+      LlmChoice(id: 'claude', model: 'claude-haiku-5-5', available: true),
+    ],
+  );
+
+  @override
+  Future<LlmStatus> getLlm() async {
+    await _begin('getLlm');
+    return _llmStatus;
+  }
+
+  @override
+  Future<LlmStatus> setLlm(String provider) async {
+    await _begin('setLlm');
+    _require(provider == 'openai' || provider == 'claude', 'provider must be openai or claude');
+    _llmProvider = provider;
+    return _llmStatus;
+  }
+
+  /// Offline no model is called, so nothing was spent.
+  @override
+  Future<DevLlm> getDevLlm() async {
+    await _begin('getDevLlm');
+    return const DevLlm();
   }
 
   @override

@@ -494,12 +494,105 @@ void main() {
     });
   });
 
+  group('the model an account runs on, and what the calls cost', () {
+    const status = {
+      'provider': 'claude',
+      'model': 'claude-haiku-5-5',
+      'choices': [
+        {'id': 'openai', 'model': 'gpt-6-luna', 'available': true},
+        {'id': 'claude', 'model': 'claude-haiku-5-5', 'available': false},
+      ],
+    };
+
+    test('GET /llm: the provider in use and the two to choose from', () async {
+      final h = ok(status);
+      final llm = await h.api.getLlm();
+      expect((h.last.method, h.last.url.path), ('GET', '/api/llm'));
+      expect((llm.provider, llm.model), ('claude', 'claude-haiku-5-5'));
+      expect([for (final c in llm.choices) (c.id, c.available)], [('openai', true), ('claude', false)]);
+    });
+
+    test('PUT /llm sends the choice', () async {
+      final h = ok(status);
+      expect((await h.api.setLlm('claude')).provider, 'claude');
+      expect((h.last.method, h.last.url.path), ('PUT', '/api/llm'));
+      expect(h.lastBody, {'provider': 'claude'});
+    });
+
+    test('GET /dev/llm: totals, by model, by agent, per audit', () async {
+      final h = ok({
+        'totals': {'calls': 12, 'failed': 1, 'cost': 0.0042, 'avg_cost': 0.00038, 'unpriced_calls': 2},
+        'providers': [
+          {
+            'provider': 'openai', 'model': 'gpt-6-luna', 'calls': 10, 'failed': 1,
+            'input_tokens': 20000, 'cached_tokens': 8000, 'output_tokens': 3000,
+            'avg_ms': 2400.0, 'cost': 0.0042, 'avg_cost': 0.00042,
+          },
+          {'provider': 'deepseek', 'model': 'deepseek-chat', 'calls': 2, 'failed': 0, 'cost': null, 'avg_cost': null},
+        ],
+        'agents': [
+          {
+            'agent': 'auditor', 'provider': 'openai', 'model': 'gpt-6-luna', 'calls': 6,
+            'avg_input_tokens': 2100.0, 'avg_output_tokens': 310.0, 'avg_ms': 2600.0,
+            'cost': 0.003, 'avg_cost': 0.0005,
+          },
+        ],
+        'audits': [
+          {'provider': 'openai', 'model': 'gpt-6-luna', 'audits': 2, 'avg_calls': 3.0, 'avg_cost': 0.0015},
+        ],
+      });
+      final llm = await h.api.getDevLlm();
+      expect((h.last.method, h.last.url.path), ('GET', '/api/dev/llm'));
+      expect((llm.calls, llm.failed, llm.cost, llm.avgCost, llm.unpricedCalls), (12, 1, 0.0042, 0.00038, 2));
+      final luna = llm.providers.first;
+      expect((luna.calls, luna.failed, luna.avgInputTokens, luna.avgOutputTokens), (10, 1, 2000, 300));
+      expect((llm.providers.last.cost, llm.providers.last.avgCost), (null, null)); // no list price
+      expect((llm.agents.single.agent, llm.agents.single.avgInputTokens), ('auditor', 2100));
+      expect((llm.audits.single.audits, llm.audits.single.avgCalls, llm.audits.single.avgCost), (2, 3, 0.0015));
+    });
+
+    test('GET /dev/voice: a GPT-Live session in its two parts; a server from before has none', () async {
+      final totals = {
+        'guide_sessions': 1, 'guide_minutes': 2.0, 'guide_cost': 0.1, 'guide_all_live': 0.1,
+        'guide_all_realtime': 0.14, 'realtime_per_minute': 0.072,
+        'audit_sessions': 2, 'audit_minutes': 9.0, 'audit_cost': 0.3,
+      };
+      final before = await ok({'totals': totals, 'sessions': <Object>[]}).api.getDevVoice();
+      expect((before.auditLiveSessions, before.guideLiveBackendCost, before.auditLiveCostPerSession), (0, 0, null));
+      final now = await ok({
+        'totals': {
+          ...totals,
+          'guide_live_voice_cost': 0.1, 'guide_live_backend_cost': 0.002, 'guide_cost_per_session': 0.102,
+          'audit_live_sessions': 1, 'audit_live_minutes': 4.0, 'audit_live_voice_cost': 0.2,
+          'audit_live_backend_cost': 0.003, 'audit_live_cost_per_session': 0.203,
+          'audit_turns_cost_per_session': 0.085,
+        },
+        'sessions': [
+          {
+            'id': 3, 'kind': 'audit', 'model': 'gpt-live-1', 'started_at': '2026-10-12T03:00:00Z',
+            'minutes': 4.0, 'turns': 5, 'audio_in': 0, 'audio_out': 0, 'cached_share': null,
+            'cost': 0.203, 'backend_cost': 0.003, 'other_cost': null,
+          },
+        ],
+      }).api.getDevVoice();
+      expect((now.guideLiveVoiceCost, now.guideLiveBackendCost, now.guideCostPerSession), (0.1, 0.002, 0.102));
+      expect((now.auditLiveSessions, now.auditLiveVoiceCost, now.auditLiveBackendCost), (1, 0.2, 0.003));
+      expect((now.auditLiveCostPerSession, now.auditTurnsCostPerSession), (0.203, 0.085));
+      expect((now.sessions.single.kind, now.sessions.single.backendCost), ('audit', 0.003));
+    });
+  });
+
   group('voice (#35)', () {
     test('GET /voice says which voice the Guide opens', () async {
       expect(await ok({'available': true, 'guide': 'live'}).api.guideVoice(), 'live');
       expect(await ok({'available': true, 'guide': 'realtime'}).api.guideVoice(), 'realtime');
       expect(await ok({'available': true}).api.guideVoice(), 'live'); // a server from before
       expect(await ok({'available': false, 'guide': 'live'}).api.guideVoice(), isNull);
+      // The audit: GPT-Live unless the server says turns.
+      expect(await ok({'available': true, 'audit': 'live'}).api.auditVoice(), 'live');
+      expect(await ok({'available': true, 'audit': 'turns'}).api.auditVoice(), 'turns');
+      expect(await ok({'available': true}).api.auditVoice(), 'live'); // a server from before
+      expect(await ok({'available': false, 'audit': 'live'}).api.auditVoice(), isNull);
     });
 
     test('GET /voice', () async {

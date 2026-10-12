@@ -3,15 +3,20 @@ Realtime API with a session we configure, and the SDP answer goes back. Audio th
 browser ↔ OpenAI directly; JSON events travel on the connection's data channel. The key and
 the session (instructions, tools) never reach the browser.
 
-Three sessions:
+Four sessions:
 - live guide (the default, settings.guide_voice): the home page's Guide on GPT-Live, a
   full-duplex voice that listens while it speaks. It hands tool use to a text backend
   (settings.live_backend_model) through Responses delegation; the backend's function calls
   arrive on the data channel and the browser runs them on /api/chat/act, as below.
 - realtime guide: the Guide as one speech-to-speech model (gpt-realtime). It talks itself and
   acts through tools the browser runs on /api/chat/act (the front desk's intents).
-- transcribe: live transcription for the audit (gpt-live-transcribe): words appear while the
-  learner speaks; the browser commits each turn when it hears a pause, and the Auditor judges.
+- live audit (the default, settings.audit_voice): the audit's voice on GPT-Live with client
+  delegation. The voice only carries the talk: when it hears that an answer is finished it hands
+  over, the browser sends the words to the audit (the Auditor judges them as typed text) and
+  gives back what the Auditor said, which the voice speaks. It can be interrupted by speaking.
+- transcribe: live transcription for the audit (gpt-live-transcribe), where a Live session
+  cannot be opened: words appear while the learner speaks; the browser commits each turn when
+  it hears a pause, and the Auditor judges.
 """
 
 import hashlib
@@ -237,6 +242,56 @@ def live_guide_session(session: Session) -> dict:
                 "tool_choice": "auto",
             },
         },
+    }
+
+
+# The audit's voice: ears and a mouth. Everything it says about the topic comes from the Auditor.
+# The three policies are the sections of OpenAI's GPT-Live prompt template, in its wording.
+LIVE_AUDIT_INSTRUCTIONS = """\
+You are the voice of the Auditor in Self-Infinity, a learning game. This is an oral exam: the
+learner explains one topic in their own words. You only carry the conversation. The Auditor,
+behind you, judges every answer and writes every question; you get its words and say them.
+
+- Never judge, correct, explain, hint at or answer anything about the topic yourself, and never
+  make up a question of your own. If they ask for the answer or a hint, say the exam gives
+  none and that they can say they do not know.
+- When the Auditor's words arrive, say all of them: first what it said about the last answer,
+  then its question. Keep every fact, name, number and condition in them and add none.
+- If they ask you to repeat the question, say it again.
+- Speak the language the Auditor's words are in. Never translate them.
+- Speak calmly and plainly, like an examiner who wants them to do well.
+
+Backchannel policy: Stay quiet while the learner answers. A pause to think is not the end of
+an answer: keep listening. Do not treat a cough, music or nearby talk as an answer.
+
+Interruption policy: Stop speaking at once when the learner interrupts. Listen to what they
+say.
+
+Delegation policy:
+Backend tools:
+- The Auditor: judges the learner's answer and writes what you say next.
+
+Delegate to the backend when:
+- The learner has finished answering the question on the table: a complete thought and then
+  they stop, or they say they are done.
+- They say they do not know, cannot go on or give up. That is an answer too.
+
+Do not delegate to the backend when:
+- They are thinking, in the middle of a sentence, or say they want a moment.
+- They ask you to repeat the question, or it is not about the exam.
+
+Do not guess the result while waiting; say at most "One moment." The Auditor takes a few
+seconds.
+"""
+
+
+def live_audit_session() -> dict:
+    """An audit's voice on GPT-Live: the browser answers its delegations with the Auditor's words."""
+    return {
+        "model": settings.live_model,
+        "instructions": LIVE_AUDIT_INSTRUCTIONS,
+        "audio": {"output": {"voice": settings.speech_voice}},
+        "delegation": {"type": "client"},
     }
 
 

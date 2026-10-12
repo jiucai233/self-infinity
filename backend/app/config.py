@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # "用默认值"，而不是把数字、布尔字段解析成空字符串。
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_ignore_empty=True)
 
-    # deepseek / openai / kimi / gemini / mock。留空则按 key 是否配置自动选择
+    # deepseek / openai / kimi / gemini / claude / mock。留空则按 key 是否配置自动选择
     # （第一个配了 key 的 provider），都没配就用 mock，见 app/llm/__init__.py。
     llm_provider: str = ""
     # 所选 provider 的默认模型；留空则用该 provider 自己的默认值。
@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     openai_api_key: str = ""
     kimi_api_key: str = ""
+    # Claude (app/llm/claude.py). An account can choose it over the server's provider
+    # (GET/PUT /api/llm) once the key is set. CLAUDE_MODEL is the model it runs on unless
+    # LLM_PROVIDER is claude and LLM_MODEL names another.
+    anthropic_api_key: str = ""
+    claude_model: str = "claude-haiku-5-5"
     # Voice (app/services/voice.py) always goes through OpenAI and needs OPENAI_API_KEY,
     # whatever LLM_PROVIDER is; without it the app uses the device's own speech.
     transcribe_model: str = "gpt-transcribe"
@@ -41,6 +46,10 @@ class Settings(BaseSettings):
     # tools to a text backend) or "realtime" (one speech-to-speech model). The browser falls back
     # from live to realtime when a Live session cannot be opened.
     guide_voice: str = "live"
+    # Which voice an audit talks with: "live" (GPT-Live as its ears and mouth; the Auditor still
+    # judges and asks) or "turns" (live transcription, a pause ends the turn, the reply is read
+    # aloud; she cannot be interrupted by speaking). The browser falls back from live to turns.
+    audit_voice: str = "live"
     live_model: str = "gpt-live-1"
     live_backend_model: str = "gpt-6-luna"
     # 留空则用离线搜索替身。搜索是独立于 LLM provider 的一层，互不影响。

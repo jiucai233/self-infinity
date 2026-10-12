@@ -26,8 +26,9 @@ def _force_mock_provider():
     # It has its own MonkeyPatch rather than the test's `monkeypatch`: a test calling
     # monkeypatch.undo() must not be able to undo this.
     with pytest.MonkeyPatch.context() as mp:
-        for field in ("gemini_api_key", "deepseek_api_key", "openai_api_key", "kimi_api_key"):
+        for field in ("gemini_api_key", "deepseek_api_key", "openai_api_key", "kimi_api_key", "anthropic_api_key"):
             mp.setattr(settings, field, "")
+        mp.setattr(settings, "claude_model", type(settings).model_fields["claude_model"].default)
         # 显式指定也要清掉，否则本地 .env 里的 LLM_PROVIDER 会绕过上面这几行。
         mp.setattr(settings, "llm_provider", "")
         mp.setattr(settings, "llm_model", "")
@@ -93,3 +94,11 @@ def client_fixture(client_engine):
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(name="api")
+def api_fixture(client_engine):
+    """The app with the real get_session: a request's LLM calls are logged and the account's
+    provider is read (app/llm/usage.py). `client` overrides get_session and has neither."""
+    with TestClient(app) as client:
+        yield client
