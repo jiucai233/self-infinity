@@ -170,7 +170,12 @@ class _DevPanelState extends State<DevPanel> {
           if (narrow)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.sm, AppSpacing.xl, AppSpacing.sm),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.sm,
+                AppSpacing.xl,
+                AppSpacing.sm,
+              ),
               child: tabs,
             ),
           Expanded(
@@ -333,6 +338,13 @@ class _VoiceCosts extends StatelessWidget {
           ('audit-cost', l.devVoiceCost, _usd(v.auditCost)),
           ('audit-live-per-session', l.devVoicePerSessionLive, _usd(v.auditLiveCostPerSession)),
           ('audit-turns-per-session', l.devVoicePerSessionTurns, _usd(v.auditTurnsCostPerSession)),
+          ('audit-all-live', l.devVoiceAllLive, _usd(v.auditAllLive)),
+          ('audit-all-turns', l.devVoiceAllTurns, _usd(v.auditAllTurns)),
+          (
+            'turns-rate',
+            v.turnsRateMeasured ? l.devVoiceTurnsRate : l.devVoiceTurnsRateDefault,
+            _usd(v.turnsPerMinute),
+          ),
         ]),
         const SizedBox(height: AppSpacing.lg),
         _tiles(context, l.devVoiceLiveParts, [
@@ -350,8 +362,9 @@ class _VoiceCosts extends StatelessWidget {
               key: Key('dev-voice-${s.id}'),
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
+                  Flexible(
                     child: Text(
                       '${switch (s.kind) {
                         'guide' => s.isLive ? l.devVoiceGuideLive : l.devVoiceGuideRealtime,
@@ -363,11 +376,20 @@ class _VoiceCosts extends StatelessWidget {
                       style: theme.bodyMedium,
                     ),
                   ),
-                  Text(
-                    '${_num(s.minutes)} ${l.devVoiceMinutes} · ${s.turns} ${l.devVoiceTurns} · ${_usd(s.cost)}'
-                    '${s.backendCost == null ? '' : ' (${l.devVoiceOtherCall} ${_usdFine(s.backendCost)})'}'
-                    '${s.otherCost == null ? '' : ' · ${s.isLive ? l.devVoiceOnRealtime : l.devVoiceLive} ${_usd(s.otherCost)}'}',
-                    style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                  const SizedBox(width: AppSpacing.md),
+                  Flexible(
+                    flex: 2,
+                    child: Text(
+                      textAlign: TextAlign.end,
+                      '${_num(s.minutes)} ${l.devVoiceMinutes} · ${s.turns} ${l.devVoiceTurns} · ${_usd(s.cost)}'
+                      '${s.backendCost == null ? '' : ' (${l.devVoiceOtherCall} ${_usdFine(s.backendCost)})'}'
+                      '${s.otherCost == null ? '' : ' · ${switch (s.kind) {
+                              'guide' => s.isLive ? l.devVoiceOnRealtime : l.devVoiceLive,
+                              'audit' => l.devVoiceOnTurns,
+                              _ => l.devVoiceLive,
+                            }} ${_usd(s.otherCost)}'}',
+                      style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                    ),
                   ),
                 ],
               ),
@@ -425,7 +447,10 @@ class _LlmCosts extends StatelessWidget {
         else ...[
           _rows(context, l.devLlmPerAudit, 'audit', [
             for (final r in d.audits)
-              (name(r), '${r.audits} ${l.devAudits} · ${_num(r.avgCalls)} ${l.devLlmCalls} · ${_usdFine(r.avgCost)}'),
+              (
+                name(r),
+                '${r.audits} ${l.devAudits} · ${_num(r.avgCalls)} ${l.devLlmCalls} · ${_usdFine(r.avgCost)}',
+              ),
           ]),
           _rows(context, l.devLlmByModel, 'model', [
             for (final r in d.providers)
@@ -442,6 +467,7 @@ class _LlmCosts extends StatelessWidget {
                 '${r.calls} ${l.devLlmCalls} · ${tokens(r)} · ${l.devLlmPerCall} ${_usdFine(r.avgCost)}',
               ),
           ]),
+          _rows(context, l.devLlmAllOn, 'all', [for (final r in d.allOn) (name(r), _usd(r.cost))]),
         ],
       ],
     );

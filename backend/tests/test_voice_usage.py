@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 import pytest
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.models import LLMCall, VoiceSession, utcnow
 from app.services import llm_usage, voice_usage
@@ -57,10 +57,19 @@ def test_reports_upsert_the_running_totals(client):
 def test_an_audit_transcription_is_priced_by_the_minute(client):
     client.put("/api/voice/sessions/t1", json={"kind": "transcribe", "seconds": 600, "turns": 4, "transcribed_seconds": 90})
     data = client.get("/api/dev/voice").json()
-    assert data["sessions"][0]["cost"] == pytest.approx(10 * 0.017)
-    assert data["sessions"][0]["other_cost"] is None
+    # By the seconds its transcriptions report, not the ten minutes it was open.
+    assert data["sessions"][0]["cost"] == pytest.approx(1.5 * 0.017)
+    # On GPT-Live every open second would have been billed.
+    assert data["sessions"][0]["other_cost"] == pytest.approx(10 * 0.05)
     assert data["totals"]["audit_sessions"] == 1
     assert data["totals"]["audit_minutes"] == 10
+    assert data["totals"]["audit_all_live"] == pytest.approx(10 * 0.05)
+    assert data["totals"]["audit_all_turns"] == pytest.approx(1.5 * 0.017, abs=1e-4)
+
+
+def test_a_transcription_session_that_reported_no_seconds_is_priced_by_its_open_time(client):
+    client.put("/api/voice/sessions/t1", json={"kind": "transcribe", "seconds": 600, "turns": 4})
+    assert client.get("/api/dev/voice").json()["sessions"][0]["cost"] == pytest.approx(10 * 0.017)
 
 
 def test_an_audit_on_gpt_live_is_priced_by_its_open_seconds(client):
@@ -69,7 +78,10 @@ def test_an_audit_on_gpt_live_is_priced_by_its_open_seconds(client):
     data = client.get("/api/dev/voice").json()
     live = next(s for s in data["sessions"] if s["kind"] == "audit")
     assert live["cost"] == pytest.approx(4 * 0.05)
-    assert live["other_cost"] is None and live["backend_cost"] is None
+    assert live["backend_cost"] is None
+    # Taking turns it would have cost its minutes at the turn-taking rate, an estimate so far.
+    assert live["other_cost"] == pytest.approx(4 * 0.015)
+    assert (data["totals"]["turns_per_minute"], data["totals"]["turns_rate_measured"]) == (0.015, False)
     # Both voices of the audit are in its totals.
     assert data["totals"]["audit_sessions"] == 2
     assert data["totals"]["audit_minutes"] == 14
@@ -77,46 +89,73 @@ def test_an_audit_on_gpt_live_is_priced_by_its_open_seconds(client):
     assert data["totals"]["guide_sessions"] == 0
 
 
-def test_a_live_audits_other_call_is_the_auditor(client, client_engine):
+def test_an_audit_session_counts_its_other_calls_and_shows_the_other_voice(client, client_engine):
     now = utcnow()
     luna = {"provider": "openai", "model": "gpt-6-luna"}
+    tts = {"agent": "speech", "provider": "openai", "model": "gpt-4o-mini-tts"}
     with Session(client_engine) as session:
-        # While the session was open: the Auditor twice (one call failed), the Challenger once,
-        # and a call on a model without a price.
+        # While the Live session was open: the Auditor twice (one call failed), the Challenger
+        # once, and a call on a model without a price.
         session.add(LLMCall(agent="auditor", **luna, input_tokens=4_000, cached_tokens=3_000, output_tokens=200, audit_id=1, created_at=now - timedelta(minutes=3)))
         session.add(LLMCall(agent="auditor", **luna, ok=False, audit_id=1, created_at=now - timedelta(minutes=2)))
         session.add(LLMCall(agent="challenger", **luna, input_tokens=2_000, output_tokens=100, audit_id=1, created_at=now - timedelta(minutes=1)))
         session.add(LLMCall(agent="auditor", provider="openai", model="my-own-model", input_tokens=9_000, created_at=now - timedelta(minutes=1)))
-        # Before it opened and after its last report: not its calls.
-        session.add(LLMCall(agent="planner", **luna, input_tokens=50_000, output_tokens=5_000, created_at=now - timedelta(minutes=9)))
+        # Before either opened and after their last report: not their calls.
+        session.add(LLMCall(agent="planner", **luna, input_tokens=50_000, output_tokens=5_000, created_at=now - timedelta(minutes=59)))
         session.add(LLMCall(agent="auditor", **luna, input_tokens=50_000, output_tokens=5_000, created_at=now + timedelta(minutes=5)))
+        # While the turn-taking session was open, half an hour earlier: the Auditor once, and
+        # two replies read aloud (30 s and 15 s of audio).
+        session.add(LLMCall(agent="auditor", **luna, input_tokens=3_000, output_tokens=300, audit_id=2, created_at=now - timedelta(minutes=28)))
+        session.add(LLMCall(**tts, input_tokens=100, output_tokens=600, created_at=now - timedelta(minutes=27)))
+        session.add(LLMCall(**tts, input_tokens=50, output_tokens=300, created_at=now - timedelta(minutes=26)))
         session.commit()
-    started = (now - timedelta(minutes=4)).isoformat()
-    client.put("/api/voice/sessions/a1", json={"kind": "audit", "model": "gpt-live-1", "started_at": started, "seconds": 240, "turns": 5})
+    client.put("/api/voice/sessions/a1", json={"kind": "audit", "model": "gpt-live-1", "started_at": (now - timedelta(minutes=4)).isoformat(), "seconds": 240, "turns": 5})
     client.put("/api/voice/sessions/a2", json={"kind": "audit", "model": "gpt-live-1", "started_at": (now - timedelta(seconds=30)).isoformat(), "seconds": 60})
-    client.put("/api/voice/sessions/t1", json={"kind": "transcribe", "seconds": 600, "turns": 4})
-    client.put("/api/voice/sessions/t2", json={"kind": "transcribe", "seconds": 300, "turns": 2})
+    client.put("/api/voice/sessions/t1", json={"kind": "transcribe", "started_at": (now - timedelta(minutes=30)).isoformat(), "seconds": 300, "turns": 4, "transcribed_seconds": 180})
+    with Session(client_engine) as session:
+        # Its last report came five minutes after it opened.
+        row = session.exec(select(VoiceSession).where(VoiceSession.client_id == "t1")).one()
+        row.updated_at = now - timedelta(minutes=25)
+        session.add(row)
+        session.commit()
 
     data = client.get("/api/dev/voice").json()
 
     auditor = (1_000 * 0.10 + 3_000 * 0.01 + 200 * 0.50 + 2_000 * 0.10 + 100 * 0.50) / 1e6
-    first = next(s for s in data["sessions"] if s["minutes"] == 4 and s["kind"] == "audit")
+    turns_auditor = (3_000 * 0.10 + 300 * 0.50) / 1e6
+    speech = (150 * 0.60 + 900 * 12.0) / 1e6
+    # The turn-taking voice a minute, measured: transcription by its seconds, and the speech.
+    turns_voice = 3 * 0.017 + speech
+    rate = turns_voice / 5
+
+    first = next(s for s in data["sessions"] if s["minutes"] == 4)
     assert first["backend_cost"] == pytest.approx(auditor, abs=1e-6)
     assert first["cost"] == pytest.approx(4 * 0.05 + auditor, abs=1e-4)
-    assert first["other_cost"] is None
+    # Taking turns: its minutes at the measured rate, and the same Auditor calls.
+    assert first["other_cost"] == pytest.approx(4 * rate + auditor, abs=1e-4)
     # No call while the second one was open: its voice only.
     second = next(s for s in data["sessions"] if s["minutes"] == 1)
     assert (second["backend_cost"], second["cost"]) == (None, pytest.approx(0.05))
 
+    turns = next(s for s in data["sessions"] if s["kind"] == "transcribe")
+    assert turns["backend_cost"] == pytest.approx(turns_auditor, abs=1e-6)  # the speech is its voice
+    assert turns["cost"] == pytest.approx(turns_voice + turns_auditor, abs=1e-4)
+    assert turns["other_cost"] == pytest.approx(5 * 0.05 + turns_auditor, abs=1e-4)
+
     totals = data["totals"]
+    assert (totals["turns_per_minute"], totals["turns_rate_measured"]) == (pytest.approx(rate, abs=1e-4), True)
     assert (totals["audit_live_sessions"], totals["audit_live_minutes"]) == (2, 5)
     assert totals["audit_live_voice_cost"] == pytest.approx(5 * 0.05)
     assert totals["audit_live_backend_cost"] == pytest.approx(auditor, abs=1e-6)
     assert totals["audit_live_cost_per_session"] == pytest.approx((5 * 0.05 + auditor) / 2, abs=1e-4)
-    assert totals["audit_turns_cost_per_session"] == pytest.approx(15 * 0.017 / 2, abs=1e-4)
-    # The totals of the audit cover both voices, the Auditor's calls included.
-    assert (totals["audit_sessions"], totals["audit_minutes"]) == (4, 20)
-    assert totals["audit_cost"] == pytest.approx(5 * 0.05 + auditor + 15 * 0.017, abs=1e-4)
+    assert totals["audit_turns_cost_per_session"] == pytest.approx(turns_voice + turns_auditor, abs=1e-4)
+    # The totals of the audit cover both voices, their other calls included.
+    assert (totals["audit_sessions"], totals["audit_minutes"]) == (3, 10)
+    assert totals["audit_cost"] == pytest.approx(5 * 0.05 + auditor + turns_voice + turns_auditor, abs=1e-4)
+    # Every audit minute on one voice: ten minutes of GPT-Live, or ten at the turn-taking rate;
+    # the Auditor's calls are the same either way.
+    assert totals["audit_all_live"] == pytest.approx(10 * 0.05 + auditor + turns_auditor, abs=1e-4)
+    assert totals["audit_all_turns"] == pytest.approx(10 * rate + auditor + turns_auditor, abs=1e-4)
 
 
 def test_the_voice_and_the_text_models_share_one_price_table():

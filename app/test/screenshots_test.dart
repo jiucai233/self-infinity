@@ -855,6 +855,10 @@ class _ShotCosts extends FakeApiClient {
       DevLlmRow(provider: 'openai', model: 'gpt-6-luna', audits: 6, avgCalls: 5.2, avgCost: 0.0023),
       DevLlmRow(provider: 'claude', model: 'claude-haiku-5-5', audits: 4, avgCalls: 5.5, avgCost: 0.0027),
     ],
+    allOn: [
+      DevLlmRow(provider: 'openai', model: 'gpt-6-luna', cost: 0.0409),
+      DevLlmRow(provider: 'claude', model: 'claude-haiku-5-5', cost: 0.0472),
+    ],
   );
 
   @override
@@ -880,10 +884,14 @@ class _ShotCosts extends FakeApiClient {
     auditLiveBackendCost: 0.0051,
     auditLiveCostPerSession: 0.213,
     auditTurnsCostPerSession: 0.067,
+    auditAllLive: 3.18,
+    auditAllTurns: 1.02,
+    turnsPerMinute: 0.017,
+    turnsRateMeasured: true,
     sessions: [
-      DevVoiceSession(id: 18, kind: 'audit', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 12, 4), minutes: 4.6, turns: 6, audioIn: 0, audioOut: 0, cost: 0.233, backendCost: 0.0028),
-      DevVoiceSession(id: 17, kind: 'audit', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 12, 3), minutes: 3.8, turns: 5, audioIn: 0, audioOut: 0, cost: 0.192, backendCost: 0.0023),
-      DevVoiceSession(id: 16, kind: 'transcribe', model: 'gpt-live-transcribe', startedAt: DateTime.utc(2026, 10, 11, 21), minutes: 1.6, turns: 5, audioIn: 0, audioOut: 0, cost: 0.027),
+      DevVoiceSession(id: 18, kind: 'audit', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 12, 4), minutes: 4.6, turns: 6, audioIn: 0, audioOut: 0, cost: 0.233, backendCost: 0.0028, otherCost: 0.078),
+      DevVoiceSession(id: 17, kind: 'audit', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 12, 3), minutes: 3.8, turns: 5, audioIn: 0, audioOut: 0, cost: 0.192, backendCost: 0.0023, otherCost: 0.065),
+      DevVoiceSession(id: 16, kind: 'transcribe', model: 'gpt-live-transcribe', startedAt: DateTime.utc(2026, 10, 11, 21), minutes: 1.6, turns: 5, audioIn: 0, audioOut: 0, cost: 0.027, otherCost: 0.082),
       DevVoiceSession(id: 7, kind: 'guide', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 9, 15), minutes: 1.1, turns: 2, audioIn: 0, audioOut: 0, cost: 0.053, backendCost: 0.0009, otherCost: 0.086),
     ],
   );

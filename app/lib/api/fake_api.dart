@@ -171,6 +171,8 @@ class FakeApiClient implements SelfInfinityApi {
     'reportVoiceUsage',
     'getLlm',
     'setLlm',
+    'getVoice',
+    'setVoice',
     'getDevLlm',
     'getDevVoice',
   };
@@ -2009,6 +2011,30 @@ class FakeApiClient implements SelfInfinityApi {
     _require(provider == 'openai' || provider == 'claude', 'provider must be openai or claude');
     _llmProvider = provider;
     return _llmStatus;
+  }
+
+  // Offline there is no speech server; the choice is only kept.
+  String _voiceChoice = 'live';
+
+  VoiceStatus get _voiceStatus => VoiceStatus(
+    available: false,
+    guide: _voiceChoice == 'realtime' ? 'realtime' : 'live',
+    audit: _voiceChoice == 'realtime' ? 'turns' : 'live',
+    choice: _voiceChoice,
+  );
+
+  @override
+  Future<VoiceStatus> getVoice() async {
+    await _begin('getVoice');
+    return _voiceStatus;
+  }
+
+  @override
+  Future<VoiceStatus> setVoice(String choice) async {
+    await _begin('setVoice');
+    _require(choice == 'live' || choice == 'realtime', 'choice must be live or realtime');
+    _voiceChoice = choice;
+    return _voiceStatus;
   }
 
   /// Offline no model is called, so nothing was spent.

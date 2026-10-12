@@ -22,7 +22,18 @@ PRICES = {
     "claude-haiku-5-5": (0.10, 0.01, 0.50),
     "claude-sonnet-5-5": (2.0, 0.10, 10.0),
     "claude-opus-5-5": (4.0, 0.20, 20.0),
+    # Text to speech (app/services/voice.py): text in, audio out. The audio tokens are
+    # estimated from the length of the audio, see SPEECH_TOKENS_PER_SECOND there.
+    "gpt-4o-mini-tts": (0.60, 0.60, 12.0),
 }
+# The agent name speech is logged under, and the models that are not text models: left out
+# where calls are priced on another model.
+SPEECH_AGENT = "speech"
+SPEECH_MODELS = frozenset({"gpt-4o-mini-tts"})
+
+
+def provider_of(model: str) -> str:
+    return "claude" if model.startswith("claude") else "openai"
 
 
 def tokens_cost(prices: tuple[float, float, float], input_tokens: int, cached_tokens: int, output_tokens: int) -> float:
@@ -128,6 +139,27 @@ def _audit_rows(calls: list[LLMCall]) -> list[dict]:
     return _by_cost(rows, "avg_cost")
 
 
+def all_on(calls: list[LLMCall]) -> list[dict]:
+    """What the text calls would have cost had every one of them run on one model, for each
+    text model with a price, cheapest first. Same tokens, that model's price; a call's cached
+    tokens count as cached only on its own provider (another one's cache would not have had
+    them, and the Claude provider here does not cache). Speech is left out."""
+    text = [c for c in calls if c.ok and c.agent != SPEECH_AGENT]
+    if not text:
+        return []
+    rows = []
+    for model, prices in PRICES.items():
+        if model in SPEECH_MODELS:
+            continue
+        provider = provider_of(model)
+        cost = sum(
+            tokens_cost(prices, c.input_tokens, c.cached_tokens if c.provider == provider else 0, c.output_tokens)
+            for c in text
+        )
+        rows.append({"provider": provider, "model": model, "cost": round(cost, 6)})
+    return sorted(rows, key=lambda r: r["cost"])
+
+
 def overview(session: Session) -> dict:
     calls = list(session.exec(select(LLMCall).order_by(col(LLMCall.created_at), col(LLMCall.id))).all())
     by_model: dict[tuple[str, str], list[LLMCall]] = defaultdict(list)
@@ -149,4 +181,5 @@ def overview(session: Session) -> dict:
         "providers": _by_cost([_provider_row(*key, rows) for key, rows in by_model.items()]),
         "agents": _by_cost([_agent_row(*key, rows) for key, rows in by_agent.items()]),
         "audits": _audit_rows(calls),
+        "all_on": all_on(calls),
     }

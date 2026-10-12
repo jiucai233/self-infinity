@@ -281,6 +281,31 @@ void main() {
       expect(find.byKey(const Key('settings-tutorial')), findsOneWidget); // still open
     });
 
+    testWidgets('Live | Realtime: the voice; a tap saves it, the menu stays', (tester) async {
+      final voiceApi = _VoiceOn();
+      await pumpScene(tester, const MapScene(), api: voiceApi);
+      await tester.tap(find.byKey(const Key('settings-button')));
+      await tester.pumpAndSettle();
+      SegmentedButton<String> voice() => tester.widget(find.byKey(const Key('settings-voice')));
+      expect(find.text('Live'), findsOneWidget);
+      expect(find.text('Realtime'), findsOneWidget);
+      expect(voice().selected, {'live'});
+
+      await tester.tap(find.byKey(const Key('settings-voice-realtime')));
+      await tester.pumpAndSettle();
+      expect((await voiceApi.getVoice()).choice, 'realtime');
+      expect(voice().selected, {'realtime'});
+      expect(find.byKey(const Key('settings-tutorial')), findsOneWidget); // still open
+    });
+
+    testWidgets('without speech on the server both voices are off', (tester) async {
+      await pumpScene(tester, const MapScene(), api: api);
+      await tester.tap(find.byKey(const Key('settings-button')));
+      await tester.pumpAndSettle();
+      final voice = tester.widget<SegmentedButton<String>>(find.byKey(const Key('settings-voice')));
+      expect([for (final s in voice.segments) (s.value, s.enabled)], [('live', false), ('realtime', false)]);
+    });
+
     testWidgets('a provider the server has no key for cannot be chosen', (tester) async {
       await pumpScene(tester, const MapScene(), api: _OpenAiOnly());
       await tester.tap(find.byKey(const Key('settings-button')));
@@ -517,4 +542,18 @@ class _OpenAiOnly extends FakeApiClient {
       LlmChoice(id: 'claude', model: 'claude-haiku-5-5', available: false),
     ],
   );
+}
+
+/// A server with speech.
+class _VoiceOn extends FakeApiClient {
+  _VoiceOn() : super(latency: Duration.zero);
+
+  @override
+  Future<VoiceStatus> getVoice() async => _on(await super.getVoice());
+
+  @override
+  Future<VoiceStatus> setVoice(String choice) async => _on(await super.setVoice(choice));
+
+  VoiceStatus _on(VoiceStatus v) =>
+      VoiceStatus(available: true, guide: v.guide, audit: v.audit, choice: v.choice);
 }

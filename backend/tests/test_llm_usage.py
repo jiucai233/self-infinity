@@ -329,7 +329,36 @@ def test_an_empty_log(client):
         "providers": [],
         "agents": [],
         "audits": [],
+        "all_on": [],
     }
+
+
+def test_every_text_call_is_priced_on_each_model(client, client_engine):
+    with Session(client_engine) as session:
+        # Two calls on OpenAI (one with a cache hit), one on Claude, a failed one, and speech.
+        session.add(LLMCall(agent="auditor", provider="openai", model="gpt-6-luna", input_tokens=10_000, cached_tokens=8_000, output_tokens=1_000))
+        session.add(LLMCall(agent="planner", provider="openai", model="gpt-6-luna", input_tokens=4_000, output_tokens=2_000))
+        session.add(LLMCall(agent="auditor", provider="claude", model="claude-haiku-5-5", input_tokens=6_000, output_tokens=500))
+        session.add(LLMCall(agent="auditor", provider="openai", model="gpt-6-luna", ok=False))
+        session.add(LLMCall(agent="speech", provider="openai", model="gpt-4o-mini-tts", input_tokens=50, output_tokens=300))
+        session.commit()
+
+    data = client.get("/api/dev/llm").json()
+
+    rows = {r["model"]: r for r in data["all_on"]}
+    assert set(rows) == {"gpt-6-luna", "gpt-6-sol", "claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"}
+    assert (rows["gpt-6-luna"]["provider"], rows["claude-opus-5-5"]["provider"]) == ("openai", "claude")
+    out = 3_500
+    # On an OpenAI model the OpenAI call's cached tokens stay cached; Claude's call had none.
+    luna = (12_000 * 0.10 + 8_000 * 0.01 + out * 0.50) / 1e6
+    assert rows["gpt-6-luna"]["cost"] == pytest.approx(luna, abs=1e-6)
+    assert rows["gpt-6-sol"]["cost"] == pytest.approx((12_000 * 1.25 + 8_000 * 0.125 + out * 10.0) / 1e6, abs=1e-6)
+    # On Claude nothing would have come from OpenAI's cache: every input token at full price.
+    assert rows["claude-haiku-5-5"]["cost"] == pytest.approx((20_000 * 0.10 + out * 0.50) / 1e6, abs=1e-6)
+    assert [r["cost"] for r in data["all_on"]] == sorted(r["cost"] for r in data["all_on"])  # cheapest first
+    # Speech is a call with a price of its own, and is not priced on a text model.
+    speech = next(r for r in data["agents"] if r["agent"] == "speech")
+    assert speech["cost"] == pytest.approx((50 * 0.60 + 300 * 12.0) / 1e6, abs=1e-6)
 
 
 def test_only_developers_see_the_costs(accounts, monkeypatch):
@@ -338,3 +367,35 @@ def test_only_developers_see_the_costs(accounts, monkeypatch):
     bob = accounts.get("/api/dev/llm", headers=auth(BOB, email="bob@example.com"))
     assert (bob.status_code, bob.json()) == (403, {"detail": "developers only"})
     assert accounts.get("/api/dev/llm").status_code == 401
+
+
+# ---------------------------------------------------------------- speech
+
+
+def test_streamed_speech_is_logged_by_the_length_of_its_audio(api, client_engine, monkeypatch):
+    from app.services import voice
+
+    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    pcm = bytes(voice.PCM_RATE * 2 * 3)  # three seconds of 16-bit mono
+    monkeypatch.setattr(voice, "_client", httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=pcm))))
+
+    assert api.post("/api/voice/speech/stream", json={"text": "Right. What happens without the softmax?"}).content == pcm
+
+    (row,) = calls(client_engine)
+    assert (row.agent, row.provider, row.model, row.ok) == ("speech", "openai", "gpt-4o-mini-tts", True)
+    assert row.output_tokens == 3 * voice.SPEECH_TOKENS_PER_SECOND
+    assert row.input_tokens == 12  # 40 bytes of text
+    assert llm_usage.call_cost(row) == pytest.approx((12 * 0.60 + 60 * 12.0) / 1e6)
+
+
+def test_speech_as_a_file_is_logged_too(api, client_engine, monkeypatch):
+    from app.services import voice
+
+    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    mp3 = bytes([0xFF, 0xF3, 0x84, 0xC4]) + bytes(16_000 - 4)  # two seconds at 64 kbit/s
+    monkeypatch.setattr(voice, "_client", httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=mp3))))
+
+    assert api.post("/api/voice/speech", json={"text": "Go on."}).status_code == 200
+
+    (row,) = calls(client_engine)
+    assert (row.agent, row.output_tokens) == ("speech", 40)

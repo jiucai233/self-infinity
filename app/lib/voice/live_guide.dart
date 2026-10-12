@@ -112,12 +112,11 @@ class LiveGuideMode extends VoiceMode {
     if (io.supported) io.unlock(); // still inside the tap
     final endpoint = api.liveEndpoint(guidePath);
     if (!io.supported || endpoint == null) return _startFallback();
-    if (_voice == null) {
-      try {
-        _voice = await api.guideVoice();
-      } on ApiException {
-        _voice = null;
-      }
+    // Asked every time: the account can change its voice in the settings between two talks.
+    try {
+      _voice = await api.guideVoice();
+    } on ApiException {
+      _voice = null;
     }
     if (_voice != 'live') return _startFallback();
     final connection = ++_connection;

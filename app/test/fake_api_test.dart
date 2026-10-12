@@ -1021,7 +1021,7 @@ void main() {
       for (final name in FakeApiClient.methodNames) {
         api.failNext(method: name); // asserts on unknown names
       }
-      expect(FakeApiClient.methodNames, hasLength(57));
+      expect(FakeApiClient.methodNames, hasLength(59));
       expect(() => api.failNext(method: 'nope'), throwsA(isA<AssertionError>()));
     });
   });

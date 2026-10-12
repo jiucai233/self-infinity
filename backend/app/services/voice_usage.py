@@ -12,10 +12,16 @@ on the other, the comparison the panel is for:
   GPT-Live it would have cost its minutes at the voice rate; the backend is left out (a few
   hundredths of a cent per tool call).
 
-An audit's voice is one of two as well: GPT-Live (`audit`, every second the session is open, plus
-its other call, the Auditor: the text calls logged while the session was open, see
-audit_backend_cost) or live transcription (`transcribe`, by the minute, its replies read aloud
-by text to speech, which is not counted here).
+An audit's voice is one of two as well, and each session shows the other one too:
+- GPT-Live (`audit`): every second the session is open.
+- Taking turns (`transcribe`): live transcription by the seconds its transcriptions report
+  (the open time of a session that reported none: an upper bound), plus the speech that
+  reads the replies aloud (logged as calls of the agent "speech", app/services/voice.py).
+Both also count their other calls, the same on either voice: the text calls logged while the
+session was open (the Auditor, the Challenger). On the other voice a session would have cost
+its minutes at that voice's rate plus those same calls; the turn-taking rate is this account's
+own (transcription and speech a minute of open session, DEFAULT_TURNS_PER_MINUTE until it has
+a minute with speech logged).
 """
 
 from sqlmodel import Session, col, select
@@ -39,6 +45,11 @@ GPT_LIVE_PER_MINUTE = 0.05
 # Until an account has a minute on Realtime: one 117.7 s Guide session on gpt-realtime-2.1
 # (2026-10-08) cost $0.1415 with its transcription, $0.072 a minute.
 DEFAULT_REALTIME_PER_MINUTE = 0.072
+
+# Until an account has a minute of turn-taking audits with their speech logged: production's
+# 13 sessions of 2026-10 had 69% of their open time transcribed ($0.0117 a minute), and
+# replies of about a fifth of it read aloud ($0.0029 at 20 audio tokens a second).
+DEFAULT_TURNS_PER_MINUTE = 0.015
 
 KINDS = ("guide", "transcribe", "audit")
 AUDIT_KINDS = ("transcribe", "audit")
@@ -78,11 +89,45 @@ def live_cost(s: VoiceSession) -> float:
     return live_voice_cost(s) + backend_cost(s)
 
 
-def audit_backend_cost(s: VoiceSession, calls: list[LLMCall]) -> float | None:
-    """A Live audit's other call: the account's text calls (the Auditor, the Challenger) logged
-    from the session's start to its last report. None when none of them has a price.
+def calls_in(s: VoiceSession, calls: list[LLMCall]) -> list[LLMCall]:
+    """The account's logged calls from the session's start to its last report.
     `started_at` is the browser's clock, the rest the server's."""
-    return llm_usage.calls_cost(c for c in calls if s.started_at <= c.created_at <= s.updated_at)
+    return [c for c in calls if s.started_at <= c.created_at <= s.updated_at]
+
+
+def audit_backend_cost(s: VoiceSession, calls: list[LLMCall]) -> float | None:
+    """An audit session's other call, the same on either voice: the text calls (the Auditor,
+    the Challenger) logged while it was open. None when none of them has a price."""
+    return llm_usage.calls_cost(c for c in calls_in(s, calls) if c.agent != llm_usage.SPEECH_AGENT)
+
+
+def speech_cost(s: VoiceSession, calls: list[LLMCall]) -> float | None:
+    """The replies read aloud while a turn-taking session was open; None when none was logged."""
+    return llm_usage.calls_cost(c for c in calls_in(s, calls) if c.agent == llm_usage.SPEECH_AGENT)
+
+
+def transcription_cost(s: VoiceSession) -> float:
+    """Live transcription is billed by audio duration: the seconds its transcriptions report.
+    A session that reported none is priced by its open time, the upper bound."""
+    return (s.transcribed_seconds or s.seconds) / 60 * LIVE_TRANSCRIBE_PER_MINUTE
+
+
+def audit_voice_cost(s: VoiceSession, calls: list[LLMCall]) -> float:
+    """An audit session's voice alone: GPT-Live's seconds, or transcription and speech."""
+    if s.kind == "audit":
+        return live_voice_cost(s)
+    return transcription_cost(s) + (speech_cost(s, calls) or 0)
+
+
+def turns_per_minute(turns: list[VoiceSession], calls: list[LLMCall]) -> tuple[float, bool]:
+    """This account's turn-taking voice a minute of open session, and whether it was measured
+    (a minute or more of sessions with their speech logged) rather than
+    DEFAULT_TURNS_PER_MINUTE."""
+    logged = [r for r in turns if speech_cost(r, calls) is not None]
+    minutes = sum(r.seconds for r in logged) / 60
+    if minutes < 1:
+        return DEFAULT_TURNS_PER_MINUTE, False
+    return sum(audit_voice_cost(r, calls) for r in logged) / minutes, True
 
 
 def guide_cost(s: VoiceSession) -> float:
@@ -99,23 +144,23 @@ def realtime_per_minute(rows: list[VoiceSession]) -> tuple[float, bool]:
     return sum(realtime_cost(r) for r in realtime) / minutes, True
 
 
-def other_cost(s: VoiceSession, realtime_rate: float) -> float | None:
-    """What a Guide session would have cost on the other voice; None for audits."""
-    if s.kind != "guide":
-        return None
+def other_cost(
+    s: VoiceSession, realtime_rate: float, turns_rate: float = DEFAULT_TURNS_PER_MINUTE, backend: float | None = None
+) -> float:
+    """What the session would have cost on the other voice. A Guide session: its minutes at the
+    other voice's rate. An audit session: the same, plus [backend], its own text calls."""
     minutes = s.seconds / 60
-    return minutes * realtime_rate if is_live(s) else minutes * GPT_LIVE_PER_MINUTE
+    if s.kind == "guide":
+        return minutes * realtime_rate if is_live(s) else minutes * GPT_LIVE_PER_MINUTE
+    rate = turns_rate if s.kind == "audit" else GPT_LIVE_PER_MINUTE
+    return minutes * rate + (backend or 0)
 
 
-def cost(s: VoiceSession, audit_backend: float | None = None) -> float:
-    """[audit_backend]: a Live audit's audit_backend_cost."""
+def cost(s: VoiceSession, calls: list[LLMCall] | None = None) -> float:
+    """Dollars. An audit session: its voice plus its text calls among [calls]."""
     if s.kind == "guide":
         return guide_cost(s)
-    if s.kind == "audit":
-        return live_voice_cost(s) + (audit_backend or 0)
-    # Live transcription is billed by audio duration. The browser keeps the session open (muted)
-    # between turns; whether that counts is not documented, so this is the upper bound.
-    return s.seconds / 60 * LIVE_TRANSCRIBE_PER_MINUTE
+    return audit_voice_cost(s, calls or []) + (audit_backend_cost(s, calls or []) or 0)
 
 
 def cached_share(s: VoiceSession) -> float | None:
@@ -142,12 +187,16 @@ def _round(value: float | None, digits: int = 4) -> float | None:
 
 
 def session_out(
-    s: VoiceSession, realtime_rate: float = DEFAULT_REALTIME_PER_MINUTE, audit_backend: float | None = None
+    s: VoiceSession,
+    realtime_rate: float = DEFAULT_REALTIME_PER_MINUTE,
+    turns_rate: float = DEFAULT_TURNS_PER_MINUTE,
+    calls: list[LLMCall] | None = None,
 ) -> dict:
+    calls = calls or []
     if s.kind == "guide":
         backend = backend_cost(s) if is_live(s) else None
     else:
-        backend = audit_backend if s.kind == "audit" else None
+        backend = audit_backend_cost(s, calls)
     return {
         "id": s.id,
         "kind": s.kind,
@@ -158,9 +207,9 @@ def session_out(
         "audio_in": s.audio_in,
         "audio_out": s.audio_out,
         "cached_share": _round(cached_share(s), 3),
-        "cost": _round(cost(s, audit_backend)),
+        "cost": _round(cost(s, calls)),
         "backend_cost": _round(backend, 6),
-        "other_cost": _round(other_cost(s, realtime_rate)),
+        "other_cost": _round(other_cost(s, realtime_rate, turns_rate, backend)),
     }
 
 
@@ -179,11 +228,13 @@ def overview(session: Session, limit: int) -> dict:
     inputs = sum(r.text_in + r.audio_in for r in realtime)
     live_audits = [r for r in audits if r.kind == "audit"]
     turns = [r for r in audits if r.kind == "transcribe"]
-    calls = _calls_since(session, min((r.started_at for r in live_audits), default=None))
-    audit_backend = {r.id: audit_backend_cost(r, calls) for r in live_audits}
+    calls = _calls_since(session, min((r.started_at for r in audits), default=None))
+    turns_rate, turns_measured = turns_per_minute(turns, calls)
+    backend = {r.id: audit_backend_cost(r, calls) or 0 for r in audits}
     audit_live_voice = sum(live_voice_cost(r) for r in live_audits)
-    audit_live_backend = sum(c for c in audit_backend.values() if c is not None)
-    audit_cost_total = sum(cost(r, audit_backend.get(r.id)) for r in audits)
+    audit_live_backend = sum(backend[r.id] for r in live_audits)
+    audit_cost_total = sum(cost(r, calls) for r in audits)
+    turns_cost = sum(cost(r, calls) for r in turns)
     totals = {
         "guide_sessions": len(guide),
         "guide_minutes": round(guide_minutes, 2),
@@ -210,14 +261,26 @@ def overview(session: Session, limit: int) -> dict:
         "audit_live_cost_per_session": (
             _round((audit_live_voice + audit_live_backend) / len(live_audits)) if live_audits else None
         ),
-        "audit_turns_cost_per_session": _round(sum(cost(r) for r in turns) / len(turns)) if turns else None,
+        "audit_turns_cost_per_session": _round(turns_cost / len(turns)) if turns else None,
+        # Every audit minute on one voice: what ran there as billed, the rest at that voice's
+        # rate with the session's own text calls.
+        "audit_all_live": round(
+            audit_live_voice + audit_live_backend
+            + sum(other_cost(r, rate, turns_rate, backend[r.id]) for r in turns),
+            4,
+        ),
+        "audit_all_turns": round(
+            turns_cost + sum(other_cost(r, rate, turns_rate, backend[r.id]) for r in live_audits), 4
+        ),
+        "turns_per_minute": round(turns_rate, 4),
+        "turns_rate_measured": turns_measured,
     }
-    sessions = [session_out(r, rate, audit_backend.get(r.id)) for r in rows[:limit]]
+    sessions = [session_out(r, rate, turns_rate, calls) for r in rows[:limit]]
     return {"totals": totals, "sessions": sessions}
 
 
 def _calls_since(session: Session, start) -> list[LLMCall]:
-    """The account's logged text calls from [start] on; none without a start."""
+    """The account's logged calls (text and speech) from [start] on; none without a start."""
     if start is None:
         return []
     return list(session.exec(select(LLMCall).where(col(LLMCall.created_at) >= start)).all())

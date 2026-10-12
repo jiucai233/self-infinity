@@ -5,6 +5,7 @@ recognition and synthesis of the browser or the phone.
 """
 
 import logging
+import math
 import time
 from collections.abc import Iterator
 
@@ -12,6 +13,8 @@ import httpx
 
 from app.config import settings
 from app.i18n import current_language
+from app.llm import usage
+from app.services.llm_usage import SPEECH_AGENT
 
 logger = logging.getLogger(__name__)
 
@@ -150,11 +153,51 @@ def speak(text: str) -> bytes:
         "speak model=%s chars=%d bytes=%d elapsed_ms=%.0f",
         settings.speech_model, len(text), len(response.content), elapsed_ms,
     )
+    _log_speech(text, mp3_seconds(response.content), elapsed_ms)
     return response.content
 
 
 # Streamed speech: raw 16-bit little-endian mono PCM at this rate, played as it arrives.
 PCM_RATE = 24000
+
+# What speech costs is logged like a text call (LLMCall, agent "speech"), so the developer
+# panel can price a turn-taking audit whole. The API bills audio tokens and reports them only
+# on its event stream, which is not what we play; they are estimated from the audio's length at
+# the audio models' rate of one token per 50 ms.
+SPEECH_TOKENS_PER_SECOND = 20
+# MPEG audio layer III bitrates in kbit/s by header index: MPEG-1, then MPEG-2 and 2.5.
+_MP3_KBPS = (
+    (0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320),
+    (0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160),
+)
+
+
+def mp3_seconds(data: bytes) -> float:
+    """How long an MP3 of one bitrate plays, from its first frame header; 0 when unreadable."""
+    start = 0
+    if data[:3] == b"ID3" and len(data) > 10:  # an ID3v2 tag in front: its size is 4 x 7 bits
+        start = 10 + ((data[6] & 0x7F) << 21 | (data[7] & 0x7F) << 14 | (data[8] & 0x7F) << 7 | (data[9] & 0x7F))
+    for i in range(start, min(len(data) - 3, start + 4096)):
+        if data[i] == 0xFF and data[i + 1] & 0xE0 == 0xE0:
+            version = (data[i + 1] >> 3) & 0x3  # 3: MPEG-1; 2 and 0: MPEG-2, 2.5
+            layer = (data[i + 1] >> 1) & 0x3  # 1: layer III
+            index = data[i + 2] >> 4
+            if version == 1 or layer != 1 or index in (0, 15):
+                continue
+            kbps = _MP3_KBPS[0 if version == 3 else 1][index]
+            return (len(data) - i) * 8 / (kbps * 1000)
+    return 0.0
+
+
+def _log_speech(text: str, seconds: float, elapsed_ms: float) -> None:
+    usage.record(
+        provider="openai",
+        model=settings.speech_model,
+        agent=SPEECH_AGENT,
+        input_tokens=math.ceil(len(text.encode()) / 3.5),  # about a token for 4 Latin letters or one CJK character
+        output_tokens=round(seconds * SPEECH_TOKENS_PER_SECOND),
+        elapsed_ms=elapsed_ms,
+    )
 
 
 def speak_stream(text: str) -> Iterator[bytes]:
@@ -194,15 +237,19 @@ def speak_stream(text: str) -> Iterator[bytes]:
 
     def chunks() -> Iterator[bytes]:
         first = True
+        sent = 0
         try:
             for chunk in response.iter_bytes():
                 if first:
                     logger.info("speak_stream first audio after %.0fms", (time.perf_counter() - start) * 1000)
                     first = False
+                sent += len(chunk)
                 yield chunk
         except httpx.HTTPError:
             logger.warning("speak_stream broke off", exc_info=True)
         finally:
             response.close()
+            # Also when the listener cut her short: what was made until then.
+            _log_speech(text, sent / (PCM_RATE * 2), (time.perf_counter() - start) * 1000)
 
     return chunks()

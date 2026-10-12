@@ -2436,6 +2436,10 @@ class DevVoice {
     this.auditLiveBackendCost = 0,
     this.auditLiveCostPerSession,
     this.auditTurnsCostPerSession,
+    this.auditAllLive,
+    this.auditAllTurns,
+    this.turnsPerMinute,
+    this.turnsRateMeasured = false,
     required this.sessions,
   });
 
@@ -2463,6 +2467,10 @@ class DevVoice {
       auditLiveBackendCost: _doubleN(t, 'audit_live_backend_cost') ?? 0,
       auditLiveCostPerSession: _doubleN(t, 'audit_live_cost_per_session'),
       auditTurnsCostPerSession: _doubleN(t, 'audit_turns_cost_per_session'),
+      auditAllLive: _doubleN(t, 'audit_all_live'),
+      auditAllTurns: _doubleN(t, 'audit_all_turns'),
+      turnsPerMinute: _doubleN(t, 'turns_per_minute'),
+      turnsRateMeasured: t['turns_rate_measured'] == true,
       sessions: [
         for (final s in (json['sessions'] as List? ?? const []))
           DevVoiceSession.fromJson(_asJson(s, 'sessions')),
@@ -2505,7 +2513,46 @@ class DevVoice {
   /// Dollars per audit session on each voice; null without sessions.
   final double? auditLiveCostPerSession;
   final double? auditTurnsCostPerSession;
+
+  /// Every audit minute on one voice: what ran there as billed, the rest
+  /// estimated. Null on a server from before.
+  final double? auditAllLive;
+  final double? auditAllTurns;
+
+  /// The turn-taking rate the estimates use; measured on this account once it
+  /// has an audit taking turns. Null on a server from before.
+  final double? turnsPerMinute;
+  final bool turnsRateMeasured;
   final List<DevVoiceSession> sessions;
+}
+
+/// `GET /voice`, `PUT /voice`: the voice this account uses.
+@immutable
+class VoiceStatus {
+  const VoiceStatus({required this.available, required this.guide, required this.audit, this.choice});
+
+  factory VoiceStatus.fromJson(Json json) {
+    final c = json['choice'];
+    return VoiceStatus(
+      available: json['available'] == true,
+      guide: _strN(json, 'guide') ?? 'live',
+      audit: _strN(json, 'audit') ?? 'live',
+      choice: c == 'live' || c == 'realtime' ? c as String : null,
+    );
+  }
+
+  /// The server has speech at all.
+  final bool available;
+
+  /// `live` or `realtime`: what the home Guide opens.
+  final String guide;
+
+  /// `live` or `turns`: what the audits run on.
+  final String audit;
+
+  /// `live` (GPT-Live for both) or `realtime` (Realtime Guide, audits taking
+  /// turns); null when the server's defaults are a mix, or it is older.
+  final String? choice;
 }
 
 /// One provider an account's agents can run on (`GET /llm`).
@@ -2621,6 +2668,7 @@ class DevLlm {
     this.providers = const [],
     this.agents = const [],
     this.audits = const [],
+    this.allOn = const [],
   });
 
   factory DevLlm.fromJson(Json json) {
@@ -2637,6 +2685,7 @@ class DevLlm {
       providers: rows('providers'),
       agents: rows('agents'),
       audits: rows('audits'),
+      allOn: rows('all_on'),
     );
   }
 
@@ -2650,5 +2699,9 @@ class DevLlm {
   final List<DevLlmRow> providers;
   final List<DevLlmRow> agents;
   final List<DevLlmRow> audits;
+
+  /// Every text call priced on one model, a row per model (cost set). Empty
+  /// on a server from before.
+  final List<DevLlmRow> allOn;
 }
 

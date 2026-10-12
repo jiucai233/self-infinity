@@ -1018,7 +1018,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get devVoiceHint =>
-      '정가 기준입니다. GPT-Live 세션은 열려 있는 초 단위로 과금되고, 또 하나의 호출이 더해집니다: 가이드는 텍스트 백엔드, 감사는 세션 동안의 Auditor 호출입니다. Realtime 가이드는 토큰으로 과금되며(침묵은 무료) 받아쓰기가 더해집니다. 각 가이드 세션 옆에 다른 음성이었을 때의 비용을 표시합니다: Realtime은 이 계정에서 측정한 분당 비용, GPT-Live는 분당 \$0.05. 차례대로 진행한 감사는 연결 시간 전체의 받아쓰기로 계산한 상한이며, 답을 읽어 주는 음성 합성은 포함하지 않습니다.';
+      '정가 기준입니다. GPT-Live 세션은 열려 있는 초 단위로 과금됩니다. 차례대로 진행하는 감사는 받아쓰기가 보고한 초 단위로 과금되고, 답을 읽어 주는 음성 합성(오디오 길이로 추정)이 더해집니다. 감사 세션마다 또 하나의 호출, 즉 세션 동안의 Auditor 호출도 포함합니다. Realtime 가이드는 토큰으로 과금되며(침묵은 무료) 받아쓰기가 더해집니다. 각 세션 옆에 다른 음성이었을 때의 비용을 표시합니다.';
 
   @override
   String get devVoiceGuide => '홈 가이드';
@@ -1587,4 +1587,22 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get devVoiceOtherCall => '또 하나의 호출';
+
+  @override
+  String get voiceModel => '음성';
+
+  @override
+  String get devVoiceAllTurns => '전부 차례대로 ≈';
+
+  @override
+  String get devVoiceTurnsRate => '차례대로 분당 (측정)';
+
+  @override
+  String get devVoiceTurnsRateDefault => '차례대로 분당 (추정)';
+
+  @override
+  String get devVoiceOnTurns => '차례대로 ≈';
+
+  @override
+  String get devLlmAllOn => '모든 호출을 한 모델로 했다면';
 }

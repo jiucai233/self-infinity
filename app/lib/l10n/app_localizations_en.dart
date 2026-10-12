@@ -1022,7 +1022,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devVoiceHint =>
-      'At list price. A GPT-Live session bills every second it is open, plus its other call: the Guide\'s text backend, or for an audit the Auditor\'s calls while the session was open. The Guide on Realtime bills tokens (silence is free) plus transcription. Each Guide session also shows the other voice: Realtime at this account\'s own cost per minute, GPT-Live at \$0.05 a minute. An audit taking turns counts its transcription for the whole open session, an upper bound, without the speech that reads the replies.';
+      'At list price. A GPT-Live session bills every second it is open. An audit taking turns bills the seconds its transcriptions report, plus the speech that reads the replies (estimated from the length of the audio). Every audit session also counts its other calls: the Auditor\'s while it was open. The Guide on Realtime bills tokens (silence is free) plus transcription. Each session also shows what it would have cost on the other voice.';
 
   @override
   String get devVoiceGuide => 'Home Guide';
@@ -1604,4 +1604,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devVoiceOtherCall => 'other call';
+
+  @override
+  String get voiceModel => 'Voice';
+
+  @override
+  String get devVoiceAllTurns => 'All taking turns ≈';
+
+  @override
+  String get devVoiceTurnsRate => 'Turns per minute (measured)';
+
+  @override
+  String get devVoiceTurnsRateDefault => 'Turns per minute (estimate)';
+
+  @override
+  String get devVoiceOnTurns => 'Taking turns ≈';
+
+  @override
+  String get devLlmAllOn => 'If every call ran on one model';
 }

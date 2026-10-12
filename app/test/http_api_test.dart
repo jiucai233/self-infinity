@@ -519,6 +519,39 @@ void main() {
       expect(h.lastBody, {'provider': 'claude'});
     });
 
+    test('GET /voice: the voice in use; a server from before has no choice', () async {
+      final h = ok({'available': true, 'guide': 'realtime', 'audit': 'turns', 'choice': 'realtime'});
+      final v = await h.api.getVoice();
+      expect((h.last.method, h.last.url.path), ('GET', '/api/voice'));
+      expect((v.available, v.guide, v.audit, v.choice), (true, 'realtime', 'turns', 'realtime'));
+      final old = await ok({'available': true, 'guide': 'live', 'audit': 'live'}).api.getVoice();
+      expect(old.choice, isNull);
+      expect((await ok({'available': true, 'choice': 'x'}).api.getVoice()).choice, isNull);
+    });
+
+    test('PUT /voice sends the choice', () async {
+      final h = ok({'available': true, 'guide': 'realtime', 'audit': 'turns', 'choice': 'realtime'});
+      expect((await h.api.setVoice('realtime')).choice, 'realtime');
+      expect((h.last.method, h.last.url.path), ('PUT', '/api/voice'));
+      expect(h.lastBody, {'choice': 'realtime'});
+    });
+
+    test('GET /dev/llm: every call priced on one model', () async {
+      final h = ok({
+        'totals': {'calls': 1},
+        'all_on': [
+          {'provider': 'openai', 'model': 'gpt-6-luna', 'cost': 0.0123},
+          {'provider': 'claude', 'model': 'claude-haiku-5-5', 'cost': 0.02},
+        ],
+      });
+      final llm = await h.api.getDevLlm();
+      expect([for (final r in llm.allOn) (r.provider, r.model, r.cost)], [
+        ('openai', 'gpt-6-luna', 0.0123),
+        ('claude', 'claude-haiku-5-5', 0.02),
+      ]);
+      expect((await ok({'totals': {'calls': 1}}).api.getDevLlm()).allOn, isEmpty);
+    });
+
     test('GET /dev/llm: totals, by model, by agent, per audit', () async {
       final h = ok({
         'totals': {'calls': 12, 'failed': 1, 'cost': 0.0042, 'avg_cost': 0.00038, 'unpriced_calls': 2},
@@ -559,6 +592,7 @@ void main() {
       };
       final before = await ok({'totals': totals, 'sessions': <Object>[]}).api.getDevVoice();
       expect((before.auditLiveSessions, before.guideLiveBackendCost, before.auditLiveCostPerSession), (0, 0, null));
+      expect((before.auditAllLive, before.auditAllTurns, before.turnsPerMinute, before.turnsRateMeasured), (null, null, null, false));
       final now = await ok({
         'totals': {
           ...totals,
@@ -566,6 +600,7 @@ void main() {
           'audit_live_sessions': 1, 'audit_live_minutes': 4.0, 'audit_live_voice_cost': 0.2,
           'audit_live_backend_cost': 0.003, 'audit_live_cost_per_session': 0.203,
           'audit_turns_cost_per_session': 0.085,
+          'audit_all_live': 0.61, 'audit_all_turns': 0.21, 'turns_per_minute': 0.015, 'turns_rate_measured': true,
         },
         'sessions': [
           {
@@ -578,6 +613,7 @@ void main() {
       expect((now.guideLiveVoiceCost, now.guideLiveBackendCost, now.guideCostPerSession), (0.1, 0.002, 0.102));
       expect((now.auditLiveSessions, now.auditLiveVoiceCost, now.auditLiveBackendCost), (1, 0.2, 0.003));
       expect((now.auditLiveCostPerSession, now.auditTurnsCostPerSession), (0.203, 0.085));
+      expect((now.auditAllLive, now.auditAllTurns, now.turnsPerMinute, now.turnsRateMeasured), (0.61, 0.21, 0.015, true));
       expect((now.sessions.single.kind, now.sessions.single.backendCost), ('audit', 0.003));
     });
   });

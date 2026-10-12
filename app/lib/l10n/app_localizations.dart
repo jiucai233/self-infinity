@@ -2005,7 +2005,7 @@ abstract class AppLocalizations {
   /// No description provided for @devVoiceHint.
   ///
   /// In en, this message translates to:
-  /// **'At list price. A GPT-Live session bills every second it is open, plus its other call: the Guide\'s text backend, or for an audit the Auditor\'s calls while the session was open. The Guide on Realtime bills tokens (silence is free) plus transcription. Each Guide session also shows the other voice: Realtime at this account\'s own cost per minute, GPT-Live at \$0.05 a minute. An audit taking turns counts its transcription for the whole open session, an upper bound, without the speech that reads the replies.'**
+  /// **'At list price. A GPT-Live session bills every second it is open. An audit taking turns bills the seconds its transcriptions report, plus the speech that reads the replies (estimated from the length of the audio). Every audit session also counts its other calls: the Auditor\'s while it was open. The Guide on Realtime bills tokens (silence is free) plus transcription. Each session also shows what it would have cost on the other voice.'**
   String get devVoiceHint;
 
   /// No description provided for @devVoiceGuide.
@@ -3033,6 +3033,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'other call'**
   String get devVoiceOtherCall;
+
+  /// No description provided for @voiceModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get voiceModel;
+
+  /// No description provided for @devVoiceAllTurns.
+  ///
+  /// In en, this message translates to:
+  /// **'All taking turns ≈'**
+  String get devVoiceAllTurns;
+
+  /// No description provided for @devVoiceTurnsRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Turns per minute (measured)'**
+  String get devVoiceTurnsRate;
+
+  /// No description provided for @devVoiceTurnsRateDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Turns per minute (estimate)'**
+  String get devVoiceTurnsRateDefault;
+
+  /// No description provided for @devVoiceOnTurns.
+  ///
+  /// In en, this message translates to:
+  /// **'Taking turns ≈'**
+  String get devVoiceOnTurns;
+
+  /// No description provided for @devLlmAllOn.
+  ///
+  /// In en, this message translates to:
+  /// **'If every call ran on one model'**
+  String get devLlmAllOn;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

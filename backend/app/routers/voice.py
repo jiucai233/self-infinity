@@ -9,20 +9,45 @@ from sqlmodel import Session
 
 from app.auth import CurrentUser, current_user
 from app.config import settings
-from app.db import get_session
-from app.schemas import SpeechIn, TranscriptOut, VoiceStatusOut, VoiceUsageIn
+from app.db import account_engine, get_session
+from app.models import Profile
+from app.schemas import SpeechIn, TranscriptOut, VoiceChoiceIn, VoiceStatusOut, VoiceUsageIn
 from app.services import realtime, voice, voice_usage
 
-router = APIRouter(prefix="/api/voice", tags=["voice"], dependencies=[Depends(current_user)])
+# account_engine: speech is logged in the caller's account (app/llm/usage.py).
+router = APIRouter(prefix="/api/voice", tags=["voice"], dependencies=[Depends(account_engine)])
+
+PROFILE_ID = 1  # the single Profile row
+
+
+def _status(row: Profile | None) -> VoiceStatusOut:
+    """What this account opens first: its own choice, else the server's (GUIDE_VOICE,
+    AUDIT_VOICE)."""
+    chosen = row.voice if row is not None and row.voice in ("live", "realtime") else None
+    if chosen is not None:
+        guide, audit = ("live", "live") if chosen == "live" else ("realtime", "turns")
+    else:
+        guide = "realtime" if settings.guide_voice == "realtime" else "live"
+        audit = "turns" if settings.audit_voice == "turns" else "live"
+        # The server's two say the same thing: that is the choice shown.
+        chosen = {("live", "live"): "live", ("realtime", "turns"): "realtime"}.get((guide, audit))
+    return VoiceStatusOut(available=voice.available(), guide=guide, audit=audit, choice=chosen)
 
 
 @router.get("", response_model=VoiceStatusOut)
-def voice_status():
-    return VoiceStatusOut(
-        available=voice.available(),
-        guide="realtime" if settings.guide_voice == "realtime" else "live",
-        audit="turns" if settings.audit_voice == "turns" else "live",
-    )
+def voice_status(session: Session = Depends(get_session)):
+    return _status(session.get(Profile, PROFILE_ID))
+
+
+@router.put("", response_model=VoiceStatusOut)
+def choose_voice(body: VoiceChoiceIn, session: Session = Depends(get_session)):
+    """The account's voice: "live" (GPT-Live for the Guide and the audits) or "realtime" (the
+    Realtime model for the Guide, live transcription and turns for the audits)."""
+    row = session.get(Profile, PROFILE_ID) or Profile(id=PROFILE_ID)
+    row.voice = body.choice
+    session.add(row)
+    session.commit()
+    return _status(row)
 
 
 @router.post("/transcribe", response_model=TranscriptOut)

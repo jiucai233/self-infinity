@@ -33,14 +33,14 @@ def openai_fixture(monkeypatch):
 
 
 def test_without_a_key_voice_is_unavailable(client):
-    assert client.get("/api/voice").json() == {"available": False, "guide": "live", "audit": "live"}
+    assert client.get("/api/voice").json() == {"available": False, "guide": "live", "audit": "live", "choice": "live"}
     assert client.post("/api/voice/transcribe", files={"file": ("a.webm", b"x", "audio/webm")}).status_code == 503
     assert client.post("/api/voice/speech", json={"text": "hi"}).status_code == 503
 
 
 def test_transcribe_sends_the_recording_and_the_languages(client, openai):
     calls = openai(httpx.Response(200, json={"text": " 判别式是 b²−4ac "}))
-    assert client.get("/api/voice").json() == {"available": True, "guide": "live", "audit": "live"}
+    assert client.get("/api/voice").json() == {"available": True, "guide": "live", "audit": "live", "choice": "live"}
 
     response = client.post(
         "/api/voice/transcribe",
@@ -288,6 +288,46 @@ def test_the_live_audit_hands_each_answer_to_the_browser(client, realtime):
 def test_the_live_audit_needs_a_key(client, realtime, monkeypatch):
     monkeypatch.setattr(settings, "openai_api_key", "")
     assert client.post("/api/voice/live/audit", content="v=0").status_code == 503
+
+
+def test_an_account_chooses_live_or_realtime_for_both_voices(client, monkeypatch):
+    def status():
+        body = client.get("/api/voice").json()
+        return body["guide"], body["audit"], body["choice"]
+
+    assert status() == ("live", "live", "live")  # the server's own
+    put = client.put("/api/voice", json={"choice": "realtime"})
+    # The Realtime model for the Guide; turns over live transcription for the audits.
+    assert put.status_code == 200 and put.json()["choice"] == "realtime"
+    assert status() == ("realtime", "turns", "realtime")
+    # The account's choice wins over the server's settings.
+    monkeypatch.setattr(settings, "guide_voice", "live")
+    monkeypatch.setattr(settings, "audit_voice", "live")
+    assert status() == ("realtime", "turns", "realtime")
+    client.put("/api/voice", json={"choice": "live"})
+    assert status() == ("live", "live", "live")
+    for bad in ("turns", "", None):
+        assert client.put("/api/voice", json={"choice": bad}).status_code == 422
+
+
+def test_a_server_whose_two_voices_differ_shows_no_choice(client, monkeypatch):
+    monkeypatch.setattr(settings, "audit_voice", "turns")
+    assert client.get("/api/voice").json() == {"available": False, "guide": "live", "audit": "turns", "choice": None}
+    monkeypatch.setattr(settings, "guide_voice", "realtime")
+    assert client.get("/api/voice").json()["choice"] == "realtime"
+
+
+def test_the_length_of_an_mp3_is_read_from_its_first_frame():
+    # MPEG-2 layer III, 64 kbit/s (index 8): 8000 bytes a second.
+    frame = bytes([0xFF, 0xF3, 0x84, 0xC4])
+    assert voice.mp3_seconds(frame + bytes(16_000 - 4)) == pytest.approx(2.0)
+    # An ID3v2 tag in front (10 bytes of header, 20 of tag) is skipped.
+    tag = b"ID3\x04\x00\x00" + bytes([0, 0, 0, 20]) + bytes(20)
+    assert voice.mp3_seconds(tag + frame + bytes(8_000 - 4)) == pytest.approx(1.0)
+    # MPEG-1 layer III, 128 kbit/s (index 9).
+    assert voice.mp3_seconds(bytes([0xFF, 0xFB, 0x90, 0x00]) + bytes(16_000 - 4)) == pytest.approx(1.0)
+    assert voice.mp3_seconds(b"not audio at all") == 0
+    assert voice.mp3_seconds(b"") == 0
 
 
 def test_the_status_says_which_voice_an_audit_opens(client, monkeypatch):

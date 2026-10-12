@@ -179,7 +179,8 @@ class _DailyQuestsSection extends StatelessWidget {
               child: Text(
                 summary,
                 key: const Key('quests-summary'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: AppColors.textSecondary),
               ),
             ),
           if (steps.isEmpty && summary.isEmpty)
@@ -489,6 +490,15 @@ class _SettingsButtonState extends State<_SettingsButton> {
           ),
           // Not an entry to pick: the switch inside it takes the taps.
           const PopupMenuItem<String>(enabled: false, child: _ModelSwitch()),
+          PopupMenuItem<String>(
+            enabled: false,
+            height: 32,
+            child: Text(
+              context.l10n.voiceModel,
+              style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
+            ),
+          ),
+          const PopupMenuItem<String>(enabled: false, child: _VoiceSwitch()),
           const PopupMenuDivider(),
           PopupMenuItem<String>(
             key: const Key('settings-tutorial'),
@@ -593,6 +603,77 @@ class _ModelSwitchState extends State<_ModelSwitch> {
       selected: {
         if (status != null && choices.any((c) => c.id == status.provider)) status.provider,
       },
+      onSelectionChanged: (s) {
+        if (s.isNotEmpty) unawaited(_choose(s.first));
+      },
+    );
+  }
+}
+
+/// Live | Realtime: the voice this account uses. Live is GPT-Live for the home
+/// Guide and the audits; Realtime is the Realtime model for the Guide, with
+/// the audits taking turns. Off while the server has no speech.
+class _VoiceSwitch extends StatefulWidget {
+  const _VoiceSwitch();
+
+  @override
+  State<_VoiceSwitch> createState() => _VoiceSwitchState();
+}
+
+class _VoiceSwitchState extends State<_VoiceSwitch> {
+  late final SelfInfinityApi _api = context.read<SelfInfinityApi>();
+  VoiceStatus? _status;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final status = await _api.getVoice();
+      if (mounted) setState(() => _status = status);
+    } on Object {
+      // the switch stays off: the server decides
+    }
+  }
+
+  Future<void> _choose(String choice) async {
+    setState(() => _saving = true);
+    try {
+      final status = await _api.setVoice(choice);
+      if (mounted) setState(() => _status = status);
+    } on ApiException catch (e) {
+      if (mounted) showToast(context, e.userMessage);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _status;
+    final enabled = status != null && status.available && !_saving;
+    final choice = status?.choice;
+    return SegmentedButton<String>(
+      key: const Key('settings-voice'),
+      showSelectedIcon: false,
+      emptySelectionAllowed: true,
+      segments: [
+        ButtonSegment(
+          value: 'live',
+          enabled: enabled,
+          label: const Text('Live', key: Key('settings-voice-live')),
+        ),
+        ButtonSegment(
+          value: 'realtime',
+          enabled: enabled,
+          label: const Text('Realtime', key: Key('settings-voice-realtime')),
+        ),
+      ],
+      selected: {?choice},
       onSelectionChanged: (s) {
         if (s.isNotEmpty) unawaited(_choose(s.first));
       },

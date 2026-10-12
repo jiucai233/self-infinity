@@ -484,6 +484,13 @@ class HttpApi implements SelfInfinityApi {
       _send('PUT', '/llm', body: {'provider': provider}, parse: (j) => LlmStatus.fromJson(_object(j)));
 
   @override
+  Future<VoiceStatus> getVoice() => _get('/voice', parse: (j) => VoiceStatus.fromJson(_object(j)));
+
+  @override
+  Future<VoiceStatus> setVoice(String choice) =>
+      _send('PUT', '/voice', body: {'choice': choice}, parse: (j) => VoiceStatus.fromJson(_object(j)));
+
+  @override
   Future<DevLlm> getDevLlm() => _get('/dev/llm', parse: (j) => DevLlm.fromJson(_object(j)));
 
   @override

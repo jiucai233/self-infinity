@@ -318,7 +318,7 @@
   "devRefresh": "刷新",
   "devTabAudits": "审计",
   "devTabVoice": "语音费用",
-  "devVoiceHint": "按官方价格估算。GPT-Live 会话按开着的秒数计费，再加上它的另一份调用：Guide 是后台文本模型，审计是会话期间 Auditor 的调用。Realtime 上的 Guide 按 token 计费（静音不花钱），加上转写。每次 Guide 会话旁边都标出换成另一种语音的花费：Realtime 按本账号实测的每分钟花费估算，GPT-Live 按每分钟 $0.05。轮流模式的审计按整个连接时长算转写，是上限，不含朗读回复的语音合成。",
+  "devVoiceHint": "按官方价格估算。GPT-Live 会话按开着的秒数计费。轮流模式的审计按转写结果报告的秒数计费，加上朗读回复的语音合成（按音频时长估算）。每场审计会话还算上它的另一份调用：会话期间 Auditor 的调用。Realtime 上的 Guide 按 token 计费（静音不花钱），加上转写。每个会话旁边都标出换成另一种语音的花费。",
   "devVoiceGuide": "首页 Guide",
   "devVoiceAudits": "审计",
   "devVoiceSessions": "会话",
@@ -489,5 +489,11 @@
   "devVoiceGuideBackend": "Guide：后台模型",
   "devVoiceAuditVoice": "审计：语音",
   "devVoiceAuditBackend": "审计：Auditor",
-  "devVoiceOtherCall": "另一份调用"
+  "devVoiceOtherCall": "另一份调用",
+  "voiceModel": "语音",
+  "devVoiceAllTurns": "全用轮流模式 ≈",
+  "devVoiceTurnsRate": "轮流模式每分钟（实测）",
+  "devVoiceTurnsRateDefault": "轮流模式每分钟（估计）",
+  "devVoiceOnTurns": "轮流模式 ≈",
+  "devLlmAllOn": "如果全部调用都用同一个模型"
 }

@@ -387,6 +387,10 @@ class Profile(SQLModel, table=True):
     # The provider this account's agents run on: "openai" | "claude"; NULL or "" = the server's
     # (app/llm/__init__.py). Nullable because it was added after the first release.
     llm_provider: str | None = None
+    # The voice this account talks with (PUT /api/voice): "live" (GPT-Live for the Guide and
+    # the audits) or "realtime" (the Realtime model for the Guide, turns for the audits);
+    # NULL = the server's (GUIDE_VOICE, AUDIT_VOICE).
+    voice: str | None = None
 
 
 class JournalEntry(SQLModel, table=True):

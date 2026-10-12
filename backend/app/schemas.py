@@ -899,6 +899,13 @@ class VoiceStatusOut(BaseModel):
     guide: Literal["live", "realtime"] = "live"
     # Which voice an audit opens first: "live" (GPT-Live) or "turns" (live transcription).
     audit: Literal["live", "turns"] = "live"
+    # The account's voice: "live" (GPT-Live for both) or "realtime" (the Realtime model for the
+    # Guide, turns for the audits). None when it has not chosen and the server's two are a mix.
+    choice: Literal["live", "realtime"] | None = None
+
+
+class VoiceChoiceIn(BaseModel):
+    choice: Literal["live", "realtime"]
 
 
 class TranscriptOut(BaseModel):
@@ -971,6 +978,13 @@ class DevVoiceTotalsOut(BaseModel):
     audit_live_backend_cost: float
     audit_live_cost_per_session: float | None
     audit_turns_cost_per_session: float | None
+    # Every audit minute on one voice: what ran there as billed, the rest estimated.
+    audit_all_live: float
+    audit_all_turns: float
+    # The turn-taking voice's rate the estimates use (transcription and speech, a minute of
+    # open session), and whether it was measured on this account.
+    turns_per_minute: float
+    turns_rate_measured: bool
 
 
 class DevVoiceOut(BaseModel):
@@ -1046,6 +1060,14 @@ class DevLLMAuditsOut(BaseModel):
     avg_cost: float | None
 
 
+class DevLLMAllOnOut(BaseModel):
+    """Every text call's tokens at one model's list price."""
+
+    provider: str
+    model: str
+    cost: float
+
+
 class DevLLMOut(BaseModel):
     """GET /api/dev/llm (contract #47)."""
 
@@ -1053,3 +1075,4 @@ class DevLLMOut(BaseModel):
     providers: list[DevLLMProviderOut]
     agents: list[DevLLMAgentOut]
     audits: list[DevLLMAuditsOut]
+    all_on: list[DevLLMAllOnOut] = []

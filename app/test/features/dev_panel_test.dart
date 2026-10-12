@@ -48,6 +48,10 @@ class _WithCosts extends FakeApiClient {
       DevLlmRow(provider: 'openai', model: 'gpt-6-luna', audits: 2, avgCalls: 3, avgCost: 0.0015),
       DevLlmRow(provider: 'claude', model: 'claude-haiku-5-5', audits: 1, avgCalls: 4, avgCost: 0.0018),
     ],
+    allOn: [
+      DevLlmRow(provider: 'openai', model: 'gpt-6-luna', cost: 0.0042),
+      DevLlmRow(provider: 'claude', model: 'claude-haiku-5-5', cost: 0.0042),
+    ],
   );
 
   @override
@@ -70,6 +74,10 @@ class _WithCosts extends FakeApiClient {
     auditLiveBackendCost: 0.003,
     auditLiveCostPerSession: 0.203,
     auditTurnsCostPerSession: 0.085,
+    auditAllLive: 0.61,
+    auditAllTurns: 0.21,
+    turnsPerMinute: 0.015,
+    turnsRateMeasured: true,
     sessions: [
       DevVoiceSession(
         id: 3,
@@ -82,6 +90,7 @@ class _WithCosts extends FakeApiClient {
         audioOut: 0,
         cost: 0.203,
         backendCost: 0.003,
+        otherCost: 0.06,
       ),
       DevVoiceSession(
         id: 2,
@@ -93,6 +102,7 @@ class _WithCosts extends FakeApiClient {
         audioIn: 0,
         audioOut: 0,
         cost: 0.085,
+        otherCost: 0.25,
       ),
     ],
   );
@@ -214,11 +224,16 @@ void main() {
     expect(metric(tester, 'guide-live-backend'), '\$0.0020');
     expect(metric(tester, 'audit-live-voice'), '\$0.200');
     expect(metric(tester, 'audit-live-backend'), '\$0.0030');
+    expect(metric(tester, 'audit-all-live'), '\$0.610');
+    expect(metric(tester, 'audit-all-turns'), '\$0.210');
+    expect(metric(tester, 'turns-rate'), '\$0.015');
     await tester.drag(find.byKey(const Key('dev-voice')), const Offset(0, -400)); // down to the sessions
     await tester.pumpAndSettle();
     expect(find.textContaining('Audit (GPT-Live)'), findsOneWidget);
     expect(find.textContaining('(other call \$0.0030)'), findsOneWidget);
     expect(find.textContaining('Audit (turns)'), findsOneWidget);
+    expect(find.textContaining('Taking turns ≈ \$0.060'), findsOneWidget);
+    expect(find.textContaining('On GPT-Live \$0.250'), findsOneWidget);
   });
 
   testWidgets('the model cost tab: every call, per audit on each model, by model and by agent', (tester) async {
@@ -237,9 +252,14 @@ void main() {
     // One audit on OpenAI next to one on Claude.
     expect(find.textContaining('2 Audits · 3.0 Calls · \$0.0015'), findsOneWidget);
     expect(find.textContaining('1 Audits · 4.0 Calls · \$0.0018'), findsOneWidget);
-    expect(find.text('claude · claude-haiku-5-5'), findsNWidgets(2));
+    expect(find.text('claude · claude-haiku-5-5'), findsNWidgets(3));
     expect(find.textContaining('6 Calls (1 Failed) · 2000 → 300 tok · 2.4 s'), findsOneWidget);
     expect(find.text('auditor · gpt-6-luna'), findsOneWidget);
+    await tester.drag(find.byKey(const Key('dev-llm')), const Offset(0, -600));
+    await tester.pumpAndSettle();
+    expect(find.text('If every call ran on one model'), findsOneWidget);
+    expect(find.byKey(const Key('dev-llm-all-0')), findsOneWidget);
+    expect(find.byKey(const Key('dev-llm-all-1')), findsOneWidget);
   });
 
   testWidgets('the model cost tab offline: nothing was called', (tester) async {

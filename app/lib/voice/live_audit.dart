@@ -139,12 +139,11 @@ class LiveAuditMode extends VoiceMode {
     if (io.supported) io.unlock(); // still inside the tap
     final endpoint = api.liveEndpoint(auditPath);
     if (!io.supported || endpoint == null) return _startFallback();
-    if (_voice == null) {
-      try {
-        _voice = await api.auditVoice();
-      } on ApiException {
-        _voice = null;
-      }
+    // Asked every time: the account can change its voice in the settings between two talks.
+    try {
+      _voice = await api.auditVoice();
+    } on ApiException {
+      _voice = null;
     }
     if (_voice != 'live') return _startFallback();
     final connection = ++_connection;
