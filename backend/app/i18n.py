@@ -13,6 +13,7 @@ background tasks included. Two things follow it:
 Anything else — no header, another language — is English.
 """
 
+import contextlib
 import contextvars
 
 SUPPORTED = ("en", "zh", "ko")
@@ -39,6 +40,52 @@ def set_language(language: str) -> contextvars.Token:
 
 def reset_language(token: contextvars.Token) -> None:
     _language.reset(token)
+
+
+@contextlib.contextmanager
+def use_language(language: str | None):
+    """Runs a block in [language] instead of the request's; None leaves it as it is."""
+    if language is None:
+        yield
+        return
+    token = set_language(language)
+    try:
+        yield
+    finally:
+        reset_language(token)
+
+
+def language_of(text: str) -> str | None:
+    """The supported language [text] is written in, by its script: `ko` with enough Hangul,
+    `zh` with enough Han, `en` when it is Latin only. None when it cannot tell (one word, a
+    number, Japanese, a mix): the caller keeps the language it has.
+
+    A Han or Hangul character counts against a whole Latin word, so Chinese that names its
+    terms in English ("QKV 三个矩阵做 softmax") is still Chinese."""
+    han = hangul = kana = words = 0
+    in_word = False
+    for ch in text:
+        code = ord(ch)
+        latin = ch.isascii() and ch.isalpha()
+        if latin and not in_word:
+            words += 1
+        in_word = latin
+        if 0x4E00 <= code <= 0x9FFF or 0x3400 <= code <= 0x4DBF:
+            han += 1
+        elif 0xAC00 <= code <= 0xD7A3 or 0x1100 <= code <= 0x11FF or 0x3130 <= code <= 0x318F:
+            hangul += 1
+        elif 0x3040 <= code <= 0x30FF:
+            kana += 1
+    units = han + hangul + kana + words
+    if units < 2:
+        return None
+    if hangul / units >= 0.3:
+        return "ko"
+    if kana / units >= 0.1:
+        return None
+    if han / units >= 0.3:
+        return "zh"
+    return "en" if words == units else None
 
 
 _LANGUAGE_NAMES = {"zh": "Simplified Chinese (简体中文)", "ko": "Korean (한국어)"}

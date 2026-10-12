@@ -188,7 +188,10 @@ Fields:
 - points: for a concept leaf, its three to six knowledge points: the named
   mechanisms, components, rules or cases a learner must be able to explain,
   at most 40 characters each, in English, in learning order; together they
-  cover the description. An empty list for every other node
+  cover the description. One thing per point, the one a single question
+  can settle: never two or three joined by "and" or a comma (with more
+  than six, keep the six that matter most). An empty list for every
+  other node
 - expand: true only for a category left to break down later
 - reason: one sentence in English explaining why A must come first
 

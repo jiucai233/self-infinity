@@ -32,7 +32,9 @@ Covers: {description}
 
 - Each point is one mechanism, component, rule or case of this leaf, with
   its real name ("Self-attention", "Positional encoding", "Feed-forward
-  layer" for "Transformer Basics").
+  layer" for "Transformer Basics"). One thing per point, the one a single
+  question can settle: never two or three joined by "and" or a comma
+  (with more than six, keep the six that matter most).
 - Together they cover what "Covers" names, and nothing outside this leaf.
 - No overview, history, summary or "applications" point.
 - At most 40 characters each, in English, in the order one would learn

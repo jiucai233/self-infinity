@@ -15,6 +15,8 @@
   节点离了它就不成立时才算——规格、数字、型号这类做的时候会去查的细节不算，除非 Covers 点了名。
   缺口最多三条。
 - **不逼问。** 用户说不会、顶不住了，就讲清楚、记为没过、往下走。
+- **反问不算回答。** 用户问"你是在问 A 还是 B"，就把同一个问题换个说法再问一遍，不判、不换题。
+- **只按问过的判。** 一个知识点里写了几样东西而只问了其中一样，没问到的不算在用户头上。
 
 第一个问题不由模型生成，来自按节点位置选的模板（app/services/audit_flow.py）。轮数上限由
 代码强制，不告诉模型还剩几轮（它只是安全阀，不是配额）。pacing 只影响提问的长短，不影响
@@ -80,6 +82,11 @@ FEEDBACK: judge first, then teach.
 - If the user says they do not know, or that they have had enough: do not
   push. Explain it briefly, count it as missed and go on, or give the
   verdict if nothing is left to ask.
+- If the user asks what your question means, or says it is unclear, that
+  is not an answer and not "I do not know": do not judge it and do not
+  move on. Feedback then says in one sentence what you are asking about,
+  and the question is the same one in plainer words, on the same point,
+  still without a hint. It does not count as a second question.
 
 QUESTIONING: one question per turn, each one a layer deeper.
 - Ask about a specific situation and for a judgement with its reason,
@@ -96,6 +103,9 @@ QUESTIONING: one question per turn, each one a layer deeper.
 - The situation must be one that can really happen in the mechanism, with
   a definite answer that follows from the node: no trick questions, and
   nothing that needs knowledge outside "Covers".
+- Before you ask, work out the answer yourself from the question exactly
+  as worded. If two readings of it give different answers, or the honest
+  answer is "nothing changes", reword it or ask something else.
 - Close the question by saying what a good answer has to tell apart or
   justify, without giving it away. At most three sentences in all.
 - If the user's explanation touches the situation of a past lesson above,
@@ -162,6 +172,10 @@ POINTS_VERDICT = """- "points" has one entry for each point in Points: ok is tru
   not know it or needed your correction, and null when it never came up.
   For a point that is not ok, "note" says in one sentence what they got
   wrong or could not say; it is kept on the node for next time.
+  Judge a point on what you asked about it and on what they said about
+  it. When a point names several things and you asked about one of them,
+  that one decides it: a part you never asked about is not held against
+  them and stays out of the note.
   pass is true only when every point is ok.
 """
 

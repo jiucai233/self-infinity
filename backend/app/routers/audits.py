@@ -6,6 +6,7 @@ from sqlmodel import Session, col, select
 
 from app.agents.recorder import Recorder
 from app.db import get_session
+from app.i18n import use_language
 from app.llm import get_provider, usage
 from app.models import AuditSession, AuditStatus, Principle, SkillNode, SkillStatus
 from app.routers.principles import principle_out
@@ -96,14 +97,16 @@ def start_audit(
         if skill.unexpanded:
             raise HTTPException(400, "Break this node down first, or challenge it as a whole.")
 
-    # A leaf without knowledge points yet (an older course, a node added by hand) gets them
-    # before its first audit: one LLM call, once per node.
-    if not body.test_out and (body.restart or audit_flow.unfinished_audit(session, skill) is None):
-        points.ensure_points(session, skill, get_provider("point_lister"))
+    # The audit is held in the node's own language when that is not English.
+    with use_language(audit_flow.audit_language(session, skill)):
+        # A leaf without knowledge points yet (an older course, a node added by hand) gets them
+        # before its first audit: one LLM call, once per node.
+        if not body.test_out and (body.restart or audit_flow.unfinished_audit(session, skill) is None):
+            points.ensure_points(session, skill, get_provider("point_lister"))
 
-    audit, question, resumed = audit_flow.start_audit(
-        session, skill, body.mode, test_out=body.test_out, restart=body.restart
-    )
+        audit, question, resumed = audit_flow.start_audit(
+            session, skill, body.mode, test_out=body.test_out, restart=body.restart
+        )
     return StartAuditResponse(session=_session_out(session, audit), opening_question=question, resumed=resumed)
 
 
@@ -121,14 +124,16 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
     skill = session.get(SkillNode, audit.skill_id)
 
     try:
-        outcome = audit_flow.submit_turn(
-            session,
-            audit,
-            skill,
-            body.content,
-            auditor_provider=get_provider("auditor"),
-            challenger_provider=get_provider("challenger"),
-        )
+        # She answers in the language the user answers in, turn after turn.
+        with use_language(audit_flow.audit_language(session, skill, audit, body.content)):
+            outcome = audit_flow.submit_turn(
+                session,
+                audit,
+                skill,
+                body.content,
+                auditor_provider=get_provider("auditor"),
+                challenger_provider=get_provider("challenger"),
+            )
     except AuditorUnavailable:
         raise HTTPException(502, "The auditor is temporarily unavailable. Please try again.")
     except AuditClosed:

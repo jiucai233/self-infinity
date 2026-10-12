@@ -44,7 +44,7 @@ from app.models import (
     TurnRole,
     utcnow,
 )
-from app.i18n import join_list, quote, t
+from app.i18n import join_list, language_of, quote, t
 from app.services import bandit, points
 from app.services.condition import audit_pacing
 from app.services.incentive import compute_reward
@@ -116,6 +116,23 @@ def test_out_parts(session: Session, skill: SkillNode) -> list[str]:
         if node is not None and (node.unexpanded or not contains_children(session, node_id)):
             parts.append(node.title)
     return parts[:TEST_OUT_PARTS]
+
+
+def audit_language(session: Session, skill: SkillNode, audit: AuditSession | None = None, answer: str = "") -> str | None:
+    """The language an audit is held in, whatever the interface is set to: the one the user
+    answers in ([answer] with their earlier answers of [audit]); before any answer, the node's
+    own when that is not English (a Chinese course under an English interface is asked in
+    Chinese). None: the request's language.
+
+    Decided here, not left to the Auditor: told only to "write in theirs", it drifted back to
+    English for a turn or two in the middle of a Chinese audit."""
+    if audit is not None:
+        said = [turn.content for turn in audit_turns(session, audit.id) if turn.role == TurnRole.user]
+        spoken = language_of(" ".join([*said, answer]))
+        if spoken is not None:
+            return spoken
+    written = language_of(" ".join([skill.title, skill.description or "", *(p["title"] for p in skill.points)]))
+    return written if written in ("zh", "ko") else None
 
 
 def opening_question(
