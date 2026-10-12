@@ -66,7 +66,7 @@
 | `DEV_EMAILS` | 可选：能看到开发者面板（审计指标）的邮箱，逗号分隔 |
 | `TRANSCRIBE_MODEL` / `SPEECH_MODEL` / `SPEECH_VOICE` | 可选：语音转写和朗读（默认 `gpt-transcribe` / `gpt-4o-mini-tts` / `marin`）。语音只走 OpenAI，有 `OPENAI_API_KEY` 就开着；没有就用浏览器自带的识别和朗读 |
 | `GUIDE_VOICE` | 可选：首页 Guide 用哪种语音，`live`（默认，GPT-Live）或 `realtime`。GPT-Live 连不上时浏览器会自动退回 realtime |
-| `AUDIT_VOICE` | 可选：审计的语音模式用哪种，`live`（默认，GPT-Live：她说话时开口就能打断，判分仍是 Auditor）或 `turns`（实时转写 + 朗读，轮流说）。GPT-Live 连不上时浏览器会自动退回 turns |
+| `AUDIT_VOICE` | 可选：审计的语音模式用哪种，`live`（默认，GPT-Live，全双工，约 $0.05/分钟）或 `turns`（实时转写 + 朗读，轮流说，约 $0.02/分钟，Auditor 的原话照念）。两种都能开口打断她；GPT-Live 连不上时浏览器会自动退回 turns |
 | `LIVE_MODEL` / `LIVE_BACKEND_MODEL` | 可选：GPT-Live 的语音模型和它调用工具的后台模型（默认 `gpt-live-1` / `gpt-6-luna`） |
 | `REALTIME_MODEL` / `LIVE_TRANSCRIBE_MODEL` | 可选：GPT-Live 用不了时的两条退路——首页 Guide 的实时语音模型、审计轮流模式的实时转写（默认 `gpt-realtime-2.1` / `gpt-live-transcribe`），走 WebRTC |
 

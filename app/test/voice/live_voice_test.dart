@@ -143,6 +143,101 @@ void main() {
       await tester.runAsync(voice.cancelListening);
     });
 
+    /// One turn heard and answered, so the session is open and she can speak.
+    Future<void> firstTurn(WidgetTester tester) async {
+      await voice.init();
+      await listen();
+      await sound(tester, 0.8, 3);
+      await sound(tester, 0, 15);
+      io.link.emit({'type': 'input_audio_buffer.committed', 'item_id': 'i1'});
+      io.link.emit({
+        'type': 'conversation.item.input_audio_transcription.completed',
+        'item_id': 'i1',
+        'transcript': 'First answer.',
+      });
+      expect(ends, 1);
+      io.link.sent.clear();
+    }
+
+    testWidgets('speaking over her cuts her short, and the turn keeps the words said from then on', (
+      tester,
+    ) async {
+      await firstTurn(tester);
+      final link = io.link;
+      io.holdStream = true;
+      var spoken = false;
+      unawaited(voice.speak('Right. Now a longer question about the softmax.').then((_) => spoken = true));
+      await tester.pump();
+      expect(link.mic, isTrue); // open while she speaks
+      expect(link.sentTypes, ['input_audio_buffer.clear']);
+
+      // A cough: loud, but not for long enough.
+      for (var i = 0; i < StreamingVoiceService.bargeSamples - 1; i++) {
+        io.level(0.8);
+      }
+      io.level(0.1);
+      await tester.pump();
+      expect((spoken, io.streamStops), (false, 0));
+
+      // They start talking: the first loud level drops what the microphone held before it.
+      link.sent.clear();
+      for (var i = 0; i < StreamingVoiceService.bargeSamples; i++) {
+        io.level(0.8);
+      }
+      await tester.pump();
+      expect(io.streamStops, 1);
+      expect(spoken, isTrue);
+      expect(link.sentTypes, ['input_audio_buffer.clear']);
+      expect(link.mic, isTrue);
+
+      // The next turn is already running: nothing is cleared, and a pause alone commits it.
+      link.sent.clear();
+      await listen();
+      expect(link.sentTypes, isEmpty);
+      await sound(tester, 0, 15);
+      expect(link.sentTypes, ['input_audio_buffer.commit']);
+      link.emit({'type': 'input_audio_buffer.committed', 'item_id': 'i2'});
+      link.emit({
+        'type': 'conversation.item.input_audio_transcription.completed',
+        'item_id': 'i2',
+        'transcript': 'Wait, I meant the keys.',
+      });
+      expect(results.last, ('Wait, I meant the keys.', true));
+      await tester.runAsync(voice.cancelListening);
+    });
+
+    testWidgets('left to finish, she is not cut short and the microphone closes again', (tester) async {
+      await firstTurn(tester);
+      final link = io.link;
+      io.holdStream = true;
+      var spoken = false;
+      unawaited(voice.speak('A question.').then((_) => spoken = true));
+      await tester.pump();
+      io.level(0.3); // her own voice, what echo cancellation left of it
+      io.level(0.3);
+      io.finishStream();
+      await tester.pump();
+      expect((spoken, io.streamStops, link.mic), (true, 0, false));
+
+      // The turn after it starts clean.
+      link.sent.clear();
+      await listen();
+      expect(link.sentTypes, ['input_audio_buffer.clear']);
+      await tester.runAsync(voice.cancelListening);
+    });
+
+    testWidgets('a tap that stops her closes the microphone too', (tester) async {
+      await firstTurn(tester);
+      io.holdStream = true;
+      unawaited(voice.speak('A question.'));
+      await tester.pump();
+      expect(io.link.mic, isTrue);
+      await voice.stopSpeaking();
+      await tester.pump();
+      expect((io.streamStops, io.link.mic), (1, false));
+      await tester.runAsync(voice.cancelListening);
+    });
+
     testWidgets('silence: nothing is committed', (tester) async {
       await voice.init();
       await listen();

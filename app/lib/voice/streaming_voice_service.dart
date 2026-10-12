@@ -15,9 +15,15 @@ import 'voice_service.dart';
 /// commits the turn), and replies read aloud as the server streams them.
 ///
 /// The session opens on the first [listen] and stays open between turns, the
-/// microphone muted while it is not listening; [cancelListening] (leaving
+/// microphone muted while the Auditor thinks; [cancelListening] (leaving
 /// voice mode) closes it. Without live voice here (a phone, no OpenAI key, the
 /// offline fake) or when the session cannot be opened, [device] does it all.
+///
+/// She can be cut short by speaking: while a reply is read aloud the
+/// microphone stays open (the browser's echo cancellation takes her own
+/// voice out of it), and [bargeSamples] loud levels in a row stop the
+/// reading. What was said from that moment on is the start of the next
+/// turn, so its first words are not lost.
 class StreamingVoiceService implements VoiceService {
   StreamingVoiceService({required this.api, required this.device, LiveIo? io})
     : io = io ?? createLiveIo();
@@ -35,6 +41,13 @@ class StreamingVoiceService implements VoiceService {
   /// The longest text the server reads aloud.
   static const int maxSpeechChars = 4096;
 
+  /// While she speaks: the microphone this loud (0–1), for this many levels
+  /// in a row (one every 50 ms), is the user cutting in. Higher than the
+  /// pause detector's speech level, so what is left of her own voice after
+  /// echo cancellation does not stop her.
+  static const double bargeLevel = 0.45;
+  static const int bargeSamples = 6;
+
   bool? _live; // null: not asked yet (or the server could not be reached)
   LiveLink? _link;
   StreamSubscription<Map<String, Object?>>? _events;
@@ -48,6 +61,12 @@ class StreamingVoiceService implements VoiceService {
   Timer? _waitForFinal;
   String _partial = '';
   bool _committed = false;
+
+  /// A reply is being read aloud with the microphone open; [_loud] counts the
+  /// loud levels in a row, and [_cutIn] says the user stopped her.
+  bool _reading = false;
+  int _loud = 0;
+  bool _cutIn = false;
 
   /// What the open session costs (contract #37).
   UsageMeter? _meter;
@@ -83,6 +102,7 @@ class StreamingVoiceService implements VoiceService {
       onLevel: (level) {
         _pause?.level(level);
         _onLevel?.call(level);
+        if (_reading) _whileReading(level);
       },
     );
     link.microphoneOn = false;
@@ -127,12 +147,30 @@ class StreamingVoiceService implements VoiceService {
       return device.listen(onResult: onResult, onEnd: onEnd, onLevel: onLevel, pauseFor: pauseFor);
     }
     if (session != _session) return;
-    link.send({'type': 'input_audio_buffer.clear'});
+    // After cutting in, the turn began while she was speaking: its first words are in the buffer.
+    final cutIn = _cutIn;
+    _cutIn = false;
+    if (!cutIn) link.send({'type': 'input_audio_buffer.clear'});
     link.microphoneOn = true;
     _pause = PauseDetector(
       pauseFor: pauseFor,
       onEnd: ({required heard}) => _endTurn(session, heard: heard),
-    )..start();
+    )..start(heard: cutIn);
+  }
+
+  /// One microphone level while she reads a reply: enough loud ones in a row
+  /// and the user has cut in.
+  void _whileReading(double level) {
+    if (level < bargeLevel) {
+      _loud = 0;
+      return;
+    }
+    // What came before the first loud level is her voice or the room, not the answer.
+    if (_loud == 0) _link?.send({'type': 'input_audio_buffer.clear'});
+    if (++_loud < bargeSamples) return;
+    _reading = false;
+    _cutIn = true;
+    unawaited(io.stopStream());
   }
 
   void _onEvent(Map<String, Object?> event) {
@@ -209,6 +247,8 @@ class StreamingVoiceService implements VoiceService {
     _listening = false;
     _onResult = _onEnd = null;
     _onLevel = null;
+    _reading = false;
+    _cutIn = false;
     _link?.microphoneOn = false;
   }
 
@@ -246,19 +286,40 @@ class StreamingVoiceService implements VoiceService {
     if (line.isEmpty) return;
     final utterance = ++_utterance;
     final clipped = line.length > maxSpeechChars ? line.substring(0, maxSpeechChars) : line;
+    // With a session open the microphone listens for the user cutting in.
+    final link = _listening ? null : _link;
+    if (link != null) {
+      _loud = 0;
+      _cutIn = false;
+      _reading = true;
+      link.send({'type': 'input_audio_buffer.clear'});
+      link.microphoneOn = true;
+    }
     try {
       await io.playStream(api.liveEndpoint(speechPath)!, jsonEncode({'text': clipped}));
     } on Object catch (e) {
       debugPrint('StreamingVoiceService: streamed speech failed, using the device ($e)');
+      _reading = false;
+      link?.microphoneOn = false;
       if (utterance != _utterance) return;
       await device.init();
       if (utterance == _utterance) await device.speak(line);
+    } finally {
+      if (utterance == _utterance) {
+        _reading = false;
+        // Cut in: the microphone stays open, the turn is already running.
+        if (!_cutIn && !_listening) link?.microphoneOn = false;
+      }
     }
   }
 
   @override
   Future<void> stopSpeaking() async {
     _utterance++;
+    if (_reading) {
+      _reading = false;
+      if (!_listening) _link?.microphoneOn = false;
+    }
     await io.stopStream();
     await device.stopSpeaking();
   }

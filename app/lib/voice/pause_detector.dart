@@ -35,9 +35,10 @@ class PauseDetector {
 
   bool get running => _timer != null;
 
-  void start() {
+  /// [heard]: speech was heard before this began (the user cut in on her).
+  void start({bool heard = false}) {
     stop();
-    _heard = false;
+    _heard = heard;
     _ticks = 0;
     _quietTicks = 0;
     _loudest = 0;

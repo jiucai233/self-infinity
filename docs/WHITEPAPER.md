@@ -74,7 +74,7 @@ backend/ (FastAPI + SQLModel + SQLite)
 | | Challenger | LLM | 对"通过"做一次对抗复核 |
 | | Recorder | LLM | 把失败反思整理成原则卡 |
 | | Linker | LLM | 判断新卡与旧卡/节点的 related / contradicts 关系（后台运行） |
-| Analyst | Transcriber | OpenAI：输入框语音 `gpt-transcribe`；语音模式 `gpt-live-1`（无 key 时用浏览器/手机自带 STT） | 语音转文字。两个语音模式默认都是 GPT-Live（全双工，她说话时你开口就能打断）：首页 Guide 由 `gpt-live-1` 说话，工具交给后台 `gpt-6-luna`，连不上时退回端到端的 `gpt-realtime-2.1`；审计里 `gpt-live-1` 只当耳朵和嘴，听出你答完了就把这一轮交给浏览器，判分和出题仍是 Auditor，连不上时退回实时转写 `gpt-live-transcribe` + `gpt-4o-mini-tts` 朗读的轮流模式（契约 #35、#36） |
+| Analyst | Transcriber | OpenAI：输入框语音 `gpt-transcribe`；语音模式 `gpt-live-1`（无 key 时用浏览器/手机自带 STT） | 语音转文字。两个语音模式默认都是 GPT-Live（全双工，她说话时你开口就能打断）：首页 Guide 由 `gpt-live-1` 说话，工具交给后台 `gpt-6-luna`，连不上时退回端到端的 `gpt-realtime-2.1`；审计里 `gpt-live-1` 只当耳朵和嘴，听出你答完了就把这一轮交给浏览器，判分和出题仍是 Auditor，连不上时退回实时转写 `gpt-live-transcribe` + `gpt-4o-mini-tts` 朗读的轮流模式，那里她朗读时麦克风也开着，听到用户持续出声就停（契约 #35、#36） |
 | | Check-in Converter | LLM | 自由文本打卡 → 结构化字段，缺的字段留空不猜 |
 | | Life Coach | LLM | 生活页上按需给三条本周建议，只看 14 天汇总和长期事实 |
 | | Fact Keeper | LLM（前置 Decisions 闸门） | 后台从打卡和对话里维护长期事实：新增 / 更新 / 结束 |

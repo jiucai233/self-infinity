@@ -46,6 +46,14 @@ class FakeLiveIo implements LiveIo {
   final List<String> streamed = [];
   Object? streamError;
 
+  /// True: a stream keeps playing until [finishStream] or [stopStream].
+  bool holdStream = false;
+  Completer<void>? _playing;
+  int streamStops = 0;
+
+  /// The stream being played has played out.
+  void finishStream() => _playing?.complete();
+
   void level(double v) => onLevel?.call(v);
 
   @override
@@ -72,8 +80,16 @@ class FakeLiveIo implements LiveIo {
   Future<void> playStream(LiveEndpoint endpoint, String body) async {
     if (streamError case final e?) throw e;
     streamed.add((jsonDecode(body) as Map)['text'] as String);
+    if (!holdStream) return;
+    final playing = _playing = Completer<void>();
+    await playing.future;
   }
 
   @override
-  Future<void> stopStream() async {}
+  Future<void> stopStream() async {
+    final playing = _playing;
+    if (playing == null || playing.isCompleted) return;
+    streamStops++;
+    playing.complete();
+  }
 }

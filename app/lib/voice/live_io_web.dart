@@ -57,8 +57,18 @@ class _WebLiveIo implements LiveIo {
     void Function(double level)? onLevel,
     void Function(double level)? onReplyLevel,
   }) async {
+    // Echo cancellation matters: the microphone stays open while she speaks, and her own voice
+    // from the speakers must not be heard as the user cutting in.
     final microphone = await web.window.navigator.mediaDevices
-        .getUserMedia(web.MediaStreamConstraints(audio: true.toJS))
+        .getUserMedia(
+          web.MediaStreamConstraints(
+            audio: web.MediaTrackConstraints(
+              echoCancellation: true.toJS,
+              noiseSuppression: true.toJS,
+              autoGainControl: true.toJS,
+            ),
+          ),
+        )
         .toDart;
     final peer = web.RTCPeerConnection();
     final link = _WebLiveLink(peer, microphone);
