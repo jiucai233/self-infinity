@@ -2375,6 +2375,10 @@ class FakeApiClient implements SelfInfinityApi {
   /// open, and — when some held before — which ones this audit is about.
   String _pointsQuestion(SkillNode node, List<SkillPoint> examined) {
     final ask = 'Start with “${examined.first.title}”: what does it do, and why is it needed?';
+    if (examined.length == 1 && node.points.length > 1) {
+      return 'What you already explained right stays cleared. This time only '
+          '“${examined.first.title}”: what does it do, and why is it needed?';
+    }
     if (examined.length < node.points.length) {
       return 'What you already explained right stays cleared. This time only '
           '${examined.map((p) => p.title).join(', ')}. $ask';

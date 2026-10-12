@@ -205,16 +205,33 @@ Dan Koe 把人生当成一局游戏：赌注（anti-vision）、胜利条件（v
 
 **登录页 = 落地页**（没登录时只显示它，2026-10-06 改；主旨「干净」）：整屏一块夜色面板，示例人生树在里面慢慢转（像背景视频）。顶部只有左边的火花标志 + `Self-Infinity`、右边一个纸色胶囊 `Sign in`。底部纸色从下往上渐变盖住树，上面一行小字（ember 圆点 + `A learning game you win by explaining`）、衬线大标题 `Prove you understand.` / `Watch your tree grow.`、两个按钮 `Get started`（墨色，开注册）和 `I have an account`（描边，开登录）。入场一次：导航从上滑入（0.8s），树淡入并从 1.05 缩回（1.8s），底部依次上浮（0.5 / 0.6 / 0.8 / 1.0s 起），曲线 `Cubic(0.16, 1, 0.3, 1)`。表单是浮在中间的纸卡（手机上是底部弹出），背后夜色半透明遮罩；×、点遮罩、Esc 关闭。表单只有邮箱 + 密码：`Sign in` / `Create an account` 切换、`Forgot password?`。注册后如果要确认邮箱，显示 `Check your inbox`。
 
-**新手教程**（账号第一次进来，或者在 ◎ 菜单里点 `Replay the tutorial`）：魔法师一问一答，每步都能 `Skip`，右上角 `Skip setup` 直接结束。
+**新手教程**（账号第一次进来，或者在 ◎ 菜单里点 `Replay the tutorial`）分两段：先**导览**，再**设置**。
+
+**导览**（2026-10-12，在设置之前）：真实的界面铺在一个示例世界上（一个有主线的角色、一门从课纲建的数学课、一个已通关的节点、一个没过的节点、今天的任务），整屏压暗，只留正在讲的那一块亮着（ember 描边），旁边一张卡：线条小人（Guide）+ 一段话 + `Skip the tour` · `n / 10` · `Back` · `Next`。亮的那块在两站之间滑动过去。卡片放在亮块旁边有地方的一侧（右、左、下、上），放不下或者没有亮块时居中。导览期间页面只能看不能点，只有卡片上的按钮可用。示例世界是独立的假数据，不碰账号。
+
+1. 欢迎（无亮块）：先带你转一圈，现在看到的都是示例。
+2. 左栏：这一侧是你自己（等级、已通关、状态）。
+3. 每日任务：按时段和状态挑今天该学和该复习的。
+4. 输入栏：在这里和向导说话。
+5. 人生树：每门课是一根枝，每个点是一个节点，通关后亮起来。
+6. 节点页的内容卡：它讲什么、它的知识点（✓ 讲清的 / ✗ 上次没讲清的）。
+7. 节点页右栏：在这个节点上的每次尝试（时间、分数、过没过）。
+8. `→` 按钮：想通关就把它讲出来。
+9. 审计页的当前问题：审核官问、你答，每次回答后她先点评再往深问。
+10. 收尾（无亮块）：接下来设置角色、建第一棵树；给主题就够，给课纲文件更好，因为课纲条目会原样成为树的第一层。按钮 `Set up my character`。
+
+当前屏幕上没有的站直接跳过，不先显示（手机上左栏和右栏在抽屉里，第 2、3、7 站跳过）。重放教程时导览也重放。
+
+**设置**：魔法师一问一答，每步都能 `Skip`，右上角 `Skip setup` 直接结束。
 
 1. Welcome：`Let's set up your character.`（说明：用自己的话解释，Auditor 判定）
 2. Stakes：`A year from now, nothing has changed. What does your life look like?`
 3. Win condition：`A year from now, you've won. What does that look like?`
 4. Identity：`Finish the sentence.`（输入框预填 `I am the type of person who `）
 5. Main quest：`What's one goal that moves you toward your win condition?`
-6. First course：`What do you need to learn first for “{quest}”?` 输入主题，或用课纲文件；在聊天里生成（所以对话从这里开始），生成后自动挂到这个 Main quest 下。
+6. First course：`What do you need to learn first for “{quest}”?` 输入主题，或用课纲文件；问题下面说明这一步决定第一棵树怎么长（给主题：先找真实课纲，条目就是第一层；给文件：条目原样使用）；在聊天里生成（所以对话从这里开始），生成后自动挂到这个 Main quest 下。
    - 输入的主题先给 Course Scout 看（`POST /skills/scout`，带上前面填的 Main quest 和三问）：说得清楚的整理成规范课名直接生成（`so arm 101` → `SO-ARM101 robot arm`）；太模糊的（`idk, a lot of things`）不生成，换成 `Where do you want to start?` 加最多 3 张课程卡（课名 + 为什么对主线有用），点一张就生成那门；也可以改写输入框再试。Scout 失败就按原文生成。课纲文件不经过 Scout。
-7. 导览三页：水晶球（显示你刚长出来的树）→ Auditor 判定 → 失败变教训卡。最后 `Enter Self-Infinity`。
+7. 课建好后 `Enter Self-Infinity`，直接进人生树（scene 2），看到刚长出来的树。跳过设置（没建课）则进首页。原来结尾的三页静态说明已由前面的导览取代（2026-10-12）。
 
 第 2–6 步的输入框右侧有麦克风（`Speak your answer`）：点一下开始听写，说的话实时接在已有文字后面，停顿 3 秒或点停止键结束；听写时按钮变成小波形 + 停止键。识别语言和语音模式一样是 `en_US`。设备不支持时提示 `Voice input isn't available on this device.`
 

@@ -587,7 +587,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get onbTopicBody => '给个主题就够了。有课程大纲？那就直接用文件（PDF、TXT 或 MD）。';
+  String get onbTopicBody =>
+      '你的回答决定第一棵树怎么长。给个主题就够了：我会去找真实的课程大纲，它的条目就是树的第一层。自己有大纲？直接用文件（PDF、TXT 或 MD），条目原样使用。';
 
   @override
   String get onbTopicHint => '例如：微积分';
@@ -815,34 +816,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get today => '今天';
 
   @override
-  String get tourBallBody => '你在中间，任务围着你，技能在更外圈。在首页点一下水晶球，就能打开完整的树。';
-
-  @override
-  String get tourBallKicker => '你的水晶球';
-
-  @override
-  String get tourBallTitle => '整棵人生树，都在一个球里。';
-
-  @override
-  String get tourLessonsBody => '审核没通过时，写下你错在哪里。它会变成一张教训卡，审核官下次会记得。';
-
-  @override
-  String get tourLessonsKicker => '教训';
-
-  @override
-  String get tourLessonsTitle => '每次失误都会变成教训。';
-
-  @override
   String get tourNext => '下一步';
-
-  @override
-  String get tourProveBody => '打开一个点，用自己的话讲清楚。审核官会一直追问，直到确定你真的懂了。然后这个点就会变成金色。';
-
-  @override
-  String get tourProveKicker => '证明它';
-
-  @override
-  String get tourProveTitle => '讲出来，审核官来判定。';
 
   @override
   String get treeStartsWithYou => '你的树从你开始。';
@@ -1494,4 +1468,47 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pointNotAsked => '还没考';
+
+  @override
+  String get tourSkip => '跳过导览';
+
+  @override
+  String get tourBegin => '开始设置我的角色';
+
+  @override
+  String get tourWelcome => '你好，我是向导。开始设置之前，先带你转一圈。现在看到的都是示例。';
+
+  @override
+  String get tourCharacter => '这一侧是你自己：等级、已通关的节点，还有今天的状态。';
+
+  @override
+  String get tourQuests => '每日任务。我会按时段和你的状态，挑出今天该学和该复习的内容。点一下就能打开。';
+
+  @override
+  String get tourTalk => '在这里和我说话，打字或语音都行：想学什么、今天过得怎样、接下来做什么，都可以说。';
+
+  @override
+  String get tourAttempts => '这一侧是你在这个节点上的每次尝试：时间、分数、过没过。';
+
+  @override
+  String get tourTree => '这是你的人生树。每门课是一根枝，每个点是一个节点，通关后会亮起来。拖动旋转，滚轮缩放，点节点打开。';
+
+  @override
+  String get tourNode => '一个节点就是一块要学的内容。这里是它讲什么，以及它的知识点：打勾的是讲清楚的，打叉的是上次没讲清的。';
+
+  @override
+  String get tourProve => '想通关一个节点，就把它讲出来。点这里，审核官接手。';
+
+  @override
+  String get tourAudit => '审核官提问，你用自己的话回答。每答一次，她会说哪里对、哪里要改，再往深一层问。讲对的不会再考。';
+
+  @override
+  String get tourSyllabus =>
+      '刚才都是示例。接下来设置你的角色，建你的第一棵树。我会问你想学什么：给一个主题就够，有课程大纲文件更好，因为大纲里的条目会原样成为树的第一层。';
+
+  @override
+  String get tourLessonsTitle => '每次失误都会变成教训。';
+
+  @override
+  String get tourProveTitle => '讲出来，审核官来判定。';
 }

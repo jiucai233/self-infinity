@@ -595,7 +595,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onbTopicBody =>
-      'A topic is enough. Got a syllabus? Use the file instead (PDF, TXT or MD).';
+      'Your answer shapes your first tree. A topic is enough: I look for a real syllabus, and its items become the first level. Got your own syllabus? Use the file (PDF, TXT or MD) and its items are used as they are.';
 
   @override
   String get onbTopicHint => 'e.g. Calculus';
@@ -823,37 +823,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get today => 'Today';
 
   @override
-  String get tourBallBody =>
-      'You in the middle, your quests around you, every skill beyond. Tap the ball on the home screen to open the full tree.';
-
-  @override
-  String get tourBallKicker => 'YOUR CRYSTAL BALL';
-
-  @override
-  String get tourBallTitle => 'Your whole life tree, in one ball.';
-
-  @override
-  String get tourLessonsBody =>
-      'When an audit fails, write down what you got wrong. It becomes a lesson card, and the Auditor remembers it next time.';
-
-  @override
-  String get tourLessonsKicker => 'LESSONS';
-
-  @override
-  String get tourLessonsTitle => 'Every miss becomes a lesson.';
-
-  @override
   String get tourNext => 'Next';
-
-  @override
-  String get tourProveBody =>
-      'Open a point and explain it in your own words. The Auditor asks follow-ups until it\'s sure you understand. Then the point turns gold.';
-
-  @override
-  String get tourProveKicker => 'PROVE IT';
-
-  @override
-  String get tourProveTitle => 'Explain it. The Auditor decides.';
 
   @override
   String get treeStartsWithYou => 'Your tree starts with you.';
@@ -1513,4 +1483,55 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pointNotAsked => 'Not asked yet';
+
+  @override
+  String get tourSkip => 'Skip the tour';
+
+  @override
+  String get tourBegin => 'Set up my character';
+
+  @override
+  String get tourWelcome =>
+      'Hi, I\'m your Guide. Before we set anything up, let me show you around. Everything you see for now is an example.';
+
+  @override
+  String get tourCharacter =>
+      'This side is you: your level, the nodes you have cleared, and how you are doing today.';
+
+  @override
+  String get tourQuests =>
+      'Your daily quests. I pick what to learn or review today, by the time of day and your condition. Tap one to open it.';
+
+  @override
+  String get tourTalk =>
+      'Talk to me here, typed or spoken: say what you want to learn, tell me about your day, or ask what to do next.';
+
+  @override
+  String get tourAttempts =>
+      'This side keeps your attempts at this node: when, the score, and whether it passed.';
+
+  @override
+  String get tourTree =>
+      'Your life tree. Every course is a branch and every dot a node; a node lights up when you clear it. Drag to turn it, scroll to zoom, tap a node to open it.';
+
+  @override
+  String get tourNode =>
+      'A node is one thing to learn. Here is what it covers and its knowledge points: a check for what you explained right, a cross for what you missed.';
+
+  @override
+  String get tourProve => 'To clear a node you explain it. Press here and the Auditor takes over.';
+
+  @override
+  String get tourAudit =>
+      'The Auditor asks, you answer in your own words. After every answer she says what was right and what to fix, then asks one level deeper. What you get right is not asked again.';
+
+  @override
+  String get tourSyllabus =>
+      'That was an example. Next we set up your character and build your first tree. I will ask what you want to learn: a topic is enough, and a syllabus file is better, because its items become the first level of your tree as they are.';
+
+  @override
+  String get tourLessonsTitle => 'Every miss becomes a lesson.';
+
+  @override
+  String get tourProveTitle => 'Explain it. The Auditor decides.';
 }

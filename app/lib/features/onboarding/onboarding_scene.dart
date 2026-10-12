@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 
 import '../../api/api.dart';
 import '../../api/api_exception.dart';
-import '../../api/life_tree.dart';
 import '../../api/models.dart';
 import '../../app/app_state.dart';
 import '../../theme/tokens.dart';
@@ -14,22 +13,27 @@ import '../../widgets/widgets.dart';
 import '../stage/profile_controller.dart';
 import '../../l10n/l10n.dart';
 
-/// The first-run tutorial (`docs/ux-chat.md` §7): the Guide sets up your
-/// character with you, one question at a time, then shows you around.
+/// The first-run setup (`docs/ux-chat.md` §7), after the guided tour
+/// (`guided_tour.dart`) has shown the app on an example: the Guide sets up
+/// your character with you, one question at a time.
 ///
 /// Welcome → Stakes → Win condition → Identity → Main quest → First course
-/// (a topic or a syllabus file; the course is built and put under the quest)
-/// → a three-page tour. Every answer is saved as soon as you continue; every
-/// step can be skipped, and `Skip setup` ends it. Finishing (or skipping)
-/// sets `onboarded` on the profile, and the app opens.
+/// (a topic or a syllabus file — it shapes the first tree, and the step says
+/// so; the course is built and put under the quest). Every answer is saved as
+/// soon as you continue; every step can be skipped, and `Skip setup` ends it.
+/// Finishing (or skipping) sets `onboarded` on the profile, and the app opens
+/// on the life tree.
 class OnboardingScene extends StatefulWidget {
-  const OnboardingScene({super.key});
+  const OnboardingScene({super.key, this.onCourseBuilt});
+
+  /// The first course was built: the app opens on the tree that holds it.
+  final VoidCallback? onCourseBuilt;
 
   @override
   State<OnboardingScene> createState() => _OnboardingSceneState();
 }
 
-enum _Step { welcome, stakes, win, identity, quest, course, tour }
+enum _Step { welcome, stakes, win, identity, quest, course }
 
 /// What the course step is doing: [reading] is the scout looking at the
 /// typed topic before anything is built.
@@ -56,8 +60,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
   /// The scout found the typed topic too vague: courses to pick from.
   CourseScout? _scouted;
   CourseMap? _course;
-  int _tourPage = 0;
-  LifeTree? _tree;
 
   @override
   void initState() {
@@ -97,7 +99,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
     _Step.identity,
     _Step.quest,
     _Step.course,
-    _Step.tour,
   ];
 
   void _go(_Step step) => setState(() {
@@ -107,10 +108,7 @@ class _OnboardingSceneState extends State<OnboardingScene> {
 
   _Step? get _previous => _step.index == 0 ? null : _Step.values[_step.index - 1];
 
-  void _next() {
-    if (_step == _Step.course) unawaited(_loadTree());
-    _go(_Step.values[_step.index + 1]);
-  }
+  void _next() => _go(_Step.values[_step.index + 1]);
 
   /// Saves the answer of this step (if any), then moves on.
   Future<void> _continue() async {
@@ -140,7 +138,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
           return;
         }
       case _Step.welcome:
-      case _Step.tour:
         break;
     }
     if (!mounted) return;
@@ -228,6 +225,7 @@ class _OnboardingSceneState extends State<OnboardingScene> {
       }
       appState.markDataChanged();
       if (!mounted) return;
+      widget.onCourseBuilt?.call();
       setState(() {
         _course = map;
         _build = _Build.done;
@@ -252,19 +250,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
         _error = null;
       }
     });
-  }
-
-  /// The tree for the first tour page.
-  Future<void> _loadTree() async {
-    final api = context.read<SelfInfinityApi>();
-    try {
-      final goals = await api.listGoals();
-      final courses = await api.listCourses();
-      final maps = await Future.wait([for (final c in courses) api.getCourseMap(c.id)]);
-      if (mounted) setState(() => _tree = LifeTree.build(goals: goals, maps: maps));
-    } on Object {
-      if (mounted) setState(() => _tree = LifeTree.build());
-    }
   }
 
   Future<void> _finish() async {
@@ -324,7 +309,7 @@ class _OnboardingSceneState extends State<OnboardingScene> {
                             ),
                           ),
                           child: KeyedSubtree(
-                            key: Key('onboarding-step-${_step.name}-$_tourPage'),
+                            key: Key('onboarding-step-${_step.name}'),
                             child: _body(context, wide),
                           ),
                         ),
@@ -462,8 +447,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
         );
       case _Step.course:
         return _courseStep(context, wide);
-      case _Step.tour:
-        return _tourStep(context, wide);
     }
   }
 
@@ -547,7 +530,17 @@ class _OnboardingSceneState extends State<OnboardingScene> {
             ? context.l10n.onbNodesToProve(course.nodes.length)
             : context.l10n.onbNodesToProveUnder(course.nodes.length, quest),
         wide: wide,
-        actions: _actions(primary: context.l10n.continueLabel, onPrimary: _next, showSkip: false),
+        error: _error,
+        actions: Row(
+          children: [
+            const Spacer(),
+            FilledButton(
+              key: const Key('onboarding-finish'),
+              onPressed: _busy ? null : _finish,
+              child: Text(context.l10n.enterApp),
+            ),
+          ],
+        ),
       );
     }
     final file = _file;
@@ -621,68 +614,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
       ),
       error: _error,
       actions: _actions(primary: context.l10n.onbBuildIt, onPrimary: _continue),
-    );
-  }
-
-  Widget _tourStep(BuildContext context, bool wide) {
-    final l = context.l10n;
-    final pages = [
-      (l.tourBallKicker, l.tourBallTitle, l.tourBallBody),
-      (l.tourProveKicker, l.tourProveTitle, l.tourProveBody),
-      (l.tourLessonsKicker, l.tourLessonsTitle, l.tourLessonsBody),
-    ];
-    final (kicker, title, body) = pages[_tourPage];
-    final last = _tourPage == pages.length - 1;
-    final Widget visual = switch (_tourPage) {
-      0 => ClipOval(
-        child: Container(
-          key: const Key('onboarding-ball'),
-          width: 200,
-          height: 200,
-          color: AppColors.night,
-          child: LifeConstellation(tree: _tree ?? LifeTree.build(), compact: true),
-        ),
-      ),
-      1 => const Avatar(agent: 'auditor', mood: AvatarMood.neutral, size: 160),
-      _ => const Avatar(agent: 'recorder', mood: AvatarMood.smile, size: 160),
-    };
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(child: visual),
-        const SizedBox(height: AppSpacing.xl),
-        _Page(
-          guideLine: null,
-          kicker: kicker,
-          title: title,
-          body: body,
-          wide: wide,
-          error: _error,
-          actions: Row(
-            children: [
-              TextButton(
-                key: const Key('onboarding-back'),
-                onPressed: _busy
-                    ? null
-                    : () => _tourPage == 0 ? _go(_Step.course) : setState(() => _tourPage--),
-                child: Text(context.l10n.back),
-              ),
-              const Spacer(),
-              Text(
-                '${_tourPage + 1} / ${pages.length}',
-                style: Theme.of(context).textTheme.labelMedium
-                    ?.copyWith(color: AppColors.textTertiary),
-              ),
-              const SizedBox(width: AppSpacing.lg),
-              FilledButton(
-                key: Key(last ? 'onboarding-finish' : 'onboarding-continue'),
-                onPressed: _busy ? null : (last ? _finish : () => setState(() => _tourPage++)),
-                child: Text(last ? context.l10n.enterApp : context.l10n.tourNext),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 

@@ -243,7 +243,7 @@ Request `{"mode": "day", "test_out": false, "restart": false}` — `mode` `day`|
 Response `{"session": AuditSession, "opening_question": "...", "resumed": false}`.
 - **Knowledge points** **(added 2026-10-12)**: a concept leaf is audited on its points (`SkillNode.points`). If it has none yet, the Point Lister lists them first (one LLM call, once per node; if it fails or gives fewer than two, the audit goes on without points, as before). The audit examines the points not `ok` yet; for a node already mastered (a review), or with nothing left open, all of them. They are stored on the session (`points`).
 - Opening question by position (Section 17.2), in English:
-  - leaf with points: `Let's take “{title}” one piece at a time. Start with “{first point}”: what does it do, and why is it needed?`; when some of its points held before: `What you already explained right stays cleared. This time only {points}. Start with “{first point}”: what does it do, and why is it needed?`
+  - leaf with points: `Let's take “{title}” one piece at a time. Start with “{first point}”: what does it do, and why is it needed?`; when some of its points held before: `What you already explained right stays cleared. This time only {points}. Start with “{first point}”: what does it do, and why is it needed?`, or with a single point left: `What you already explained right stays cleared. This time only “{point}”: what does it do, and why is it needed?`
   - leaf without points: `Explain “{title}” from scratch to someone who has never heard of it.`
   - branch: `“{title}” covers {children}. Why do these belong together, and when do you use which?` — `{children}` = contains-children titles joined by `, `
   - root: `Which problems call for “{title}”, and which don't? How do you decide?`

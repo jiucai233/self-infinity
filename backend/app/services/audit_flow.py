@@ -129,6 +129,8 @@ def opening_question(
     """`examined`: the knowledge points this audit asks about (a leaf that has them); `again`:
     some of the node's points held before and are left out."""
     if examined and not test_out:
+        if again and len(examined) == 1:
+            return t("opening_point_again", point=quote(examined[0]))
         if again:
             return t(
                 "opening_points_again",

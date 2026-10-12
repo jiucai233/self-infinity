@@ -225,6 +225,11 @@ _TEXTS: dict[str, dict[str, str]] = {
         "zh": "上次讲清楚的不再考，这次只看{points}。先说{point}：它是做什么的？为什么需要它？",
         "ko": "지난번에 제대로 설명한 건 다시 묻지 않아요. 이번엔 {points}만 볼게요. {point}부터: 무슨 일을 하고, 왜 필요한가요?",
     },
+    "opening_point_again": {
+        "en": "What you already explained right stays cleared. This time only {point}: what does it do, and why is it needed?",
+        "zh": "上次讲清楚的不再考，这次只看{point}：它是做什么的？为什么需要它？",
+        "ko": "지난번에 제대로 설명한 건 다시 묻지 않아요. 이번엔 {point}만 볼게요: 무슨 일을 하고, 왜 필요한가요?",
+    },
     "opening_branch": {
         "en": "{title} covers {children}. Why do these belong together, and when do you use which?",
         "zh": "{title}包括{children}。它们为什么归在一起？什么时候用哪个？",

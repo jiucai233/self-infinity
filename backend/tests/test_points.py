@@ -170,8 +170,8 @@ def test_the_next_audit_asks_only_about_what_was_missed(client, client_engine, m
     answer_turns(client, body["session"]["id"], FIRST)
 
     assert body["opening_question"] == (
-        "What you already explained right stays cleared. This time only What Discriminant is. "
-        "Start with “What Discriminant is”: what does it do, and why is it needed?"
+        "What you already explained right stays cleared. This time only “What Discriminant is”: "
+        "what does it do, and why is it needed?"
     )
     assert body["session"]["points"] == [{"title": POINTS[0], "ok": None, "note": NOTE}]
     with Session(client_engine) as session:

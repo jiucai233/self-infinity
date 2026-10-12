@@ -7,6 +7,7 @@ import '../api/fake_api.dart';
 import '../api/http_api.dart';
 import '../auth/auth_service.dart';
 import '../features/auth/sign_in_scene.dart';
+import '../features/onboarding/guided_tour.dart';
 import '../features/onboarding/onboarding_scene.dart';
 import '../features/stage/profile_controller.dart';
 import '../l10n/l10n.dart';
@@ -73,6 +74,7 @@ class SelfInfinityApp extends StatefulWidget {
     this.filePicker,
     this.initialLocation,
     this.locale,
+    this.tour = true,
   });
 
   final SelfInfinityApi api;
@@ -94,6 +96,10 @@ class SelfInfinityApp extends StatefulWidget {
 
   /// The app's language; English (not remembered) when null.
   final LocaleController? locale;
+
+  /// Whether a new account sees the guided tour before the setup. Tests of
+  /// the setup itself switch it off.
+  final bool tour;
 
   @override
   State<SelfInfinityApp> createState() => _SelfInfinityAppState();
@@ -152,7 +158,11 @@ class _SelfInfinityAppState extends State<SelfInfinityApp> {
               live: _live,
               filePicker: _filePicker,
               auth: _auth,
-              child: _AccountShell(look: look, initialLocation: widget.initialLocation),
+              child: _AccountShell(
+                look: look,
+                initialLocation: widget.initialLocation,
+                tour: widget.tour,
+              ),
             ),
           );
         },
@@ -161,13 +171,15 @@ class _SelfInfinityAppState extends State<SelfInfinityApp> {
   }
 }
 
-/// One account's app: a splash while its profile loads, the tutorial until it
-/// is done, then the router with the scenes.
+/// One account's app: a splash while its profile loads; for a new account the
+/// guided tour (the app on an example) and then the setup; then the router
+/// with the scenes, opening on the life tree right after a setup.
 class _AccountShell extends StatefulWidget {
-  const _AccountShell({required this.look, this.initialLocation});
+  const _AccountShell({required this.look, this.initialLocation, this.tour = true});
 
   final _AppLook look;
   final String? initialLocation;
+  final bool tour;
 
   @override
   State<_AccountShell> createState() => _AccountShellState();
@@ -176,7 +188,25 @@ class _AccountShell extends StatefulWidget {
 class _AccountShellState extends State<_AccountShell> {
   GoRouter? _router;
 
-  GoRouter get _scenes => _router ??= createRouter(initialLocation: widget.initialLocation);
+  /// The guided tour was seen (or skipped) in this run of the setup.
+  bool _toured = false;
+
+  /// The setup just built a course: the scenes open on the life tree, with it.
+  bool _landOnTree = false;
+
+  GoRouter get _scenes {
+    final land = _landOnTree;
+    _landOnTree = false;
+    final router = _router;
+    if (router == null) {
+      return _router = createRouter(
+        initialLocation: widget.initialLocation ?? (land ? AppRoutes.map : null),
+      );
+    }
+    // A replayed setup: the scenes are still where they were left.
+    if (land) WidgetsBinding.instance.addPostFrameCallback((_) => router.go(AppRoutes.map));
+    return router;
+  }
 
   @override
   void dispose() {
@@ -199,6 +229,13 @@ class _AccountShellState extends State<_AccountShell> {
       );
     }
     if (!profile.profile.onboarded) {
+      if (widget.tour && !_toured) {
+        return GuidedTour(
+          theme: look.theme,
+          locale: look.locale,
+          onDone: () => setState(() => _toured = true),
+        );
+      }
       return MaterialApp(
         title: 'Self-Infinity',
         debugShowCheckedModeBanner: false,
@@ -206,9 +243,11 @@ class _AccountShellState extends State<_AccountShell> {
         locale: look.locale,
         localizationsDelegates: _AppLook.delegates,
         supportedLocales: _AppLook.locales,
-        home: const OnboardingScene(),
+        home: OnboardingScene(onCourseBuilt: () => _landOnTree = true),
       );
     }
+    // Replaying the tutorial later starts with the tour again.
+    _toured = false;
     return MaterialApp.router(
       title: 'Self-Infinity',
       debugShowCheckedModeBanner: false,

@@ -118,6 +118,7 @@ void main() {
     bool seeded = true,
     FakeVoiceService? voice,
     AuthService? auth,
+    bool tour = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -136,6 +137,7 @@ void main() {
           filePicker: FakeFilePicker(),
           initialLocation: location,
           locale: LocaleController(_language),
+          tour: tour,
         ),
       ),
     );
@@ -329,20 +331,30 @@ void main() {
         ],
       );
     });
-    testWidgets(skip: dir == null, 'tutorial tour ($tag)', (tester) async {
-      await onboarding(
-        tester,
-        '0-tutorial-tour',
-        7,
-        answers: [
-          'Another year of nodding along.',
-          'I can teach it.',
-          '',
-          'Teach calculus to a stranger',
-          'math',
-        ],
-      );
-    });
+    // The guided tour before the setup: one shot per stop.
+    for (var stop = 0; stop < 10; stop++) {
+      testWidgets(skip: dir == null, 'guided tour stop $stop ($tag)', (tester) async {
+        await scene(
+          tester,
+          size: size,
+          name: '0-tour-${stop.toString().padLeft(2, '0')}-$tag',
+          location: '/',
+          tour: true,
+          api: FakeApiClient(latency: Duration.zero, onboarded: false),
+          act: (t) async {
+            for (var i = 0; i < stop; i++) {
+              if (find.byKey(const Key('tour-next')).evaluate().isEmpty) break;
+              await t.tap(find.byKey(const Key('tour-next')));
+              // The page of the next stop loads, then its anchor is looked for.
+              await t.pump(const Duration(milliseconds: 400));
+              await t.pumpAndSettle();
+              await t.pump(const Duration(milliseconds: 400));
+              await t.pumpAndSettle();
+            }
+          },
+        );
+      });
+    }
     testWidgets(skip: dir == null, 'scene 2 a node card ($tag)', (tester) async {
       await scene(
         tester,

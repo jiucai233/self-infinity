@@ -590,7 +590,8 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get onbTopicBody => '주제만 있어도 돼요. 강의계획서가 있다면 파일을 쓰세요 (PDF, TXT, MD).';
+  String get onbTopicBody =>
+      '이 답이 첫 나무의 모양을 정해요. 주제만 있어도 돼요: 실제 강의계획서를 찾아 그 항목을 첫 단계로 써요. 강의계획서가 있다면 파일을 쓰세요 (PDF, TXT, MD). 항목을 그대로 써요.';
 
   @override
   String get onbTopicHint => '예: 미적분';
@@ -818,35 +819,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get today => '오늘';
 
   @override
-  String get tourBallBody => '가운데엔 당신, 주위엔 퀘스트, 그 바깥엔 모든 스킬. 홈 화면에서 구슬을 누르면 나무 전체가 열려요.';
-
-  @override
-  String get tourBallKicker => '당신의 수정 구슬';
-
-  @override
-  String get tourBallTitle => '인생 나무 전체가 구슬 하나에.';
-
-  @override
-  String get tourLessonsBody => '심사에서 떨어지면 어디서 틀렸는지 적어 두세요. 그게 교훈 카드가 되고, 심사관은 다음에 그걸 기억해요.';
-
-  @override
-  String get tourLessonsKicker => '교훈';
-
-  @override
-  String get tourLessonsTitle => '모든 실수는 교훈이 돼요.';
-
-  @override
   String get tourNext => '다음';
-
-  @override
-  String get tourProveBody =>
-      '점 하나를 열고 자기 말로 설명해 보세요. 심사관은 당신이 이해했다고 확신할 때까지 계속 물어요. 그러면 그 점이 금색으로 바뀌어요.';
-
-  @override
-  String get tourProveKicker => '증명하기';
-
-  @override
-  String get tourProveTitle => '설명하세요. 판단은 심사관이 해요.';
 
   @override
   String get treeStartsWithYou => '나무는 당신에게서 시작돼요.';
@@ -1498,4 +1471,50 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get pointNotAsked => '아직 안 물어봄';
+
+  @override
+  String get tourSkip => '둘러보기 건너뛰기';
+
+  @override
+  String get tourBegin => '내 캐릭터 설정하기';
+
+  @override
+  String get tourWelcome => '안녕하세요, 가이드예요. 설정을 시작하기 전에 먼저 한 바퀴 보여 드릴게요. 지금 보이는 건 모두 예시예요.';
+
+  @override
+  String get tourCharacter => '이쪽은 당신이에요: 레벨, 클리어한 노드, 그리고 오늘의 컨디션.';
+
+  @override
+  String get tourQuests => '일일 퀘스트예요. 시간대와 컨디션에 맞춰 오늘 배울 것과 복습할 것을 골라요. 누르면 열려요.';
+
+  @override
+  String get tourTalk => '여기서 저와 이야기해요. 글이나 음성으로 배우고 싶은 것, 오늘 하루, 다음에 할 일을 말해 주세요.';
+
+  @override
+  String get tourAttempts => '이쪽에는 이 노드에 도전한 기록이 남아요: 언제, 몇 점, 통과했는지.';
+
+  @override
+  String get tourTree =>
+      '당신의 인생 나무예요. 강좌 하나가 가지 하나, 점 하나가 노드 하나예요. 클리어하면 불이 켜져요. 끌어서 돌리고, 스크롤로 확대하고, 노드를 눌러 열어요.';
+
+  @override
+  String get tourNode =>
+      '노드는 배울 것 하나예요. 무엇을 다루는지와 지식 포인트가 여기 있어요. 체크는 제대로 설명한 것, 엑스는 지난번에 놓친 것이에요.';
+
+  @override
+  String get tourProve => '노드를 클리어하려면 설명해야 해요. 여기를 누르면 심사관이 맡아요.';
+
+  @override
+  String get tourAudit =>
+      '심사관이 묻고, 당신은 자기 말로 답해요. 답할 때마다 무엇이 맞았고 무엇을 고쳐야 하는지 말해 주고, 한 단계 더 깊이 물어요. 맞힌 건 다시 묻지 않아요.';
+
+  @override
+  String get tourSyllabus =>
+      '지금까지는 예시였어요. 이제 캐릭터를 설정하고 첫 나무를 만들어요. 무엇을 배우고 싶은지 물을게요. 주제만 있어도 되고, 강의계획서 파일이면 더 좋아요. 계획서의 항목이 그대로 나무의 첫 단계가 되니까요.';
+
+  @override
+  String get tourLessonsTitle => '모든 실수는 교훈이 돼요.';
+
+  @override
+  String get tourProveTitle => '설명하세요. 판단은 심사관이 해요.';
 }
