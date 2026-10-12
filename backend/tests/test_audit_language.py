@@ -59,7 +59,7 @@ def node_fixture(client, client_engine):
 def test_a_chinese_node_is_asked_in_chinese_under_an_english_interface(client, node):
     body = client.post(f"/api/skills/{node}/audits").json()
 
-    assert body["opening_question"].startswith("我们把「判别式」一块一块过。先说「")
+    assert body["opening_question"] == "向一个从没听说过「判别式」的人，从头讲清楚它。"
 
 
 def test_an_english_node_keeps_the_interface_language(client, client_engine):
@@ -68,11 +68,11 @@ def test_an_english_node_keeps_the_interface_language(client, client_engine):
         set_status(session, ids["discriminant"], SkillStatus.available)
 
     english = client.post(f"/api/skills/{ids['discriminant']}/audits").json()
-    assert english["opening_question"].startswith("Let's take “Discriminant” one piece at a time.")
+    assert english["opening_question"] == "Explain “Discriminant” from scratch to someone who has never heard of it."
     chinese = client.post(
         f"/api/skills/{ids['discriminant']}/audits", json={"restart": True}, headers={"Accept-Language": "zh"}
     ).json()
-    assert chinese["opening_question"].startswith("我们把「Discriminant」一块一块过。")
+    assert chinese["opening_question"] == "向一个从没听说过「Discriminant」的人，从头讲清楚它。"
 
 
 def test_she_answers_in_the_language_they_answer_in(client, client_engine, monkeypatch, node):
@@ -110,8 +110,8 @@ def test_english_answers_to_a_chinese_node_are_answered_in_english(client, clien
 
 
 def test_the_auditor_is_told_how_to_treat_a_question_about_its_question_and_a_point_of_several_things():
-    # A question back is not an answer; a point is judged on what was asked of it.
+    # A question back is not an answer; a point is judged on what came up of it.
     assert "asks what your question means" in SYSTEM_PROMPT
     assert "It does not count as a second question." in SYSTEM_PROMPT
-    assert "a part you never asked about is not held against" in POINTS_VERDICT
-    assert "work out the answer yourself" in SYSTEM_PROMPT
+    assert "a part that never came up is not held against" in POINTS_VERDICT
+    assert "Work out the answer yourself first" in SYSTEM_PROMPT

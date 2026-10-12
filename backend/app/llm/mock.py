@@ -144,7 +144,7 @@ _GENERIC_BRANCHES = [("core-concepts", "Core Concepts"), ("main-methods", "Key M
 
 # ---------------------------------------------------------------- parsing helpers
 
-_POINTS_BLOCK_RE = re.compile(r"this audit examines these\n.*?:\n((?:- .*\n)+)", re.S)
+_POINTS_BLOCK_RE = re.compile(r"Points, the knowledge points inside this node\..*?:\n((?:- .*\n)+)", re.S)
 _LESSONS_BLOCK_RE = re.compile(r"<lessons>\n(.*?)\n</lessons>", re.S)
 _LESSON_LINE_RE = re.compile(r"^- .*\(misconception: (.*)\)\s*$")
 _RESULT_LINE_RE = re.compile(r"^\[(\d+)\] ")

@@ -496,9 +496,12 @@ void main() {
       });
 
       testWidgets('an audit from yesterday (KST) does not count', (tester) async {
+        // Noon KST two days ago: at night the plan has no node to learn, so the
+        // hour the test runs at must not decide what is in it.
+        final now = DateTime.now().toUtc();
         final old = FakeApiClient(
           latency: Duration.zero,
-          clock: () => DateTime.now().toUtc().subtract(const Duration(days: 2)),
+          clock: () => DateTime.utc(now.year, now.month, now.day - 2, 3),
         );
         await old.generateCourse(const GenerateRequest(topic: 'math'));
         await old.sendChat('What should I do today?');

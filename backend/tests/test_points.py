@@ -170,8 +170,8 @@ def test_the_next_audit_asks_only_about_what_was_missed(client, client_engine, m
     answer_turns(client, body["session"]["id"], FIRST)
 
     assert body["opening_question"] == (
-        "What you already explained right stays cleared. This time only “What Discriminant is”: "
-        "what does it do, and why is it needed?"
+        "What you already explained right stays cleared. This time explain only “What Discriminant is” "
+        "to someone who has never heard of it, in your own words."
     )
     assert body["session"]["points"] == [{"title": POINTS[0], "ok": None, "note": NOTE}]
     with Session(client_engine) as session:
@@ -198,7 +198,21 @@ def test_a_review_of_a_mastered_node_asks_every_point_again(client, math):
     body = begin(client, math["discriminant"])
 
     assert [p["title"] for p in body["session"]["points"]] == POINTS
-    assert body["opening_question"].startswith("Let's take “Discriminant” one piece at a time.")
+    assert body["opening_question"] == "Explain “Discriminant” from scratch to someone who has never heard of it."
+
+
+def test_several_points_still_open_are_all_named_in_the_opening(client, client_engine, math):
+    with Session(client_engine) as session:
+        skill = session.get(SkillNode, math["discriminant"])
+        position = audit_flow.node_position(session, skill)
+        again = audit_flow.opening_question(skill, position, [], examined=POINTS[1:], again=True)
+        first = audit_flow.opening_question(skill, position, [], examined=POINTS, again=False)
+
+    assert again == (
+        f"What you already explained right stays cleared. This time explain {POINTS[1]}, {POINTS[2]} "
+        "to someone who has never heard of them, in your own words."
+    )
+    assert first == "Explain “Discriminant” from scratch to someone who has never heard of it."
 
 
 def test_a_point_the_audit_did_not_settle_keeps_what_it_had():

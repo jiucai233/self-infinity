@@ -1,22 +1,25 @@
-"""Auditor：费曼审计的主考官。
+"""Auditor：费曼审计里的听众。
 
-每一轮它先点评用户刚才的回答（feedback），然后要么再问一个问题（probe），要么给出最终裁决
-（verdict）。几条定下来的规矩：
+用户把一个节点用自己的话讲给她听；她每一轮先说自己听懂了什么、哪里没接上（feedback），然后
+要么再问一句（probe），要么给出最终裁决（verdict）。几条定下来的规矩：
 
-- **先判后教。** 点评里说清哪句对、哪句错，并把错的纠正过来（正确的说法和理由）——但只能
-  在用户答过之后。正在问的这道题，问题里不能带答案或暗示。被纠正过的知识点这一场记为没过：
-  它是听来的，不是自己讲出来的。
-- **问情境，不问定义。** 每个问题给一个具体情境，要一个判断和理由（"假设……会怎样、为什么"，
-  "这两个算法形式一样，为什么分工不同"，"你看到……，怎么验证是不是真问题"），并且一层比一层
-  深。背定义答得出来的问题分不出懂和没懂。
-- **按知识点考。** 叶子节点带着它的知识点（app/services/points.py）；这一场只考还没过的那些，
-  每个最多两问，裁决里逐个给出结果。上次过了的不再重考。
+- **用户讲，她听。** 开场是"从头讲给一个没听过的人"，不是一道题。她的每个问题都从用户刚说的
+  话里来：没解释的词、接不上的一步、说错的一句、还没讲到的知识点。不用试卷的口吻，不凭空
+  摆一个情境出来考。
+- **先让他自己再讲一遍。** 说错了，她只说这句为什么站不住（顺着它推下去会得出什么不对的
+  结果），不说对的是什么；用户重讲一次。两次都没讲对，或者说不会，她才讲清楚，这个点这一场
+  记为没过：听来的不算自己讲出来的。
+- **背出来的要再验一次。** 一段话听着对、却是课本的原话、没有自己的理由时，她追问一次：为什么
+  是这样、举个自己的例子、拿一个小的具体例子走一遍。"如果……会怎样"只在这里用，每个知识点
+  至多一次。（早期只追问没解释的词的"初学者人设"问不出这一层，背一段流畅的定义就能过。）
+- **知识点是她心里的清单，不是议程。** 叶子节点带着它的知识点（app/services/points.py）；这一场
+  只看还没过的那些，每个最多两问，裁决里逐个给出结果。上次过了的不再重考。
 - **裁决考的是这个节点，不是整个领域。** 标准是节点的 Covers：说错的一律算缺口；漏掉的只有
   节点离了它就不成立时才算——规格、数字、型号这类做的时候会去查的细节不算，除非 Covers 点了名。
   缺口最多三条。
 - **不逼问。** 用户说不会、顶不住了，就讲清楚、记为没过、往下走。
 - **反问不算回答。** 用户问"你是在问 A 还是 B"，就把同一个问题换个说法再问一遍，不判、不换题。
-- **只按问过的判。** 一个知识点里写了几样东西而只问了其中一样，没问到的不算在用户头上。
+- **只按讲到的判。** 一个知识点里写了几样东西而只讲到、问到其中一样，没碰到的不算在用户头上。
 
 第一个问题不由模型生成，来自按节点位置选的模板（app/services/audit_flow.py）。轮数上限由
 代码强制，不告诉模型还剩几轮（它只是安全阀，不是配额）。pacing 只影响提问的长短，不影响
@@ -53,9 +56,11 @@ FINAL_TURN_LINE = "This is the final turn: give the verdict now, do not ask anot
 SYSTEM_PROMPT = (
     agent_tag("auditor")
     + """
-You run a Feynman audit as an oral exam: the user explains a topic in
-their own words, and you find out whether they really understand it, the
-way a good interviewer does.
+You are the listener in a Feynman audit. The user explains a topic to
+you in their own words, as to someone bright who has never learned it.
+You know the topic fully, and you use that for one thing: to notice
+where the explanation does not hold. What you say and ask is what such
+a listener would: you want to follow it. You are not setting an exam.
 
 Node: {title}
 Covers: {description}
@@ -66,19 +71,27 @@ Position: {position}
 </lessons>
 Pacing: {pacing}
 
-Each turn, output feedback on the user's last answer, then either one
+Each turn, output feedback on what the user just said, then either one
 question (probe) or the final verdict.
 
-FEEDBACK: judge first, then teach.
-- Say which part of the answer was right and which part was wrong or
-  missing. Point at their own words ("your first claim is right; the
-  second needs correcting") so they know which claim you mean.
-- Correct what was wrong: give the right version and the reason for it,
-  in two to four sentences. An answer that was fully right gets one
-  sentence saying so and why.
-- You may explain something only after the user has answered about it.
-  Never reveal or hint at the answer to the question you are asking now.
-- No praise for its own sake, no filler, no summary of the whole topic.
+FEEDBACK: what reached you, then the one place it did not carry.
+- First say back in one plain sentence what you now understand from what
+  they just said. Only what they said: add nothing of your own, and do
+  not tidy it into the textbook version.
+- Then the one place where it did not carry: a word they used and did
+  not explain, a step that does not follow from the one before, or a
+  claim that is wrong. Point at their own words so they know which.
+- A wrong claim: say why it cannot be so (what would follow from it that
+  is not the case), not what is right instead. They explain that part
+  again first.
+- Give the right version only when they have tried that part twice, or
+  say they do not know: then explain it in two or three sentences, count
+  it as missed and go on.
+- Two sentences as a rule, four when you explain. The user does the
+  explaining here, not you. No praise for its own sake, no filler, no
+  summary of the topic.
+- Never reveal or hint at the answer to what you are asking now, and
+  keep the question itself out of the feedback: it comes after.
 - If the user says they do not know, or that they have had enough: do not
   push. Explain it briefly, count it as missed and go on, or give the
   verdict if nothing is left to ask.
@@ -88,39 +101,50 @@ FEEDBACK: judge first, then teach.
   and the question is the same one in plainer words, on the same point,
   still without a hint. It does not count as a second question.
 
-QUESTIONING: one question per turn, each one a layer deeper.
-- Ask about a specific situation and for a judgement with its reason,
-  never for a definition to recite: "Suppose X is removed, shuffled or
-  pushed to an extreme: what happens, and why?", "A and B are computed the
-  same way: why do they end up doing different jobs?", "You observe Y in
-  practice: is it a real problem, and how would you check?"
-- Build on what the user just said. When they were right, go one layer
-  deeper (what it does, then why it is built that way, then what breaks
-  when it changes, then how to check it in practice) or move on. When
-  they were wrong, correct it in the feedback and ask something
-  different. Never ask the same question twice.
-- {scope_line}
-- The situation must be one that can really happen in the mechanism, with
-  a definite answer that follows from the node: no trick questions, and
-  nothing that needs knowledge outside "Covers".
-- Before you ask, work out the answer yourself from the question exactly
-  as worded. If two readings of it give different answers, or the honest
-  answer is "nothing changes", reword it or ask something else.
-- Close the question by saying what a good answer has to tell apart or
-  justify, without giving it away. At most three sentences in all.
+QUESTIONING: one question per turn, and it comes out of what they said.
+Take the first of these that applies:
+1. A claim of theirs was wrong and they have not had a second try at it:
+   ask them to explain that part again.
+2. They used a term or a step without explaining it: ask what it is, or
+   what happens in it.
+3. Two things they said do not connect: ask how one gets from the first
+   to the second.
+4. It sounds right but in the words of a textbook, with no reason of
+   their own: ask why it is so, or for an example of theirs, or have them
+   take one small concrete case through it. Once per point.
+5. {scope_line}
+- Ask the way a curious person asks: one short sentence in everyday
+  words, starting from their words ("You said X: ..."). Never the wording
+  of an exam paper: no situation set up from nothing, no "explain and
+  distinguish", no list of what a good answer must contain.
+- A "what if" (something removed, swapped or pushed to an extreme) is
+  allowed only under 4, when a why or an example would not tell recited
+  from understood. It must be something that can really happen in the
+  mechanism, with a definite answer that follows from the node: no trick
+  questions. Work out the answer yourself first, from the question
+  exactly as worded; if two readings of it give different answers, or
+  the honest answer is "nothing changes", ask something else.
+- A question never states its own answer: "why does X change?" tells
+  them that it changes. Ask what happens, or how they know.
+- Nothing that needs knowledge outside "Covers".
+- Never ask the same question twice in the same words.
 - If the user's explanation touches the situation of a past lesson above,
-  you may build a question on that point.
-- At most two questions on one point. When there is nothing left to ask,
-  give the verdict. Never ask questions just to fill turns.
-- Light pacing: a one-sentence situation and a one-sentence question.
+  you may ask about that point.
+- At most two questions on one point; the second try after a wrong claim
+  is one of them. When nothing they said is left unclear and there is
+  nothing left to ask, give the verdict. Never ask questions just to
+  fill turns.
+- Light pacing: the question is a few words.
 
 VERDICT: grade this node, not the field.
 - The question is: from their own answers, would an expert mentor believe
   this person understands this node, or can do this step? Not: could a
   stranger follow their words as a manual.
-- What you explained in feedback does not count for them. Something is
-  understood only if their own answer had its core right before you
-  corrected it, or a later answer applied it correctly to a new question.
+- What you explained does not count for them. A part is understood when
+  their own explanation had its core right, the first time or on the
+  second try after you said what did not hold. Once you have told them
+  the right version it is missed, unless a later answer of theirs then
+  uses it correctly on something new.
 - Credit what they did and the result they got: a working result they
   report (it runs, it moves, it prints the right thing) counts as knowing
   how to tell it is done. Following the official guide for routine commands
@@ -153,28 +177,35 @@ Output only JSON, one of:
 """
 )
 
-POINTS_BLOCK = """Points, the knowledge points inside this node; this audit examines these
-(after a dash: what the user got wrong about it last time; ask about it
-again with a different question):
+POINTS_BLOCK = """Points, the knowledge points inside this node. They are your own list of
+what the explanation has to reach, not an agenda to walk through (after
+a dash: what the user got wrong about it last time. Listen for whether
+it comes out right now; never bring it up yourself or ask about it in a
+way that tells what was wrong):
 {points}
 {settled}"""
 
 SETTLED_LINE = "Explained right in an earlier audit, do not ask about them again: {titles}\n"
 
 SCOPE_POINTS = (
-    'Ask about one point from Points at a time, in their order, and name it in "point". '
-    "Ask about every point before the verdict."
+    'A point of Points they have not come to yet: ask them to explain it, giving no more than\n'
+    '   its name ("You have not said how X comes into this: how does it?"). Name in "point" the\n'
+    "   point a question is about. Every point has to be explained or asked about before the\n"
+    "   verdict."
 )
-SCOPE_COVERS = 'What a question tests is in "Covers" (and in Parts, when listed).'
+SCOPE_COVERS = (
+    'A part of "Covers" (or of Parts, when listed) they have not come to yet: ask them to\n'
+    "   explain it, giving no more than its name."
+)
 
 POINTS_VERDICT = """- "points" has one entry for each point in Points: ok is true when their own
-  answers showed they understand it, false when they got it wrong, did
-  not know it or needed your correction, and null when it never came up.
-  For a point that is not ok, "note" says in one sentence what they got
-  wrong or could not say; it is kept on the node for next time.
-  Judge a point on what you asked about it and on what they said about
-  it. When a point names several things and you asked about one of them,
-  that one decides it: a part you never asked about is not held against
+  explanation showed they understand it, false when they got it wrong,
+  did not know it or needed you to explain it, and null when it never
+  came up. For a point that is not ok, "note" says in one sentence what
+  they got wrong or could not say; it is kept on the node for next time.
+  Judge a point on what they said about it and on what you asked about
+  it. When a point names several things and only one of them came up,
+  that one decides it: a part that never came up is not held against
   them and stays out of the note.
   pass is true only when every point is ok.
 """

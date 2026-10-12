@@ -196,13 +196,12 @@ void main() {
         '“Algebra” covers Quadratic Equations, Sequences. Why do these belong together, and when do you use which?',
       );
 
-      // A leaf is audited one knowledge point at a time, starting with the first.
+      // A leaf with points opens with the same explanation as one without.
       final leaf = await api.startAudit(6);
       expect(leaf.session.nodePosition, NodePosition.leaf);
       expect(
         leaf.openingQuestion,
-        "Let's take “Discriminant” one piece at a time. Start with “What Discriminant is”: "
-        'what does it do, and why is it needed?',
+        'Explain “Discriminant” from scratch to someone who has never heard of it.',
       );
       expect(leaf.session.points.map((p) => p.title), FakeApiClient.fakePointTitles('Discriminant'));
 

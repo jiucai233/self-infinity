@@ -161,7 +161,7 @@ def test_ut11_light_pacing_puts_the_pacing_line_in_the_prompt_and_leaves_the_lim
 
     assert "Pacing: normal" in system_prompt(normal)
     assert "Pacing: light" in system_prompt(light)
-    assert "Light pacing: a one-sentence situation and a one-sentence question." in system_prompt(light)
+    assert "Light pacing: the question is a few words." in system_prompt(light)
     assert "Pacing never changes this standard." in system_prompt(light)
 
     # 轮数上限照旧：light 下同样在上限处被强制裁决，没到上限时不会。
@@ -248,27 +248,49 @@ def test_a_reported_working_result_counts_as_the_check():
     assert "a working result they\n  report" in system_prompt(provider)
 
 
-def test_the_auditor_judges_first_then_teaches_and_never_hints_at_the_open_question():
+def test_the_auditor_is_a_listener_and_the_user_does_the_explaining():
     _, provider = next_turn(probe_json())
     prompt = system_prompt(provider)
 
-    assert "FEEDBACK: judge first, then teach." in prompt
-    assert "give the right version and the reason for it" in prompt
-    assert "You may explain something only after the user has answered about it." in prompt
-    assert "Never reveal or hint at the answer to the question you are asking now." in prompt
-    # What she explained is not the user's own understanding.
-    assert "What you explained in feedback does not count for them." in prompt
+    assert "You are the listener in a Feynman audit." in prompt
+    assert "You are not setting an exam." in prompt
+    assert "say back in one plain sentence what you now understand" in prompt
+    assert "The user does the\n  explaining here, not you." in prompt
 
 
-def test_questions_ask_for_a_judgement_in_a_situation_not_a_definition():
+def test_a_wrong_claim_gets_a_second_try_before_the_auditor_explains_it():
     _, provider = next_turn(probe_json())
     prompt = system_prompt(provider)
 
-    assert "Ask about a specific situation and for a judgement with its reason" in prompt
-    assert "never for a definition to recite" in prompt
-    assert "Never ask the same question twice." in prompt
-    assert "no trick questions" in prompt
-    assert "At most two questions on one point." in prompt
+    assert "say why it cannot be so" in prompt and "not what is right instead" in prompt
+    assert "Give the right version only when they have tried that part twice" in prompt
+    assert "Never reveal or hint at the answer to what you are asking now" in prompt
+    # What she explained is not the user's own understanding; a second try of their own is.
+    assert "What you explained does not count for them." in prompt
+    assert "the first time or on the\n  second try after you said what did not hold" in prompt
+
+
+def test_questions_come_out_of_what_the_user_said_not_from_an_exam_paper():
+    _, provider = next_turn(probe_json())
+    prompt = system_prompt(provider)
+
+    assert "QUESTIONING: one question per turn, and it comes out of what they said." in prompt
+    assert "They used a term or a step without explaining it" in prompt
+    assert "Two things they said do not connect" in prompt
+    assert "Never the wording\n  of an exam paper: no situation set up from nothing" in prompt
+    assert "A question never states its own answer" in prompt
+    assert "Never ask the same question twice in the same words." in prompt
+    assert "At most two questions on one point" in prompt
+
+
+def test_a_recited_explanation_is_checked_once_and_a_what_if_is_kept_for_that():
+    _, provider = next_turn(probe_json())
+    prompt = system_prompt(provider)
+
+    assert "in the words of a textbook, with no reason of\n   their own" in prompt
+    assert "Once per point." in prompt
+    assert 'A "what if" (something removed, swapped or pushed to an extreme) is\n  allowed only under 4' in prompt
+    assert "no trick\n  questions" in prompt
 
 
 def test_the_auditor_does_not_push_a_user_who_has_had_enough():
@@ -299,17 +321,20 @@ def test_without_points_the_prompt_has_no_points_block():
     prompt = system_prompt(provider)
 
     assert "Points, the knowledge points" not in prompt and '"points" has one entry' not in prompt
-    assert 'What a question tests is in "Covers"' in prompt
+    assert 'A part of "Covers" (or of Parts, when listed) they have not come to yet' in prompt
 
 
 def test_the_points_to_examine_are_listed_with_the_note_of_the_last_miss():
     _, provider = next_turn(probe_json(), points=POINTS, settled=["Completing the square"])
     prompt = system_prompt(provider)
 
-    assert "this audit examines these" in prompt
+    assert "your own list of\nwhat the explanation has to reach, not an agenda to walk through" in prompt
     assert "- Discriminant\n- Vieta's formulas — Mixed up the signs.\n" in prompt
+    # Last time's miss is listened for, not handed back as a leading question.
+    assert "never bring it up yourself" in prompt
     assert "do not ask about them again: Completing the square\n" in prompt
-    assert "Ask about one point from Points at a time" in prompt
+    assert "A point of Points they have not come to yet: ask them to explain it" in prompt
+    assert "Every point has to be explained or asked about before the\n   verdict." in prompt
     assert "pass is true only when every point is ok." in prompt
 
 

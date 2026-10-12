@@ -280,7 +280,9 @@ def test_the_live_audit_hands_each_answer_to_the_browser(client, realtime):
     instructions = session["instructions"]
     assert "Never judge, correct, explain, hint" in instructions
     assert "Stop speaking at once when the learner interrupts" in instructions
-    assert "A pause to think is not the end of" in instructions
+    assert "a pause to think is not its end, keep listening" in instructions
+    # Spoken to directly ("can you hear me?"), she answers; silence reads as a dead line.
+    assert "whether you can hear them" in instructions and "tell them to go on" in instructions
     # It speaks the Auditor's language (the learner's), not the interface's.
     assert "Never translate" in instructions and "Simplified Chinese" not in instructions
 

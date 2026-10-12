@@ -261,21 +261,16 @@ _TEXTS: dict[str, dict[str, str]] = {
         "zh": "向一个从没听说过{title}的人，从头讲清楚它。",
         "ko": "{title}에 대해 처음 듣는 사람에게 처음부터 설명해 보세요.",
     },
-    # a leaf with knowledge points: one point at a time, starting with the first one still open
-    "opening_points": {
-        "en": "Let's take {title} one piece at a time. Start with {point}: what does it do, and why is it needed?",
-        "zh": "我们把{title}一块一块过。先说{point}：它是做什么的？为什么需要它？",
-        "ko": "{title}을 한 부분씩 살펴볼게요. {point}부터: 무슨 일을 하고, 왜 필요한가요?",
-    },
+    # a leaf audited again: the points that held before are left out of the explanation
     "opening_points_again": {
-        "en": "What you already explained right stays cleared. This time only {points}. Start with {point}: what does it do, and why is it needed?",
-        "zh": "上次讲清楚的不再考，这次只看{points}。先说{point}：它是做什么的？为什么需要它？",
-        "ko": "지난번에 제대로 설명한 건 다시 묻지 않아요. 이번엔 {points}만 볼게요. {point}부터: 무슨 일을 하고, 왜 필요한가요?",
+        "en": "What you already explained right stays cleared. This time explain {points} to someone who has never heard of them, in your own words.",
+        "zh": "上次讲清楚的不用再讲。这次把{points}讲给一个从没听说过的人，用你自己的话。",
+        "ko": "지난번에 제대로 설명한 건 다시 묻지 않아요. 이번엔 {points}만, 처음 듣는 사람에게 본인 말로 설명해 보세요.",
     },
     "opening_point_again": {
-        "en": "What you already explained right stays cleared. This time only {point}: what does it do, and why is it needed?",
-        "zh": "上次讲清楚的不再考，这次只看{point}：它是做什么的？为什么需要它？",
-        "ko": "지난번에 제대로 설명한 건 다시 묻지 않아요. 이번엔 {point}만 볼게요: 무슨 일을 하고, 왜 필요한가요?",
+        "en": "What you already explained right stays cleared. This time explain only {point} to someone who has never heard of it, in your own words.",
+        "zh": "上次讲清楚的不用再讲。这次只把{point}讲给一个从没听说过的人，用你自己的话。",
+        "ko": "지난번에 제대로 설명한 건 다시 묻지 않아요. 이번엔 {point}만, 처음 듣는 사람에게 본인 말로 설명해 보세요.",
     },
     "opening_branch": {
         "en": "{title} covers {children}. Why do these belong together, and when do you use which?",

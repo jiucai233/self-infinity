@@ -2438,19 +2438,18 @@ class FakeApiClient implements SelfInfinityApi {
     }
   }
 
-  /// The opening of an audit that goes point by point: the first point still
-  /// open, and — when some held before — which ones this audit is about.
+  /// The opening of an audit on a leaf with points: an explanation, like a leaf
+  /// without points — narrowed to the points still open when some held before.
   String _pointsQuestion(SkillNode node, List<SkillPoint> examined) {
-    final ask = 'Start with “${examined.first.title}”: what does it do, and why is it needed?';
     if (examined.length == 1 && node.points.length > 1) {
-      return 'What you already explained right stays cleared. This time only '
-          '“${examined.first.title}”: what does it do, and why is it needed?';
+      return 'What you already explained right stays cleared. This time explain only '
+          '“${examined.first.title}” to someone who has never heard of it, in your own words.';
     }
     if (examined.length < node.points.length) {
-      return 'What you already explained right stays cleared. This time only '
-          '${examined.map((p) => p.title).join(', ')}. $ask';
+      return 'What you already explained right stays cleared. This time explain '
+          '${examined.map((p) => p.title).join(', ')} to someone who has never heard of them, in your own words.';
     }
-    return "Let's take “${node.title}” one piece at a time. $ask";
+    return _openingQuestion(node, NodePosition.leaf);
   }
 
   /// The knowledge points the script gives a leaf titled [title].

@@ -143,19 +143,14 @@ def opening_question(
     examined: list[str] | None = None,
     again: bool = False,
 ) -> str:
-    """`examined`: the knowledge points this audit asks about (a leaf that has them); `again`:
-    some of the node's points held before and are left out."""
-    if examined and not test_out:
-        if again and len(examined) == 1:
+    """An audit opens by asking for the explanation, never with a question about one point: the
+    user explains, and what she asks afterwards comes out of what they said. `examined`: the
+    knowledge points this audit is on (a leaf that has them); `again`: some of the node's
+    points held before, so only the ones still open are to be explained."""
+    if examined and again and not test_out:
+        if len(examined) == 1:
             return t("opening_point_again", point=quote(examined[0]))
-        if again:
-            return t(
-                "opening_points_again",
-                title=quote(skill.title),
-                points=join_list(examined),
-                point=quote(examined[0]),
-            )
-        return t("opening_points", title=quote(skill.title), point=quote(examined[0]))
+        return t("opening_points_again", points=join_list(examined))
     if test_out:
         if children:
             return t("opening_test_out", title=quote(skill.title), part=quote(children[0]))
