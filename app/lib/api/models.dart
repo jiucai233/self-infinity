@@ -2529,15 +2529,15 @@ class DevVoice {
 /// `GET /voice`, `PUT /voice`: the voice this account uses.
 @immutable
 class VoiceStatus {
-  const VoiceStatus({required this.available, required this.guide, required this.audit, this.choice});
+  const VoiceStatus({required this.available, required this.guide, required this.audit});
 
   factory VoiceStatus.fromJson(Json json) {
-    final c = json['choice'];
+    final g = json['guide'];
+    final a = json['audit'];
     return VoiceStatus(
       available: json['available'] == true,
-      guide: _strN(json, 'guide') ?? 'live',
-      audit: _strN(json, 'audit') ?? 'live',
-      choice: c == 'live' || c == 'realtime' ? c as String : null,
+      guide: g == 'live' || g == 'realtime' ? g as String : 'live',
+      audit: a == 'live' || a == 'turns' ? a as String : 'live',
     );
   }
 
@@ -2549,10 +2549,6 @@ class VoiceStatus {
 
   /// `live` or `turns`: what the audits run on.
   final String audit;
-
-  /// `live` (GPT-Live for both) or `realtime` (Realtime Guide, audits taking
-  /// turns); null when the server's defaults are a mix, or it is older.
-  final String? choice;
 }
 
 /// One provider an account's agents can run on (`GET /llm`).

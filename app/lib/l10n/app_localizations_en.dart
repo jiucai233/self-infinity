@@ -1606,7 +1606,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get devVoiceOtherCall => 'other call';
 
   @override
-  String get voiceModel => 'Voice';
+  String get voiceGuide => 'Guide voice';
+
+  @override
+  String get voiceAudit => 'Audit voice';
+
+  @override
+  String get voiceTurns => 'Turns';
 
   @override
   String get devVoiceAllTurns => 'All taking turns ≈';

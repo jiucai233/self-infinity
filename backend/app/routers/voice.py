@@ -21,17 +21,16 @@ PROFILE_ID = 1  # the single Profile row
 
 
 def _status(row: Profile | None) -> VoiceStatusOut:
-    """What this account opens first: its own choice, else the server's (GUIDE_VOICE,
+    """What this account opens first: each voice its own choice, else the server's (GUIDE_VOICE,
     AUDIT_VOICE)."""
-    chosen = row.voice if row is not None and row.voice in ("live", "realtime") else None
-    if chosen is not None:
-        guide, audit = ("live", "live") if chosen == "live" else ("realtime", "turns")
-    else:
+    both = getattr(row, "voice", None)  # the one choice for both of 2026-10-12
+    guide = getattr(row, "guide_voice", None) or {"live": "live", "realtime": "realtime"}.get(both)
+    audit = getattr(row, "audit_voice", None) or {"live": "live", "realtime": "turns"}.get(both)
+    if guide not in ("live", "realtime"):
         guide = "realtime" if settings.guide_voice == "realtime" else "live"
+    if audit not in ("live", "turns"):
         audit = "turns" if settings.audit_voice == "turns" else "live"
-        # The server's two say the same thing: that is the choice shown.
-        chosen = {("live", "live"): "live", ("realtime", "turns"): "realtime"}.get((guide, audit))
-    return VoiceStatusOut(available=voice.available(), guide=guide, audit=audit, choice=chosen)
+    return VoiceStatusOut(available=voice.available(), guide=guide, audit=audit)
 
 
 @router.get("", response_model=VoiceStatusOut)
@@ -41,10 +40,14 @@ def voice_status(session: Session = Depends(get_session)):
 
 @router.put("", response_model=VoiceStatusOut)
 def choose_voice(body: VoiceChoiceIn, session: Session = Depends(get_session)):
-    """The account's voice: "live" (GPT-Live for the Guide and the audits) or "realtime" (the
-    Realtime model for the Guide, live transcription and turns for the audits)."""
+    """The account's voices, one by one: the Guide's ("live": GPT-Live, "realtime": the
+    Realtime model) and the audits' ("live", or "turns": live transcription and replies read
+    aloud). The one not sent is kept."""
     row = session.get(Profile, PROFILE_ID) or Profile(id=PROFILE_ID)
-    row.voice = body.choice
+    if body.guide is not None:
+        row.guide_voice = body.guide
+    if body.audit is not None:
+        row.audit_voice = body.audit
     session.add(row)
     session.commit()
     return _status(row)

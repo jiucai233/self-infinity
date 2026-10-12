@@ -490,15 +490,7 @@ class _SettingsButtonState extends State<_SettingsButton> {
           ),
           // Not an entry to pick: the switch inside it takes the taps.
           const PopupMenuItem<String>(enabled: false, child: _ModelSwitch()),
-          PopupMenuItem<String>(
-            enabled: false,
-            height: 32,
-            child: Text(
-              context.l10n.voiceModel,
-              style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
-            ),
-          ),
-          const PopupMenuItem<String>(enabled: false, child: _VoiceSwitch()),
+          const PopupMenuItem<String>(enabled: false, child: _VoiceSwitches()),
           const PopupMenuDivider(),
           PopupMenuItem<String>(
             key: const Key('settings-tutorial'),
@@ -610,17 +602,18 @@ class _ModelSwitchState extends State<_ModelSwitch> {
   }
 }
 
-/// Live | Realtime: the voice this account uses. Live is GPT-Live for the home
-/// Guide and the audits; Realtime is the Realtime model for the Guide, with
-/// the audits taking turns. Off while the server has no speech.
-class _VoiceSwitch extends StatefulWidget {
-  const _VoiceSwitch();
+/// The voices this account uses, one switch each. The home Guide: Live is
+/// GPT-Live, Realtime the Realtime model. The audits: Live is GPT-Live, Turns
+/// is live transcription where a pause ends the turn. Off while the server has
+/// no speech.
+class _VoiceSwitches extends StatefulWidget {
+  const _VoiceSwitches();
 
   @override
-  State<_VoiceSwitch> createState() => _VoiceSwitchState();
+  State<_VoiceSwitches> createState() => _VoiceSwitchesState();
 }
 
-class _VoiceSwitchState extends State<_VoiceSwitch> {
+class _VoiceSwitchesState extends State<_VoiceSwitches> {
   late final SelfInfinityApi _api = context.read<SelfInfinityApi>();
   VoiceStatus? _status;
   bool _saving = false;
@@ -636,14 +629,14 @@ class _VoiceSwitchState extends State<_VoiceSwitch> {
       final status = await _api.getVoice();
       if (mounted) setState(() => _status = status);
     } on Object {
-      // the switch stays off: the server decides
+      // the switches stay off: the server decides
     }
   }
 
-  Future<void> _choose(String choice) async {
+  Future<void> _save({String? guide, String? audit}) async {
     setState(() => _saving = true);
     try {
-      final status = await _api.setVoice(choice);
+      final status = await _api.setVoice(guide: guide, audit: audit);
       if (mounted) setState(() => _status = status);
     } on ApiException catch (e) {
       if (mounted) showToast(context, e.userMessage);
@@ -652,31 +645,61 @@ class _VoiceSwitchState extends State<_VoiceSwitch> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  SegmentedButton<String> _switch({
+    required Key key,
+    required List<(String, Widget)> options,
+    required String? selected,
+    required void Function(String) onChosen,
+  }) {
     final status = _status;
     final enabled = status != null && status.available && !_saving;
-    final choice = status?.choice;
     return SegmentedButton<String>(
-      key: const Key('settings-voice'),
+      key: key,
       showSelectedIcon: false,
       emptySelectionAllowed: true,
       segments: [
-        ButtonSegment(
-          value: 'live',
-          enabled: enabled,
-          label: const Text('Live', key: Key('settings-voice-live')),
+        for (final (value, label) in options) ButtonSegment(value: value, enabled: enabled, label: label),
+      ],
+      selected: {?selected},
+      onSelectionChanged: (s) {
+        if (s.isNotEmpty) onChosen(s.first);
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+    final status = _status;
+    final label = theme.labelSmall?.copyWith(color: AppColors.textTertiary);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(context.l10n.voiceGuide, style: label),
+        const SizedBox(height: AppSpacing.xs),
+        _switch(
+          key: const Key('settings-voice-guide'),
+          options: const [
+            ('live', Text('Live', key: Key('settings-voice-guide-live'))),
+            ('realtime', Text('Realtime', key: Key('settings-voice-guide-realtime'))),
+          ],
+          selected: status?.guide,
+          onChosen: (v) => unawaited(_save(guide: v)),
         ),
-        ButtonSegment(
-          value: 'realtime',
-          enabled: enabled,
-          label: const Text('Realtime', key: Key('settings-voice-realtime')),
+        const SizedBox(height: AppSpacing.sm),
+        Text(context.l10n.voiceAudit, style: label),
+        const SizedBox(height: AppSpacing.xs),
+        _switch(
+          key: const Key('settings-voice-audit'),
+          options: [
+            ('live', const Text('Live', key: Key('settings-voice-audit-live'))),
+            ('turns', Text(context.l10n.voiceTurns, key: const Key('settings-voice-audit-turns'))),
+          ],
+          selected: status?.audit,
+          onChosen: (v) => unawaited(_save(audit: v)),
         ),
       ],
-      selected: {?choice},
-      onSelectionChanged: (s) {
-        if (s.isNotEmpty) unawaited(_choose(s.first));
-      },
     );
   }
 }

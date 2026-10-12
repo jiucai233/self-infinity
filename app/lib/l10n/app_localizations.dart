@@ -3034,11 +3034,23 @@ abstract class AppLocalizations {
   /// **'other call'**
   String get devVoiceOtherCall;
 
-  /// No description provided for @voiceModel.
+  /// No description provided for @voiceGuide.
   ///
   /// In en, this message translates to:
-  /// **'Voice'**
-  String get voiceModel;
+  /// **'Guide voice'**
+  String get voiceGuide;
+
+  /// No description provided for @voiceAudit.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit voice'**
+  String get voiceAudit;
+
+  /// No description provided for @voiceTurns.
+  ///
+  /// In en, this message translates to:
+  /// **'Turns'**
+  String get voiceTurns;
 
   /// No description provided for @devVoiceAllTurns.
   ///

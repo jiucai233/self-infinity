@@ -519,21 +519,22 @@ void main() {
       expect(h.lastBody, {'provider': 'claude'});
     });
 
-    test('GET /voice: the voice in use; a server from before has no choice', () async {
-      final h = ok({'available': true, 'guide': 'realtime', 'audit': 'turns', 'choice': 'realtime'});
+    test('GET /voice: the Guide\'s voice and the audits\'; anything else is Live', () async {
+      final h = ok({'available': true, 'guide': 'realtime', 'audit': 'turns'});
       final v = await h.api.getVoice();
       expect((h.last.method, h.last.url.path), ('GET', '/api/voice'));
-      expect((v.available, v.guide, v.audit, v.choice), (true, 'realtime', 'turns', 'realtime'));
-      final old = await ok({'available': true, 'guide': 'live', 'audit': 'live'}).api.getVoice();
-      expect(old.choice, isNull);
-      expect((await ok({'available': true, 'choice': 'x'}).api.getVoice()).choice, isNull);
+      expect((v.available, v.guide, v.audit), (true, 'realtime', 'turns'));
+      final odd = await ok({'available': true, 'guide': 'turns', 'audit': 'realtime'}).api.getVoice();
+      expect((odd.guide, odd.audit), ('live', 'live'));
     });
 
-    test('PUT /voice sends the choice', () async {
-      final h = ok({'available': true, 'guide': 'realtime', 'audit': 'turns', 'choice': 'realtime'});
-      expect((await h.api.setVoice('realtime')).choice, 'realtime');
+    test('PUT /voice sends only the voices given', () async {
+      final h = ok({'available': true, 'guide': 'live', 'audit': 'turns'});
+      expect((await h.api.setVoice(audit: 'turns')).audit, 'turns');
       expect((h.last.method, h.last.url.path), ('PUT', '/api/voice'));
-      expect(h.lastBody, {'choice': 'realtime'});
+      expect(h.lastBody, {'audit': 'turns'});
+      await h.api.setVoice(guide: 'realtime', audit: 'live');
+      expect(h.lastBody, {'guide': 'realtime', 'audit': 'live'});
     });
 
     test('GET /dev/llm: every call priced on one model', () async {

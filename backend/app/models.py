@@ -387,9 +387,14 @@ class Profile(SQLModel, table=True):
     # The provider this account's agents run on: "openai" | "claude"; NULL or "" = the server's
     # (app/llm/__init__.py). Nullable because it was added after the first release.
     llm_provider: str | None = None
-    # The voice this account talks with (PUT /api/voice): "live" (GPT-Live for the Guide and
-    # the audits) or "realtime" (the Realtime model for the Guide, turns for the audits);
-    # NULL = the server's (GUIDE_VOICE, AUDIT_VOICE).
+    # The voices this account talks with (PUT /api/voice), chosen one by one: the home Guide's,
+    # "live" (GPT-Live) or "realtime" (the Realtime model), and the audits', "live" or "turns"
+    # (live transcription, a pause ends the turn, the reply is read aloud). NULL = the server's
+    # (GUIDE_VOICE, AUDIT_VOICE).
+    guide_voice: str | None = None
+    audit_voice: str | None = None
+    # One choice for both, 2026-10-12 only ("live", or "realtime" = realtime and turns): read
+    # where the two above are NULL, never written.
     voice: str | None = None
 
 

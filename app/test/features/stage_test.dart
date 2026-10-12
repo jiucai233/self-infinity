@@ -281,29 +281,39 @@ void main() {
       expect(find.byKey(const Key('settings-tutorial')), findsOneWidget); // still open
     });
 
-    testWidgets('Live | Realtime: the voice; a tap saves it, the menu stays', (tester) async {
+    testWidgets('two voice switches: a tap saves one voice, the menu stays', (tester) async {
       final voiceApi = _VoiceOn();
       await pumpScene(tester, const MapScene(), api: voiceApi);
       await tester.tap(find.byKey(const Key('settings-button')));
       await tester.pumpAndSettle();
-      SegmentedButton<String> voice() => tester.widget(find.byKey(const Key('settings-voice')));
-      expect(find.text('Live'), findsOneWidget);
-      expect(find.text('Realtime'), findsOneWidget);
-      expect(voice().selected, {'live'});
+      SegmentedButton<String> guide() => tester.widget(find.byKey(const Key('settings-voice-guide')));
+      SegmentedButton<String> audit() => tester.widget(find.byKey(const Key('settings-voice-audit')));
+      expect(guide().selected, {'live'});
+      expect(audit().selected, {'live'});
 
-      await tester.tap(find.byKey(const Key('settings-voice-realtime')));
+      await tester.tap(find.byKey(const Key('settings-voice-audit-turns')));
       await tester.pumpAndSettle();
-      expect((await voiceApi.getVoice()).choice, 'realtime');
-      expect(voice().selected, {'realtime'});
+      final v = await voiceApi.getVoice();
+      expect((v.guide, v.audit), ('live', 'turns'));
+      expect(audit().selected, {'turns'});
       expect(find.byKey(const Key('settings-tutorial')), findsOneWidget); // still open
+
+      await tester.tap(find.byKey(const Key('settings-voice-guide-realtime')));
+      await tester.pumpAndSettle();
+      final w = await voiceApi.getVoice();
+      expect((w.guide, w.audit), ('realtime', 'turns'));
+      expect(guide().selected, {'realtime'});
+      expect(find.byKey(const Key('settings-tutorial')), findsOneWidget);
     });
 
-    testWidgets('without speech on the server both voices are off', (tester) async {
+    testWidgets('without speech on the server all four voices are off', (tester) async {
       await pumpScene(tester, const MapScene(), api: api);
       await tester.tap(find.byKey(const Key('settings-button')));
       await tester.pumpAndSettle();
-      final voice = tester.widget<SegmentedButton<String>>(find.byKey(const Key('settings-voice')));
-      expect([for (final s in voice.segments) (s.value, s.enabled)], [('live', false), ('realtime', false)]);
+      for (final key in ['settings-voice-guide', 'settings-voice-audit']) {
+        final voice = tester.widget<SegmentedButton<String>>(find.byKey(Key(key)));
+        expect(voice.segments.map((s) => s.enabled), [false, false]);
+      }
     });
 
     testWidgets('a provider the server has no key for cannot be chosen', (tester) async {
@@ -552,8 +562,9 @@ class _VoiceOn extends FakeApiClient {
   Future<VoiceStatus> getVoice() async => _on(await super.getVoice());
 
   @override
-  Future<VoiceStatus> setVoice(String choice) async => _on(await super.setVoice(choice));
+  Future<VoiceStatus> setVoice({String? guide, String? audit}) async =>
+      _on(await super.setVoice(guide: guide, audit: audit));
 
   VoiceStatus _on(VoiceStatus v) =>
-      VoiceStatus(available: true, guide: v.guide, audit: v.audit, choice: v.choice);
+      VoiceStatus(available: true, guide: v.guide, audit: v.audit);
 }

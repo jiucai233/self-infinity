@@ -1589,7 +1589,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get devVoiceOtherCall => '또 하나의 호출';
 
   @override
-  String get voiceModel => '음성';
+  String get voiceGuide => '홈 가이드 음성';
+
+  @override
+  String get voiceAudit => '감사 음성';
+
+  @override
+  String get voiceTurns => '차례대로';
 
   @override
   String get devVoiceAllTurns => '전부 차례대로 ≈';

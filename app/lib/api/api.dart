@@ -334,13 +334,16 @@ abstract class SelfInfinityApi {
   /// when the server has no key for it.
   Future<LlmStatus> setLlm(String provider);
 
-  /// `GET /voice` (no LLM): the voice this account uses: GPT-Live, or Realtime
-  /// with the audits taking turns. `choice` is null when the server's defaults
-  /// are a mix.
+  /// `GET /voice` (no LLM): the voices this account uses, chosen separately:
+  /// the Guide's (`live`: GPT-Live, `realtime`: the Realtime model) and the
+  /// audits' (`live`: GPT-Live, `turns`: live transcription, a pause ends the
+  /// turn, the reply is read aloud).
   Future<VoiceStatus> getVoice();
 
-  /// `PUT /voice` (no LLM): chooses `live` or `realtime` for this account.
-  Future<VoiceStatus> setVoice(String choice);
+  /// `PUT /voice` (no LLM): chooses the Guide's voice (`live` or `realtime`)
+  /// and/or the audits' (`live` or `turns`) for this account; a null one is
+  /// left as it is.
+  Future<VoiceStatus> setVoice({String? guide, String? audit});
 
   /// `GET /dev/llm` (developers only): what the text agents' calls cost, by
   /// provider, by agent and per audit.

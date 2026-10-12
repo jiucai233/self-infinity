@@ -33,14 +33,14 @@ def openai_fixture(monkeypatch):
 
 
 def test_without_a_key_voice_is_unavailable(client):
-    assert client.get("/api/voice").json() == {"available": False, "guide": "live", "audit": "live", "choice": "live"}
+    assert client.get("/api/voice").json() == {"available": False, "guide": "live", "audit": "live"}
     assert client.post("/api/voice/transcribe", files={"file": ("a.webm", b"x", "audio/webm")}).status_code == 503
     assert client.post("/api/voice/speech", json={"text": "hi"}).status_code == 503
 
 
 def test_transcribe_sends_the_recording_and_the_languages(client, openai):
     calls = openai(httpx.Response(200, json={"text": " 判别式是 b²−4ac "}))
-    assert client.get("/api/voice").json() == {"available": True, "guide": "live", "audit": "live", "choice": "live"}
+    assert client.get("/api/voice").json() == {"available": True, "guide": "live", "audit": "live"}
 
     response = client.post(
         "/api/voice/transcribe",
@@ -290,31 +290,50 @@ def test_the_live_audit_needs_a_key(client, realtime, monkeypatch):
     assert client.post("/api/voice/live/audit", content="v=0").status_code == 503
 
 
-def test_an_account_chooses_live_or_realtime_for_both_voices(client, monkeypatch):
+def test_an_account_chooses_each_voice_by_itself(client, client_engine, monkeypatch):
     def status():
         body = client.get("/api/voice").json()
-        return body["guide"], body["audit"], body["choice"]
+        return body["guide"], body["audit"]
 
-    assert status() == ("live", "live", "live")  # the server's own
-    put = client.put("/api/voice", json={"choice": "realtime"})
-    # The Realtime model for the Guide; turns over live transcription for the audits.
-    assert put.status_code == 200 and put.json()["choice"] == "realtime"
-    assert status() == ("realtime", "turns", "realtime")
-    # The account's choice wins over the server's settings.
+    assert status() == ("live", "live")  # the server's own
+    # The audits take turns; the Guide stays where it was.
+    put = client.put("/api/voice", json={"audit": "turns"})
+    assert put.status_code == 200 and put.json() == {"available": False, "guide": "live", "audit": "turns"}
+    assert status() == ("live", "turns")
+    client.put("/api/voice", json={"guide": "realtime"})
+    assert status() == ("realtime", "turns")
+    # The account's choices win over the server's settings.
     monkeypatch.setattr(settings, "guide_voice", "live")
     monkeypatch.setattr(settings, "audit_voice", "live")
-    assert status() == ("realtime", "turns", "realtime")
-    client.put("/api/voice", json={"choice": "live"})
-    assert status() == ("live", "live", "live")
-    for bad in ("turns", "", None):
-        assert client.put("/api/voice", json={"choice": bad}).status_code == 422
+    assert status() == ("realtime", "turns")
+    client.put("/api/voice", json={"guide": "live", "audit": "live"})
+    assert status() == ("live", "live")
+    for bad in ({}, {"guide": "turns"}, {"audit": "realtime"}, {"guide": ""}, {"choice": "live"}):
+        assert client.put("/api/voice", json=bad).status_code == 422
 
 
-def test_a_server_whose_two_voices_differ_shows_no_choice(client, monkeypatch):
+def test_an_account_that_has_not_chosen_follows_the_server(client, monkeypatch):
     monkeypatch.setattr(settings, "audit_voice", "turns")
-    assert client.get("/api/voice").json() == {"available": False, "guide": "live", "audit": "turns", "choice": None}
+    assert client.get("/api/voice").json() == {"available": False, "guide": "live", "audit": "turns"}
     monkeypatch.setattr(settings, "guide_voice", "realtime")
-    assert client.get("/api/voice").json()["choice"] == "realtime"
+    assert client.get("/api/voice").json()["guide"] == "realtime"
+    # One of the two chosen: the other still follows the server.
+    client.put("/api/voice", json={"guide": "live"})
+    assert client.get("/api/voice").json() == {"available": False, "guide": "live", "audit": "turns"}
+
+
+def test_the_one_choice_for_both_of_the_first_day_still_counts(client, client_engine):
+    from sqlmodel import Session
+
+    from app.models import Profile
+
+    with Session(client_engine) as session:
+        session.add(Profile(id=1, voice="realtime"))
+        session.commit()
+    assert client.get("/api/voice").json() == {"available": False, "guide": "realtime", "audit": "turns"}
+    # A choice made since replaces it for that voice only.
+    client.put("/api/voice", json={"audit": "live"})
+    assert client.get("/api/voice").json() == {"available": False, "guide": "realtime", "audit": "live"}
 
 
 def test_the_length_of_an_mp3_is_read_from_its_first_frame():

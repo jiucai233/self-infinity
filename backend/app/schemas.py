@@ -899,13 +899,19 @@ class VoiceStatusOut(BaseModel):
     guide: Literal["live", "realtime"] = "live"
     # Which voice an audit opens first: "live" (GPT-Live) or "turns" (live transcription).
     audit: Literal["live", "turns"] = "live"
-    # The account's voice: "live" (GPT-Live for both) or "realtime" (the Realtime model for the
-    # Guide, turns for the audits). None when it has not chosen and the server's two are a mix.
-    choice: Literal["live", "realtime"] | None = None
 
 
 class VoiceChoiceIn(BaseModel):
-    choice: Literal["live", "realtime"]
+    """The account's voices, either or both; an omitted one is kept."""
+
+    guide: Literal["live", "realtime"] | None = None
+    audit: Literal["live", "turns"] | None = None
+
+    @model_validator(mode="after")
+    def _something_chosen(self) -> "VoiceChoiceIn":
+        if self.guide is None and self.audit is None:
+            raise ValueError("choose a voice for the guide, the audits, or both")
+        return self
 
 
 class TranscriptOut(BaseModel):

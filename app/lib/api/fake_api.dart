@@ -2013,15 +2013,11 @@ class FakeApiClient implements SelfInfinityApi {
     return _llmStatus;
   }
 
-  // Offline there is no speech server; the choice is only kept.
-  String _voiceChoice = 'live';
+  // Offline there is no speech server; the choices are only kept.
+  String _voiceGuide = 'live';
+  String _voiceAudit = 'live';
 
-  VoiceStatus get _voiceStatus => VoiceStatus(
-    available: false,
-    guide: _voiceChoice == 'realtime' ? 'realtime' : 'live',
-    audit: _voiceChoice == 'realtime' ? 'turns' : 'live',
-    choice: _voiceChoice,
-  );
+  VoiceStatus get _voiceStatus => VoiceStatus(available: false, guide: _voiceGuide, audit: _voiceAudit);
 
   @override
   Future<VoiceStatus> getVoice() async {
@@ -2030,10 +2026,12 @@ class FakeApiClient implements SelfInfinityApi {
   }
 
   @override
-  Future<VoiceStatus> setVoice(String choice) async {
+  Future<VoiceStatus> setVoice({String? guide, String? audit}) async {
     await _begin('setVoice');
-    _require(choice == 'live' || choice == 'realtime', 'choice must be live or realtime');
-    _voiceChoice = choice;
+    _require(guide == null || guide == 'live' || guide == 'realtime', 'guide must be live or realtime');
+    _require(audit == null || audit == 'live' || audit == 'turns', 'audit must be live or turns');
+    _voiceGuide = guide ?? _voiceGuide;
+    _voiceAudit = audit ?? _voiceAudit;
     return _voiceStatus;
   }
 

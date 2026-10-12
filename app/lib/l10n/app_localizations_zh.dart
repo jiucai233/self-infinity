@@ -1583,7 +1583,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get devVoiceOtherCall => '另一份调用';
 
   @override
-  String get voiceModel => '语音';
+  String get voiceGuide => '首页 Guide 的语音';
+
+  @override
+  String get voiceAudit => '审计的语音';
+
+  @override
+  String get voiceTurns => '轮流';
 
   @override
   String get devVoiceAllTurns => '全用轮流模式 ≈';
