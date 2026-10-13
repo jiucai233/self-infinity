@@ -1637,5 +1637,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get replayReflectHint => '你当时是怎么想的？…';
 
   @override
+  String get feedbackTooHard => '这个现在太难了';
+
+  @override
+  String get feedbackMisheard => '我没这么说';
+
+  @override
+  String get feedbackTooHardNoted => '已记下：太难了';
+
+  @override
+  String get feedbackMisheardNoted => '已记下：你没这么说';
+
+  @override
   String get notReflectedYet => '还没反思';
 }

@@ -3130,6 +3130,30 @@ abstract class AppLocalizations {
   /// **'What did you believe at the time?…'**
   String get replayReflectHint;
 
+  /// No description provided for @feedbackTooHard.
+  ///
+  /// In en, this message translates to:
+  /// **'Too hard for now'**
+  String get feedbackTooHard;
+
+  /// No description provided for @feedbackMisheard.
+  ///
+  /// In en, this message translates to:
+  /// **'I didn\'t say that'**
+  String get feedbackMisheard;
+
+  /// No description provided for @feedbackTooHardNoted.
+  ///
+  /// In en, this message translates to:
+  /// **'Noted: too hard for now'**
+  String get feedbackTooHardNoted;
+
+  /// No description provided for @feedbackMisheardNoted.
+  ///
+  /// In en, this message translates to:
+  /// **'Noted: you didn\'t say that'**
+  String get feedbackMisheardNoted;
+
   /// No description provided for @notReflectedYet.
   ///
   /// In en, this message translates to:

@@ -170,6 +170,13 @@ class HttpApi implements SelfInfinityApi {
   Future<AuditSession> getAudit(int auditId) =>
       _get('/audits/$auditId', parse: (j) => AuditSession.fromJson(_object(j)));
 
+  @override
+  Future<AuditSession> auditFeedback(int auditId, AuditFeedback kind) => _post(
+    '/audits/$auditId/feedback',
+    body: {'kind': kind.wire},
+    parse: (j) => AuditSession.fromJson(_object(j)),
+  );
+
   // -- 13: briefing ----------------------------------------------
 
   @override

@@ -136,10 +136,12 @@ def choose_tier(session: Session, bucket: str) -> str:
     return best_tier
 
 
-def update_arm(session: Session, bucket: str, tier: str, reward: bool) -> None:
+def update_arm(session: Session, bucket: str, tier: str, reward: float, weight: float = 1.0) -> None:
+    """`reward`, 0 to 1, is the audit's progress (app/services/learner.py), not whether it
+    passed: rewarded with passes, the sampler settles on the easiest tier. `weight`: how much
+    the verdict counts (less when its votes disagreed)."""
     arm = _get_or_create_arm(session, bucket, tier)
-    if reward:
-        arm.alpha += 1
-    else:
-        arm.beta += 1
+    reward = min(1.0, max(0.0, float(reward)))
+    arm.alpha += weight * reward
+    arm.beta += weight * (1 - reward)
     session.add(arm)

@@ -180,6 +180,15 @@ Planner 只决定结构，不生成教学内容。内容质量由审计把关：
 
 **每日任务按时间和状态安排**（`services/day_plan.py`）：一天的专注时间按 4 小时算——即使是专家，刻意练习每天也就 4 小时左右 [Ericsson et al., 1993]；状态 `low` 时减半，没有打卡时按 3 小时；今天的审计已经用掉的时间（从开题到最后一轮）扣掉。剩下的时间按时段分给两类事：需要判断的（学新节点、整块挑战、分支）和回忆类的（复习已通过的节点）。早上 80/20，下午 60/40，晚上 25/75，深夜最多一个短复习。晚上偏复习，是因为学完后的睡眠帮助巩固记忆 [Gais et al., 2006; Diekelmann & Born, 2010]：今天通过的节点，睡前再讲一遍。复习本身是提取练习 [Roediger & Karpicke, 2006]，按间隔排期——通过后 1、3、7、14 天，之后每 30 天 [Cepeda et al., 2006]。状态低时不安排挑战，只排叶子节点。时段比例是默认值：人的最佳时段因作息类型而异 [Schmidt et al., 2007]，计划里记录了时段，之后可以用用户自己按时段的通过率来校正。每日任务上方有一句说明，今天的打卡如果落在用户自己某个规律的较差一组（比如今天睡不满 6 小时），就引用他自己的通过率。
 
+**学习者模型与裁判校准（2026-10-13）。** 这里有两个互相咬合的学习系统：系统给用户出题、判分（用户在学），用户的结果又是系统调整出题的信号（系统在学）。两边共用同一个信号——审计官的裁决——而它是有噪声的，所以先校准裁判，再用它调难度。模型权重和 prompt 的文字都不动，学的是几十个数，和一个人的数据量相称。
+
+- **裁判当作有噪声的 reward。** 借的是强化学习里处理 critic 的办法：裁决并行判 3 次取多数（集成），分歧的那场只算半步（按不确定性加权）；裁判的误放率、误杀率有一个实测的先验，再随用户对裁决的反馈更新；一个结果的分量是“给定裁决和这两个错误率，它真的讲对了的概率”[Dawid & Skene, 1979; Wang et al., 2020]，所以一次判挂不等于零分；裁判规则带版本号，换了版本的裁决不混在一起算（相当于 target network 的冻结）。
+- **裁判准不准，先量出来。** 用更强的模型（Opus 5.5）独立标注了线上一个账号的 19 场真实审计。只看它有把握的 13 场、每场重判 4 次：旧规则把该过的判挂 14/20、把该挂的判过 4/32；改规则后是 6/20 和 0/32。原裁决列出的 40 条缺口里，站得住的 16 条，过严的 18 条，裁判自己知识错的 4 条，听错用户的话 1 条，对话里没提过的 1 条。标注者也是 LLM，是参考不是真理，它自己标了“两可”的 6 场不当硬标签用。
+- **能力值与难度值。** 账号一个能力值、每个知识点一个难度值，讲对的概率是两者之差的 logistic，每个结果之后各挪一步（Elo 更新，同 Math Garden [Klinkenberg et al., 2011]）。推荐时每个候选节点带上这个概率，Recommender 优先选最接近 75% 的——线上那个账号的实际通过率是 9%，离“略超出能力”很远。
+- **reward 是进步，不是通过。** bandit 原来用“过没过”当 reward，Thompson Sampling 会收敛到最容易的那一档。现在的 reward 是结果超出预期的部分（分量 ×（1 − 预期概率））：本来就会的几乎不加分，够不着的拿不到，中间最高 [Clement et al., 2015]。
+- **用户能说的两句话。** 用户判断不了自己讲得对不对，但能可靠地说两件事：“这个现在太难了”（难度信号，这场的知识点立刻调难）和“我没这么说”（裁判信号，算一次误杀）。
+- **做不到的，如实写。** 单人数据学不出提问策略和复习间隔，也不训练任何模型权重；这是 bandit 加在线校准，RL 的成分在结构不在规模。
+
 ### 4.5 每日打卡与 컨디션
 
 用户可以填结构化字段（睡眠、压力等），也可以写一段自由文本，由 Check-in Converter 转成字段；文本里没提到的字段留空，不猜，但入睡和起床时间算说了（“11 点睡到 7 点”= 8 小时）。一天里分几次说的（早上说睡眠、晚上说运动）会合并到当天这一行：新说到的字段覆盖，没说到的保留。语音 Guide 被要求一听到就调用打卡工具；它没调用时，对话记录会经过一个兜底：Decisions API 先判断这句话有没有在报告当天的状态，是的话再转换，找到字段才写入。睡眠质量（1–5）、运动分钟数、体重三项只在说到或填了时记录，从不追问。最近 3 次打卡的平均睡眠 < 6 小时、平均压力 ≥ 4 或平均专注 ≤ 2 → `low`；没有打卡 → `unknown`。
@@ -286,6 +295,10 @@ SQLite 起步，schema 不依赖 SQLite 特性。启动时检测到旧（DAG 之
 - Gais, S., Lucas, B., & Born, J. (2006). Sleep after learning aids memory recall. *Learning & Memory, 13*(3), 259–262.
 - Hattie, J., & Timperley, H. (2007). The power of feedback. *Review of Educational Research, 77*(1), 81–112.
 - Packer, C., et al. (2023). MemGPT: Towards LLMs as operating systems. arXiv:2310.08560.
+- Dawid, A. P., & Skene, A. M. (1979). Maximum likelihood estimation of observer error-rates using the EM algorithm. Applied Statistics, 28(1), 20–28.
+- Wang, J., Liu, Y., & Li, B. (2020). Reinforcement learning with perturbed rewards. AAAI 2020.
+- Klinkenberg, S., Straatemeier, M., & van der Maas, H. L. J. (2011). Computer adaptive practice of Maths ability using a new item response model for on the fly ability and difficulty estimation. Computers & Education, 57(2), 1813–1824.
+- Clement, B., Roy, D., Oudeyer, P.-Y., & Lopes, M. (2015). Multi-armed bandits for intelligent tutoring systems. Journal of Educational Data Mining, 7(2).
 - Rasmussen, P., et al. (2025). Zep: A temporal knowledge graph architecture for agent memory. arXiv:2501.13956.
 - Roediger, H. L., & Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. *Psychological Science, 17*(3), 249–255.
 - Schmidt, C., Collette, F., Cajochen, C., & Peigneux, P. (2007). A time to think: Circadian rhythms in human cognition. *Cognitive Neuropsychology, 24*(7), 755–789.

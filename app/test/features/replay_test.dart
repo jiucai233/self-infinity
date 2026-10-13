@@ -3,6 +3,7 @@
 // writes themselves.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:self_infinity/api/api.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/router.dart';
@@ -138,6 +139,58 @@ void main() {
       expect(row(0).style!.color, AppColors.danger);
       expect(row(1).data, 'Held: Reason before conclusion');
       expect(row(1).style!.color, AppColors.success);
+    });
+
+    testWidgets('the feedback buttons show only for a fail with their callbacks', (tester) async {
+      await pumpCard(tester, VerdictCard(verdict: failedVerdict, onBack: () {}));
+      expect(key('verdict-too-hard'), findsNothing);
+      expect(key('verdict-misheard'), findsNothing);
+
+      var told = 0;
+      await pumpCard(
+        tester,
+        VerdictCard(
+          verdict: failedVerdict,
+          onTooHard: () => told++,
+          onMisheard: () => told += 10,
+          onBack: () {},
+        ),
+      );
+      expect(find.text('Too hard for now'), findsOneWidget);
+      expect(find.text("I didn't say that"), findsOneWidget);
+      await tester.tap(key('verdict-too-hard'));
+      await tester.tap(key('verdict-misheard'));
+      expect(told, 11);
+
+      await pumpCard(
+        tester,
+        VerdictCard(
+          verdict: const VerdictResult(passed: true, score: 90),
+          onTooHard: () {},
+          onMisheard: () {},
+          onBack: () {},
+        ),
+      );
+      expect(key('verdict-too-hard'), findsNothing);
+      expect(key('verdict-misheard'), findsNothing);
+    });
+
+    testWidgets('a button already used gives way to a line saying it was noted', (tester) async {
+      await pumpCard(
+        tester,
+        VerdictCard(
+          verdict: failedVerdict,
+          onTooHard: () {},
+          onMisheard: () {},
+          tooHardNoted: true,
+          onBack: () {},
+        ),
+      );
+      expect(key('verdict-too-hard'), findsNothing);
+      expect(key('verdict-too-hard-noted'), findsOneWidget);
+      expect(find.text('Noted: too hard for now'), findsOneWidget);
+      expect(key('verdict-misheard'), findsOneWidget);
+      expect(key('verdict-misheard-noted'), findsNothing);
     });
 
     testWidgets('after a real fail the card quotes the last answer', (tester) async {
@@ -288,6 +341,56 @@ void main() {
     });
   });
 
+  group('the feedback on a fail', () {
+    testWidgets('a failed audit offers both; tapping one sends it and says it was noted', (
+      tester,
+    ) async {
+      final failed = await failAudit(api, 6);
+      await pumpReplay(tester, api, failed.sessionId);
+      expect(find.text('Too hard for now'), findsOneWidget);
+      expect(find.text("I didn't say that"), findsOneWidget);
+      await tester.ensureVisible(key('replay-too-hard'));
+      await tester.pumpAndSettle();
+      await tester.tap(key('replay-too-hard'));
+      await tester.pumpAndSettle();
+      expect(key('replay-too-hard'), findsNothing);
+      expect(find.text('Noted: too hard for now'), findsOneWidget);
+      expect(key('replay-misheard'), findsOneWidget);
+      expect(key('replay-misheard-noted'), findsNothing);
+      final audit = await api.getAudit(failed.sessionId);
+      expect([audit.tooHard, audit.disputed], [true, false]);
+
+      await tester.tap(key('replay-misheard'));
+      await tester.pumpAndSettle();
+      expect(find.text('Noted: you didn\'t say that'), findsOneWidget);
+      expect((await api.getAudit(failed.sessionId)).disputed, isTrue);
+    });
+
+    testWidgets('a reopened audit shows what was already noted', (tester) async {
+      final failed = await failAudit(api, 6);
+      await api.auditFeedback(failed.sessionId, AuditFeedback.misheard);
+      await pumpReplay(tester, api, failed.sessionId);
+      expect(key('replay-misheard-noted'), findsOneWidget);
+      expect(key('replay-misheard'), findsNothing);
+      expect(key('replay-too-hard'), findsOneWidget);
+    });
+
+    testWidgets('a failed call leaves the button to try again', (tester) async {
+      final failed = await failAudit(api, 6);
+      await pumpReplay(tester, api, failed.sessionId);
+      api.failNext(method: 'auditFeedback');
+      await tester.ensureVisible(key('replay-too-hard'));
+      await tester.pumpAndSettle();
+      await tester.tap(key('replay-too-hard'));
+      await tester.pumpAndSettle();
+      expect(key('replay-too-hard-noted'), findsNothing);
+      expect(tester.widget<TextButton>(key('replay-too-hard')).onPressed, isNotNull);
+      await tester.tap(key('replay-too-hard'));
+      await tester.pumpAndSettle();
+      expect(key('replay-too-hard-noted'), findsOneWidget);
+    });
+  });
+
   group('the replay of a pass', () {
     testWidgets('Passed and the score; no gaps, no reflection box', (tester) async {
       final passed = await passAudit(api, 6);
@@ -299,6 +402,8 @@ void main() {
       expect(key('replay-reflection'), findsNothing);
       expect(key('replay-submit'), findsNothing);
       expect(key('replay-lesson'), findsNothing);
+      expect(key('replay-too-hard'), findsNothing);
+      expect(key('replay-misheard'), findsNothing);
     });
   });
 

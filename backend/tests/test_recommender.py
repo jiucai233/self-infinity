@@ -80,9 +80,43 @@ def test_the_prompt_lists_nodes_tier_clusters_and_condition():
     assert system.startswith("[agent: recommender]")
     nodes = json.loads(system.split("<available_nodes>\n")[1].split("\n</available_nodes>")[0])
     assert nodes == [{"skill_id": 1, "title": "Quadratic Functions", "position": "leaf", "tier": "hard",
-                      "unmet_requires": ["Quadratic Equations"], "kind": "learn", "minutes": 25}]
+                      "unmet_requires": ["Quadratic Equations"], "kind": "learn", "minutes": 25, "chance": 50}]
     assert "Suggested difficulty tier: medium" in system and "Condition: low" in system
     assert "Time of day: morning" in system
+
+
+
+def test_the_chance_of_each_node_reaches_the_prompt():
+    provider = reply(1, 2)
+    Recommender(provider).recommend(
+        [Candidate(1, "A", "leaf", "easy", chance=82), Candidate(2, "B", "leaf", "hard", chance=31)], "medium", [], "normal"
+    )
+
+    (system,) = provider.system_prompts("recommender")
+    nodes = json.loads(system.split("<available_nodes>\n")[1].split("\n</available_nodes>")[0])
+    assert [n["chance"] for n in nodes] == [82, 31]
+    flat = " ".join(system.split())
+    assert "the estimated chance, in percent, that the user explains it right today" in flat
+    assert "Prefer nodes whose chance is nearest 75" in flat
+
+
+def test_planning_gives_a_node_the_chance_the_learner_model_estimates(client_engine):
+    from app.models import AuditStatus
+    from app.services import learner, planning
+    from tests.helpers import make_audit
+
+    with Session(client_engine) as session:
+        course = make_course(session)
+        node = make_skill(session, course, "a")
+        other = make_skill(session, course, "b")
+        before = {c.skill_id: c.chance for c in planning._candidates(session, [node, other])}
+        assert before[node.id] == before[other.id] == round(learner.node_chance(session, node, "medium") * 100)
+
+        learner.too_hard(session, make_audit(session, node, AuditStatus.failed), node)
+        after = {c.skill_id: c.chance for c in planning._candidates(session, [node, other])}
+
+    assert after[node.id] < before[node.id]
+    assert after[other.id] == before[other.id]
 
 
 # ---------------------------------------------------------------- the Mock script, contract 4.6

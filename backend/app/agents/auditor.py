@@ -58,6 +58,10 @@ PACINGS = ("normal", "light")
 
 MAX_GAPS = 3
 
+# Changed with the rules a verdict is given under; kept on each audit, so verdicts of
+# different rules are not counted as one judge's.
+JUDGE_VERSION = "2026-10-13"
+
 GENERIC_PROBE = "Could you explain that part a bit more specifically?"
 FORCED_GAPS = ["Could not confirm a sufficient explanation within the question limit."]
 FORCED_COMMENT = "Reached the maximum number of questions, so this counts as not passed."

@@ -236,6 +236,21 @@ void main() {
       expect(s.principle, isNull);
       expect(s.skillTitle, '');
       expect(s.createdAt, isNull);
+      expect(s.agreement, isNull);
+      expect(s.tooHard, isFalse);
+      expect(s.disputed, isFalse);
+    });
+
+    test('an AuditSession reads the agreement and what the user said about the fail', () {
+      final s = AuditSession.fromJson(
+        obj(
+          '{"id": 31, "skill_id": 5, "node_position": "leaf", "status": "failed", '
+          '"agreement": 0.75, "too_hard": true, "disputed": false}',
+        ),
+      );
+      expect(s.agreement, 0.75);
+      expect(s.tooHard, isTrue);
+      expect(s.disputed, isFalse);
     });
 
     test('TurnResult: passing verdict with reward', () {

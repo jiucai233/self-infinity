@@ -131,6 +131,7 @@ class FakeApiClient implements SelfInfinityApi {
     'submitTurn',
     'submitReflection',
     'getAudit',
+    'auditFeedback',
     'checkInVoice',
     'getBriefing',
     'narrate',
@@ -825,6 +826,26 @@ class FakeApiClient implements SelfInfinityApi {
     await _begin('getAudit');
     final audit = _audits[auditId];
     if (audit == null) throw const ApiException(404, 'audit session not found');
+    return audit.toModel(
+      principle: _principles.where((p) => p.id == audit.principleId).firstOrNull,
+      skillTitle: (_nodes[audit.skillId] ?? _hiddenNodes[audit.skillId])!.title,
+    );
+  }
+
+  @override
+  Future<AuditSession> auditFeedback(int auditId, AuditFeedback kind) async {
+    await _begin('auditFeedback');
+    final audit = _audits[auditId];
+    if (audit == null) throw const ApiException(404, 'audit session not found');
+    if (audit.status != AuditStatus.failed) {
+      throw const ApiException(400, 'feedback is only accepted for a failed audit');
+    }
+    switch (kind) {
+      case AuditFeedback.tooHard:
+        audit.tooHard = true;
+      case AuditFeedback.misheard:
+        audit.disputed = true;
+    }
     return audit.toModel(
       principle: _principles.where((p) => p.id == audit.principleId).firstOrNull,
       skillTitle: (_nodes[audit.skillId] ?? _hiddenNodes[audit.skillId])!.title,
@@ -2894,6 +2915,8 @@ class _FakeAudit {
   AuditReview? review;
   bool leaked = false;
   int? principleId;
+  bool tooHard = false;
+  bool disputed = false;
 
   AuditSession toModel({Principle? principle, String skillTitle = ''}) => AuditSession(
     id: id,
@@ -2911,6 +2934,8 @@ class _FakeAudit {
     principle: principle,
     skillTitle: skillTitle,
     createdAt: createdAt,
+    tooHard: tooHard,
+    disputed: disputed,
   );
 }
 

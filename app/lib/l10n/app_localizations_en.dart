@@ -1660,5 +1660,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get replayReflectHint => 'What did you believe at the time?…';
 
   @override
+  String get feedbackTooHard => 'Too hard for now';
+
+  @override
+  String get feedbackMisheard => 'I didn\'t say that';
+
+  @override
+  String get feedbackTooHardNoted => 'Noted: too hard for now';
+
+  @override
+  String get feedbackMisheardNoted => 'Noted: you didn\'t say that';
+
+  @override
   String get notReflectedYet => 'Not reflected on yet';
 }

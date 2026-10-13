@@ -5,6 +5,7 @@ Mock 的审计脚本是确定的（契约 4.3），所以大多数测试只靠�
 """
 
 import json
+import threading
 
 import pytest
 from sqlmodel import Session, select
@@ -15,12 +16,14 @@ from app.models import (
     AuditStatus,
     AuditTurn,
     DailyCheckIn,
+    LearnerPoint,
     NodePosition,
     PrincipleCheck,
     RewardEvent,
     SkillNode,
     SkillStatus,
 )
+from app.services import learner
 from tests.helpers import (
     FIRST,
     LONG,
@@ -185,7 +188,7 @@ def test_the_session_response_matches_the_contract_shape(client, math):
     assert body["resumed"] is False
     assert set(body["session"]) == {
         "id", "skill_id", "node_position", "status", "score", "gaps", "comment", "turns", "test_out", "points",
-        "evidence", "lessons", "principle", "skill_title", "created_at",
+        "evidence", "lessons", "principle", "skill_title", "created_at", "agreement", "too_hard", "disputed",
     }
     assert body["session"]["test_out"] is False
     assert body["session"]["skill_id"] == math["discriminant"]
@@ -340,7 +343,7 @@ def test_it14_after_an_overturn_the_next_pass_is_final_and_the_challenger_is_not
 
     assert challenge["type"] == "probe"
     assert verdict["type"] == "verdict" and verdict["passed"] is True
-    assert provider.counts == {"point_lister": 1, "auditor": 3, "challenger": 1}
+    assert provider.counts == {"point_lister": 1, "auditor": 7, "challenger": 1}
     assert node_status(client, math["discriminant"]) == "mastered"
     assert stored_audit(client_engine, audit_id).status == AuditStatus.passed
 
@@ -363,7 +366,7 @@ def test_it15_with_the_challenger_disabled_a_pass_is_final_at_once(client, monke
     _probe, verdict = answer_turns(client, audit_id, FIRST, MEDIUM)
 
     assert verdict["type"] == "verdict" and verdict["passed"] is True
-    assert provider.counts == {"point_lister": 1, "auditor": 2}
+    assert provider.counts == {"point_lister": 1, "auditor": 4}
 
 
 def test_a_fail_is_never_sent_to_the_challenger(client, monkeypatch, math):
@@ -373,7 +376,7 @@ def test_a_fail_is_never_sent_to_the_challenger(client, monkeypatch, math):
 
     answer_turns(client, audit_id, FIRST, SHORT)
 
-    assert provider.counts == {"point_lister": 1, "auditor": 2}
+    assert provider.counts == {"point_lister": 1, "auditor": 4}
 
 
 def test_a_challenger_that_errors_upholds_the_pass(client, monkeypatch, math):
@@ -768,3 +771,244 @@ def test_an_audit_stored_before_evidence_existed_still_gives_one_empty_entry_per
 
     assert len(body["gaps"]) == 2
     assert body["evidence"] == [{"gap": gap, "said": None, "right": None} for gap in body["gaps"]]
+
+
+# ---------------------------------------------------------------- votes: several judgements, the majority
+
+
+class VotingProvider(CountingProvider):
+    """The first Auditor call is a probe; the verdict calls after it give `verdicts` in the order
+    they come (they run in parallel threads, so a test relies only on how many of them pass).
+    A verdict that is an Exception is raised."""
+
+    def __init__(self, *verdicts):
+        super().__init__()
+        self._verdicts = list(verdicts)
+        self._lock = threading.Lock()
+        self._verdict_calls = 0
+
+    def complete(self, messages):
+        if "[agent: auditor]" not in messages[0]["content"]:
+            return super().complete(messages)
+        with self._lock:
+            self.counts["auditor"] = self.counts.get("auditor", 0) + 1
+            if self.counts["auditor"] == 1:
+                return probe_json("Why?")
+            verdict = self._verdicts[min(self._verdict_calls, len(self._verdicts) - 1)]
+            self._verdict_calls += 1
+        if isinstance(verdict, Exception):
+            raise verdict
+        return verdict_json(verdict, 80 if verdict else 20)
+
+
+def judged(client, client_engine, monkeypatch, math, *verdicts):
+    monkeypatch.setattr(settings, "challenger_enabled", False)
+    provider = VotingProvider(*verdicts)
+    use_provider(monkeypatch, provider)
+    audit_id = start(client, math["discriminant"])
+    _probe, verdict = answer_turns(client, audit_id, FIRST, LONG)
+    assert verdict["type"] == "verdict"
+    return audit_id, verdict, provider
+
+
+def test_with_one_vote_the_auditor_is_called_once_on_a_verdict_and_there_is_no_agreement(
+    client, client_engine, monkeypatch, math
+):
+    monkeypatch.setattr(settings, "auditor_votes", 1)
+    monkeypatch.setattr(settings, "challenger_enabled", False)
+    provider = CountingProvider()
+    use_provider(monkeypatch, provider)
+    audit_id = start(client, math["discriminant"])
+
+    answer_turns(client, audit_id, FIRST, LONG)
+
+    assert provider.counts["auditor"] == 2
+    assert client.get(f"/api/audits/{audit_id}").json()["agreement"] is None
+
+
+def test_by_default_a_verdict_is_judged_three_times_and_the_mock_agrees_with_itself(client, monkeypatch, math):
+    monkeypatch.setattr(settings, "challenger_enabled", False)
+    provider = CountingProvider()
+    use_provider(monkeypatch, provider)
+    audit_id = start(client, math["discriminant"])
+
+    answer_turns(client, audit_id, FIRST, LONG)
+
+    assert provider.counts["auditor"] == 4  # a probe, then three judgements
+    assert client.get(f"/api/audits/{audit_id}").json()["agreement"] == 1.0
+
+
+def test_one_pass_in_three_is_a_fail_with_two_thirds_agreement(client, client_engine, monkeypatch, math):
+    audit_id, verdict, provider = judged(client, client_engine, monkeypatch, math, True, False, False)
+
+    assert verdict["passed"] is False
+    assert provider.counts["auditor"] == 4
+    body = client.get(f"/api/audits/{audit_id}").json()
+    assert body["status"] == "failed"
+    assert body["agreement"] == pytest.approx(2 / 3)
+
+
+def test_two_passes_in_three_is_a_pass_with_two_thirds_agreement(client, client_engine, monkeypatch, math):
+    audit_id, verdict, _ = judged(client, client_engine, monkeypatch, math, True, True, False)
+
+    assert verdict["passed"] is True
+    body = client.get(f"/api/audits/{audit_id}").json()
+    assert body["status"] == "passed"
+    assert body["agreement"] == pytest.approx(2 / 3)
+
+
+def test_a_tie_between_two_votes_is_a_fail(client, client_engine, monkeypatch, math):
+    monkeypatch.setattr(settings, "auditor_votes", 2)
+
+    audit_id, verdict, _ = judged(client, client_engine, monkeypatch, math, True, False)
+
+    assert verdict["passed"] is False
+    assert client.get(f"/api/audits/{audit_id}").json()["agreement"] == 0.5
+
+
+def test_an_extra_vote_that_raises_does_not_vote(client, client_engine, monkeypatch, math):
+    audit_id, verdict, _ = judged(client, client_engine, monkeypatch, math, True, True, RuntimeError("down"))
+
+    assert verdict["passed"] is True
+    assert client.get(f"/api/audits/{audit_id}").json()["agreement"] == 1.0
+
+
+def test_the_judge_version_is_stored_on_the_finalized_audit(client, client_engine, math):
+    from app.agents.auditor import JUDGE_VERSION
+
+    audit_id = start(client, math["discriminant"])
+    assert stored_audit(client_engine, audit_id).judge_version is None
+
+    answer_turns(client, audit_id, FIRST, LONG)
+
+    assert stored_audit(client_engine, audit_id).judge_version == JUDGE_VERSION
+
+
+# ---------------------------------------------------------------- feedback and the learner
+
+
+def points_difficulties(client_engine, skill_id: int) -> dict[str, float]:
+    with Session(client_engine) as session:
+        rows = session.exec(select(LearnerPoint).where(LearnerPoint.skill_id == skill_id)).all()
+        return {r.title: r.difficulty for r in rows}
+
+
+def test_too_hard_on_a_failed_audit_is_set_and_raises_the_difficulty_once(client, client_engine, math):
+    audit_id = fail_node(client, math["discriminant"])
+    before = points_difficulties(client_engine, math["discriminant"])
+
+    first = client.post(f"/api/audits/{audit_id}/feedback", json={"kind": "too_hard"})
+    after = points_difficulties(client_engine, math["discriminant"])
+    second = client.post(f"/api/audits/{audit_id}/feedback", json={"kind": "too_hard"})
+
+    assert first.status_code == 200 and first.json()["too_hard"] is True
+    assert before and set(after) == set(before)
+    assert all(after[t] == pytest.approx(before[t] + learner.TOO_HARD_STEP) for t in before)
+    assert second.status_code == 200
+    assert points_difficulties(client_engine, math["discriminant"]) == after
+
+
+def test_misheard_marks_the_audit_disputed_and_raises_the_false_fail_rate(client, client_engine, math):
+    audit_id = fail_node(client, math["discriminant"])
+    before = client.get("/api/learner").json()
+
+    response = client.post(f"/api/audits/{audit_id}/feedback", json={"kind": "misheard"})
+
+    assert response.status_code == 200 and response.json()["disputed"] is True
+    assert stored_audit(client_engine, audit_id).disputed is True
+    assert client.get("/api/learner").json()["judge_false_fail"] > before["judge_false_fail"]
+
+
+def test_feedback_on_a_passed_or_an_active_audit_is_a_400(client, math):
+    pass_node(client, math["discriminant"])
+    passed_id = client.get("/api/audits").json()[0]["id"]
+    active_id = start(client, math["root-coefficient"])
+
+    for audit_id in (passed_id, active_id):
+        response = client.post(f"/api/audits/{audit_id}/feedback", json={"kind": "too_hard"})
+        assert response.status_code == 400
+        assert response.json()["detail"] == "feedback is only accepted for a failed audit"
+
+
+def test_feedback_on_an_unknown_audit_is_a_404(client):
+    response = client.post("/api/audits/999/feedback", json={"kind": "too_hard"})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "audit session not found"
+
+
+def test_an_unknown_kind_of_feedback_is_a_422(client, math):
+    audit_id = fail_node(client, math["discriminant"])
+
+    assert client.post(f"/api/audits/{audit_id}/feedback", json={"kind": "boring"}).status_code == 422
+
+
+def test_the_learner_has_exactly_these_keys_and_aims_at_three_quarters(client, math):
+    body = client.get("/api/learner").json()
+
+    assert set(body) == {"ability", "target_chance", "judge_false_pass", "judge_false_fail", "nodes"}
+    assert body["target_chance"] == 0.75
+    assert body["ability"] == 0
+    assert body["nodes"] and all(set(n) == {"skill_id", "title", "chance"} for n in body["nodes"])
+
+
+def test_the_learner_lists_the_available_nodes_nearest_the_target_first(client, math):
+    body = client.get("/api/learner").json()
+
+    available = {n["id"] for n in client.get("/api/skills").json() if n["status"] == "available"}
+    assert {n["skill_id"] for n in body["nodes"]} == available
+    distances = [abs(n["chance"] - 0.75) for n in body["nodes"]]
+    assert distances == sorted(distances)
+
+
+def test_after_a_failed_audit_that_missed_every_point_the_ability_is_lower(client, monkeypatch, math):
+    verdict = json.dumps({
+        "action": "verdict", "pass": False, "score": 10, "gaps": ["g"], "comment": "No.",
+        "points": [{"point": title, "ok": False, "note": "n"} for title in POINTS],
+    })
+    use_provider(monkeypatch, ScriptedProvider(auditor=[probe_json("Why?"), verdict]))
+    before = client.get("/api/learner").json()["ability"]
+    audit_id = start(client, math["discriminant"])
+
+    _probe, result = answer_turns(client, audit_id, FIRST, SHORT)
+
+    assert result["passed"] is False
+    assert client.get("/api/learner").json()["ability"] < before
+
+
+def test_two_of_three_judgements_wanting_to_ask_on_keep_the_audit_going(monkeypatch):
+    """A verdict two of the three would not give yet is not given: the audit goes on."""
+    from app.agents.auditor import AuditorTurnResult
+    from app.services import audit_flow
+
+    verdict = AuditorTurnResult(is_verdict=True, passed=True, score=90, gaps=[], comment="ok")
+    probe = AuditorTurnResult(is_verdict=False, question="And the edge case?")
+
+    chosen, agreement, challenge = audit_flow._voted(verdict, lambda: probe, alongside=lambda: "challenge?")
+
+    assert chosen is probe and agreement == pytest.approx(2 / 3)
+    assert challenge is None  # a pass that was not given is not challenged
+
+
+def test_on_a_final_turn_judgements_that_disagree_are_not_a_pass(monkeypatch):
+    from app.agents.auditor import AuditorTurnResult
+    from app.services import audit_flow
+
+    passed = AuditorTurnResult(is_verdict=True, passed=True, score=90, gaps=[], comment="ok")
+    failed = AuditorTurnResult(is_verdict=True, passed=False, score=40, gaps=["x"], comment="no")
+    monkeypatch.setattr(audit_flow.settings, "auditor_votes", 2)
+
+    chosen, agreement, _ = audit_flow._voted(passed, lambda: failed, final=True)
+
+    assert chosen is failed and agreement == 0.5
+
+
+def test_the_challenger_runs_beside_the_votes_and_its_question_is_kept_for_a_pass():
+    from app.agents.auditor import AuditorTurnResult
+    from app.services import audit_flow
+
+    passed = AuditorTurnResult(is_verdict=True, passed=True, score=90, gaps=[], comment="ok")
+
+    chosen, agreement, challenge = audit_flow._voted(passed, lambda: passed, alongside=lambda: "Why does it hold?")
+
+    assert chosen.passed and agreement == 1.0 and challenge == "Why does it hold?"

@@ -506,5 +506,9 @@
   "lessonCounts": "守住 {held} 次 · 又犯 {relapsed} 次",
   "replayDialogue": "完整对话",
   "replayReflectHint": "你当时是怎么想的？…",
+  "feedbackTooHard": "这个现在太难了",
+  "feedbackMisheard": "我没这么说",
+  "feedbackTooHardNoted": "已记下：太难了",
+  "feedbackMisheardNoted": "已记下：你没这么说",
   "notReflectedYet": "还没反思"
 }

@@ -1,5 +1,7 @@
 """The log of LLM calls (app/llm/usage.py) and what they cost (contract #47)."""
 
+import threading
+
 import httpx
 import pytest
 from sqlalchemy import inspect, text
@@ -91,12 +93,23 @@ def test_an_audit_answer_logs_the_auditor_and_the_challenger_with_its_id(api, cl
         return openai_reply(verdict, prompt=900, cached=500, completion=60)
 
     fake_llm_http(monkeypatch, handler)
+    # The votes are judged in parallel threads; the test engine is one in-memory connection shared
+    # by all of them, which cannot take two writes at once (a file database can).
+    lock, write = threading.Lock(), usage.record
+
+    def one_at_a_time(**kwargs):
+        with lock:
+            write(**kwargs)
+
+    monkeypatch.setattr(usage, "record", one_at_a_time)
 
     result = api.post(f"/api/audits/{audit_id}/turns", json={"content": LONG})
 
     assert result.json()["question"] == "And when it is zero?"
     rows = calls(client_engine)
-    assert [(r.agent, r.audit_id, r.ok) for r in rows] == [("auditor", audit_id, True), ("challenger", audit_id, True)]
+    # The first judgement comes first; the other two and the Challenger run at once, in any order.
+    assert (rows[0].agent, rows[0].audit_id, rows[0].ok) == ("auditor", audit_id, True)
+    assert sorted((r.agent, r.audit_id, r.ok) for r in rows) == [("auditor", audit_id, True)] * 3 + [("challenger", audit_id, True)]
     assert (rows[0].input_tokens, rows[0].cached_tokens, rows[0].output_tokens) == (900, 500, 60)
 
     # Another request of the same account starts without an audit.

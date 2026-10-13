@@ -11,6 +11,7 @@ Without a context (scripts, tests that call a service directly) nothing is logge
 server's provider is used.
 """
 
+import threading
 import logging
 from contextvars import ContextVar, Token
 
@@ -65,6 +66,9 @@ def account_choice() -> str:
     return ctx.choice
 
 
+_WRITING = threading.Lock()
+
+
 def record(
     *,
     provider: str,
@@ -82,7 +86,8 @@ def record(
     if ctx is None or ctx.bind is None:
         return
     try:
-        with Session(ctx.bind) as session:
+        # A verdict's votes log from several threads at once; SQLite's one connection cannot take that.
+        with _WRITING, Session(ctx.bind) as session:
             session.add(
                 LLMCall(
                     agent=agent or "-",

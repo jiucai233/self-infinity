@@ -45,6 +45,9 @@ class _ReplaySceneState extends State<ReplayScene> {
   bool _loading = true;
   bool _dialogueFolded = true;
 
+  // The two things to say about a fail; the one in flight, if any.
+  AuditFeedback? _telling;
+
   // The reflection.
   bool _sending = false;
   String? _problem;
@@ -110,6 +113,24 @@ class _ReplaySceneState extends State<ReplayScene> {
         _sending = false;
         _problem = ErrorView.messageFor(e);
       });
+    }
+  }
+
+  /// Tells the backend; the audit it sends back says what is noted now.
+  Future<void> _tell(AuditFeedback kind) async {
+    if (_telling != null) return;
+    setState(() => _telling = kind);
+    try {
+      final audit = await _api.auditFeedback(widget.auditId, kind);
+      if (!mounted) return;
+      setState(() {
+        _audit = audit;
+        _telling = null;
+      });
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() => _telling = null);
+      showToast(context, ErrorView.messageFor(e));
     }
   }
 
@@ -216,6 +237,10 @@ class _ReplaySceneState extends State<ReplayScene> {
                   for (final (i, lesson) in audit.lessons.indexed)
                     LessonCheckRow(key: Key('replay-lesson-check-$i'), check: lesson),
                 ],
+                if (failed) ...[
+                  const SizedBox(height: AppSpacing.xl),
+                  _feedbackRow(context, audit),
+                ],
                 if (audit.turns.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.xxl),
                   CollapsibleSection(
@@ -259,6 +284,46 @@ class _ReplaySceneState extends State<ReplayScene> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Two quiet things to say about a fail: it was too hard for now, or the
+  /// judge quoted words the user did not say. Once sent, a line says so.
+  Widget _feedbackRow(BuildContext context, AuditSession audit) {
+    final l = context.l10n;
+    final theme = Theme.of(context).textTheme;
+    Widget one(AuditFeedback kind, bool noted, String label, String done, String name) => noted
+        ? Text(
+            done,
+            key: Key('replay-$name-noted'),
+            style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
+          )
+        : TextButton(
+            key: Key('replay-$name'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
+            onPressed: _telling == null ? () => unawaited(_tell(kind)) : null,
+            child: Text(label),
+          );
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        one(
+          AuditFeedback.tooHard,
+          audit.tooHard,
+          l.feedbackTooHard,
+          l.feedbackTooHardNoted,
+          'too-hard',
+        ),
+        one(
+          AuditFeedback.misheard,
+          audit.disputed,
+          l.feedbackMisheard,
+          l.feedbackMisheardNoted,
+          'misheard',
+        ),
+      ],
     );
   }
 

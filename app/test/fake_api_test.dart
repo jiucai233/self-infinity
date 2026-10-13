@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/api_exception.dart';
+import 'package:self_infinity/api/api.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/graph_utils.dart';
 import 'package:self_infinity/api/models.dart';
@@ -533,6 +534,32 @@ void main() {
       expect((await api.getAudit(second.sessionId)).principle, isNull);
 
       expect((await failure(() => api.getAudit(999))).statusCode, 404);
+    });
+
+    test('auditFeedback sets the flag on a failed audit, and sending it again changes nothing', () async {
+      final api = await seededFakeApi();
+      final failed = await failAudit(api, 6);
+      var audit = await api.getAudit(failed.sessionId);
+      expect([audit.tooHard, audit.disputed], [false, false]);
+
+      audit = await api.auditFeedback(failed.sessionId, AuditFeedback.tooHard);
+      expect([audit.tooHard, audit.disputed], [true, false]);
+      audit = await api.auditFeedback(failed.sessionId, AuditFeedback.tooHard);
+      expect([audit.tooHard, audit.disputed], [true, false]);
+      audit = await api.auditFeedback(failed.sessionId, AuditFeedback.misheard);
+      expect([audit.tooHard, audit.disputed], [true, true]);
+      expect((await api.getAudit(failed.sessionId)).disputed, isTrue);
+      expect(AuditFeedback.values.map((k) => k.wire), ['too_hard', 'misheard']);
+    });
+
+    test('auditFeedback on a passed audit is a 400, on a missing one a 404', () async {
+      final api = await seededFakeApi();
+      await passAudit(api, 6);
+      final id = (await api.listAudits()).first.id;
+      final e = await failure(() => api.auditFeedback(id, AuditFeedback.tooHard));
+      expect(e.statusCode, 400);
+      expect(e.serverMessage, 'feedback is only accepted for a failed audit');
+      expect((await failure(() => api.auditFeedback(999, AuditFeedback.misheard))).statusCode, 404);
     });
 
     test('an audit line says whether it was reflected on', () async {
@@ -1098,7 +1125,7 @@ void main() {
       for (final name in FakeApiClient.methodNames) {
         api.failNext(method: name); // asserts on unknown names
       }
-      expect(FakeApiClient.methodNames, hasLength(60));
+      expect(FakeApiClient.methodNames, hasLength(61));
       expect(() => api.failNext(method: 'nope'), throwsA(isA<AssertionError>()));
     });
   });

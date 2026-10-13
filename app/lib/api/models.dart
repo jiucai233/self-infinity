@@ -864,6 +864,9 @@ class AuditSession {
     this.principle,
     this.skillTitle = '',
     this.createdAt,
+    this.agreement,
+    this.tooHard = false,
+    this.disputed = false,
   });
 
   factory AuditSession.fromJson(Json json) => AuditSession(
@@ -882,6 +885,9 @@ class AuditSession {
     principle: json['principle'] == null ? null : Principle.fromJson(_obj(json, 'principle')),
     skillTitle: _strN(json, 'skill_title') ?? '',
     createdAt: _timeN(json, 'created_at'),
+    agreement: _doubleN(json, 'agreement'),
+    tooHard: _boolN(json, 'too_hard') ?? false,
+    disputed: _boolN(json, 'disputed') ?? false,
   );
 
   final int id;
@@ -913,6 +919,15 @@ class AuditSession {
 
   /// UTC.
   final DateTime? createdAt;
+
+  /// How far the judges agreed, when more than one looked; null if not known.
+  final double? agreement;
+
+  /// The user said this was too hard for them right now (a fail only).
+  final bool tooHard;
+
+  /// The user said the judge quoted words they did not say (a fail only).
+  final bool disputed;
 }
 
 /// Body of `POST /skills/{id}/audits`. Contract endpoint 7.

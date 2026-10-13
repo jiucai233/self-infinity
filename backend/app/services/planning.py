@@ -15,7 +15,7 @@ from app.i18n import t
 from app.llm.base import LLMProvider
 from app.models import DailyCheckIn, EdgeKind, SkillEdge, SkillNode, SkillStatus, StudyPlan
 from app.schemas import PlanStepOut, StudyPlanOut
-from app.services import bandit, day_plan, life
+from app.services import bandit, day_plan, learner, life
 from app.services.condition import current_condition
 from app.services.courses import live_nodes
 from app.services.profile import cluster_misconceptions
@@ -65,12 +65,14 @@ def _candidates(session: Session, nodes: list[SkillNode]) -> list[Candidate]:
             if e.to_id == node.id and all_nodes[e.from_id].status != SkillStatus.mastered
         ]
         position = node_position(session, node).value
+        tier = bandit.difficulty_tier(session, node, depths.get(node.id, 0))
         result.append(
             Candidate(
                 skill_id=node.id,
                 title=node.title,
                 position=position,
-                tier=bandit.difficulty_tier(session, node, depths.get(node.id, 0)),
+                tier=tier,
+                chance=round(learner.node_chance(session, node, tier) * 100),
                 unmet_requires=unmet,
                 kind="challenge" if node.unexpanded else "learn",
                 minutes=day_plan.learn_minutes(node, position),

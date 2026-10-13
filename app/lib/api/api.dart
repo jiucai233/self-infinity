@@ -118,6 +118,13 @@ abstract class SelfInfinityApi {
   /// own lesson card. 404 `audit session not found`.
   Future<AuditSession> getAudit(int auditId);
 
+  /// `POST /audits/{auditId}/feedback`. Body `{"kind"}`: the two things the
+  /// user can say about a failed audit — it was too hard for now, or the
+  /// judge quoted words they did not say. Returns the audit with the flag
+  /// set; sending it again changes nothing. 400 `feedback is only accepted
+  /// for a failed audit`, 404 `audit session not found`.
+  Future<AuditSession> auditFeedback(int auditId, AuditFeedback kind);
+
   /// `GET /narrator/briefing` — the facts behind the left panel (bars) computed
   /// fresh, plus the cached narrative (unused by the UI).
   Future<Briefing> getBriefing();
@@ -357,4 +364,14 @@ abstract class SelfInfinityApi {
   /// `GET /dev/voice?limit=` (contract #37; developers only): what live voice
   /// cost, and the newest [limit] sessions next to their GPT-Live price.
   Future<DevVoice> getDevVoice({int limit = 50});
+}
+
+/// What the user says about a failed audit (`POST /audits/{id}/feedback`).
+enum AuditFeedback {
+  tooHard('too_hard'),
+  misheard('misheard');
+
+  const AuditFeedback(this.wire);
+
+  final String wire;
 }

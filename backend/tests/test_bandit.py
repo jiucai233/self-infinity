@@ -1,10 +1,12 @@
 import random
 
+import pytest
+
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
-from app.models import BanditArm, EdgeKind, NodeType, SkillNode, SkillStatus
-from app.services import bandit
+from app.models import AuditSession, BanditArm, EdgeKind, NodeType, SkillNode, SkillStatus
+from app.services import bandit, learner
 from tests.helpers import generate, ids_by_slug, link, make_course, make_skill, pass_node
 
 
@@ -150,5 +152,14 @@ def test_failing_an_audit_grows_the_beta_of_that_arm(client, client_engine):
 
     with Session(client_engine) as session:
         hard_arms = session.exec(select(BanditArm).where(BanditArm.tier == "hard")).all()
-    assert any(arm.beta > 1.0 for arm in hard_arms)
-    assert not any(arm.alpha > 1.0 for arm in hard_arms)
+        audit = session.exec(select(AuditSession)).one()
+    # The reward is the audit's progress, split between alpha and beta; a fail is worth
+    # something only as far as the judge fails what should pass.
+    false_pass, false_fail = learner.PRIOR_FALSE_PASS[0] / sum(learner.PRIOR_FALSE_PASS), learner.PRIOR_FALSE_FAIL[0] / sum(learner.PRIOR_FALSE_FAIL)
+    expected = learner.chance(0.0, learner.TIER_DIFFICULTY["hard"])
+    settled = [p["ok"] for p in audit.points if isinstance(p["ok"], bool)] or [False]
+    progress = sum(learner.corrected(ok, expected, false_pass, false_fail) * (1 - expected) for ok in settled) / len(settled)
+    (arm,) = [a for a in hard_arms if a.beta > 1.0]
+    assert arm.alpha == pytest.approx(1.0 + progress)
+    assert arm.beta == pytest.approx(1.0 + (1 - progress))
+    assert 0 < progress < 0.5

@@ -251,6 +251,37 @@ class AuditSessionOut(BaseModel):
     principle: "PrincipleOut | None" = None
     skill_title: str = ""
     created_at: datetime | None = None
+    # The share of the verdict's votes that agreed with it (1.0 unanimous; null: judged once).
+    agreement: float | None = None
+    # The user's word on a failed audit.
+    too_hard: bool = False
+    disputed: bool = False
+
+
+class AuditFeedbackIn(BaseModel):
+    """`too_hard`: it was beyond them for now (a signal about difficulty). `misheard`: a gap
+    rests on something they did not say (a signal about the judge)."""
+
+    kind: Literal["too_hard", "misheard"]
+
+
+class LearnerNodeOut(BaseModel):
+    skill_id: int
+    title: str
+    # The estimated chance, 0 to 1, of explaining right what an audit of it asks now.
+    chance: float
+
+
+class LearnerOut(BaseModel):
+    """The learner model (app/services/learner.py)."""
+
+    ability: float
+    target_chance: float
+    # The Auditor's two error rates as estimated for this account.
+    judge_false_pass: float
+    judge_false_fail: float
+    # The nodes open to study, the one nearest the target first.
+    nodes: list[LearnerNodeOut]
 
 
 class StartAuditResponse(BaseModel):

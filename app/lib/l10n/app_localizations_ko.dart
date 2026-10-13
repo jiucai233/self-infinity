@@ -1643,5 +1643,17 @@ class AppLocalizationsKo extends AppLocalizations {
   String get replayReflectHint => '그때는 어떻게 생각했나요?…';
 
   @override
+  String get feedbackTooHard => '지금은 너무 어려워요';
+
+  @override
+  String get feedbackMisheard => '저는 그렇게 말하지 않았어요';
+
+  @override
+  String get feedbackTooHardNoted => '기록했어요: 지금은 너무 어려움';
+
+  @override
+  String get feedbackMisheardNoted => '기록했어요: 그렇게 말하지 않음';
+
+  @override
   String get notReflectedYet => '아직 돌아보지 않았어요';
 }

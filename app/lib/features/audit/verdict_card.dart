@@ -18,15 +18,56 @@ import 'gap_evidence.dart';
 /// A pass gets an ember edge and the XP; a fail offers [onLesson] (the
 /// Recorder turns the miss into a lesson card) until that has started.
 class VerdictCard extends StatelessWidget {
-  const VerdictCard({super.key, required this.verdict, this.onLesson, required this.onBack});
+  const VerdictCard({
+    super.key,
+    required this.verdict,
+    this.onLesson,
+    this.onTooHard,
+    this.onMisheard,
+    this.tooHardNoted = false,
+    this.misheardNoted = false,
+    required this.onBack,
+  });
 
   final VerdictResult verdict;
 
   /// "Make a lesson card" (a fail only); null hides it.
   final VoidCallback? onLesson;
 
+  /// "Too hard for now" / "I didn't say that" (a fail only); null hides each.
+  final VoidCallback? onTooHard;
+  final VoidCallback? onMisheard;
+
+  /// Already said: the button gives way to a line saying it was noted.
+  final bool tooHardNoted;
+  final bool misheardNoted;
+
   /// Back to the node (scene 4).
   final VoidCallback onBack;
+
+  /// A quiet text button, or once sent the line that says it was noted.
+  Widget _feedback(
+    BuildContext context,
+    String name,
+    bool noted,
+    VoidCallback? onTap,
+    String label,
+    String done,
+  ) => noted
+      ? Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          child: Text(
+            done,
+            key: Key('verdict-$name-noted'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+          ),
+        )
+      : TextButton(
+          key: Key('verdict-$name'),
+          style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
+          onPressed: onTap,
+          child: Text(label),
+        );
 
   /// One per gap: what the verdict says it rests on, or the gap alone
   /// (an older verdict).
@@ -171,6 +212,26 @@ class VerdictCard extends StatelessWidget {
                 onPressed: onBack,
                 child: Text(context.l10n.backToNode),
               ),
+              if (!passed) ...[
+                if (onTooHard != null || tooHardNoted)
+                  _feedback(
+                    context,
+                    'too-hard',
+                    tooHardNoted,
+                    onTooHard,
+                    context.l10n.feedbackTooHard,
+                    context.l10n.feedbackTooHardNoted,
+                  ),
+                if (onMisheard != null || misheardNoted)
+                  _feedback(
+                    context,
+                    'misheard',
+                    misheardNoted,
+                    onMisheard,
+                    context.l10n.feedbackMisheard,
+                    context.l10n.feedbackMisheardNoted,
+                  ),
+              ],
             ],
           ),
         ],

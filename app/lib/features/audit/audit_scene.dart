@@ -121,6 +121,9 @@ class _AuditSceneState extends State<AuditScene> {
   // Result.
   VerdictResult? _verdict;
   bool _recorderAsks = false;
+  AuditFeedback? _telling;
+  bool _tooHard = false;
+  bool _disputed = false;
   Principle? _principle;
   _Celebration? _celebration;
   bool _celebrationOpen = false;
@@ -171,6 +174,8 @@ class _AuditSceneState extends State<AuditScene> {
       _problem = null;
       _closed = false;
       _verdict = null;
+      _tooHard = false;
+      _disputed = false;
       _recorderAsks = false;
       _principle = null;
       _celebration = null;
@@ -589,6 +594,30 @@ class _AuditSceneState extends State<AuditScene> {
     );
   }
 
+  /// Tells the backend what the user says about the fail; on an error the
+  /// button stays and a toast says why.
+  Future<void> _tell(AuditFeedback kind) async {
+    final id = _session?.id;
+    if (id == null || _telling != null) return;
+    setState(() => _telling = kind);
+    try {
+      await _api.auditFeedback(id, kind);
+      if (!mounted) return;
+      setState(() {
+        _telling = null;
+        if (kind == AuditFeedback.tooHard) {
+          _tooHard = true;
+        } else {
+          _disputed = true;
+        }
+      });
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() => _telling = null);
+      showToast(context, ErrorView.messageFor(e));
+    }
+  }
+
   Widget _lineView(BuildContext context, _Line line, {required bool current}) {
     if (line.fromUser) return _Answer(text: line.text);
     switch (line.kind) {
@@ -605,6 +634,10 @@ class _AuditSceneState extends State<AuditScene> {
             VerdictCard(
               verdict: verdict,
               onLesson: verdict.passed || _recorderAsks ? null : _askRecorder,
+              onTooHard: verdict.passed || _telling != null ? null : () => unawaited(_tell(AuditFeedback.tooHard)),
+              onMisheard: verdict.passed || _telling != null ? null : () => unawaited(_tell(AuditFeedback.misheard)),
+              tooHardNoted: _tooHard,
+              misheardNoted: _disputed,
               onBack: () => context.go(AppRoutes.skill(widget.skillId)),
             ),
           ],

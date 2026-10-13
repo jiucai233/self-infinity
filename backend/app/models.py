@@ -220,6 +220,15 @@ class AuditSession(SQLModel, table=True):
     # What each gap rests on, `[{"gap", "said", "right"}]` in the order of the gaps: the user's
     # own words and what holds instead, for the replay.
     evidence_json: str | None = None
+    # The share of the verdict's votes that agreed with the one given (app/services/learner.py):
+    # 1.0 unanimous. None: judged once.
+    agreement: float | None = None
+    # The Auditor's rules the verdict was given under (app/agents/auditor.py JUDGE_VERSION).
+    judge_version: str | None = None
+    # The user's word on a failed audit: it was too hard for them now / a gap rests on
+    # something they did not say.
+    too_hard: bool | None = None
+    disputed: bool | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
     @property
@@ -280,6 +289,25 @@ class PrincipleLink(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
     __table_args__ = (Index("ix_principlelink_target", "target_kind", "target_id"),)
+
+
+class Learner(SQLModel, table=True):
+    """The one learner of this account: how able they are right now, on the scale the points'
+    difficulties are on (app/services/learner.py)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    ability: float = 0.0
+    updated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+
+
+class LearnerPoint(SQLModel, table=True):
+    """How hard one knowledge point (or a node without points, `title` empty) has proved."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    skill_id: int = Field(foreign_key="skillnode.id", index=True)
+    title: str = ""
+    difficulty: float = 0.0
+    attempts: int = 0
 
 
 class BanditArm(SQLModel, table=True):

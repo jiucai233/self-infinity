@@ -34,7 +34,8 @@ Condition: {condition_flag}   (normal | low | unknown)
 Time of day: {slot}   (morning | afternoon | evening | night)
 
 Each node has a kind (learn: explain it; challenge: prove a whole area not
-broken down yet) and the minutes it takes. Code keeps your order while it
+broken down yet), the minutes it takes, and a chance: the estimated chance,
+in percent, that the user explains it right today. Code keeps your order while it
 fits the time the user has left, so put first what matters most now.
 
 Rules:
@@ -43,7 +44,9 @@ Rules:
 - Rank nodes with no unmet requires before nodes with unmet requires.
 - Prefer nodes where a recurring misconception is likely to come up again,
   so it can be tested.
-- Prefer the suggested tier.
+- Prefer nodes whose chance is nearest {target_chance}: far above it there is
+  little left to learn, far below it is out of reach for now.
+- Between nodes of similar chance, prefer the suggested tier.
 - If the condition is low, prefer leaf nodes (smaller units).
 - In the morning put what takes the most judgement first (challenges,
   branches, the hard tier); later in the day put smaller, easier nodes first.
@@ -55,6 +58,10 @@ Output only JSON:
 {{"steps": [{{"skill_id": 0, "rationale": "...", "focus_hint": "..."}}]}}
 """
 )
+
+
+# What recommendations aim at (app/services/learner.py TARGET_CHANCE).
+TARGET_CHANCE_PERCENT = 75
 
 
 class RecommenderError(Exception):
@@ -70,6 +77,8 @@ class Candidate:
     unmet_requires: list[str] = field(default_factory=list)
     kind: str = "learn"  # learn | challenge
     minutes: int = 25
+    # The learner model's estimate, in percent, of explaining it right now.
+    chance: int = 50
 
 
 @dataclass
@@ -100,6 +109,7 @@ class Recommender:
                 "unmet_requires": c.unmet_requires,
                 "kind": c.kind,
                 "minutes": c.minutes,
+                "chance": c.chance,
             }
             for c in candidates
         ]
@@ -107,6 +117,7 @@ class Recommender:
         system = fill_template(
             SYSTEM_PROMPT,
             suggested_tier=suggested_tier,
+            target_chance=str(TARGET_CHANCE_PERCENT),
             condition_flag=condition_flag,
             slot=slot,
             available_nodes=json.dumps(nodes, ensure_ascii=False, indent=1),

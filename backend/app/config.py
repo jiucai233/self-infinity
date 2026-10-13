@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     # 这两个数字只是服务端的安全阀：prompt 里不告诉模型还剩几轮，"什么时候该收敛"
     # 由模型自己判断。night 模式在此基础上翻倍（见 app/services/audit_flow.py）。
     audit_max_turns: int = 8
+    # How many times a verdict is judged (in parallel); the majority decides. 1: once.
+    auditor_votes: int = 3
     task_max_turns: int = 4
     # Challenger 总开关；留成配置项是为了评估时能做 Auditor 单独 vs Auditor+Challenger 的消融。
     challenger_enabled: bool = True

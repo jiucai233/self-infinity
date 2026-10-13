@@ -11,6 +11,9 @@ from app.llm import get_provider, usage
 from app.models import AuditSession, AuditStatus, Principle, SkillNode, SkillStatus
 from app.routers.principles import check_counts, principle_out
 from app.schemas import (
+    AuditFeedbackIn,
+    LearnerNodeOut,
+    LearnerOut,
     AuditSessionOut,
     AuditSummaryOut,
     AuditTurnOut,
@@ -23,7 +26,9 @@ from app.schemas import (
     TurnResult,
     VerdictResult,
 )
-from app.services import audit_flow, linking, points
+from app.services import audit_flow, bandit, learner, linking, points
+from app.services.courses import live_nodes
+from app.services.tree import depth_map
 from app.services.audit_flow import AuditClosed, AuditorUnavailable, ProbeOutcome
 
 logger = logging.getLogger(__name__)
@@ -44,6 +49,9 @@ def _session_out(session: Session, audit: AuditSession) -> AuditSessionOut:
         ),
         skill_title=skill.title,
         created_at=audit.created_at,
+        agreement=audit.agreement,
+        too_hard=bool(audit.too_hard),
+        disputed=bool(audit.disputed),
         id=audit.id,
         skill_id=audit.skill_id,
         node_position=audit.node_position,
@@ -99,6 +107,52 @@ def get_audit(audit_id: int, session: Session = Depends(get_session)):
     if audit is None:
         raise HTTPException(404, "audit session not found")
     return _session_out(session, audit)
+
+
+@router.post("/audits/{audit_id}/feedback", response_model=AuditSessionOut)
+def audit_feedback(audit_id: int, body: AuditFeedbackIn, session: Session = Depends(get_session)):
+    """The user's word on a failed audit, each said once. "Too hard" is about the difficulty: the
+    audit's points get harder for the learner model at once. "Misheard" is about the judge: a
+    gap rests on words they did not say, which counts as a verdict that failed what should pass."""
+    audit = session.get(AuditSession, audit_id)
+    if audit is None:
+        raise HTTPException(404, "audit session not found")
+    if audit.status != AuditStatus.failed:
+        raise HTTPException(400, "feedback is only accepted for a failed audit")
+    if body.kind == "too_hard" and not audit.too_hard:
+        audit.too_hard = True
+        learner.too_hard(session, audit, session.get(SkillNode, audit.skill_id))
+    elif body.kind == "misheard":
+        audit.disputed = True
+    session.add(audit)
+    session.commit()
+    session.refresh(audit)
+    return _session_out(session, audit)
+
+
+@router.get("/learner", response_model=LearnerOut)
+def get_learner(session: Session = Depends(get_session)):
+    """The learner model as it stands: the ability, the judge's error rates, and for each node
+    open to study the chance of explaining it right, nearest the target first."""
+    false_pass, false_fail = learner.judge_rates(session)
+    depths = depth_map(session)
+    nodes = [
+        LearnerNodeOut(
+            skill_id=node.id,
+            title=node.title,
+            chance=round(learner.node_chance(session, node, bandit.difficulty_tier(session, node, depths.get(node.id, 0))), 3),
+        )
+        for node in session.exec(live_nodes().where(SkillNode.status == SkillStatus.available)).all()
+    ]
+    ability = learner.learner(session).ability
+    session.commit()
+    return LearnerOut(
+        ability=round(ability, 3),
+        target_chance=learner.TARGET_CHANCE,
+        judge_false_pass=round(false_pass, 3),
+        judge_false_fail=round(false_fail, 3),
+        nodes=sorted(nodes, key=lambda n: abs(n.chance - learner.TARGET_CHANCE)),
+    )
 
 
 @router.post("/skills/{skill_id}/audits", response_model=StartAuditResponse)

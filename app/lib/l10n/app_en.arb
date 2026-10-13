@@ -908,5 +908,9 @@
   },
   "replayDialogue": "The whole conversation",
   "replayReflectHint": "What did you believe at the time?…",
+  "feedbackTooHard": "Too hard for now",
+  "feedbackMisheard": "I didn't say that",
+  "feedbackTooHardNoted": "Noted: too hard for now",
+  "feedbackMisheardNoted": "Noted: you didn't say that",
   "notReflectedYet": "Not reflected on yet"
 }

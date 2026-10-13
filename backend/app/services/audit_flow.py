@@ -19,8 +19,10 @@
   对错（和错在哪）写回节点（app/services/points.py），下一场从没过的那些开始。
 """
 
+import contextvars
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Sequence
@@ -28,7 +30,7 @@ from typing import Sequence
 from sqlalchemy import update
 from sqlmodel import Session, col, select
 
-from app.agents.auditor import Auditor, AuditorTurnResult
+from app.agents.auditor import JUDGE_VERSION, Auditor, AuditorTurnResult
 from app.agents.challenger import Challenger
 from app.agents.memory_retriever import recent_misconceptions, retrieve_lessons
 from app.config import settings
@@ -48,7 +50,7 @@ from app.models import (
     utcnow,
 )
 from app.i18n import join_list, language_of, quote, t
-from app.services import bandit, points
+from app.services import bandit, learner, points
 from app.services.condition import audit_pacing
 from app.services.incentive import compute_reward
 from app.services.course_edit import sync_links
@@ -270,8 +272,8 @@ def submit_turn(
     pacing = _pacing(session)
     examined = audit.points
     asked = {p["title"] for p in examined}
-    try:
-        result = Auditor(auditor_provider).next_turn(
+    def judge() -> AuditorTurnResult:
+        return Auditor(auditor_provider).next_turn(
             skill.title,
             skill.description,
             history,
@@ -287,24 +289,38 @@ def submit_turn(
             points=examined,
             settled=[p["title"] for p in skill.points if p["title"] not in asked] if examined else None,
         )
+
+    try:
+        result = judge()
     except Exception as exc:
         raise AuditorUnavailable from exc
+    agreement = None
+    challenge = None
+    if result.is_verdict:
+        # 只复核 pass，且每场审计至多一次（challenged 是那道收敛保证）。fail 不需要复核——
+        # Challenger 的目标是推翻通过，对一个已经不通过的裁决无事可做。它和另外几票同时跑：
+        # 用户等的是一次调用的时间；票数最后没判通过，它的结果就不用。
+        may_challenge = bool(result.passed) and settings.challenger_enabled and not audit.challenged
+        misconceptions = recent_misconceptions(session, settings.challenger_misconception_limit) if may_challenge else []
+        result, agreement, challenge = _voted(
+            result,
+            judge,
+            final=audit.challenged or sum(1 for m in history if m["role"] == "user") >= audit.max_turns,
+            alongside=(lambda: _challenge(skill, history, challenger_provider, misconceptions)) if may_challenge else None,
+        )
 
     if not result.is_verdict:
         return _save_question(session, audit, result.question, result.feedback, result.point)
 
-    # 只复核 pass，且每场审计至多一次（challenged 是那道收敛保证）。fail 不需要复核——
-    # Challenger 的目标是推翻通过，对一个已经不通过的裁决无事可做。挑战不直接翻转裁决，
-    # 而是变成最后一个追问：用户回应后由 Auditor 出最终裁决，那时 challenged 已为真。
-    if result.passed and settings.challenger_enabled and not audit.challenged:
-        question = _challenge(session, skill, history, challenger_provider)
-        if question is not None:
-            audit.challenged = True
-            session.add(audit)
-            # What she said about the last answer still stands; the question is the Challenger's.
-            return _save_question(session, audit, question, result.feedback)
+    # 挑战不直接翻转裁决，而是变成最后一个追问：用户回应后由 Auditor 出最终裁决，那时
+    # challenged 已为真。
+    if result.passed and challenge is not None:
+        audit.challenged = True
+        session.add(audit)
+        # What she said about the last answer still stands; the question is the Challenger's.
+        return _save_question(session, audit, challenge, result.feedback)
 
-    return _finalize(session, audit, skill, result, lessons)
+    return _finalize(session, audit, skill, result, lessons, agreement)
 
 
 def _save_answer(session: Session, audit: AuditSession, content: str) -> None:
@@ -347,15 +363,13 @@ def _pacing(session: Session) -> str:
         return "normal"
 
 
-def _challenge(session: Session, skill: SkillNode, history: list[Message], provider: LLMProvider) -> str | None:
-    """The Challenger's question if it overturns the pass; None if it upholds or fails."""
+def _challenge(
+    skill: SkillNode, history: list[Message], provider: LLMProvider, misconceptions: list[str]
+) -> str | None:
+    """The Challenger's question if it overturns the pass; None if it upholds or fails. Takes
+    no session: it runs beside the verdict's other votes, off the request's thread."""
     try:
-        review = Challenger(provider).review(
-            skill.title,
-            skill.description,
-            history,
-            recent_misconceptions(session, settings.challenger_misconception_limit),
-        )
+        review = Challenger(provider).review(skill.title, skill.description, history, misconceptions)
     except Exception:
         logger.warning("challenger failed, upholding the auditor verdict", exc_info=True)
         return None
@@ -363,6 +377,54 @@ def _challenge(session: Session, skill: SkillNode, history: list[Message], provi
         logger.info("challenger overturned a pass: %s", review.reason)
         return review.question
     return None
+
+
+def _voted(
+    first: AuditorTurnResult, judge, final: bool = False, alongside=None
+) -> tuple[AuditorTurnResult, float | None, str | None]:
+    """What the majority of `settings.auditor_votes` judgements of this answer says, the share
+    of them that agreed, and the result of `alongside` (the Challenger, run at the same time so
+    the wait is one call's).
+
+    The same conversation judged again does not always end the same way near the line. Each
+    judgement says pass, fail, or that she would ask on (a probe; on a final turn that is
+    already a forced fail). Two that agree decide. With no two agreeing, or with most wanting
+    to ask on, the audit goes on with a question when it may, and is not a pass when it may not:
+    passing what should fail is the costlier mistake. A judgement that fails does not vote.
+    """
+    extra = settings.auditor_votes - 1
+
+    def one(context: contextvars.Context, call):
+        try:
+            return context.run(call)  # the language and the usage log live in context variables
+        except Exception:
+            logger.warning("a call beside the verdict failed", exc_info=True)
+            return None
+
+    calls = [judge] * max(extra, 0) + ([alongside] if alongside is not None else [])
+    if not calls:
+        return first, None, None
+    with ThreadPoolExecutor(len(calls)) as pool:
+        done = list(pool.map(one, [contextvars.copy_context() for _ in calls], calls))
+    challenge = done.pop() if alongside is not None else None
+    votes = [first, *(v for v in done if v is not None)]
+    if len(votes) < 2:
+        return first, None, challenge
+
+    def said(vote: AuditorTurnResult) -> str:
+        return ("pass" if vote.passed else "fail") if vote.is_verdict else "ask"
+
+    counts = {kind: sum(1 for v in votes if said(v) == kind) for kind in ("pass", "fail", "ask")}
+    if counts["pass"] * 2 > len(votes):
+        outcome = "pass"
+    elif counts["fail"] * 2 > len(votes):
+        outcome = "fail"
+    elif counts["ask"] and not final:
+        outcome = "ask"
+    else:
+        outcome = "fail" if counts["fail"] else "ask"
+    chosen = next(v for v in votes if said(v) == outcome)
+    return chosen, counts[outcome] / len(votes), challenge if outcome == "pass" else None
 
 
 def lesson_results(session: Session, audit_id: int) -> list[dict]:
@@ -377,7 +439,12 @@ def lesson_results(session: Session, audit_id: int) -> list[dict]:
 
 
 def _finalize(
-    session: Session, audit: AuditSession, skill: SkillNode, verdict: AuditorTurnResult, lessons: Sequence = ()
+    session: Session,
+    audit: AuditSession,
+    skill: SkillNode,
+    verdict: AuditorTurnResult,
+    lessons: Sequence = (),
+    agreement: float | None = None,
 ) -> VerdictOutcome:
     status = AuditStatus.passed if verdict.passed else AuditStatus.failed
     _claim(session, audit, status)
@@ -397,6 +464,8 @@ def _finalize(
         session.add(skill)
     if verdict.evidence:
         audit.evidence_json = json.dumps(verdict.evidence, ensure_ascii=False)
+    audit.agreement = agreement
+    audit.judge_version = JUDGE_VERSION
     session.add(audit)
     # A lesson of this very audit's node may be among them; one made by this audit cannot be.
     for check in verdict.lesson_checks or []:
@@ -404,7 +473,12 @@ def _finalize(
             session.add(
                 PrincipleCheck(principle_id=lessons[check["index"]].id, session_id=audit.id, held=check["held"])
             )
-    bandit.update_arm(session, bucket, tier, reward=bool(verdict.passed))
+    # The learner model moves by what was settled; the bandit is rewarded with the progress
+    # made, not with the pass.
+    progress = learner.record(session, skill, bool(verdict.passed), verdict.points, agreement, tier)
+    if progress is not None:
+        split = agreement is not None and agreement < 1
+        bandit.update_arm(session, bucket, tier, reward=progress, weight=learner.SPLIT_WEIGHT if split else 1.0)
     session.flush()
 
     outcome = VerdictOutcome(
