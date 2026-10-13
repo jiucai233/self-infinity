@@ -1611,4 +1611,37 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get devLlmAllOn => '모든 호출을 한 모델로 했다면';
+
+  @override
+  String get youSaid => '내가 한 말';
+
+  @override
+  String get whatHolds => '실제로는';
+
+  @override
+  String get pastLessons => '지난 교훈';
+
+  @override
+  String lessonCameBack(String title) {
+    return '다시 나옴: $title';
+  }
+
+  @override
+  String lessonHeld(String title) {
+    return '지켜냄: $title';
+  }
+
+  @override
+  String lessonCounts(int held, int relapsed) {
+    return '지켜냄 $held · 다시 나옴 $relapsed';
+  }
+
+  @override
+  String get replayDialogue => '전체 대화';
+
+  @override
+  String get replayReflectHint => '그때는 어떻게 생각했나요?…';
+
+  @override
+  String get notReflectedYet => '아직 돌아보지 않았어요';
 }

@@ -166,6 +166,10 @@ class HttpApi implements SelfInfinityApi {
     parse: (j) => Principle.fromJson(_object(j)),
   );
 
+  @override
+  Future<AuditSession> getAudit(int auditId) =>
+      _get('/audits/$auditId', parse: (j) => AuditSession.fromJson(_object(j)));
+
   // -- 13: briefing ----------------------------------------------
 
   @override

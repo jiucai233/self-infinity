@@ -1605,4 +1605,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get devLlmAllOn => '如果全部调用都用同一个模型';
+
+  @override
+  String get youSaid => '你当时说';
+
+  @override
+  String get whatHolds => '其实是';
+
+  @override
+  String get pastLessons => '以前的教训';
+
+  @override
+  String lessonCameBack(String title) {
+    return '又犯了：$title';
+  }
+
+  @override
+  String lessonHeld(String title) {
+    return '守住了：$title';
+  }
+
+  @override
+  String lessonCounts(int held, int relapsed) {
+    return '守住 $held 次 · 又犯 $relapsed 次';
+  }
+
+  @override
+  String get replayDialogue => '完整对话';
+
+  @override
+  String get replayReflectHint => '你当时是怎么想的？…';
+
+  @override
+  String get notReflectedYet => '还没反思';
 }

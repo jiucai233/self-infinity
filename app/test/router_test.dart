@@ -7,6 +7,7 @@ import 'package:self_infinity/app/app.dart';
 import 'package:self_infinity/app/app_state.dart';
 import 'package:self_infinity/app/router.dart';
 import 'package:self_infinity/features/audit/audit_scene.dart';
+import 'package:self_infinity/features/audit/replay_scene.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/features/map/map_scene.dart';
 import 'package:self_infinity/features/skill/skill_scene.dart';
@@ -58,6 +59,9 @@ void main() {
       expect(find.byType(SkillScene), findsOneWidget);
       await go(tester, AppRoutes.audit(1));
       expect(find.byType(AuditScene), findsOneWidget);
+      final failed = await failAudit(tester.widget<SelfInfinityApp>(find.byType(SelfInfinityApp)).api, 6);
+      await go(tester, AppRoutes.replay(failed.sessionId));
+      expect(find.byType(ReplayScene), findsOneWidget);
       await go(tester, AppRoutes.home);
       expect(find.byType(HomeScene), findsOneWidget);
     });
@@ -67,6 +71,7 @@ void main() {
       expect(AppRoutes.map, '/map');
       expect(AppRoutes.skill(5), '/skill/5');
       expect(AppRoutes.audit(5), '/skill/5/audit');
+      expect(AppRoutes.replay(31), '/audit/31');
     });
 
     testWidgets('the scenes that were deleted are gone: they are "not found"', (tester) async {
@@ -272,10 +277,10 @@ void main() {
     expect(app.title, 'Self-Infinity');
   });
 
-  testWidgets('createRouter has exactly the five scene routes', (tester) async {
+  testWidgets('createRouter has exactly the six scene routes', (tester) async {
     final router = createRouter();
     addTearDown(router.dispose);
     final paths = router.configuration.routes.whereType<GoRoute>().map((r) => r.path).toList();
-    expect(paths, ['/', '/map', '/life', '/skill/:skillId', '/skill/:skillId/audit']);
+    expect(paths, ['/', '/map', '/life', '/skill/:skillId', '/skill/:skillId/audit', '/audit/:auditId']);
   });
 }

@@ -12,6 +12,9 @@ from app.agents.auditor import (
     AuditorOutputError,
     began_with,
     format_lessons,
+    gap_evidence,
+    lesson_checks,
+    said_by_user,
 )
 from app.config import settings
 from app.models import NodePosition, NodeType
@@ -535,3 +538,165 @@ def test_lesson_text_is_flattened_to_single_lines():
     flat = format_lessons([lesson("Title\nsecond line", "Body\n\nbreak", "Misconception\nbreak")])
 
     assert flat == "- Title second line: Body break (misconception: Misconception break)"
+
+
+# ---------------------------------------------------------------- evidence and lesson checks
+
+
+def evidence_verdict(gaps, evidence=None, lessons=None) -> str:
+    data = {"action": "verdict", "pass": False, "score": 40, "gaps": gaps, "comment": "c"}
+    if evidence is not None:
+        data["evidence"] = evidence
+    if lessons is not None:
+        data["lessons"] = lessons
+    return json.dumps(data, ensure_ascii=False)
+
+
+def spoken(*user_texts: str) -> list[dict]:
+    messages = [{"role": "assistant", "content": "Explain it from scratch."}]
+    for text in user_texts:
+        messages += [{"role": "user", "content": text}, {"role": "assistant", "content": "And then?"}]
+    return messages
+
+
+def test_the_prompt_asks_for_evidence_and_for_a_check_on_each_lesson_that_came_up():
+    _, provider = next_turn(probe_json())
+
+    prompt = system_prompt(provider)
+    assert '"evidence" has one entry for each gap' in prompt
+    assert "copied exactly from one of their answers" in prompt
+    assert '"lessons": for each past lesson above whose situation came up' in prompt
+
+
+def test_a_quote_found_in_a_user_turn_is_kept():
+    assert said_by_user("no real roots", spoken("I think no real roots means no solutions")) == "no real roots"
+
+
+def test_a_quote_is_matched_without_regard_to_spacing_or_case():
+    history = spoken("I think  No Real\nRoots means nothing")
+
+    assert said_by_user("no real roots", history) == "no real roots"
+
+
+def test_a_quote_wrapped_in_quote_marks_is_kept_without_them():
+    history = spoken("I think no real roots means no solutions")
+
+    assert said_by_user("“no real roots”", history) == "no real roots"
+    assert said_by_user('"no real roots"', history) == "no real roots"
+
+
+def test_a_quote_that_only_the_assistant_said_is_dropped():
+    history = spoken("I think it is about roots")
+    history[0]["content"] = "Tell me about the repeated root"
+
+    assert said_by_user("the repeated root", history) is None
+
+
+def test_a_reworded_empty_or_non_string_quote_is_dropped():
+    history = spoken("I think no real roots means no solutions")
+
+    assert said_by_user("no complex roots means no solutions", history) is None
+    assert said_by_user("", history) is None
+    assert said_by_user("   ", history) is None
+    assert said_by_user(None, history) is None
+    assert said_by_user(42, history) is None
+    assert said_by_user(["no real roots"], history) is None
+
+
+def test_a_verdict_has_one_evidence_entry_per_gap_in_order():
+    output = evidence_verdict(
+        ["Skipped why", "Missed the repeated root"],
+        [{"said": "it just works", "right": "Each step follows from the last."}, {"said": "the root is single", "right": "A double root is one value."}],
+    )
+
+    result, _ = next_turn_with_history(output, spoken("well it just works", "I think the root is single"))
+
+    assert result.evidence == [
+        {"gap": "Skipped why", "said": "it just works", "right": "Each step follows from the last."},
+        {"gap": "Missed the repeated root", "said": "the root is single", "right": "A double root is one value."},
+    ]
+
+
+def next_turn_with_history(output: str, messages: list[dict], **kwargs):
+    provider = ScriptedProvider(auditor=output)
+    result = Auditor(provider).next_turn("Quadratic Equations", "Judge the roots with the discriminant", messages, **kwargs)
+    return result, provider
+
+
+def test_evidence_whose_said_is_not_the_users_words_keeps_right_and_drops_said():
+    output = evidence_verdict(["Skipped why"], [{"said": "I memorised the formula", "right": "Say why it holds."}])
+
+    result, _ = next_turn(output)
+
+    assert result.evidence == [{"gap": "Skipped why", "said": None, "right": "Say why it holds."}]
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    [None, "not a list", {"said": "x"}, [], ["a string", 3], [{"right": "Only the first."}]],
+    ids=["missing", "string", "dict", "empty", "non-dicts", "short"],
+)
+def test_missing_short_or_malformed_evidence_still_gives_one_entry_per_gap(evidence):
+    result, _ = next_turn(evidence_verdict(["First gap", "Second gap"], evidence))
+
+    assert [e["gap"] for e in result.evidence] == ["First gap", "Second gap"]
+    assert all(set(e) == {"gap", "said", "right"} and e["said"] is None for e in result.evidence)
+    assert result.evidence[1]["right"] is None
+
+
+def test_gap_evidence_keeps_the_gap_order_when_the_model_gave_more_entries_than_gaps():
+    evidence = gap_evidence([{"right": "One"}, {"right": "Two"}], ["Only gap"], spoken("x"))
+
+    assert evidence == [{"gap": "Only gap", "said": None, "right": "One"}]
+
+
+def test_lesson_checks_are_numbered_from_one_into_the_lessons_given():
+    raw = [{"lesson": 2, "held": True}, {"lesson": 1, "held": False}]
+
+    assert lesson_checks(raw, 3) == [{"index": 0, "held": False}, {"index": 1, "held": True}]
+
+
+def test_lesson_checks_ignore_out_of_range_duplicate_and_non_bool_entries():
+    raw = [
+        {"lesson": 0, "held": True},
+        {"lesson": 4, "held": True},
+        {"lesson": -1, "held": True},
+        {"lesson": 1, "held": True},
+        {"lesson": 1, "held": False},  # a second word on the same lesson
+        {"lesson": 2, "held": "yes"},
+        {"lesson": 2, "held": 1},
+        {"lesson": "x", "held": True},
+        "junk",
+    ]
+
+    assert lesson_checks(raw, 3) == [{"index": 0, "held": True}]
+
+
+def test_lesson_checks_ignore_input_that_is_not_a_list():
+    assert lesson_checks(None, 2) == []
+    assert lesson_checks({"lesson": 1, "held": True}, 2) == []
+    assert lesson_checks("1", 2) == []
+
+
+def test_with_no_lessons_given_there_are_no_lesson_checks():
+    assert lesson_checks([{"lesson": 1, "held": True}], 0) == []
+
+    result, _ = next_turn(evidence_verdict([], lessons=[{"lesson": 1, "held": True}]))
+
+    assert result.lesson_checks == []
+
+
+def test_a_verdict_reports_the_lessons_that_held_and_the_ones_that_came_back():
+    output = evidence_verdict(["g"], lessons=[{"lesson": 1, "held": False}, {"lesson": 2, "held": True}])
+
+    result, _ = next_turn(output, lessons=[lesson("A"), lesson("B")])
+
+    assert result.lesson_checks == [{"index": 0, "held": False}, {"index": 1, "held": True}]
+
+
+def test_a_quote_she_ended_with_her_own_punctuation_is_still_the_users_words():
+    """Speech comes without full stops; she adds one, and the quote was dropped for it."""
+    history = [{"role": "assistant", "content": "Q"}, {"role": "user", "content": "每层接入的特征都有更多的 global feature 然后再往下走"}]
+
+    assert said_by_user("每层接入的特征都有更多的 global feature。", history) == "每层接入的特征都有更多的 global feature"
+    assert said_by_user("“每层接入的特征都有更多的 global feature，”", history) == "每层接入的特征都有更多的 global feature"

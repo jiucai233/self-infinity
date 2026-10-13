@@ -10,7 +10,7 @@ from app.agents.material_finder import MaterialFinder
 from app.db import account_engine, get_session
 from app.llm import get_provider
 from app.models import AuditSession, Course, EdgeKind, Goal, Principle, Profile, SearchPlan, SkillEdge, SkillNode
-from app.routers.audits import audit_summary
+from app.routers.audits import audit_summary, reflected_ids
 from app.schemas import (
     ClarifyRequest,
     ClarifyResponse,
@@ -291,6 +291,7 @@ def get_overview(skill_id: int, session: Session = Depends(get_session)):
         .where(AuditSession.skill_id == skill.id)
         .order_by(col(AuditSession.created_at).desc(), col(AuditSession.id).desc())
     ).all()
+    reflected = reflected_ids(session)
     plans = session.exec(
         select(SearchPlan)
         .where(SearchPlan.skill_id == skill.id)
@@ -301,6 +302,6 @@ def get_overview(skill_id: int, session: Session = Depends(get_session)):
         course=CourseOut.model_validate(course),
         contains_parents=[SkillNodeOut.model_validate(p) for p in contains_parents(session, skill.id)],
         requires=[RequiredSkillOut(skill=SkillNodeOut.model_validate(n), reason=e.reason) for e, n in required],
-        audits=[audit_summary(a, skill) for a in audits],
+        audits=[audit_summary(a, skill, reflected) for a in audits],
         materials=[search_plan_out(p) for p in plans],
     )

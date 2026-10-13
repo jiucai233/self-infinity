@@ -217,11 +217,25 @@ class AuditSession(SQLModel, table=True):
     # The knowledge points this audit examines, `[{"title", "ok", "note"}]`: the node's points
     # still open when it started, with their result once it is closed.
     points_json: str | None = None
+    # What each gap rests on, `[{"gap", "said", "right"}]` in the order of the gaps: the user's
+    # own words and what holds instead, for the replay.
+    evidence_json: str | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
     @property
     def points(self) -> list[dict]:
         return parse_points(self.points_json)
+
+    @property
+    def evidence(self) -> list[dict]:
+        """One entry per gap; an audit from before evidence was kept has the gaps alone."""
+        gaps = json.loads(self.gaps_json) if self.gaps_json else []
+        kept = json.loads(self.evidence_json) if self.evidence_json else []
+        by_gap = {e.get("gap"): e for e in kept if isinstance(e, dict)}
+        return [
+            {"gap": gap, "said": by_gap.get(gap, {}).get("said"), "right": by_gap.get(gap, {}).get("right")}
+            for gap in gaps
+        ]
 
 
 class AuditTurn(SQLModel, table=True):
@@ -241,6 +255,17 @@ class Principle(SQLModel, table=True):
     body: str
     misconception: str | None = None
     source_session_id: int = Field(foreign_key="auditsession.id", index=True)
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+
+
+class PrincipleCheck(SQLModel, table=True):
+    """A later audit met the situation of a lesson: it held, or the same mistake came back.
+    Appended by the verdict; the lesson itself is never changed (AD-4)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    principle_id: int = Field(foreign_key="principle.id", index=True)
+    session_id: int = Field(foreign_key="auditsession.id", index=True)
+    held: bool
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 

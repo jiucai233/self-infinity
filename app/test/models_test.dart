@@ -174,6 +174,70 @@ void main() {
       expect(v.rewardMultiplier, isNull);
     });
 
+    test('a verdict carries what each gap rests on and the past lessons it touched', () {
+      final v =
+          TurnResult.fromJson(
+                obj('''
+        {"type": "verdict", "passed": false, "score": 45, "gaps": ["No reason given", "No exceptions"],
+         "evidence": [{"gap": "No reason given", "said": "It just works", "right": "It works because the range is fixed"},
+                      {"gap": "No exceptions", "said": null, "right": null}],
+         "lessons": [{"principle_id": 7, "title": "State the range first", "held": false},
+                     {"principle_id": 8, "title": "Reason before conclusion", "held": true}]}'''),
+              )
+              as VerdictResult;
+      expect(v.evidence.map((e) => e.gap), v.gaps);
+      expect(v.evidence.first.said, 'It just works');
+      expect(v.evidence.first.right, 'It works because the range is fixed');
+      expect(v.evidence.last.said, isNull);
+      expect(v.evidence.last.right, isNull);
+      expect(v.lessons.map((l) => (l.principleId, l.title, l.held)), [
+        (7, 'State the range first', false),
+        (8, 'Reason before conclusion', true),
+      ]);
+    });
+
+    test('a verdict from an older server has no evidence and no lessons', () {
+      final v =
+          TurnResult.fromJson(obj('{"type": "verdict", "passed": false, "score": 45, "gaps": ["..."]}'))
+              as VerdictResult;
+      expect(v.evidence, isEmpty);
+      expect(v.lessons, isEmpty);
+    });
+
+    test('AuditSession for the replay: evidence, lessons, its lesson card, the node and the time', () {
+      final s = AuditSession.fromJson(
+        obj('''
+        {"id": 31, "skill_id": 5, "node_position": "leaf", "status": "failed", "score": 45,
+         "gaps": ["No reason given"], "comment": "Stops at the conclusion.", "turns": [],
+         "evidence": [{"gap": "No reason given", "said": "It just works"}],
+         "lessons": [{"principle_id": 7, "title": "State the range first", "held": true}],
+         "principle": {"id": 9, "title": "Reason first", "body": "I give the reason first.",
+                       "misconception": null, "source_session_id": 31, "skill_id": 5,
+                       "skill_title": "Quadratic Equations", "created_at": "2026-10-05T03:30:00Z",
+                       "held": 2, "relapsed": 1},
+         "skill_title": "Quadratic Equations", "created_at": "2026-10-05T03:20:00Z"}'''),
+      );
+      expect(s.evidence.single.said, 'It just works');
+      expect(s.evidence.single.right, isNull);
+      expect(s.lessons.single.held, isTrue);
+      expect(s.principle!.id, 9);
+      expect(s.principle!.held, 2);
+      expect(s.principle!.relapsed, 1);
+      expect(s.skillTitle, 'Quadratic Equations');
+      expect(s.createdAt, DateTime.utc(2026, 10, 5, 3, 20));
+    });
+
+    test('an AuditSession without the replay fields reads as empty', () {
+      final s = AuditSession.fromJson(
+        obj('{"id": 31, "skill_id": 5, "node_position": "leaf", "status": "failed", "score": 45}'),
+      );
+      expect(s.evidence, isEmpty);
+      expect(s.lessons, isEmpty);
+      expect(s.principle, isNull);
+      expect(s.skillTitle, '');
+      expect(s.createdAt, isNull);
+    });
+
     test('TurnResult: passing verdict with reward', () {
       final v = TurnResult.fromJson(
         obj('''
@@ -223,6 +287,9 @@ void main() {
       expect(p.skillId, 5);
       expect(p.skillTitle, 'Quadratic Equations');
       expect(p.createdAt, DateTime.utc(2026, 10, 5, 3, 20));
+      // An older server does not count what happened to the lesson since.
+      expect(p.held, 0);
+      expect(p.relapsed, 0);
     });
 
     test('Principle without a misconception', () {

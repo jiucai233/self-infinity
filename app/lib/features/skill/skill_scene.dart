@@ -872,6 +872,7 @@ class _AvatarColumn extends StatelessWidget {
 
 /// The body of the right panel “Attempts” on scene 4: one card per audit of
 /// this node, newest first — the date, a Passed/Failed chip and the score.
+/// A card opens the audit's replay; a fail not reflected on yet says so.
 class _AuditHistory extends StatelessWidget {
   const _AuditHistory({required this.audits});
 
@@ -900,33 +901,49 @@ class _AuditHistory extends StatelessWidget {
                 borderRadius: AppRadius.cardBorder,
                 border: Border.all(color: AppColors.outline),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            formatLocal(a.createdAt, style: DateStyle.dateTime),
-                            style: theme.bodySmall,
+              child: Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  key: Key('audit-open-${a.id}'),
+                  borderRadius: AppRadius.cardBorder,
+                  onTap: () => context.go(AppRoutes.replay(a.id)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                formatLocal(a.createdAt, style: DateStyle.dateTime),
+                                style: theme.bodySmall,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                a.score == null ? '—' : context.l10n.points(a.score!),
+                                key: const Key('audit-score'),
+                                style: theme.titleLarge,
+                              ),
+                              if (a.status == AuditStatus.failed && !a.reflected) ...[
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  context.l10n.notReflectedYet,
+                                  key: const Key('audit-unreflected'),
+                                  style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                                ),
+                              ],
+                            ],
                           ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            a.score == null ? '—' : context.l10n.points(a.score!),
-                            key: const Key('audit-score'),
-                            style: theme.titleLarge,
-                          ),
-                        ],
-                      ),
+                        ),
+                        StatusChip(
+                          label: a.status.label(context.l10n),
+                          color: a.status.color,
+                          fill: a.status.fill,
+                        ),
+                      ],
                     ),
-                    StatusChip(
-                      label: a.status.label(context.l10n),
-                      color: a.status.color,
-                      fill: a.status.fill,
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

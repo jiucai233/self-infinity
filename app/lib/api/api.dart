@@ -113,6 +113,11 @@ abstract class SelfInfinityApi {
   /// ([Principle]). 400 if the audit did not fail or already has a card.
   Future<Principle> submitReflection(int sessionId, String reflection);
 
+  /// `GET /audits/{auditId}` — one audit whole, for the replay: the dialogue,
+  /// the verdict, what each gap rests on, the past lessons it touched and its
+  /// own lesson card. 404 `audit session not found`.
+  Future<AuditSession> getAudit(int auditId);
+
   /// `GET /narrator/briefing` — the facts behind the left panel (bars) computed
   /// fresh, plus the cached narrative (unused by the UI).
   Future<Briefing> getBriefing();

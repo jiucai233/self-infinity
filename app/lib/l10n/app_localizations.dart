@@ -3081,6 +3081,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'If every call ran on one model'**
   String get devLlmAllOn;
+
+  /// No description provided for @youSaid.
+  ///
+  /// In en, this message translates to:
+  /// **'You said'**
+  String get youSaid;
+
+  /// No description provided for @whatHolds.
+  ///
+  /// In en, this message translates to:
+  /// **'What holds'**
+  String get whatHolds;
+
+  /// No description provided for @pastLessons.
+  ///
+  /// In en, this message translates to:
+  /// **'Past lessons'**
+  String get pastLessons;
+
+  /// No description provided for @lessonCameBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Came back: {title}'**
+  String lessonCameBack(String title);
+
+  /// No description provided for @lessonHeld.
+  ///
+  /// In en, this message translates to:
+  /// **'Held: {title}'**
+  String lessonHeld(String title);
+
+  /// No description provided for @lessonCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Held {held} · Came back {relapsed}'**
+  String lessonCounts(int held, int relapsed);
+
+  /// No description provided for @replayDialogue.
+  ///
+  /// In en, this message translates to:
+  /// **'The whole conversation'**
+  String get replayDialogue;
+
+  /// No description provided for @replayReflectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What did you believe at the time?…'**
+  String get replayReflectHint;
+
+  /// No description provided for @notReflectedYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not reflected on yet'**
+  String get notReflectedYet;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

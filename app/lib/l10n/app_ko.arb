@@ -497,5 +497,14 @@
   "devVoiceTurnsRate": "차례대로 분당 (측정)",
   "devVoiceTurnsRateDefault": "차례대로 분당 (추정)",
   "devVoiceOnTurns": "차례대로 ≈",
-  "devLlmAllOn": "모든 호출을 한 모델로 했다면"
+  "devLlmAllOn": "모든 호출을 한 모델로 했다면",
+  "youSaid": "내가 한 말",
+  "whatHolds": "실제로는",
+  "pastLessons": "지난 교훈",
+  "lessonCameBack": "다시 나옴: {title}",
+  "lessonHeld": "지켜냄: {title}",
+  "lessonCounts": "지켜냄 {held} · 다시 나옴 {relapsed}",
+  "replayDialogue": "전체 대화",
+  "replayReflectHint": "그때는 어떻게 생각했나요?…",
+  "notReflectedYet": "아직 돌아보지 않았어요"
 }

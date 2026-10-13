@@ -1628,4 +1628,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devLlmAllOn => 'If every call ran on one model';
+
+  @override
+  String get youSaid => 'You said';
+
+  @override
+  String get whatHolds => 'What holds';
+
+  @override
+  String get pastLessons => 'Past lessons';
+
+  @override
+  String lessonCameBack(String title) {
+    return 'Came back: $title';
+  }
+
+  @override
+  String lessonHeld(String title) {
+    return 'Held: $title';
+  }
+
+  @override
+  String lessonCounts(int held, int relapsed) {
+    return 'Held $held · Came back $relapsed';
+  }
+
+  @override
+  String get replayDialogue => 'The whole conversation';
+
+  @override
+  String get replayReflectHint => 'What did you believe at the time?…';
+
+  @override
+  String get notReflectedYet => 'Not reflected on yet';
 }

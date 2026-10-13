@@ -287,6 +287,28 @@ void main() {
       expect(r.title, 'State the range of the solution first');
     });
 
+    test('getAudit: GET /audits/{id}', () async {
+      final h = ok({
+        'id': 31,
+        'skill_id': 5,
+        'node_position': 'leaf',
+        'status': 'failed',
+        'score': 45,
+        'gaps': ['No reason given'],
+        'evidence': [
+          {'gap': 'No reason given', 'said': 'It just works', 'right': 'The range is fixed'},
+        ],
+        'principle': principleJson,
+        'skill_title': 'Quadratic Equations',
+        'created_at': '2026-10-05T03:20:00Z',
+      });
+      final r = await h.api.getAudit(31);
+      expect(h.last.method, 'GET');
+      expect(h.last.url.path, '/api/audits/31');
+      expect(r.evidence.single.said, 'It just works');
+      expect(r.principle!.title, 'State the range of the solution first');
+    });
+
     test('13 getBriefing: GET /narrator/briefing', () async {
       final h = ok(briefingJson);
       final r = await h.api.getBriefing();

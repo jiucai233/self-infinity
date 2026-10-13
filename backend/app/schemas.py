@@ -211,6 +211,26 @@ class AuditTurnOut(BaseModel):
     feedback: str | None = None
 
 
+class GapEvidenceOut(BaseModel):
+    """What a gap rests on, for the replay."""
+
+    gap: str
+    # The user's own words, as they said them; null when the gap is a part they never spoke about
+    # (and for audits from before evidence was kept).
+    said: str | None = None
+    # What holds instead.
+    right: str | None = None
+
+
+class LessonCheckOut(BaseModel):
+    """A past lesson this audit touched."""
+
+    principle_id: int
+    title: str
+    # True: the lesson held. False: the same mistake came back.
+    held: bool
+
+
 class AuditSessionOut(BaseModel):
     id: int
     skill_id: int
@@ -223,6 +243,14 @@ class AuditSessionOut(BaseModel):
     test_out: bool = False
     # The knowledge points this audit examines; their results once it is closed.
     points: list[PointOut] = []
+    # One per gap, in their order.
+    evidence: list[GapEvidenceOut] = []
+    # Past lessons this audit touched.
+    lessons: list[LessonCheckOut] = []
+    # The lesson card made from this audit's reflection, once there is one.
+    principle: "PrincipleOut | None" = None
+    skill_title: str = ""
+    created_at: datetime | None = None
 
 
 class StartAuditResponse(BaseModel):
@@ -259,6 +287,10 @@ class VerdictResult(BaseModel):
     feedback: str | None = None
     # One per knowledge point examined: what held, what was missed and why.
     points: list[PointOut] = []
+    # One per gap, in their order: the user's own words and what holds instead.
+    evidence: list[GapEvidenceOut] = []
+    # Past lessons this audit touched: held, or the same mistake came back.
+    lessons: list[LessonCheckOut] = []
     unlocked_skill_ids: list[int]
     # 通过时有值，失败时为 null。
     reward_amount: int | None
@@ -284,6 +316,13 @@ class PrincipleOut(BaseModel):
     skill_id: int
     skill_title: str
     created_at: datetime
+    # Later audits that met this lesson's situation: how often it held, how often the mistake
+    # came back.
+    held: int = 0
+    relapsed: int = 0
+
+
+AuditSessionOut.model_rebuild()
 
 
 # ---------------------------------------------------------------- 知识图谱
@@ -699,6 +738,8 @@ class AuditSummaryOut(BaseModel):
     score: int | None
     created_at: datetime
     test_out: bool = False
+    # A failed audit whose lesson card has been made.
+    reflected: bool = False
 
 
 class RequiredSkillOut(BaseModel):

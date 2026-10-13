@@ -212,6 +212,7 @@ void main() {
       );
 
       await tester.ensureVisible(key('verdict-copy'));
+      await tester.pumpAndSettle(); // the card is taller than the window now
       await tester.tap(key('verdict-copy'));
       await tester.pump();
 
@@ -219,6 +220,7 @@ void main() {
       expect(copied.single, contains('✗ ${points[0]} — ${FakeApiClient.failNote}'));
       expect(copied.single, contains('✓ ${points[1]}'));
       expect(copied.single, contains("- You didn't cover the exceptions."));
+      expect(copied.single, contains("  You said: $shortAnswer\n  What holds: ${FakeApiClient.failRight}"));
       expect(find.text('Copied.'), findsOneWidget);
     });
 

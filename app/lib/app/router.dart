@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/audit/audit_scene.dart';
+import '../features/audit/replay_scene.dart';
 import '../features/life/life_scene.dart';
 import '../features/chat/home_scene.dart';
 import '../features/map/map_scene.dart';
@@ -20,6 +21,7 @@ import '../l10n/l10n.dart';
 /// | `/map` | `MapScene` | 2 skill graph |
 /// | `/skill/:id` | `SkillScene` | 4 node overview |
 /// | `/skill/:id/audit` | `AuditScene` | 4-1 audit |
+/// | `/audit/:auditId` | `ReplayScene` | a finished audit, read again |
 ///
 /// Every scene is reached with `context.go(...)`; there are no other pages.
 abstract final class AppRoutes {
@@ -37,14 +39,19 @@ abstract final class AppRoutes {
 
   /// `/skill/<skillId>/audit?challenge=1`: a challenge on the whole branch.
   static String challenge(int skillId) => '/skill/$skillId/audit?challenge=1';
+
+  /// `/audit/<auditId>`: the replay of one audit.
+  static String replay(int auditId) => '/audit/$auditId';
 }
 
 /// How deep a scene is: going to a deeper one (home -> map -> node -> audit)
-/// slides up into place, going back slides down (`docs/ux-chat.md` 5.6).
+/// slides up into place, going back slides down (`docs/ux-chat.md` 5.6). A
+/// replay is as deep as the audit: it is opened from the node.
 int _depthOf(Uri uri) {
   final segments = uri.pathSegments;
   if (segments.isEmpty) return 0;
   if (segments.first == 'map' || segments.first == 'life') return 1;
+  if (segments.first == 'audit') return 3;
   return segments.length >= 3 ? 3 : 2;
 }
 
@@ -124,6 +131,16 @@ GoRouter createRouter({String? initialLocation}) {
               testOut: testOut,
             ),
           );
+        },
+      ),
+      GoRoute(
+        path: '/audit/:auditId',
+        pageBuilder: (context, state) {
+          final auditId = int.tryParse(state.pathParameters['auditId'] ?? '');
+          if (auditId == null) {
+            return page(state, NotFoundScreen(location: state.uri.toString()));
+          }
+          return page(state, ReplayScene(key: ValueKey('replay-$auditId'), auditId: auditId));
         },
       ),
     ],

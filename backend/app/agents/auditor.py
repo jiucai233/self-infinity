@@ -29,6 +29,9 @@
   因为没提插电源而判不过。
 - **不逼问。** 用户说不会、顶不住了，就讲清楚、记为没过、往下走。
 - **反问不算回答。** 用户问"你是在问 A 还是 B"，就把同一个问题换个说法再问一遍，不判、不换题。
+- **缺口带证据。** 裁决给每个缺口附上用户的原话（said）和对的说法（right），回放时并排给用户看：
+  人看不到自己的盲点，要有人把那句话指出来。原话由代码核对（必须出现在用户说过的话里），对不上
+  就丢掉，不让她替用户"说"话。她还报告手里的旧教训这一场是守住了还是又犯了。
 - **只按讲到的判。** 一个知识点里写了几样东西而只讲到、问到其中一样，没碰到的不算在用户头上。
 
 第一个问题不由模型生成，来自按节点位置选的模板（app/services/audit_flow.py）。轮数上限由
@@ -222,13 +225,23 @@ The comment says in one or two sentences what holds and what to work on
 next.
 score: 0 to 100, how much of the node their own answers got right. It is
 reported to the user; it does not decide pass, the gaps do.
+"evidence" has one entry for each gap, in the order of "gaps", so the
+user can see the mistake for themselves: "said" is the words of theirs
+the gap rests on, copied exactly from one of their answers (a phrase or
+a sentence, never reworded, never yours); null when the gap is a part
+they never spoke about. "right" is what holds instead, in one or two
+plain sentences.
+"lessons": for each past lesson above whose situation came up in this
+audit, its number in that list counted from 1, and whether it held this
+time ("held": true) or the same mistake came back ("held": false). Leave
+out a lesson this audit did not touch.
 
 Write feedback, questions, gaps and comment in English. If the user
 answers in another language, write in theirs.
 
 {began_line}Output only JSON, one of:
 {{"action": "probe", "feedback": "...", "point": "the point this question examines, or null", "question": "..."}}
-{{"action": "verdict", "feedback": "...", "pass": false, "score": 60, "points": [{{"point": "...", "ok": false, "note": "..."}}], "gaps": ["..."], "comment": "..."}}
+{{"action": "verdict", "feedback": "...", "pass": false, "score": 60, "points": [{{"point": "...", "ok": false, "note": "..."}}], "gaps": ["..."], "evidence": [{{"said": "...", "right": "..."}}], "lessons": [{{"lesson": 1, "held": false}}], "comment": "..."}}
 """
 )
 
@@ -377,6 +390,11 @@ class AuditorTurnResult:
     comment: str | None = None
     # On a verdict of an audit with points: `[{"title", "ok", "note"}]`, one per point examined.
     points: list[dict] | None = None
+    # One per gap, in their order: `{"gap", "said", "right"}`. `said` is the user's own words
+    # the gap rests on (checked against what they said), `right` what holds instead.
+    evidence: list[dict] | None = None
+    # Past lessons this audit touched: `{"index", "held"}`, the index into `lessons` as given.
+    lesson_checks: list[dict] | None = None
 
 
 class Auditor:
@@ -475,6 +493,8 @@ class Auditor:
             gaps=data["gaps"],
             comment=data["comment"],
             points=results,
+            evidence=gap_evidence(data.get("evidence"), data["gaps"], history),
+            lesson_checks=lesson_checks(data.get("lessons"), len(lessons or [])),
         )
 
     @staticmethod
@@ -531,6 +551,8 @@ class Auditor:
             "comment": str(data.get("comment") or "").strip(),
             "feedback": _text(data.get("feedback")),
             "points": data.get("points"),
+            "evidence": data.get("evidence"),
+            "lessons": data.get("lessons"),
         }
 
     @staticmethod
@@ -566,6 +588,54 @@ def _named(value, points: list[str]) -> str | None:
     """The point of `points` the model named, matched without case; None for anything else."""
     name = " ".join(str(value or "").split()).casefold()
     return next((p for p in points if p.casefold() == name), None) if name else None
+
+
+_QUOTE_EDGES = " \t\n\"'“”‘’「」『』《》….。,，、;；:：!！?？"
+
+
+def _squeezed(text: str) -> str:
+    return "".join(str(text).split()).casefold()
+
+
+def said_by_user(quote, history: list[Message]) -> str | None:
+    """`quote` when it is the user's own words: found in one of their answers, whitespace and
+    case aside. Anything else is dropped: a quote she reworded would put words in their mouth
+    on the page that is meant to show them what they said."""
+    text = _text(quote)
+    if text is None:
+        return None
+    text = text.strip(_QUOTE_EDGES)
+    needle = _squeezed(text)
+    if len(needle) < 2:
+        return None
+    return text if any(needle in _squeezed(m["content"]) for m in history if m["role"] == "user") else None
+
+
+def gap_evidence(raw, gaps: list[str], history: list[Message]) -> list[dict]:
+    """One entry per gap, in their order: the gap, the user's words it rests on, what holds
+    instead. Entries the model left out or shaped wrongly come back empty, never missing."""
+    given = raw if isinstance(raw, list) else []
+    evidence = []
+    for i, gap in enumerate(gaps):
+        item = given[i] if i < len(given) and isinstance(given[i], dict) else {}
+        evidence.append({"gap": gap, "said": said_by_user(item.get("said"), history), "right": _text(item.get("right"))})
+    return evidence
+
+
+def lesson_checks(raw, count: int) -> list[dict]:
+    """`{"index", "held"}` for each lesson the verdict spoke about: `index` into the lessons
+    as they were given (from 0), once each; a number outside the list is ignored."""
+    checks: dict[int, bool] = {}
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict) or not isinstance(item.get("held"), bool):
+            continue
+        try:
+            index = int(item.get("lesson")) - 1
+        except (TypeError, ValueError):
+            continue
+        if 0 <= index < count and index not in checks:
+            checks[index] = item["held"]
+    return [{"index": index, "held": held} for index, held in sorted(checks.items())]
 
 
 def point_results(raw, points: list[str], passed: bool) -> list[dict]:

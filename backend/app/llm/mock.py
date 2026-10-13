@@ -38,6 +38,7 @@ _FAIL_GAPS = [
     "You stated the definition but not why it works.",
     "You didn't cover the exceptions.",
 ]
+_FAIL_RIGHT = "The mechanism has to be explained step by step, with what each step is for."
 _FAIL_COMMENT = "The answer stops at the conclusion and lacks reasons."
 
 _CHALLENGE_BELOW_CHARS = 160
@@ -394,6 +395,9 @@ def _audit(messages: list[Message]) -> str:
                 {"point": p, "ok": i > 0, **({"note": _FAIL_NOTE} if i == 0 else {})} for i, p in enumerate(examined)
             ],
             "gaps": _FAIL_GAPS,
+            # The user's own last words, and a lesson that came back when one was given.
+            "evidence": [{"said": user_turns[-1][:80], "right": _FAIL_RIGHT} for _ in _FAIL_GAPS],
+            "lessons": [{"lesson": 1, "held": False}],
             "comment": _FAIL_COMMENT,
         }
     )

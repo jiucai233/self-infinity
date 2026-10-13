@@ -468,6 +468,84 @@ void main() {
     });
   });
 
+  group('the replay', () {
+    test('each gap of a fail quotes the last answer, up to 80 characters, and says what holds', () async {
+      final api = await seededFakeApi();
+      final start = await api.startAudit(6);
+      await api.submitTurn(start.session.id, 'first answer');
+      final last = "I'm not sure, ${'x' * 100}";
+      final v = await api.submitTurn(start.session.id, last) as VerdictResult;
+      expect(v.passed, isFalse);
+      expect(v.evidence.map((e) => e.gap), v.gaps);
+      for (final e in v.evidence) {
+        expect(e.said, last.substring(0, 80));
+        expect(e.right, 'The mechanism has to be explained step by step, with what each step is for.');
+      }
+      expect(v.lessons, isEmpty); // no lesson on this node yet
+    });
+
+    test('a pass has no evidence', () async {
+      final api = await seededFakeApi();
+      final v = await passAudit(api, 6);
+      expect(v.evidence, isEmpty);
+      expect(v.lessons, isEmpty);
+    });
+
+    test('a second fail on a node with a lesson reports it as come back, and counts it', () async {
+      final api = await seededFakeApi();
+      final first = await failAudit(api, 6);
+      final lesson = await api.submitReflection(first.sessionId, 'I memorized the formula');
+      expect((lesson.held, lesson.relapsed), (0, 0));
+
+      final second = await failAudit(api, 6);
+      expect(second.verdict.lessons.map((l) => (l.principleId, l.title, l.held)), [
+        (lesson.id, lesson.title, false),
+      ]);
+      expect((await api.listPrinciples()).single.relapsed, 1);
+      await failAudit(api, 6);
+      expect((await api.listPrinciples()).single.relapsed, 2);
+      expect((await api.listPrinciples()).single.held, 0);
+
+      // A fail elsewhere does not touch it.
+      api.debugSetStatus(7, SkillStatus.available);
+      final other = await failAudit(api, 7);
+      expect(other.verdict.lessons, isEmpty);
+      expect((await api.listPrinciples()).single.relapsed, 2);
+    });
+
+    test('getAudit returns the audit whole: dialogue, evidence, lessons and its lesson card', () async {
+      final api = await seededFakeApi();
+      final first = await failAudit(api, 6);
+      var audit = await api.getAudit(first.sessionId);
+      expect(audit.status, AuditStatus.failed);
+      expect(audit.skillTitle, 'Discriminant');
+      expect(audit.createdAt, isNotNull);
+      expect(audit.turns.where((t) => t.isUser), hasLength(2));
+      expect(audit.evidence.map((e) => e.said), [shortAnswer, shortAnswer]);
+      expect(audit.principle, isNull);
+
+      final lesson = await api.submitReflection(first.sessionId, 'I memorized the formula');
+      final second = await failAudit(api, 6);
+      audit = await api.getAudit(first.sessionId);
+      expect(audit.principle!.id, lesson.id);
+      expect(audit.principle!.relapsed, 1);
+      expect((await api.getAudit(second.sessionId)).lessons.single.principleId, lesson.id);
+      expect((await api.getAudit(second.sessionId)).principle, isNull);
+
+      expect((await failure(() => api.getAudit(999))).statusCode, 404);
+    });
+
+    test('an audit line says whether it was reflected on', () async {
+      final api = await seededFakeApi();
+      final first = await failAudit(api, 6);
+      await failAudit(api, 6);
+      expect((await api.listAudits()).map((a) => a.reflected), [false, false]);
+      await api.submitReflection(first.sessionId, 'I memorized the formula');
+      expect((await api.listAudits()).map((a) => a.reflected), [false, true]); // newest first
+      expect((await api.getSkillOverview(6)).audits.map((a) => a.reflected), [false, true]);
+    });
+  });
+
   group('Memory Retriever', () {
     Future<FakeApiClient> mathWithOpenNodes() async {
       final api = await seededFakeApi();
@@ -1020,7 +1098,7 @@ void main() {
       for (final name in FakeApiClient.methodNames) {
         api.failNext(method: name); // asserts on unknown names
       }
-      expect(FakeApiClient.methodNames, hasLength(59));
+      expect(FakeApiClient.methodNames, hasLength(60));
       expect(() => api.failNext(method: 'nope'), throwsA(isA<AssertionError>()));
     });
   });

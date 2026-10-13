@@ -169,6 +169,16 @@ void main() {
       expect(a.status, AuditStatus.failed);
       expect(a.score, 45);
       expect(a.createdAt, DateTime.utc(2026, 10, 5, 3, 20));
+      expect(a.reflected, isFalse); // absent on an older server
+    });
+
+    test('a fail a lesson card was made from is reflected', () {
+      final a = AuditSummary.fromJson(
+        obj('''
+        {"id": 31, "skill_id": 5, "skill_title": "x", "status": "failed", "score": 45,
+         "created_at": "2026-10-05T03:20:00Z", "reflected": true}'''),
+      );
+      expect(a.reflected, isTrue);
     });
 
     test('an active audit has no score', () {

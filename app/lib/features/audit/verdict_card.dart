@@ -7,11 +7,13 @@ import '../../api/models.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
 import '../../l10n/l10n.dart';
+import 'gap_evidence.dart';
 
 /// The Auditor's verdict, in the dialogue column of the audit (scene 4-1):
 /// the outcome in the display serif, the score, her comment and — the part
-/// to learn from — each knowledge point (held or missed, and why) and every
-/// gap she found. The copy button takes all of it as text.
+/// to learn from — each knowledge point (held or missed, and why), every
+/// gap she found with the user's own words next to what holds, and the past
+/// lessons that held or came back. The copy button takes all of it as text.
 ///
 /// A pass gets an ember edge and the XP; a fail offers [onLesson] (the
 /// Recorder turns the miss into a lesson card) until that has started.
@@ -26,6 +28,12 @@ class VerdictCard extends StatelessWidget {
   /// Back to the node (scene 4).
   final VoidCallback onBack;
 
+  /// One per gap: what the verdict says it rests on, or the gap alone
+  /// (an older verdict).
+  List<GapEvidence> get _gaps => verdict.evidence.isNotEmpty
+      ? verdict.evidence
+      : [for (final gap in verdict.gaps) GapEvidence(gap: gap)];
+
   /// The verdict as plain text, for the clipboard.
   String _asText(BuildContext context) {
     final l = context.l10n;
@@ -39,7 +47,8 @@ class VerdictCard extends StatelessWidget {
             : p.ok == false
             ? '✗'
             : '○'} ${p.title}${p.note == null ? '' : ' — ${p.note}'}',
-      for (final gap in verdict.gaps) '- $gap',
+      for (final gap in _gaps) GapEvidenceView.asText(context, gap),
+      for (final lesson in verdict.lessons) LessonCheckRow.textOf(context, lesson),
     ].join('\n');
   }
 
@@ -124,34 +133,27 @@ class VerdictCard extends StatelessWidget {
             for (final (i, point) in verdict.points.indexed)
               PointRow(key: Key('verdict-point-$i'), point: point),
           ],
-          if (verdict.gaps.isNotEmpty) ...[
+          if (_gaps.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.lg),
             const Divider(height: 1),
             const SizedBox(height: AppSpacing.lg),
             Text(passed ? context.l10n.worthSecondLook : context.l10n.whatWasMissing, style: theme.labelMedium),
             const SizedBox(height: AppSpacing.sm),
-            for (final (i, gap) in verdict.gaps.indexed)
-              Padding(
+            for (final (i, gap) in _gaps.indexed)
+              GapEvidenceView(
                 key: Key('verdict-gap-$i'),
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 9, right: AppSpacing.md),
-                      child: Container(
-                        width: 5,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: passed ? AppColors.textTertiary : AppColors.danger,
-                        ),
-                      ),
-                    ),
-                    Expanded(child: Text(gap, style: theme.bodyMedium)),
-                  ],
-                ),
+                evidence: gap,
+                color: passed ? AppColors.textTertiary : AppColors.danger,
               ),
+          ],
+          if (verdict.lessons.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            const Divider(height: 1),
+            const SizedBox(height: AppSpacing.lg),
+            Text(context.l10n.pastLessons, style: theme.labelMedium),
+            const SizedBox(height: AppSpacing.sm),
+            for (final (i, lesson) in verdict.lessons.indexed)
+              LessonCheckRow(key: Key('verdict-lesson-$i'), check: lesson),
           ],
           const SizedBox(height: AppSpacing.lg),
           Wrap(

@@ -9,7 +9,7 @@ from app.db import get_session
 from app.i18n import use_language
 from app.llm import get_provider, usage
 from app.models import AuditSession, AuditStatus, Principle, SkillNode, SkillStatus
-from app.routers.principles import principle_out
+from app.routers.principles import check_counts, principle_out
 from app.schemas import (
     AuditSessionOut,
     AuditSummaryOut,
@@ -32,7 +32,18 @@ router = APIRouter(prefix="/api", tags=["audits"])
 
 
 def _session_out(session: Session, audit: AuditSession) -> AuditSessionOut:
+    skill = session.get(SkillNode, audit.skill_id)
+    principle = session.exec(select(Principle).where(Principle.source_session_id == audit.id)).first()
     return AuditSessionOut(
+        evidence=audit.evidence,
+        lessons=audit_flow.lesson_results(session, audit.id),
+        principle=(
+            principle_out(principle, skill, check_counts(session, principle.id).get(principle.id))
+            if principle is not None
+            else None
+        ),
+        skill_title=skill.title,
+        created_at=audit.created_at,
         id=audit.id,
         skill_id=audit.skill_id,
         node_position=audit.node_position,
@@ -49,8 +60,14 @@ def _session_out(session: Session, audit: AuditSession) -> AuditSessionOut:
     )
 
 
-def audit_summary(audit: AuditSession, skill: SkillNode) -> AuditSummaryOut:
+def reflected_ids(session: Session) -> set[int]:
+    """The audits a lesson card was made from."""
+    return set(session.exec(select(Principle.source_session_id)).all())
+
+
+def audit_summary(audit: AuditSession, skill: SkillNode, reflected: set[int] = frozenset()) -> AuditSummaryOut:
     return AuditSummaryOut(
+        reflected=audit.id in reflected,
         id=audit.id,
         skill_id=skill.id,
         skill_title=skill.title,
@@ -70,7 +87,18 @@ def list_audits(limit: int = Query(20, ge=1, le=100), session: Session = Depends
         .order_by(col(AuditSession.created_at).desc(), col(AuditSession.id).desc())
         .limit(limit)
     ).all()
-    return [audit_summary(audit, skill) for audit, skill in rows]
+    reflected = reflected_ids(session)
+    return [audit_summary(audit, skill, reflected) for audit, skill in rows]
+
+
+@router.get("/audits/{audit_id}", response_model=AuditSessionOut)
+def get_audit(audit_id: int, session: Session = Depends(get_session)):
+    """One audit whole, for the replay: the dialogue, the verdict, what each gap rests on, the
+    past lessons it touched and its own lesson card."""
+    audit = session.get(AuditSession, audit_id)
+    if audit is None:
+        raise HTTPException(404, "audit session not found")
+    return _session_out(session, audit)
 
 
 @router.post("/skills/{skill_id}/audits", response_model=StartAuditResponse)
@@ -148,6 +176,8 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
         comment=outcome.comment,
         feedback=outcome.feedback,
         points=outcome.points,
+        evidence=outcome.evidence,
+        lessons=outcome.lessons,
         unlocked_skill_ids=outcome.unlocked_skill_ids,
         reward_amount=outcome.reward_amount,
         reward_multiplier=outcome.reward_multiplier,

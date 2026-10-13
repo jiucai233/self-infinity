@@ -16,6 +16,7 @@ from app.models import (
     AuditTurn,
     DailyCheckIn,
     NodePosition,
+    PrincipleCheck,
     RewardEvent,
     SkillNode,
     SkillStatus,
@@ -184,6 +185,7 @@ def test_the_session_response_matches_the_contract_shape(client, math):
     assert body["resumed"] is False
     assert set(body["session"]) == {
         "id", "skill_id", "node_position", "status", "score", "gaps", "comment", "turns", "test_out", "points",
+        "evidence", "lessons", "principle", "skill_title", "created_at",
     }
     assert body["session"]["test_out"] is False
     assert body["session"]["skill_id"] == math["discriminant"]
@@ -276,6 +278,8 @@ def test_it09_pass_upheld_opens_the_next_node_masters_this_one_and_records_the_r
         "passed": True,
         "score": 91,  # min(95, 70 + 210 // 10)
         "gaps": [],
+        "evidence": [],
+        "lessons": [],
         "comment": "You explained the core idea and why it holds.",
         "feedback": PASS_FEEDBACK,
         "points": held(True, True, True),
@@ -305,7 +309,7 @@ def test_the_probe_and_verdict_shapes_are_exactly_the_contract_keys(client, math
 
     assert set(probe) == {"type", "question", "feedback", "point"}
     assert set(verdict) == {
-        "type", "passed", "score", "gaps", "comment", "feedback", "points",
+        "type", "passed", "score", "gaps", "evidence", "lessons", "comment", "feedback", "points",
         "unlocked_skill_ids", "reward_amount", "reward_multiplier",
     }
 
@@ -400,6 +404,14 @@ def test_it16_a_fail_closes_the_session_and_leaves_the_node_status_alone(client,
             "You stated the definition but not why it works.",
             "You didn't cover the exceptions.",
         ],
+        "evidence": [
+            {"gap": gap, "said": SHORT[:80], "right": "The mechanism has to be explained step by step, with what each step is for."}
+            for gap in (
+                "You stated the definition but not why it works.",
+                "You didn't cover the exceptions.",
+            )
+        ],
+        "lessons": [],
         "comment": "The answer stops at the conclusion and lacks reasons.",
         "feedback": FAIL_FEEDBACK,
         "points": held(False, True, True, note="Named it without saying why it holds."),
@@ -666,3 +678,93 @@ def test_the_pass_standard_does_not_change_under_light_pacing(client, client_eng
 
     assert short["passed"] is False
     assert long["passed"] is True
+
+
+# ---------------------------------------------------------------- replay: evidence, lessons, GET one audit
+
+MOCK_RIGHT = "The mechanism has to be explained step by step, with what each step is for."
+
+
+def reflect(client, audit_id: int) -> dict:
+    response = client.post(f"/api/audits/{audit_id}/reflection", json={"reflection": "I thought no real roots meant no solutions."})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_a_failed_audit_carries_the_users_own_words_as_evidence_and_the_replay_returns_them(client, math):
+    audit_id = start(client, math["discriminant"])
+
+    _probe, verdict = answer_turns(client, audit_id, FIRST, SHORT)
+
+    assert [(e["gap"], e["said"], e["right"]) for e in verdict["evidence"]] == [(gap, SHORT, MOCK_RIGHT) for gap in verdict["gaps"]]
+    response = client.get(f"/api/audits/{audit_id}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == audit_id and body["status"] == "failed" and body["score"] == 45
+    assert body["evidence"] == verdict["evidence"]
+    assert body["gaps"] == verdict["gaps"]
+    assert [t["role"] for t in body["turns"]] == ["auditor", "user", "auditor", "user"]
+    assert body["turns"][1]["content"] == FIRST and body["turns"][3]["content"] == SHORT
+    assert body["skill_title"] == "Discriminant"
+    assert body["created_at"].endswith("Z") or body["created_at"].endswith("+00:00")
+    assert body["principle"] is None
+
+
+def test_after_a_reflection_the_replay_returns_the_lesson_with_no_checks_yet(client, math):
+    audit_id = fail_node(client, math["discriminant"])
+
+    principle = reflect(client, audit_id)
+
+    body = client.get(f"/api/audits/{audit_id}").json()
+    assert body["principle"] == principle
+    assert body["principle"]["held"] == 0 and body["principle"]["relapsed"] == 0
+
+
+def test_the_replay_of_an_unknown_audit_is_404(client):
+    response = client.get("/api/audits/999")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "audit session not found"
+
+
+def test_the_same_mistake_again_is_a_relapse_of_the_lesson_and_is_recorded(client, client_engine, math):
+    first = fail_node(client, math["discriminant"])
+    principle = reflect(client, first)
+
+    second = start(client, math["discriminant"])
+    _probe, verdict = answer_turns(client, second, FIRST, SHORT)
+
+    assert verdict["lessons"] == [{"principle_id": principle["id"], "title": principle["title"], "held": False}]
+    (listed,) = client.get("/api/principles").json()
+    assert listed["id"] == principle["id"]
+    assert (listed["relapsed"], listed["held"]) == (1, 0)
+    with Session(client_engine) as session:
+        (check,) = session.exec(select(PrincipleCheck)).all()
+        assert (check.principle_id, check.session_id, check.held) == (principle["id"], second, False)
+    assert client.get(f"/api/audits/{second}").json()["lessons"] == verdict["lessons"]
+
+
+def test_only_the_audit_a_lesson_was_made_from_is_marked_reflected(client, math):
+    first = fail_node(client, math["discriminant"])
+    second = fail_node(client, math["discriminant"])
+    reflect(client, first)
+
+    listed = {a["id"]: a["reflected"] for a in client.get("/api/audits").json()}
+    overview = {a["id"]: a["reflected"] for a in client.get(f"/api/skills/{math['discriminant']}/overview").json()["audits"]}
+
+    assert listed == {first: True, second: False}
+    assert overview == listed
+
+
+def test_an_audit_stored_before_evidence_existed_still_gives_one_empty_entry_per_gap(client, client_engine, math):
+    audit_id = fail_node(client, math["discriminant"])
+    with Session(client_engine) as session:
+        audit = session.get(AuditSession, audit_id)
+        audit.evidence_json = None
+        session.add(audit)
+        session.commit()
+
+    body = client.get(f"/api/audits/{audit_id}").json()
+
+    assert len(body["gaps"]) == 2
+    assert body["evidence"] == [{"gap": gap, "said": None, "right": None} for gap in body["gaps"]]

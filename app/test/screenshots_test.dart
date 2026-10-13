@@ -399,6 +399,22 @@ void main() {
     testWidgets(skip: dir == null, 'scene 4 locked ($tag)', (tester) async {
       await scene(tester, size: size, name: '4-locked-$tag', location: '/skill/12');
     });
+    testWidgets(skip: dir == null, 'replay of a fail ($tag)', (tester) async {
+      final api = await _seed();
+      final failed = await failAudit(api, 5); // its lesson came back
+      await scene(
+        tester,
+        size: size,
+        name: 'replay-failed-$tag',
+        location: '/audit/${failed.sessionId}',
+        api: api,
+      );
+    });
+    testWidgets(skip: dir == null, 'replay with its lesson card ($tag)', (tester) async {
+      final api = await _seed();
+      await failAudit(api, 5);
+      await scene(tester, size: size, name: 'replay-lesson-$tag', location: '/audit/3', api: api);
+    });
     testWidgets(skip: dir == null, 'scene 4-1 asking ($tag)', (tester) async {
       await scene(tester, size: size, name: '41-asking-$tag', location: '/skill/9/audit');
     });

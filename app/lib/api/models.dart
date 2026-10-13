@@ -807,6 +807,44 @@ class AuditTurn {
   bool get isUser => role == AuditRole.user;
 }
 
+/// What a gap rests on. Contract: `AuditSession.evidence[]`, one per gap.
+@immutable
+class GapEvidence {
+  const GapEvidence({required this.gap, this.said, this.right});
+
+  factory GapEvidence.fromJson(Json json) => GapEvidence(
+    gap: _str(json, 'gap'),
+    said: _strN(json, 'said'),
+    right: _strN(json, 'right'),
+  );
+
+  final String gap;
+
+  /// The user's own words; null for a part they never spoke about.
+  final String? said;
+
+  /// What holds instead.
+  final String? right;
+}
+
+/// A past lesson an audit touched. Contract: `AuditSession.lessons[]`.
+@immutable
+class LessonCheck {
+  const LessonCheck({required this.principleId, required this.title, required this.held});
+
+  factory LessonCheck.fromJson(Json json) => LessonCheck(
+    principleId: _int(json, 'principle_id'),
+    title: _str(json, 'title'),
+    held: _bool(json, 'held'),
+  );
+
+  final int principleId;
+  final String title;
+
+  /// True: the lesson held. False: the same mistake came back.
+  final bool held;
+}
+
 /// An audit session. Contract: `AuditSession`.
 @immutable
 class AuditSession {
@@ -821,6 +859,11 @@ class AuditSession {
     this.turns = const [],
     this.testOut = false,
     this.points = const [],
+    this.evidence = const [],
+    this.lessons = const [],
+    this.principle,
+    this.skillTitle = '',
+    this.createdAt,
   });
 
   factory AuditSession.fromJson(Json json) => AuditSession(
@@ -834,6 +877,11 @@ class AuditSession {
     turns: _list(json, 'turns', AuditTurn.fromJson),
     testOut: _boolN(json, 'test_out') ?? false,
     points: json['points'] == null ? const [] : _list(json, 'points', SkillPoint.fromJson),
+    evidence: json['evidence'] == null ? const [] : _list(json, 'evidence', GapEvidence.fromJson),
+    lessons: json['lessons'] == null ? const [] : _list(json, 'lessons', LessonCheck.fromJson),
+    principle: json['principle'] == null ? null : Principle.fromJson(_obj(json, 'principle')),
+    skillTitle: _strN(json, 'skill_title') ?? '',
+    createdAt: _timeN(json, 'created_at'),
   );
 
   final int id;
@@ -852,6 +900,19 @@ class AuditSession {
 
   /// The knowledge points this audit examines; their results once it is closed.
   final List<SkillPoint> points;
+
+  /// One per gap, in their order; empty for audits from before it was kept.
+  final List<GapEvidence> evidence;
+
+  /// Past lessons this audit touched.
+  final List<LessonCheck> lessons;
+
+  /// The lesson card made from this audit's reflection, once there is one.
+  final Principle? principle;
+  final String skillTitle;
+
+  /// UTC.
+  final DateTime? createdAt;
 }
 
 /// Body of `POST /skills/{id}/audits`. Contract endpoint 7.
@@ -922,6 +983,8 @@ final class VerdictResult extends TurnResult {
     this.comment,
     this.feedback,
     this.points = const [],
+    this.evidence = const [],
+    this.lessons = const [],
     this.unlockedSkillIds = const [],
     this.rewardAmount,
     this.rewardMultiplier,
@@ -934,6 +997,8 @@ final class VerdictResult extends TurnResult {
     comment: _strN(json, 'comment'),
     feedback: _strN(json, 'feedback'),
     points: json['points'] == null ? const [] : _list(json, 'points', SkillPoint.fromJson),
+    evidence: json['evidence'] == null ? const [] : _list(json, 'evidence', GapEvidence.fromJson),
+    lessons: json['lessons'] == null ? const [] : _list(json, 'lessons', LessonCheck.fromJson),
     unlockedSkillIds: _intList(json, 'unlocked_skill_ids'),
     rewardAmount: _intN(json, 'reward_amount'),
     rewardMultiplier: _doubleN(json, 'reward_multiplier'),
@@ -953,6 +1018,12 @@ final class VerdictResult extends TurnResult {
 
   /// One per knowledge point examined: what held, what was missed and why.
   final List<SkillPoint> points;
+
+  /// One per gap, in their order: the user's own words and what holds instead.
+  final List<GapEvidence> evidence;
+
+  /// Past lessons this audit touched: held, or the same mistake came back.
+  final List<LessonCheck> lessons;
 
   /// Nodes that changed from locked to available (pass only).
   final List<int> unlockedSkillIds;
@@ -979,6 +1050,8 @@ class Principle {
     required this.skillId,
     required this.skillTitle,
     required this.createdAt,
+    this.held = 0,
+    this.relapsed = 0,
   });
 
   factory Principle.fromJson(Json json) => Principle(
@@ -990,6 +1063,8 @@ class Principle {
     skillId: _int(json, 'skill_id'),
     skillTitle: _str(json, 'skill_title'),
     createdAt: _time(json, 'created_at'),
+    held: _intN(json, 'held') ?? 0,
+    relapsed: _intN(json, 'relapsed') ?? 0,
   );
 
   final int id;
@@ -1006,6 +1081,11 @@ class Principle {
 
   /// UTC.
   final DateTime createdAt;
+
+  /// Later audits that met this lesson's situation: how often it held, and
+  /// how often the mistake came back.
+  final int held;
+  final int relapsed;
 
   bool get hasMisconception => misconception != null && misconception!.trim().isNotEmpty;
 }
@@ -1917,6 +1997,7 @@ class AuditSummary {
     this.score,
     required this.createdAt,
     this.testOut = false,
+    this.reflected = false,
   });
 
   factory AuditSummary.fromJson(Json json) => AuditSummary(
@@ -1927,6 +2008,7 @@ class AuditSummary {
     score: _intN(json, 'score'),
     createdAt: _time(json, 'created_at'),
     testOut: _boolN(json, 'test_out') ?? false,
+    reflected: _boolN(json, 'reflected') ?? false,
   );
 
   final int id;
@@ -1938,6 +2020,9 @@ class AuditSummary {
 
   /// A challenge on a whole branch.
   final bool testOut;
+
+  /// A lesson card was made from this audit.
+  final bool reflected;
 }
 
 /// A prerequisite of a node with the reason (`SkillOverview.requires`).

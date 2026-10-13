@@ -63,6 +63,7 @@ def test_it19_a_failed_audit_gets_a_principle_from_the_recorder(client, client_e
     body = response.json()
     assert set(body) == {
         "id", "title", "body", "misconception", "source_session_id", "skill_id", "skill_title", "created_at",
+        "held", "relapsed",
     }
     assert body["id"] == 1
     assert body["title"] == "Revisit “Quadratic Equations”"
@@ -311,6 +312,7 @@ def test_principles_are_listed_newest_first_with_their_origin_node(client):
     assert principles[1]["skill_id"] == ids["quadratic-equation"]
     assert set(principles[0]) == {
         "id", "title", "body", "misconception", "source_session_id", "skill_id", "skill_title", "created_at",
+        "held", "relapsed",
     }
 
 

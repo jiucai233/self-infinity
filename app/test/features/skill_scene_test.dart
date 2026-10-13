@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/app_state.dart';
+import 'package:self_infinity/app/router.dart';
 import 'package:self_infinity/features/skill/skill_scene.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
 import 'package:self_infinity/testing/test_app.dart';
@@ -439,6 +440,29 @@ void main() {
       final decoration = tester.widget<DecoratedBox>(cards.first).decoration as BoxDecoration;
       expect(decoration.color, AppColors.surface);
       expect(decoration.borderRadius, BorderRadius.circular(16));
+    });
+
+    testWidgets('a card opens the replay of its audit', (tester) async {
+      final failed = await failAudit(api, 6);
+      await pumpSkill(tester, api, 6);
+      await tester.tap(find.byKey(const Key('audit-card')));
+      await tester.pumpAndSettle();
+      expect(find.text('route:${AppRoutes.replay(failed.sessionId)}'), findsOneWidget);
+    });
+
+    testWidgets('a fail not reflected on yet says so; a reflected one and a pass do not', (
+      tester,
+    ) async {
+      final reflected = await failAudit(api, 6);
+      await api.submitReflection(reflected.sessionId, 'I memorized the formula');
+      await failAudit(api, 6);
+      await passAudit(api, 6);
+      await pumpSkill(tester, api, 6);
+      final cards = find.byKey(const Key('audit-card'));
+      bool labelled(int i) => textsIn(tester, cards.at(i)).contains('Not reflected on yet');
+      expect([labelled(0), labelled(1), labelled(2)], [false, true, false]); // pass, fail, reflected fail
+      final label = tester.widget<Text>(find.text('Not reflected on yet'));
+      expect(label.style!.color, AppColors.textTertiary);
     });
 
     testWidgets('the chips are colored: green for a pass, red for a fail', (tester) async {

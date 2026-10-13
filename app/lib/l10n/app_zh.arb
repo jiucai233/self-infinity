@@ -497,5 +497,14 @@
   "devVoiceTurnsRate": "轮流模式每分钟（实测）",
   "devVoiceTurnsRateDefault": "轮流模式每分钟（估计）",
   "devVoiceOnTurns": "轮流模式 ≈",
-  "devLlmAllOn": "如果全部调用都用同一个模型"
+  "devLlmAllOn": "如果全部调用都用同一个模型",
+  "youSaid": "你当时说",
+  "whatHolds": "其实是",
+  "pastLessons": "以前的教训",
+  "lessonCameBack": "又犯了：{title}",
+  "lessonHeld": "守住了：{title}",
+  "lessonCounts": "守住 {held} 次 · 又犯 {relapsed} 次",
+  "replayDialogue": "完整对话",
+  "replayReflectHint": "你当时是怎么想的？…",
+  "notReflectedYet": "还没反思"
 }

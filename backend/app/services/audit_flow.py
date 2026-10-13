@@ -23,6 +23,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import timedelta
+from typing import Sequence
 
 from sqlalchemy import update
 from sqlmodel import Session, col, select
@@ -38,6 +39,8 @@ from app.models import (
     AuditTurn,
     NodePosition,
     NodeType,
+    Principle,
+    PrincipleCheck,
     RewardEvent,
     SkillNode,
     SkillStatus,
@@ -81,6 +84,10 @@ class VerdictOutcome:
     comment: str
     feedback: str | None = None
     points: list[dict] = field(default_factory=list)
+    # One per gap: the user's own words it rests on and what holds instead.
+    evidence: list[dict] = field(default_factory=list)
+    # Past lessons this audit touched: `{"principle_id", "title", "held"}`.
+    lessons: list[dict] = field(default_factory=list)
     unlocked_skill_ids: list[int] = field(default_factory=list)
     reward_amount: int | None = None
     reward_multiplier: float | None = None
@@ -297,7 +304,7 @@ def submit_turn(
             # What she said about the last answer still stands; the question is the Challenger's.
             return _save_question(session, audit, question, result.feedback)
 
-    return _finalize(session, audit, skill, result)
+    return _finalize(session, audit, skill, result, lessons)
 
 
 def _save_answer(session: Session, audit: AuditSession, content: str) -> None:
@@ -358,7 +365,20 @@ def _challenge(session: Session, skill: SkillNode, history: list[Message], provi
     return None
 
 
-def _finalize(session: Session, audit: AuditSession, skill: SkillNode, verdict: AuditorTurnResult) -> VerdictOutcome:
+def lesson_results(session: Session, audit_id: int) -> list[dict]:
+    """The past lessons an audit touched, in the order recorded: held, or the mistake came back."""
+    rows = session.exec(
+        select(PrincipleCheck, Principle)
+        .join(Principle, Principle.id == PrincipleCheck.principle_id)
+        .where(PrincipleCheck.session_id == audit_id)
+        .order_by(col(PrincipleCheck.id))
+    ).all()
+    return [{"principle_id": lesson.id, "title": lesson.title, "held": check.held} for check, lesson in rows]
+
+
+def _finalize(
+    session: Session, audit: AuditSession, skill: SkillNode, verdict: AuditorTurnResult, lessons: Sequence = ()
+) -> VerdictOutcome:
     status = AuditStatus.passed if verdict.passed else AuditStatus.failed
     _claim(session, audit, status)
 
@@ -375,8 +395,17 @@ def _finalize(session: Session, audit: AuditSession, skill: SkillNode, verdict: 
         # What held and what was missed stays on the node: the next audit starts from there.
         points.record_results(skill, verdict.points)
         session.add(skill)
+    if verdict.evidence:
+        audit.evidence_json = json.dumps(verdict.evidence, ensure_ascii=False)
     session.add(audit)
+    # A lesson of this very audit's node may be among them; one made by this audit cannot be.
+    for check in verdict.lesson_checks or []:
+        if check["index"] < len(lessons):
+            session.add(
+                PrincipleCheck(principle_id=lessons[check["index"]].id, session_id=audit.id, held=check["held"])
+            )
     bandit.update_arm(session, bucket, tier, reward=bool(verdict.passed))
+    session.flush()
 
     outcome = VerdictOutcome(
         passed=bool(verdict.passed),
@@ -385,6 +414,8 @@ def _finalize(session: Session, audit: AuditSession, skill: SkillNode, verdict: 
         comment=verdict.comment or "",
         feedback=verdict.feedback,
         points=list(verdict.points or []),
+        evidence=audit.evidence,
+        lessons=lesson_results(session, audit.id),
     )
     if verdict.passed:
         skill.status = SkillStatus.mastered

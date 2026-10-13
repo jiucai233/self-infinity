@@ -130,6 +130,7 @@ class FakeApiClient implements SelfInfinityApi {
     'startAudit',
     'submitTurn',
     'submitReflection',
+    'getAudit',
     'checkInVoice',
     'getBriefing',
     'narrate',
@@ -817,6 +818,17 @@ class FakeApiClient implements SelfInfinityApi {
     }
     _principles.add(principle);
     return principle;
+  }
+
+  @override
+  Future<AuditSession> getAudit(int auditId) async {
+    await _begin('getAudit');
+    final audit = _audits[auditId];
+    if (audit == null) throw const ApiException(404, 'audit session not found');
+    return audit.toModel(
+      principle: _principles.where((p) => p.id == audit.principleId).firstOrNull,
+      skillTitle: (_nodes[audit.skillId] ?? _hiddenNodes[audit.skillId])!.title,
+    );
   }
 
   // ===========================================================================
@@ -1856,6 +1868,7 @@ class FakeApiClient implements SelfInfinityApi {
     score: a.score,
     createdAt: a.createdAt,
     testOut: a.testOut,
+    reflected: a.principleId != null,
   );
 
   // ===========================================================================
@@ -2472,6 +2485,10 @@ class FakeApiClient implements SelfInfinityApi {
   static const String failFeedback = 'The conclusion is there, but the reason behind it is missing.';
   static const String failNote = 'Named it without saying why it holds.';
 
+  /// What holds instead, for every gap of a fail.
+  static const String failRight =
+      'The mechanism has to be explained step by step, with what each step is for.';
+
   /// Returns the probe, or — if the turn limit is reached — a failing verdict.
   TurnResult _probeOrForcedFail(
     _FakeAudit audit,
@@ -2522,11 +2539,15 @@ class FakeApiClient implements SelfInfinityApi {
     String? feedback,
     List<SkillPoint> points = const [],
   }) {
+    // Each gap rests on the user's own last words.
+    final said = _cut(audit.turns.lastWhere((t) => t.isUser).content, 80);
     audit
       ..status = AuditStatus.failed
       ..score = score
       ..gaps = gaps
-      ..comment = comment;
+      ..comment = comment
+      ..evidence = [for (final gap in gaps) GapEvidence(gap: gap, said: said, right: failRight)]
+      ..lessons = _relapse(audit.skillId);
     _recordPoints(audit, points);
     return VerdictResult(
       passed: false,
@@ -2535,7 +2556,30 @@ class FakeApiClient implements SelfInfinityApi {
       comment: comment,
       feedback: feedback,
       points: points,
+      evidence: audit.evidence,
+      lessons: audit.lessons,
     );
+  }
+
+  /// A fail on a node that already has a lesson card: the newest one came
+  /// back, and counts it.
+  List<LessonCheck> _relapse(int skillId) {
+    final i = _principles.lastIndexWhere((p) => p.skillId == skillId);
+    if (i < 0) return const [];
+    final p = _principles[i];
+    _principles[i] = Principle(
+      id: p.id,
+      title: p.title,
+      body: p.body,
+      misconception: p.misconception,
+      sourceSessionId: p.sourceSessionId,
+      skillId: p.skillId,
+      skillTitle: p.skillTitle,
+      createdAt: p.createdAt,
+      held: p.held,
+      relapsed: p.relapsed + 1,
+    );
+    return [LessonCheck(principleId: p.id, title: p.title, held: false)];
   }
 
   VerdictResult _finishPass(_FakeAudit audit, int characters) {
@@ -2842,12 +2886,16 @@ class _FakeAudit {
   int? score;
   List<String> gaps = const [];
   String? comment;
+
+  /// One per gap, and the past lessons it touched (a fail only).
+  List<GapEvidence> evidence = const [];
+  List<LessonCheck> lessons = const [];
   bool challenged = false;
   AuditReview? review;
   bool leaked = false;
   int? principleId;
 
-  AuditSession toModel() => AuditSession(
+  AuditSession toModel({Principle? principle, String skillTitle = ''}) => AuditSession(
     id: id,
     skillId: skillId,
     nodePosition: position,
@@ -2858,6 +2906,11 @@ class _FakeAudit {
     turns: List.unmodifiable(turns),
     testOut: testOut,
     points: List.unmodifiable(points),
+    evidence: List.unmodifiable(evidence),
+    lessons: List.unmodifiable(lessons),
+    principle: principle,
+    skillTitle: skillTitle,
+    createdAt: createdAt,
   );
 }
 
