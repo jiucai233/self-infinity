@@ -475,7 +475,7 @@ def _finalize(
             )
     # The learner model moves by what was settled; the bandit is rewarded with the progress
     # made, not with the pass.
-    progress = learner.record(session, skill, bool(verdict.passed), verdict.points, agreement, tier)
+    progress = learner.record(session, skill, bool(verdict.passed), verdict.points, agreement, tier, audit.id)
     if progress is not None:
         split = agreement is not None and agreement < 1
         bandit.update_arm(session, bucket, tier, reward=progress, weight=learner.SPLIT_WEIGHT if split else 1.0)

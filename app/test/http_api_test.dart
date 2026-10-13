@@ -607,6 +607,22 @@ void main() {
       expect((llm.audits.single.audits, llm.audits.single.avgCalls, llm.audits.single.avgCost), (2, 3, 0.0015));
     });
 
+    test('getLearner: GET /learner', () async {
+      final h = ok({
+        'ability': 0.12,
+        'target_chance': 0.75,
+        'judge_false_pass': 0.05,
+        'judge_false_fail': 0.3,
+        'nodes': [
+          {'skill_id': 3, 'title': 'U-Net', 'chance': 0.62},
+        ],
+      });
+      final m = await h.api.getLearner();
+      expect((h.last.method, h.last.url.path), ('GET', '/api/learner'));
+      expect((m.ability, m.nodes.single.chance), (0.12, 0.62));
+      expect(m.history, isEmpty);
+    });
+
     test('GET /dev/voice: a GPT-Live session in its two parts; a server from before has none', () async {
       final totals = {
         'guide_sessions': 1, 'guide_minutes': 2.0, 'guide_cost': 0.1, 'guide_all_live': 0.1,

@@ -946,7 +946,7 @@ def test_an_unknown_kind_of_feedback_is_a_422(client, math):
 def test_the_learner_has_exactly_these_keys_and_aims_at_three_quarters(client, math):
     body = client.get("/api/learner").json()
 
-    assert set(body) == {"ability", "target_chance", "judge_false_pass", "judge_false_fail", "nodes"}
+    assert set(body) == {"ability", "target_chance", "judge_false_pass", "judge_false_fail", "nodes", "history"}
     assert body["target_chance"] == 0.75
     assert body["ability"] == 0
     assert body["nodes"] and all(set(n) == {"skill_id", "title", "chance"} for n in body["nodes"])
@@ -1012,3 +1012,24 @@ def test_the_challenger_runs_beside_the_votes_and_its_question_is_kept_for_a_pas
     chosen, agreement, challenge = audit_flow._voted(passed, lambda: passed, alongside=lambda: "Why does it hold?")
 
     assert chosen.passed and agreement == 1.0 and challenge == "Why does it hold?"
+
+
+def test_the_learner_keeps_the_ability_after_each_audit(client, math):
+    assert client.get("/api/learner").json()["history"] == []
+
+    first = fail_node(client, math["discriminant"])
+    second = start(client, math["discriminant"])
+    answer_turns(client, second, FIRST, LONG)
+
+    body = client.get("/api/learner").json()
+    history = body["history"]
+
+    assert [(h["audit_id"], h["passed"], h["skill_title"]) for h in history] == [
+        (first, False, "Discriminant"),
+        (second, True, "Discriminant"),
+    ]
+    assert set(history[0]) == {
+        "audit_id", "skill_id", "skill_title", "passed", "ability", "progress", "agreement", "created_at",
+    }
+    assert history[-1]["ability"] == body["ability"]  # the last step is where the learner stands
+    assert all(0 <= h["progress"] <= 1 for h in history)

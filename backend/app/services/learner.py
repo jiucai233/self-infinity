@@ -21,7 +21,7 @@ import math
 
 from sqlmodel import Session, col, select
 
-from app.models import AuditSession, AuditStatus, Learner, LearnerPoint, SkillNode, utcnow
+from app.models import AuditSession, AuditStatus, Learner, LearnerPoint, LearnerStep, SkillNode, utcnow
 
 # The chance of explaining a point right that recommendations aim at.
 TARGET_CHANCE = 0.75
@@ -131,6 +131,7 @@ def record(
     points: list[dict] | None,
     agreement: float | None,
     tier: str = "medium",
+    audit_id: int | None = None,
 ) -> float | None:
     """Moves the ability and the difficulties by an audit's results and returns its progress,
     0 to 1: how far the results went beyond what was expected. None: nothing was settled."""
@@ -154,7 +155,20 @@ def record(
         session.add(row)
     me.updated_at = utcnow()
     session.add(me)
-    return progress / len(results)
+    progress /= len(results)
+    if audit_id is not None:
+        session.add(LearnerStep(session_id=audit_id, ability=me.ability, progress=progress))
+    return progress
+
+
+def history(session: Session) -> list[tuple[LearnerStep, AuditSession, SkillNode]]:
+    """The ability after each audit, oldest first, with the audit and its node."""
+    return session.exec(
+        select(LearnerStep, AuditSession, SkillNode)
+        .join(AuditSession, AuditSession.id == LearnerStep.session_id)
+        .join(SkillNode, SkillNode.id == AuditSession.skill_id)
+        .order_by(col(LearnerStep.id))
+    ).all()
 
 
 def too_hard(session: Session, audit: AuditSession, skill: SkillNode) -> None:

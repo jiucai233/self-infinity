@@ -3082,6 +3082,72 @@ abstract class AppLocalizations {
   /// **'If every call ran on one model'**
   String get devLlmAllOn;
 
+  /// No description provided for @devTabLearner.
+  ///
+  /// In en, this message translates to:
+  /// **'Learner'**
+  String get devTabLearner;
+
+  /// No description provided for @devLearnerOverTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Ability over time'**
+  String get devLearnerOverTime;
+
+  /// No description provided for @devLearnerAbilityNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Ability now'**
+  String get devLearnerAbilityNow;
+
+  /// No description provided for @devLearnerRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent audits'**
+  String get devLearnerRecent;
+
+  /// No description provided for @devLearnerAbility.
+  ///
+  /// In en, this message translates to:
+  /// **'Ability'**
+  String get devLearnerAbility;
+
+  /// No description provided for @devLearnerProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get devLearnerProgress;
+
+  /// No description provided for @devLearnerAgreed.
+  ///
+  /// In en, this message translates to:
+  /// **'{share} agreed'**
+  String devLearnerAgreed(String share);
+
+  /// No description provided for @devLearnerJudge.
+  ///
+  /// In en, this message translates to:
+  /// **'The judge'**
+  String get devLearnerJudge;
+
+  /// No description provided for @devLearnerFalseFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Fails what should pass'**
+  String get devLearnerFalseFail;
+
+  /// No description provided for @devLearnerFalsePass.
+  ///
+  /// In en, this message translates to:
+  /// **'Passes what should fail'**
+  String get devLearnerFalsePass;
+
+  /// No description provided for @devLearnerNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Open nodes · aims at {target}'**
+  String devLearnerNodes(String target);
+
   /// No description provided for @youSaid.
   ///
   /// In en, this message translates to:

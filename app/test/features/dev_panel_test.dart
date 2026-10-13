@@ -108,6 +108,40 @@ class _WithCosts extends FakeApiClient {
   );
 }
 
+/// A learner three audits in, one of them voted two to one.
+class _WithLearner extends FakeApiClient {
+  _WithLearner() : super(latency: Duration.zero);
+
+  @override
+  Future<LearnerModel> getLearner() async => LearnerModel(
+    ability: 0.12,
+    targetChance: 0.75,
+    judgeFalsePass: 0.05,
+    judgeFalseFail: 0.30,
+    nodes: const [
+      LearnerNode(skillId: 3, title: 'U-Net', chance: 0.62),
+      LearnerNode(skillId: 4, title: 'Attention', chance: 0.41),
+    ],
+    history: [
+      for (final (i, (title, passed, ability, progress, agreement)) in const [
+        ('Convolution', true, 0.2, 0.5, 1.0),
+        ('U-Net', false, -0.1, 0.12, 0.667),
+        ('Pooling', true, 0.12, 0.6, null),
+      ].indexed)
+        LearnerStep(
+          auditId: i + 1,
+          skillId: i + 1,
+          skillTitle: title,
+          passed: passed,
+          ability: ability,
+          progress: progress,
+          agreement: agreement,
+          createdAt: DateTime.utc(2026, 10, 12 + i, 3),
+        ),
+    ],
+  );
+}
+
 String metric(WidgetTester tester, String key) =>
     tester.widget<Text>(find.byKey(Key('dev-metric-$key'))).data!;
 
@@ -260,6 +294,95 @@ void main() {
     expect(find.text('If every call ran on one model'), findsOneWidget);
     expect(find.byKey(const Key('dev-llm-all-0')), findsOneWidget);
     expect(find.byKey(const Key('dev-llm-all-1')), findsOneWidget);
+  });
+
+  String textIn(WidgetTester tester, String key) => tester
+      .widgetList<Text>(find.descendant(of: find.byKey(Key(key)), matching: find.byType(Text)))
+      .map((t) => t.data ?? t.textSpan!.toPlainText())
+      .join(' | ');
+
+  testWidgets('the learner tab: the ability as a line and now, the newest audits first', (tester) async {
+    final api = _WithLearner();
+    await api.generateCourse(const GenerateRequest(topic: 'math'));
+    await openPanel(tester, api);
+    await tester.tap(find.byKey(const Key('dev-tab-learner')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('dev-learner')), findsOneWidget);
+    expect(find.byKey(const Key('learner-chart')), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('learner-ability'))).textSpan!.toPlainText(),
+      'Ability now +0.12 · 3 Audits',
+    );
+    expect(textIn(tester, 'learner-step-0'), startsWith('Pooling | Passed | '));
+    expect(textIn(tester, 'learner-step-0'), endsWith('Ability +0.12 · Progress 60%')); // not voted on
+    expect(textIn(tester, 'learner-step-1'), startsWith('U-Net | Failed | '));
+    expect(textIn(tester, 'learner-step-1'), endsWith('Ability -0.10 · Progress 12% · 67% agreed'));
+    expect(textIn(tester, 'learner-step-2'), startsWith('Convolution | Passed | '));
+    expect(textIn(tester, 'learner-step-2'), endsWith('Ability +0.20 · Progress 50%')); // all agreed
+    expect(find.byKey(const Key('learner-step-3')), findsNothing);
+  });
+
+  testWidgets('the learner tab: the judge\'s two error rates, and the open nodes under the target', (tester) async {
+    final api = _WithLearner();
+    await api.generateCourse(const GenerateRequest(topic: 'math'));
+    await openPanel(tester, api);
+    await tester.tap(find.byKey(const Key('dev-tab-learner')));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byKey(const Key('dev-learner')), const Offset(0, -600));
+    await tester.pumpAndSettle();
+
+    expect(
+      textIn(tester, 'learner-judge'),
+      'The judge | Fails what should pass | 30% | Passes what should fail | 5%',
+    );
+    expect(find.text('Open nodes · aims at 75%'), findsOneWidget);
+    expect(textIn(tester, 'learner-node-0'), 'U-Net | 62%');
+    expect(textIn(tester, 'learner-node-1'), 'Attention | 41%');
+  });
+
+  testWidgets('the learner tab keeps the last ten audits', (tester) async {
+    final api = await seededFakeApi();
+    for (var i = 0; i < 12; i++) {
+      await failAudit(api, 6);
+    }
+    await openPanel(tester, api);
+    await tester.tap(find.byKey(const Key('dev-tab-learner')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const Key('learner-ability'))).textSpan!.toPlainText(),
+      'Ability now -1.20 · 12 Audits',
+    );
+    await tester.drag(find.byKey(const Key('dev-learner')), const Offset(0, -400));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('learner-step-9'), skipOffstage: false), findsOneWidget);
+    expect(find.byKey(const Key('learner-step-10'), skipOffstage: false), findsNothing);
+  });
+
+  testWidgets('the learner tab before any audit: no chart, the judge and the open nodes', (tester) async {
+    final api = await seededFakeApi();
+    await openPanel(tester, api);
+    await tester.tap(find.byKey(const Key('dev-tab-learner')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dev-learner')), findsOneWidget);
+    expect(find.byKey(const Key('learner-chart')), findsNothing);
+    expect(find.byKey(const Key('learner-ability')), findsNothing);
+    expect(find.byKey(const Key('learner-step-0')), findsNothing);
+    expect(find.text('No finished audits yet.'), findsOneWidget);
+    expect(find.byKey(const Key('learner-judge')), findsOneWidget);
+    expect(find.byKey(const Key('learner-node-0')), findsOneWidget);
+  });
+
+  testWidgets('the learner tab says when the learner model cannot be read', (tester) async {
+    final api = await seededFakeApi();
+    api.failNext(method: 'getLearner');
+    await openPanel(tester, api);
+    await tester.tap(find.byKey(const Key('dev-tab-learner')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dev-learner')), findsNothing);
+    await tester.tap(find.byKey(const Key('dev-refresh')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dev-learner')), findsOneWidget);
   });
 
   testWidgets('the model cost tab offline: nothing was called', (tester) async {

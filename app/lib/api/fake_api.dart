@@ -177,6 +177,7 @@ class FakeApiClient implements SelfInfinityApi {
     'setVoice',
     'getDevLlm',
     'getDevVoice',
+    'getLearner',
   };
 
   // -- state ------------------------------------------------------------------
@@ -185,6 +186,7 @@ class FakeApiClient implements SelfInfinityApi {
   final Map<int, SkillNode> _nodes = {}; // insertion order == id order
   final List<SkillEdge> _edges = []; // per course: contains edges, then requires
   final Map<int, _FakeAudit> _audits = {};
+  final List<LearnerStep> _learnerSteps = []; // one per finished audit, oldest first
   final List<Principle> _principles = []; // creation order
   final List<_Link> _links = [];
   final Map<String, DailyCheckIn> _checkIns = {}; // by KST date
@@ -2115,6 +2117,41 @@ class FakeApiClient implements SelfInfinityApi {
     );
   }
 
+  /// No model of the learner offline: a pass moves the ability up 0.2, a
+  /// fail down 0.1, and every open node is an even chance.
+  @override
+  Future<LearnerModel> getLearner() async {
+    await _begin('getLearner');
+    return LearnerModel(
+      ability: _learnerSteps.lastOrNull?.ability ?? 0,
+      targetChance: 0.75,
+      judgeFalsePass: 0.05,
+      judgeFalseFail: 0.30,
+      nodes: [
+        for (final n in _nodes.values)
+          if (n.isAvailable) LearnerNode(skillId: n.id, title: n.title, chance: 0.5),
+      ],
+      history: List.unmodifiable(_learnerSteps),
+    );
+  }
+
+  void _recordLearnerStep(_FakeAudit audit, {required bool passed}) {
+    final before = _learnerSteps.lastOrNull?.ability ?? 0;
+    _learnerSteps.add(
+      LearnerStep(
+        auditId: audit.id,
+        skillId: audit.skillId,
+        skillTitle: (_nodes[audit.skillId] ?? _hiddenNodes[audit.skillId])!.title,
+        passed: passed,
+        // Kept to two decimals so that ten steps of 0.1 add up to 1.
+        ability: ((before + (passed ? 0.2 : -0.1)) * 100).round() / 100,
+        progress: passed ? 0.5 : 0.1,
+        agreement: 1,
+        createdAt: _clock(),
+      ),
+    );
+  }
+
   DevAudit _devAuditOf(_FakeAudit a) => DevAudit(
     id: a.id,
     skillId: a.skillId,
@@ -2570,6 +2607,7 @@ class FakeApiClient implements SelfInfinityApi {
       ..evidence = [for (final gap in gaps) GapEvidence(gap: gap, said: said, right: failRight)]
       ..lessons = _relapse(audit.skillId);
     _recordPoints(audit, points);
+    _recordLearnerStep(audit, passed: false);
     return VerdictResult(
       passed: false,
       score: score,
@@ -2613,6 +2651,7 @@ class FakeApiClient implements SelfInfinityApi {
       ..comment = comment;
     final points = [for (final p in audit.points) SkillPoint(title: p.title, ok: true)];
     _recordPoints(audit, points);
+    _recordLearnerStep(audit, passed: true);
 
     final mastered = _nodes[audit.skillId]!.copyWith(
       status: SkillStatus.mastered,

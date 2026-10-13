@@ -1630,6 +1630,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get devLlmAllOn => 'If every call ran on one model';
 
   @override
+  String get devTabLearner => 'Learner';
+
+  @override
+  String get devLearnerOverTime => 'Ability over time';
+
+  @override
+  String get devLearnerAbilityNow => 'Ability now';
+
+  @override
+  String get devLearnerRecent => 'Recent audits';
+
+  @override
+  String get devLearnerAbility => 'Ability';
+
+  @override
+  String get devLearnerProgress => 'Progress';
+
+  @override
+  String devLearnerAgreed(String share) {
+    return '$share agreed';
+  }
+
+  @override
+  String get devLearnerJudge => 'The judge';
+
+  @override
+  String get devLearnerFalseFail => 'Fails what should pass';
+
+  @override
+  String get devLearnerFalsePass => 'Passes what should fail';
+
+  @override
+  String devLearnerNodes(String target) {
+    return 'Open nodes · aims at $target';
+  }
+
+  @override
   String get youSaid => 'You said';
 
   @override

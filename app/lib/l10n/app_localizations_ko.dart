@@ -1613,6 +1613,43 @@ class AppLocalizationsKo extends AppLocalizations {
   String get devLlmAllOn => '모든 호출을 한 모델로 했다면';
 
   @override
+  String get devTabLearner => '학습자';
+
+  @override
+  String get devLearnerOverTime => '능력 변화';
+
+  @override
+  String get devLearnerAbilityNow => '현재 능력';
+
+  @override
+  String get devLearnerRecent => '최근 감사';
+
+  @override
+  String get devLearnerAbility => '능력';
+
+  @override
+  String get devLearnerProgress => '진전';
+
+  @override
+  String devLearnerAgreed(String share) {
+    return '$share 일치';
+  }
+
+  @override
+  String get devLearnerJudge => '심사관의 오판';
+
+  @override
+  String get devLearnerFalseFail => '통과여야 할 것을 미통과로';
+
+  @override
+  String get devLearnerFalsePass => '미통과여야 할 것을 통과로';
+
+  @override
+  String devLearnerNodes(String target) {
+    return '열린 노드 · 목표 $target';
+  }
+
+  @override
   String get youSaid => '내가 한 말';
 
   @override

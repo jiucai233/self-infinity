@@ -876,6 +876,31 @@
   "devVoiceTurnsRateDefault": "Turns per minute (estimate)",
   "devVoiceOnTurns": "Taking turns ≈",
   "devLlmAllOn": "If every call ran on one model",
+  "devTabLearner": "Learner",
+  "devLearnerOverTime": "Ability over time",
+  "devLearnerAbilityNow": "Ability now",
+  "devLearnerRecent": "Recent audits",
+  "devLearnerAbility": "Ability",
+  "devLearnerProgress": "Progress",
+  "devLearnerAgreed": "{share} agreed",
+  "@devLearnerAgreed": {
+    "placeholders": {
+      "share": {
+        "type": "String"
+      }
+    }
+  },
+  "devLearnerJudge": "The judge",
+  "devLearnerFalseFail": "Fails what should pass",
+  "devLearnerFalsePass": "Passes what should fail",
+  "devLearnerNodes": "Open nodes · aims at {target}",
+  "@devLearnerNodes": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
   "youSaid": "You said",
   "whatHolds": "What holds",
   "pastLessons": "Past lessons",

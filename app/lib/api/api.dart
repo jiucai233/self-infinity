@@ -364,6 +364,11 @@ abstract class SelfInfinityApi {
   /// `GET /dev/voice?limit=` (contract #37; developers only): what live voice
   /// cost, and the newest [limit] sessions next to their GPT-Live price.
   Future<DevVoice> getDevVoice({int limit = 50});
+
+  /// `GET /learner` — the learner model: the ability now and after each
+  /// finished audit, the Auditor's estimated error rates for this account,
+  /// and the nodes open to study with the chance of passing each.
+  Future<LearnerModel> getLearner();
 }
 
 /// What the user says about a failed audit (`POST /audits/{id}/feedback`).

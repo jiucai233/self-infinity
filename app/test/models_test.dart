@@ -577,6 +577,38 @@ void main() {
         },
       );
     });
+
+    test('LearnerModel: the ability now, the judge, open nodes and a step per audit', () {
+      final m = LearnerModel.fromJson(
+        obj('''
+        {"ability": 0.12, "target_chance": 0.75, "judge_false_pass": 0.05, "judge_false_fail": 0.30,
+         "nodes": [{"skill_id": 3, "title": "U-Net", "chance": 0.62}],
+         "history": [
+           {"audit_id": 7, "skill_id": 3, "skill_title": "U-Net", "passed": false, "ability": -0.1,
+            "progress": 0.12, "agreement": 0.667, "created_at": "2026-10-13T03:00:00Z"},
+           {"audit_id": 8, "skill_id": 3, "skill_title": "U-Net", "passed": true, "ability": 0.12,
+            "progress": 0.6, "agreement": null, "created_at": "2026-10-14T03:00:00Z"}
+         ]}'''),
+      );
+      expect((m.ability, m.targetChance, m.judgeFalsePass, m.judgeFalseFail), (0.12, 0.75, 0.05, 0.30));
+      expect((m.nodes.single.skillId, m.nodes.single.title, m.nodes.single.chance), (3, 'U-Net', 0.62));
+      final [first, second] = m.history;
+      expect((first.auditId, first.skillId, first.skillTitle, first.passed), (7, 3, 'U-Net', false));
+      expect((first.ability, first.progress, first.agreement), (-0.1, 0.12, 0.667));
+      expect(first.createdAt, DateTime.utc(2026, 10, 13, 3));
+      expect((second.passed, second.ability, second.agreement), (true, 0.12, null));
+    });
+
+    test('LearnerModel from a server without a history has none', () {
+      final m = LearnerModel.fromJson(
+        obj('''
+        {"ability": 0, "target_chance": 0.75, "judge_false_pass": 0.05, "judge_false_fail": 0.3,
+         "nodes": []}'''),
+      );
+      expect(m.ability, 0);
+      expect(m.history, isEmpty);
+      expect(m.nodes, isEmpty);
+    });
   });
 
   group('lasting facts (#40)', () {

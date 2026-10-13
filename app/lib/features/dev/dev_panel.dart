@@ -8,7 +8,9 @@ import '../../api/api_exception.dart';
 import '../../api/models.dart';
 import '../../l10n/l10n.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/empty_view.dart';
 import '../../widgets/status_chip.dart';
+import 'learner_chart.dart';
 
 /// Opens the developer panel (contract #34) over the current scene.
 Future<void> showDevPanel(BuildContext context) => showDialog<void>(
@@ -24,7 +26,8 @@ Future<void> showDevPanel(BuildContext context) => showDialog<void>(
 /// reviews of its verdicts, and how audits go overall; below, every finished
 /// audit with its transcript and the buttons to review it. A second tab shows
 /// what live voice costs (contract #37), a third what the text agents' calls
-/// cost on each model.
+/// cost on each model, a fourth the learner model: the user's ability audit
+/// by audit, the Auditor's error rates and the nodes open to study.
 class DevPanel extends StatefulWidget {
   const DevPanel({super.key});
 
@@ -42,6 +45,8 @@ class _DevPanelState extends State<DevPanel> {
   Object? _voiceError;
   DevLlm? _llm;
   Object? _llmError;
+  LearnerModel? _learner;
+  Object? _learnerError;
 
   @override
   void initState() {
@@ -91,16 +96,32 @@ class _DevPanelState extends State<DevPanel> {
     }
   }
 
+  Future<void> _loadLearner() async {
+    try {
+      final learner = await _api.getLearner();
+      if (mounted) {
+        setState(() {
+          _learner = learner;
+          _learnerError = null;
+        });
+      }
+    } on Object catch (e) {
+      if (mounted) setState(() => _learnerError = e);
+    }
+  }
+
   void _show(_Tab tab) {
     setState(() => _tab = tab);
     if (tab == _Tab.voice && _voice == null) unawaited(_loadVoice());
     if (tab == _Tab.llm && _llm == null) unawaited(_loadLlm());
+    if (tab == _Tab.learner && _learner == null) unawaited(_loadLearner());
   }
 
   Future<void> _refresh() => switch (_tab) {
     _Tab.audits => _load(),
     _Tab.voice => _loadVoice(),
     _Tab.llm => _loadLlm(),
+    _Tab.learner => _loadLearner(),
   };
 
   Future<void> _review(DevAudit audit, AuditReview? review, bool leaked) async {
@@ -135,11 +156,15 @@ class _DevPanelState extends State<DevPanel> {
           value: _Tab.llm,
           label: Text(l.devTabLlm, key: const Key('dev-tab-llm')),
         ),
+        ButtonSegment(
+          value: _Tab.learner,
+          label: Text(l.devTabLearner, key: const Key('dev-tab-learner')),
+        ),
       ],
       selected: {_tab},
       onSelectionChanged: (s) => _show(s.first),
     );
-    // On a phone the three tabs do not fit beside the title: they get a line of their own.
+    // On a phone the four tabs do not fit beside the title: they get a line of their own.
     final narrow = MediaQuery.sizeOf(context).width < AppLayout.wideBreakpoint;
     return ConstrainedBox(
       key: const Key('dev-panel'),
@@ -183,6 +208,8 @@ class _DevPanelState extends State<DevPanel> {
                 ? _VoiceCosts(voice: _voice, error: _voiceError)
                 : _tab == _Tab.llm
                 ? _LlmCosts(llm: _llm, error: _llmError)
+                : _tab == _Tab.learner
+                ? _Learner(learner: _learner, error: _learnerError)
                 : data == null
                 ? Center(
                     child: _error == null
@@ -232,7 +259,7 @@ class _DevPanelState extends State<DevPanel> {
   }
 }
 
-enum _Tab { audits, voice, llm }
+enum _Tab { audits, voice, llm, learner }
 
 /// Dollars for what costs fractions of a cent (one model call): two
 /// significant digits below a cent.
@@ -249,8 +276,19 @@ String _usd(double? v) =>
     v == null ? '—' : '\$${v < 1 ? v.toStringAsFixed(3) : v.toStringAsFixed(2)}';
 String _num(double? v, [int digits = 1]) => v == null ? '—' : v.toStringAsFixed(digits);
 
-/// A titled row of number tiles, keyed `dev-metric-<key>`.
-Widget _tiles(BuildContext context, String title, List<(String, String, String)> tiles) {
+/// An ability to two decimals with its sign (`+0.20`, `-0.10`, `0.00`).
+String _signed(double v) {
+  final digits = v.abs().toStringAsFixed(2);
+  return digits == '0.00' ? digits : '${v > 0 ? '+' : '-'}$digits';
+}
+
+/// A titled row of number tiles, keyed `dev-metric-<key>` (or [prefix]`<key>`).
+Widget _tiles(
+  BuildContext context,
+  String title,
+  List<(String, String, String)> tiles, {
+  String prefix = 'dev-metric-',
+}) {
   final theme = Theme.of(context).textTheme;
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,7 +310,7 @@ Widget _tiles(BuildContext context, String title, List<(String, String, String)>
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
-                    child: Text(value, key: Key('dev-metric-$key'), style: theme.headlineMedium),
+                    child: Text(value, key: Key('$prefix$key'), style: theme.headlineMedium),
                   ),
                 ],
               ),
@@ -506,6 +544,129 @@ class _LlmCosts extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// The learner model: the ability after each audit as a line, the newest
+/// audits with what each moved, the Auditor's two error rates, and the nodes
+/// open to study with the chance of passing each.
+class _Learner extends StatelessWidget {
+  const _Learner({required this.learner, required this.error});
+
+  final LearnerModel? learner;
+  final Object? error;
+
+  static const int recent = 10;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context).textTheme;
+    final m = learner;
+    if (m == null) {
+      final e = error;
+      return Center(
+        child: e == null
+            ? const CircularProgressIndicator()
+            : Text(e is ApiException ? e.userMessage : '$e'),
+      );
+    }
+    final steps = m.history.reversed.take(recent).toList(); // newest first
+    return ListView(
+      key: const Key('dev-learner'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.xl,
+      ),
+      children: [
+        Text(l.devLearnerOverTime, style: theme.labelLarge),
+        const SizedBox(height: AppSpacing.sm),
+        if (m.history.isEmpty)
+          EmptyView(message: l.devNoAudits)
+        else ...[
+          LearnerChart(key: const Key('learner-chart'), history: m.history),
+          const SizedBox(height: AppSpacing.md),
+          Text.rich(
+            key: const Key('learner-ability'),
+            TextSpan(
+              children: [
+                TextSpan(text: '${l.devLearnerAbilityNow} '),
+                TextSpan(
+                  text: _signed(m.ability),
+                  style: theme.titleSmall?.copyWith(color: AppColors.textPrimary),
+                ),
+                TextSpan(text: ' · ${m.history.length} ${l.devAudits}'),
+              ],
+            ),
+            style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Text(l.devLearnerRecent, style: theme.labelLarge),
+          const SizedBox(height: AppSpacing.sm),
+          for (final (i, s) in steps.indexed)
+            Padding(
+              key: Key('learner-step-$i'),
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text(s.skillTitle, style: theme.bodyMedium)),
+                      const SizedBox(width: AppSpacing.md),
+                      if (s.passed)
+                        StatusChip.success(l.auditPassed)
+                      else
+                        StatusChip.danger(l.auditFailed),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    '${formatLocal(s.createdAt, style: DateStyle.dateTime)} · '
+                    '${l.devLearnerAbility} ${_signed(s.ability)} · '
+                    '${l.devLearnerProgress} ${_pct(s.progress)}'
+                    '${switch (s.agreement) {
+                      final a? when a < 1 => ' · ${l.devLearnerAgreed(_pct(a))}',
+                      _ => '',
+                    }}',
+                    style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+        ],
+        const SizedBox(height: AppSpacing.lg),
+        KeyedSubtree(
+          key: const Key('learner-judge'),
+          child: _tiles(context, l.devLearnerJudge, prefix: 'learner-judge-', [
+            ('false-fail', l.devLearnerFalseFail, _pct(m.judgeFalseFail)),
+            ('false-pass', l.devLearnerFalsePass, _pct(m.judgeFalsePass)),
+          ]),
+        ),
+        if (m.nodes.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xl),
+          Text(l.devLearnerNodes(_pct(m.targetChance)), style: theme.labelLarge),
+          const SizedBox(height: AppSpacing.sm),
+          for (final (i, n) in m.nodes.indexed)
+            Padding(
+              key: Key('learner-node-$i'),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                children: [
+                  Expanded(child: Text(n.title, style: theme.bodyMedium)),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(
+                    _pct(n.chance),
+                    style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ],
     );
   }
 }

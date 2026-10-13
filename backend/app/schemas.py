@@ -272,6 +272,21 @@ class LearnerNodeOut(BaseModel):
     chance: float
 
 
+class LearnerStepOut(BaseModel):
+    """The ability after one audit."""
+
+    audit_id: int
+    skill_id: int
+    skill_title: str
+    passed: bool
+    ability: float
+    # How far the audit's results went beyond what was expected, 0 to 1.
+    progress: float
+    # The share of the verdict's votes that agreed (null: judged once).
+    agreement: float | None = None
+    created_at: datetime
+
+
 class LearnerOut(BaseModel):
     """The learner model (app/services/learner.py)."""
 
@@ -282,6 +297,8 @@ class LearnerOut(BaseModel):
     judge_false_fail: float
     # The nodes open to study, the one nearest the target first.
     nodes: list[LearnerNodeOut]
+    # The ability after each audit, oldest first (it starts at 0).
+    history: list[LearnerStepOut] = []
 
 
 class StartAuditResponse(BaseModel):

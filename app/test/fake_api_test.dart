@@ -1125,7 +1125,7 @@ void main() {
       for (final name in FakeApiClient.methodNames) {
         api.failNext(method: name); // asserts on unknown names
       }
-      expect(FakeApiClient.methodNames, hasLength(61));
+      expect(FakeApiClient.methodNames, hasLength(62));
       expect(() => api.failNext(method: 'nope'), throwsA(isA<AssertionError>()));
     });
   });
@@ -1180,6 +1180,37 @@ void main() {
       );
       final cleared = await api.reviewAudit(p1.id, null, leaked: true);
       expect((cleared.review, cleared.leaked), (null, false));
+    });
+
+    test('the learner: every finished audit is a step; a pass lifts the ability, a fail lowers it', () async {
+      final api = await seededFakeApi();
+      var m = await api.getLearner();
+      expect(m.ability, 0);
+      expect(m.history, isEmpty);
+      expect((m.targetChance, m.judgeFalsePass, m.judgeFalseFail), (0.75, 0.05, 0.30));
+      final open = (await api.listSkills()).where((n) => n.isAvailable).toList();
+      expect([for (final n in m.nodes) (n.skillId, n.title, n.chance)], [
+        for (final n in open) (n.id, n.title, 0.5),
+      ]);
+      expect(m.nodes, isNotEmpty);
+
+      final failed = await failAudit(api, 6);
+      m = await api.getLearner();
+      expect(m.history, hasLength(1));
+      expect(m.ability, -0.1);
+      final step = m.history.single;
+      expect((step.auditId, step.skillId, step.skillTitle), (failed.sessionId, 6, 'Discriminant'));
+      expect((step.passed, step.ability, step.progress, step.agreement), (false, -0.1, 0.1, 1));
+
+      await passAudit(api, 6);
+      await api.startAudit(7); // running: not a step
+      m = await api.getLearner();
+      expect(m.history, hasLength(2));
+      expect([for (final s in m.history) (s.passed, s.ability, s.progress)], [
+        (false, -0.1, 0.1),
+        (true, 0.1, 0.5),
+      ]);
+      expect(m.ability, 0.1);
     });
 
     test('kappa', () {

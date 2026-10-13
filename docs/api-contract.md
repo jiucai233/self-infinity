@@ -703,4 +703,4 @@ What a verdict is worth as evidence, and what is learnt from it (`app/services/l
 
 `POST /api/audits/{id}/feedback` body `{"kind": "too_hard" | "misheard"}` → `AuditSession`. A failed audit only (400 `feedback is only accepted for a failed audit`; 404 `audit session not found`). `too_hard`: the audit's points get 0.5 harder at once, once. `misheard`: a gap rests on words the user did not say; sets `disputed`. `AuditSession` has `agreement`, `too_hard`, `disputed`.
 
-`GET /api/learner` → `{ability, target_chance, judge_false_pass, judge_false_fail, nodes: [{skill_id, title, chance}]}`: the nodes open to study, the one nearest the target first.
+`GET /api/learner` → `{ability, target_chance, judge_false_pass, judge_false_fail, nodes: [{skill_id, title, chance}]}`: the nodes open to study, the one nearest the target first. `history: [{audit_id, skill_id, skill_title, passed, ability, progress, agreement, created_at}]`: the ability after each audit that settled something, oldest first (a `LearnerStep` row written with the verdict; before the first it is 0). The developer panel's Learner tab draws it.

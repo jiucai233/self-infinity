@@ -722,7 +722,7 @@ void main() {
         },
       );
     });
-    for (final tab in const ['voice', 'llm']) {
+    for (final tab in const ['voice', 'llm', 'learner']) {
       testWidgets(skip: dir == null, 'developer panel, $tab ($tag)', (tester) async {
         final api = _ShotCosts();
         await api.generateCourse(const GenerateRequest(topic: 'math'));
@@ -740,6 +740,8 @@ void main() {
             await t.tap(find.byKey(const Key('settings-button')));
             await t.pumpAndSettle();
             await t.tap(find.byKey(const Key('settings-dev')));
+            await t.pumpAndSettle();
+            await t.ensureVisible(find.byKey(Key('dev-tab-$tab'))); // the last tab is off a phone's edge
             await t.pumpAndSettle();
             await t.tap(find.byKey(Key('dev-tab-$tab')));
             await t.pumpAndSettle();
@@ -832,6 +834,38 @@ void main() {
 /// Model calls and voice sessions with costs, for the developer panel's shots.
 class _ShotCosts extends FakeApiClient {
   _ShotCosts() : super(latency: Duration.zero);
+
+  @override
+  Future<LearnerModel> getLearner() async => LearnerModel(
+    ability: 0.34,
+    targetChance: 0.75,
+    judgeFalsePass: 0.05,
+    judgeFalseFail: 0.30,
+    nodes: const [
+      LearnerNode(skillId: 6, title: 'Discriminant', chance: 0.71),
+      LearnerNode(skillId: 7, title: 'Roots and Coefficients', chance: 0.58),
+    ],
+    history: [
+      for (final (i, (passed, ability, progress, agreement)) in const [
+        (false, -0.12, 0.1, 1.0),
+        (false, -0.2, 0.15, 0.667),
+        (true, 0.05, 0.6, 1.0),
+        (true, 0.26, 0.55, 1.0),
+        (false, 0.18, 0.3, 0.667),
+        (true, 0.34, 0.5, null),
+      ].indexed)
+        LearnerStep(
+          auditId: i + 1,
+          skillId: i.isEven ? 6 : 7,
+          skillTitle: i.isEven ? 'Discriminant' : 'Roots and Coefficients',
+          passed: passed,
+          ability: ability,
+          progress: progress,
+          agreement: agreement,
+          createdAt: DateTime.utc(2026, 10, 8 + i, 3),
+        ),
+    ],
+  );
 
   @override
   Future<DevLlm> getDevLlm() async => const DevLlm(

@@ -14,6 +14,7 @@ from app.schemas import (
     AuditFeedbackIn,
     LearnerNodeOut,
     LearnerOut,
+    LearnerStepOut,
     AuditSessionOut,
     AuditSummaryOut,
     AuditTurnOut,
@@ -152,6 +153,19 @@ def get_learner(session: Session = Depends(get_session)):
         judge_false_pass=round(false_pass, 3),
         judge_false_fail=round(false_fail, 3),
         nodes=sorted(nodes, key=lambda n: abs(n.chance - learner.TARGET_CHANCE)),
+        history=[
+            LearnerStepOut(
+                audit_id=audit.id,
+                skill_id=skill.id,
+                skill_title=skill.title,
+                passed=audit.status == AuditStatus.passed,
+                ability=round(step.ability, 3),
+                progress=round(step.progress, 3),
+                agreement=audit.agreement,
+                created_at=step.created_at,
+            )
+            for step, audit, skill in learner.history(session)
+        ],
     )
 
 

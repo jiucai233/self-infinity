@@ -2801,3 +2801,105 @@ class DevLlm {
   final List<DevLlmRow> allOn;
 }
 
+
+/// A node open to study in `GET /learner`, with the chance the learner
+/// passes it now.
+@immutable
+class LearnerNode {
+  const LearnerNode({required this.skillId, required this.title, required this.chance});
+
+  factory LearnerNode.fromJson(Json json) => LearnerNode(
+    skillId: _int(json, 'skill_id'),
+    title: _str(json, 'title'),
+    chance: _double(json, 'chance'),
+  );
+
+  final int skillId;
+  final String title;
+
+  /// 0–1.
+  final double chance;
+}
+
+/// One finished audit in `GET /learner`'s history: the ability after it.
+@immutable
+class LearnerStep {
+  const LearnerStep({
+    required this.auditId,
+    required this.skillId,
+    required this.skillTitle,
+    required this.passed,
+    required this.ability,
+    required this.progress,
+    this.agreement,
+    required this.createdAt,
+  });
+
+  factory LearnerStep.fromJson(Json json) => LearnerStep(
+    auditId: _int(json, 'audit_id'),
+    skillId: _int(json, 'skill_id'),
+    skillTitle: _str(json, 'skill_title'),
+    passed: _bool(json, 'passed'),
+    ability: _double(json, 'ability'),
+    progress: _double(json, 'progress'),
+    agreement: _doubleN(json, 'agreement'),
+    createdAt: _time(json, 'created_at'),
+  );
+
+  final int auditId;
+  final int skillId;
+  final String skillTitle;
+  final bool passed;
+
+  /// The ability after this audit.
+  final double ability;
+
+  /// 0–1.
+  final double progress;
+
+  /// The share of the verdict's votes that agreed with it (0–1); null when
+  /// it was not voted on.
+  final double? agreement;
+  final DateTime createdAt;
+}
+
+/// `GET /learner`: the learner model. The ability is on a logit scale and
+/// starts at 0; the judge's two rates are the Auditor's estimated errors for
+/// this account.
+@immutable
+class LearnerModel {
+  const LearnerModel({
+    this.ability = 0,
+    this.targetChance = 0.75,
+    this.judgeFalsePass = 0,
+    this.judgeFalseFail = 0,
+    this.nodes = const [],
+    this.history = const [],
+  });
+
+  factory LearnerModel.fromJson(Json json) => LearnerModel(
+    ability: _double(json, 'ability'),
+    targetChance: _double(json, 'target_chance'),
+    judgeFalsePass: _double(json, 'judge_false_pass'),
+    judgeFalseFail: _double(json, 'judge_false_fail'),
+    nodes: _list(json, 'nodes', LearnerNode.fromJson),
+    history: _list(json, 'history', LearnerStep.fromJson),
+  );
+
+  final double ability;
+
+  /// The chance of passing the next node is aimed at this (0–1).
+  final double targetChance;
+
+  /// How often the Auditor passes what should fail (0–1).
+  final double judgeFalsePass;
+
+  /// How often the Auditor fails what should pass (0–1).
+  final double judgeFalseFail;
+
+  /// Nodes open to study, nearest the target first.
+  final List<LearnerNode> nodes;
+
+  /// One step per finished audit, oldest first. Empty on a server from before.
+  final List<LearnerStep> history;
+}

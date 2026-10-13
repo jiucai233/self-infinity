@@ -300,6 +300,17 @@ class Learner(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 
+class LearnerStep(SQLModel, table=True):
+    """The ability after one audit: its history, one row per audit that settled something."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    session_id: int = Field(foreign_key="auditsession.id", index=True)
+    ability: float
+    # How far the audit's results went beyond what was expected, 0 to 1 (the bandit's reward).
+    progress: float
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+
+
 class LearnerPoint(SQLModel, table=True):
     """How hard one knowledge point (or a node without points, `title` empty) has proved."""
 

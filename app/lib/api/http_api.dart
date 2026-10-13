@@ -511,6 +511,9 @@ class HttpApi implements SelfInfinityApi {
     parse: (j) => DevVoice.fromJson(_object(j)),
   );
 
+  @override
+  Future<LearnerModel> getLearner() => _get('/learner', parse: (j) => LearnerModel.fromJson(_object(j)));
+
   static List<ChatMessage> _chatMessages(Object? j) =>
       _array(_object(j)['messages']).map((e) => ChatMessage.fromJson(_object(e))).toList();
 

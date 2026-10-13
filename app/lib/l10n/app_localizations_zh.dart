@@ -1607,6 +1607,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String get devLlmAllOn => '如果全部调用都用同一个模型';
 
   @override
+  String get devTabLearner => '学习者';
+
+  @override
+  String get devLearnerOverTime => '能力变化';
+
+  @override
+  String get devLearnerAbilityNow => '当前能力';
+
+  @override
+  String get devLearnerRecent => '最近的审计';
+
+  @override
+  String get devLearnerAbility => '能力';
+
+  @override
+  String get devLearnerProgress => '进步';
+
+  @override
+  String devLearnerAgreed(String share) {
+    return '$share 意见一致';
+  }
+
+  @override
+  String get devLearnerJudge => '审核官的误判';
+
+  @override
+  String get devLearnerFalseFail => '该过的判成未通过';
+
+  @override
+  String get devLearnerFalsePass => '不该过的判成通过';
+
+  @override
+  String devLearnerNodes(String target) {
+    return '开放的节点 · 目标 $target';
+  }
+
+  @override
   String get youSaid => '你当时说';
 
   @override
