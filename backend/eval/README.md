@@ -6,28 +6,63 @@ Offline evaluation of `Auditor.next_turn` judgment quality against a hand-labele
 ## Running
 
 ```
-backend/.venv/bin/python backend/eval/run_calibration.py                    # OpenAI, the Auditor's model
-backend/.venv/bin/python backend/eval/run_calibration.py --challenger       # same, with the Challenger
-backend/.venv/bin/python backend/eval/run_calibration.py --provider mock    # offline
+backend/.venv/bin/python backend/eval/run_calibration.py                         # OpenAI, the Auditor's model
+backend/.venv/bin/python backend/eval/run_calibration.py --out transcripts.json  # and keep every transcript
+backend/.venv/bin/python backend/eval/run_calibration.py --provider mock         # offline
 ```
 
 `--provider openai` (default) needs `OPENAI_API_KEY` in `backend/.env` and makes
-real API calls for every scenario; it uses the Auditor's model (`LLM_MODEL_OVERRIDES`,
-then `LLM_MODEL`, then `gpt-6-luna`), the one the app runs. `--provider mock` runs
-offline with no key, using the deterministic `MockProvider` heuristic. The
-DeepSeek runs below are history from before the app moved to OpenAI.
+real API calls for every scenario (about 150 calls, a few cents on `gpt-6-luna`); it uses the
+Auditor's model (`LLM_MODEL_OVERRIDES`, then `LLM_MODEL`, then `gpt-6-luna`), the one the app
+runs. `--provider mock` runs offline with no key, using the deterministic `MockProvider`
+heuristic. The DeepSeek runs below are history from before the app moved to OpenAI.
+
+Since 2026-10-13 a scenario runs the way production runs an audit
+(`app/services/audit_flow.py`): the student opening, her turns fed back whole (feedback, then
+question), a pass reviewed once by the Challenger and the answer to its question getting the
+verdict. One run reports both arms: the verdict before the Challenger and the final one.
 
 ## What it measures
 
 For each scenario, the script replays `student_turns` into a simulated audit
 conversation (opening question, then probes) up to a safety cap of 10 rounds,
-and compares the final verdict's `passed` against the scenario's
-`expected_passed` ground truth. It reports:
+and compares the verdict's `passed` against the scenario's
+`expected_passed` ground truth. It reports, before the Challenger and after it:
 
 - overall accuracy (% of scenarios where actual verdict matches expected)
 - leniency rate (放水率): among scenarios that SHOULD fail, the % that the
   Auditor incorrectly passed — this is the false-pass / grade-inflation risk
 - both metrics broken down by `node_type` (concept vs task)
+
+## Runs of 2026-10-13 (`gpt-6-luna`, the student Auditor)
+
+| Auditor | run | accuracy before / after the Challenger | leniency before / after | false fail |
+|---|---|---|---|---|
+| before the gap rule changed | 1 | 27/30 / 28/30 | 2/15 / 1/15 | 1/15 |
+| after | 1 | 30/30 / 30/30 | 0/15 / 0/15 | 0/15 |
+| after | 2 | 29/30 / 29/30 | 0/15 / 0/15 | 1/15 |
+| after | 3 | 26/30 / 26/30 | 3/15 / 3/15 | 1/15 |
+
+After the change, over three runs: accuracy 85/90 = 94.4%, leniency 3/45 = 6.7%. **One run moves
+between 87% and 100%, so this set does not tell the two Auditors apart.** Read a single run as
+"within the bar or not", not as a number to compare. Where the movement comes from:
+
+- The student's later answers are written by an LLM. Asked a follow-up, a "should fail" student
+  sometimes produces a workable order of steps (make the environment, activate it, install,
+  check for errors) while still saying it does not remember the commands.
+- That is a pass by the Auditor's rule (a command one would look up is not required) and a fail
+  by the labels of July (`python-venv-setup-fail`, `mapo-tofu-blanch-tofu-fail`,
+  `assemble-bookshelf-fail`). The three labels need a decision: relabel, or make the scripted
+  turns say they do not know the *actions*.
+- The scripted second and third turns were written for the July question order and often do
+  not answer what she asks now (`tcp-handshake-pass` failed once on exactly that).
+
+What did tell the two apart: the 19 finished audits of one production account, each given to
+the Auditor again four times for its verdict. Pass judgements 14/76 before, 18/76 after; the
+audit that had passed at 95 on "I already did all of it" is asked what was done (4/4) instead of
+passing (4/4); two claims that were right and had been held against the user no longer appear
+in `gaps`. The cost: audits whose four verdicts disagree went from 1 to 5 of 19, all near the
+line. That replay is not in this folder (it reads one user's data).
 
 ## Interpreting mock vs real results
 

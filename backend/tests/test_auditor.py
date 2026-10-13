@@ -243,10 +243,48 @@ def test_the_verdict_grades_the_node_against_covers_not_the_whole_field():
 
     assert "grade this node, not the field" in prompt
     assert "would an expert mentor believe" in prompt and "Not: could a\n  stranger follow their words" in prompt
-    assert "Details one would\n  look up while doing it" in prompt
+    assert "Details one would look up while doing it" in prompt
     assert "Brevity is not a gap." in prompt
     assert "At most three\n  gaps" in prompt
     assert "on the final turn, give the benefit of the doubt" in prompt
+
+
+def test_a_wrong_claim_is_a_gap_only_once_it_was_put_to_the_user():
+    """Production audits were failed on claims the conversation never raised, two of them right."""
+    _, provider = next_turn(probe_json())
+    prompt = system_prompt(provider)
+
+    assert "a claim that stayed wrong after its second try" in prompt
+    assert "an answer to the\n  last question that is wrong in substance" in prompt
+    assert "A wrong claim that was never put to them is not a gap" in prompt
+    assert "never holds against them something the conversation did not raise" in prompt
+    assert 'an essential part of "Covers" their own words never reached' in prompt
+    assert "do not give\n  the verdict: ask about it (1)" in prompt
+    assert "name it in the comment as what to check" in prompt
+    assert "even if you never asked about it" not in prompt
+    assert "pass is true when there is no gap" in prompt
+
+
+def test_loose_wording_and_misheard_words_are_judged_by_what_was_meant():
+    _, provider = next_turn(probe_json())
+    prompt = system_prompt(provider)
+
+    assert "Wrong means wrong in substance" in prompt
+    assert "A loose, shortened or\n  everyday way of saying something right is right" in prompt
+    assert "speech recognition" in prompt
+    assert "what they said, not what it resembles" in prompt
+
+
+def test_a_task_passes_on_the_actions_said_not_on_a_report_that_it_is_done():
+    """An audit passed at 95 on "I already did all of it"."""
+    _, provider = next_turn(probe_json(), node_type=NodeType.task)
+    prompt = system_prompt(provider)
+
+    assert "tells you the result and not the actions" in prompt
+    assert "ask what they did" in prompt
+    assert "vouches for the routine actions it could not have been reached without" in prompt
+    assert 'would do "somehow" is not known' in prompt
+    assert "a setting they would look up while doing it, which is not required" in prompt
 
 
 def test_a_reported_working_result_counts_as_the_check():

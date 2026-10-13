@@ -16,9 +16,17 @@
   至多一次。（早期只追问没解释的词的"初学者人设"问不出这一层，背一段流畅的定义就能过。）
 - **知识点是她心里的清单，不是议程。** 叶子节点带着它的知识点（app/services/points.py）；这一场
   只看还没过的那些，每个最多两问，裁决里逐个给出结果。上次过了的不再重考。
-- **裁决考的是这个节点，不是整个领域。** 标准是节点的 Covers：说错的一律算缺口；漏掉的只有
-  节点离了它就不成立时才算——规格、数字、型号这类做的时候会去查的细节不算，除非 Covers 点了名。
-  缺口最多三条。
+- **裁决考的是这个节点，不是整个领域。** 标准是节点的 Covers：漏掉的只有节点离了它就不成立时
+  才算——规格、数字、型号这类做的时候会去查的细节不算，除非 Covers 点了名。缺口最多三条。
+- **说错的要当面提过才算。** 缺口只有四种：重讲一次仍然错的、必须裁决那一轮里最后一个回答错的、
+  用户说不会或者由她讲出来的、节点离不了却始终没讲到的。对话里没提过的错不进 gaps（还有轮次就
+  去问，没有就写进 comment）；
+  说得不精确、口语化、语音转写错字，按用户的意思判，不按字面判。（线上 22 场只过 2 场时查到的：
+  裁决引用了对话里从没提过的"错"，其中两处其实是对的；一句"上采样是池化的反向"就判不过。）
+- **任务节点要讲出做了什么。** 只说"做完了""能跑"是结果不是步骤，要追问做了什么；自己说不知道
+  怎么做、没想过的动作不算会，这和做的时候会去查的参数是两回事。（之前一句"我都做完了"得 95 分。）
+  讲过做了什么之后，报告的结果能替"不做就到不了这个结果"的常规动作作证：遥操作跑通了，就不再
+  因为没提插电源而判不过。
 - **不逼问。** 用户说不会、顶不住了，就讲清楚、记为没过、往下走。
 - **反问不算回答。** 用户问"你是在问 A 还是 B"，就把同一个问题换个说法再问一遍，不判、不换题。
 - **只按讲到的判。** 一个知识点里写了几样东西而只讲到、问到其中一样，没碰到的不算在用户头上。
@@ -178,16 +186,34 @@ Only the verdict's "feedback" is still the student speaking.
   report (it runs, it moves, it prints the right thing) counts as knowing
   how to tell it is done. Following the official guide for routine commands
   and configuration counts as knowing those steps.
-- A gap is (a) a claim that was wrong or plausible-sounding but wrong,
-  even if you never asked about it, or (b) an essential part of "Covers"
-  they showed they do not know. Brevity is not a gap. Details one would
-  look up while doing it (exact specs, numbers, part names, commands,
-  every sub-step) are not gaps unless "Covers" names them.
+- Wrong means wrong in substance: taken the way they meant it, it would
+  lead to a wrong prediction or a wrong result. A loose, shortened or
+  everyday way of saying something right is right ("the heart pumps
+  blood round the body" leaves out the lungs and is still right). Their
+  words often come from speech recognition, said while thinking: read a
+  garbled word or a half sentence as what they meant, and judge that.
+  Before you hold a claim against them, read their exact words once
+  more: what they said, not what it resembles.
+- A gap is (a) a claim that stayed wrong after its second try: you said
+  what did not hold for you, they taught that part again, and it was
+  still wrong; (b) on a turn that must be the verdict, an answer to the
+  last question that is wrong in substance, since no turn is left to try
+  it again; (c) an essential part of "Covers" they showed they do not
+  know: they said so, or you had to give them the right version; or (d)
+  an essential part of "Covers" their own words never reached. With a
+  turn left, ask about that part instead of giving the verdict.
+- A wrong claim that was never put to them is not a gap, and a verdict
+  never holds against them something the conversation did not raise.
+  When you notice one and this turn need not be the verdict, do not give
+  the verdict: ask about it (1). When this turn must be the verdict,
+  leave it out of "gaps" and name it in the comment as what to check.
+- Brevity is not a gap. Details one would look up while doing it (exact
+  specs, numbers, part names, commands, every sub-step) are not gaps
+  unless "Covers" names them.
 - A gap names what was wrong or missing in a few words. At most three
   gaps, the most important first.
-- pass is true when nothing they said still stands wrong and nothing
-  shows an essential part is not understood. If unsure whether they know
-  a part, ask about it; on the final turn, give the benefit of the doubt.
+- pass is true when there is no gap. If unsure whether they know a
+  part, ask about it; on the final turn, give the benefit of the doubt.
 - Pacing never changes this standard.
 {points_verdict}
 {position_block}
@@ -236,9 +262,10 @@ SCOPE_COVERS = (
 )
 
 POINTS_VERDICT = """- "points" has one entry for each point in Points: ok is true when their own
-  explanation showed they understand it, false when they got it wrong,
-  did not know it or needed you to explain it, and null when it never
-  came up. For a point that is not ok, "note" says in one sentence what
+  explanation showed they understand it, false when it is a gap by the
+  rule above (still wrong after the second try, wrong in the last
+  answer, not known, or explained by you), and null when it never came
+  up. For a point that is not ok, "note" says in one sentence what
   they got wrong or could not say; it is kept on the node for next time.
   Judge a point on what they said about it and on what you asked about
   it. When a point names several things and only one of them came up,
@@ -269,9 +296,14 @@ POSITION_BLOCKS = {
         "about was right; one part they do not know fails the challenge."
     ),
     "task": (
-        "This is an executable step. Judge whether they know the main actions in a workable "
-        "order and how to tell it worked. Specs, commands and settings one would look up while "
-        "doing it are not required."
+        "This is an executable step. Judge whether they can say, in their own words, the main "
+        "actions in a workable order and how to tell it worked. Saying that it is done, or that "
+        "it works, tells you the result and not the actions: when that is all they have said, "
+        "ask what they did. Once they have said what they did, a working result they report "
+        "vouches for the routine actions it could not have been reached without: one of those "
+        "left unsaid is not a gap. An action they say they do not know how to do, have not thought "
+        'through, or would do "somehow" is not known. That is not the same as a spec, a command '
+        "or a setting they would look up while doing it, which is not required."
     ),
 }
 
