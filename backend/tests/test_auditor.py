@@ -10,6 +10,7 @@ from app.agents.auditor import (
     GENERIC_PROBE,
     Auditor,
     AuditorOutputError,
+    asked_so_far,
     began_with,
     format_lessons,
     gap_evidence,
@@ -259,10 +260,9 @@ def test_a_wrong_claim_is_a_gap_only_once_it_was_put_to_the_user():
 
     assert "a claim that stayed wrong after its second try" in prompt
     assert "an answer to the\n  last question that is wrong in substance" in prompt
-    assert "A wrong claim that was never put to them is not a gap" in prompt
-    assert "never holds against them something the conversation did not raise" in prompt
-    assert 'an essential part of "Covers" their own words never reached' in prompt
-    assert "do not give\n  the verdict: ask about it (1)" in prompt
+    assert "a wrong claim that was never put to them is not a gap" in prompt
+    assert "never holds against them something the conversation did not\n  raise" in prompt
+    assert "do not give the verdict: ask about\n  it." in prompt
     assert "name it in the comment as what to check" in prompt
     assert "even if you never asked about it" not in prompt
     assert "pass is true when there is no gap" in prompt
@@ -426,6 +426,47 @@ def test_without_points_the_prompt_has_no_points_block():
 
     assert "Points, the knowledge points" not in prompt and '"points" has one entry' not in prompt
     assert 'A part of "Covers" (or of Parts, when listed) they have not come to yet' in prompt
+
+
+def test_the_rules_keep_her_at_the_level_of_the_point_and_hold_nothing_unasked():
+    _, provider = next_turn(probe_json(), points=POINTS)
+    prompt = system_prompt(provider)
+
+    assert "Never go a level below that" in prompt and "splitting hairs" in prompt
+    assert "you asked them for and their answers\n  still did not give" in prompt
+    assert "neither is a part nobody asked them about" in prompt
+    assert "their own words never reached" not in prompt
+    assert "a question they could not make sense of is not held" in prompt
+
+
+def test_she_is_shown_her_own_questions_once_there_are_two_and_told_a_part_gets_two():
+    _, two_asked = next_turn(probe_json(), user_turns=3)
+    _, one_asked = next_turn(probe_json(), user_turns=2)
+
+    assert "Your questions so far, in order:\n1. Question 1\n2. Question 2\n" in system_prompt(two_asked)
+    assert "A narrower question on the same part" in system_prompt(two_asked)
+    assert "Your questions so far" not in system_prompt(one_asked)
+
+
+def test_her_questions_are_listed_without_the_feedback_before_them():
+    messages = [
+        {"role": "assistant", "content": "Explain it from scratch."},
+        {"role": "user", "content": "a"},
+        {"role": "assistant", "content": "I follow the first step.\n\nWhy the sign?"},
+        {"role": "user", "content": "b"},
+    ]
+
+    assert asked_so_far(messages) == ["Why the sign?"]
+
+
+def test_closed_points_are_named_and_all_of_them_closed_makes_the_turn_final():
+    _, some = next_turn(probe_json(), points=POINTS, closed=["Discriminant"])
+    forced, every = next_turn(probe_json(), points=POINTS, closed=[p["title"] for p in POINTS])
+
+    assert "judge them on what was said: Discriminant\n" in system_prompt(some)
+    assert "give the verdict now" not in system_prompt(some)
+    assert "give the verdict now" in system_prompt(every)
+    assert forced.is_verdict is True and forced.passed is False
 
 
 def test_the_points_to_examine_are_listed_with_the_note_of_the_last_miss():
@@ -647,7 +688,75 @@ def test_missing_short_or_malformed_evidence_still_gives_one_entry_per_gap(evide
 def test_gap_evidence_keeps_the_gap_order_when_the_model_gave_more_entries_than_gaps():
     evidence = gap_evidence([{"right": "One"}, {"right": "Two"}], ["Only gap"], spoken("x"))
 
-    assert evidence == [{"gap": "Only gap", "said": None, "right": "One"}]
+    assert evidence == [{"gap": "Only gap", "said": None, "asked": None, "right": "One", "kind": None, "point": None}]
+
+
+# ---------------------------------------------------------------- gaps that were never raised
+
+
+def kinds_verdict(*entries, points=None) -> str:
+    data = json.loads(evidence_verdict([e["gap"] for e in entries], list(entries)))
+    if points is not None:
+        data["points"] = points
+    return json.dumps(data)
+
+
+@pytest.mark.parametrize("kind", ["partial", "unasked", "detail", "Detail"])
+def test_a_gap_she_calls_not_raised_is_dropped_and_a_fail_with_none_left_is_a_pass(kind):
+    result, _ = next_turn(kinds_verdict({"gap": "Which patch gets which vector", "kind": kind, "right": "r"}))
+
+    assert result.gaps == [] and result.evidence == []
+    assert result.passed is True
+
+
+def test_a_not_given_gap_stands_only_with_the_question_that_asked_for_it():
+    asked = history(1)[0]["content"]
+    with_question, _ = next_turn(kinds_verdict({"gap": "G", "kind": "not_given", "asked": asked}))
+    without, _ = next_turn(kinds_verdict({"gap": "G", "kind": "not_given", "asked": "Something I never asked"}))
+
+    assert with_question.gaps == ["G"] and with_question.passed is False
+    assert without.gaps == [] and without.passed is True
+
+
+def test_gaps_of_the_other_kinds_or_of_no_kind_stand():
+    result, _ = next_turn(
+        kinds_verdict({"gap": "A", "kind": "wrong_twice"}, {"gap": "B", "kind": "detail"}, {"gap": "C"})
+    )
+
+    assert result.gaps == ["A", "C"]
+    assert [e["gap"] for e in result.evidence] == ["A", "C"]
+    assert result.passed is False
+
+
+def test_a_point_marked_wrong_only_for_a_dropped_gap_stays_open_and_keeps_the_audit_from_passing():
+    titles = [p["title"] for p in POINTS]
+    marks = [{"point": titles[0], "ok": True}, {"point": titles[1], "ok": False, "note": "Did not say how."}]
+    result, _ = next_turn(
+        kinds_verdict({"gap": "How", "kind": "unasked", "point": titles[1]}, points=marks), points=POINTS
+    )
+
+    assert result.gaps == []
+    assert result.points == [
+        {"title": titles[0], "ok": True, "note": None},
+        {"title": titles[1], "ok": None, "note": None},
+    ]
+    assert result.passed is False  # not settled is not passed; nothing is held against them
+
+
+def test_a_point_with_a_gap_that_stands_stays_wrong_when_another_of_its_gaps_is_dropped():
+    titles = [p["title"] for p in POINTS]
+    marks = [{"point": titles[0], "ok": True}, {"point": titles[1], "ok": False, "note": "Signs."}]
+    result, _ = next_turn(
+        kinds_verdict(
+            {"gap": "Signs", "kind": "wrong_twice", "point": titles[1]},
+            {"gap": "Order", "kind": "detail", "point": titles[1]},
+            points=marks,
+        ),
+        points=POINTS,
+    )
+
+    assert result.gaps == ["Signs"]
+    assert result.points[1] == {"title": titles[1], "ok": False, "note": "Signs."}
 
 
 def test_lesson_checks_are_numbered_from_one_into_the_lessons_given():

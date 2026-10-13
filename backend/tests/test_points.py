@@ -246,6 +246,47 @@ def test_her_feedback_goes_back_to_her_with_her_question(client, monkeypatch, ma
     assert history[-2] == {"role": "assistant", "content": "Half right: the sign is wrong.\n\nWhy?"}
 
 
+def point_probe(point: str | None) -> str:
+    return json.dumps({"action": "probe", "question": "And then?", "point": point})
+
+
+def test_a_point_asked_about_twice_is_closed_and_she_is_told_to_leave_it(client, monkeypatch, math):
+    spy = ScriptedProvider(auditor=point_probe(POINTS[0]))
+    monkeypatch.setattr("app.routers.audits.get_provider", lambda agent=None: spy)
+    audit_id = start(client, math["discriminant"])
+
+    answer_turns(client, audit_id, FIRST, "more", "still more")
+
+    prompts = spy.system_prompts("auditor")
+    assert "You have asked about these twice" not in prompts[1]  # one question so far
+    assert f"judge them on what was said: {POINTS[0]}\n" in prompts[2]
+
+
+def test_when_every_point_has_had_its_questions_the_turn_is_the_verdict(client, monkeypatch, math):
+    asks = [point_probe(p) for p in POINTS for _ in range(2)]
+    spy = ScriptedProvider(auditor=[point_probe(None), *asks[:5], point_probe(None), asks[5], point_probe(None)])
+    monkeypatch.setattr("app.routers.audits.get_provider", lambda agent=None: spy)
+    audit_id = start(client, math["discriminant"], "night")  # twelve turns: the limit is not what ends it
+
+    results = answer_turns(client, audit_id, *["answer"] * 9)
+
+    # Questions that name no point close nothing; the sixth that does closes the last point.
+    assert [r["type"] for r in results] == ["probe"] * 8 + ["verdict"]
+    assert "give the verdict now" in spy.system_prompts("auditor")[-1]
+
+
+def test_closed_points_counts_only_her_questions_that_name_a_point():
+    from app.models import AuditTurn, TurnRole
+
+    def asked(point):
+        return AuditTurn(session_id=1, role=TurnRole.auditor, content="?", point=point)
+
+    examined = [{"title": "A"}, {"title": "B"}]
+    turns = [asked("A"), asked(None), asked("B"), asked("A"), AuditTurn(session_id=1, role=TurnRole.user, content="B")]
+
+    assert audit_flow.closed_points(examined, turns) == ["A"]
+
+
 # ---------------------------------------------------------------- the smallest node
 
 

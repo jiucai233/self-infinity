@@ -903,7 +903,10 @@ def test_too_hard_on_a_failed_audit_is_set_and_raises_the_difficulty_once(client
 
     assert first.status_code == 200 and first.json()["too_hard"] is True
     assert before and set(after) == set(before)
-    assert all(after[t] == pytest.approx(before[t] + learner.TOO_HARD_STEP) for t in before)
+    # Only the point the audit did not pass gets harder; the ones explained right stay.
+    missed = {p["title"] for p in stored_audit(client_engine, audit_id).points if p["ok"] is not True}
+    assert missed and missed != set(before)
+    assert all(after[t] == pytest.approx(before[t] + (learner.TOO_HARD_STEP if t in missed else 0)) for t in before)
     assert second.status_code == 200
     assert points_difficulties(client_engine, math["discriminant"]) == after
 

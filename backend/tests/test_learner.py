@@ -257,14 +257,15 @@ def test_the_chance_of_a_node_follows_the_ability(session, skill):
 # ---------------------------------------------------------------- too_hard
 
 
-def test_too_hard_raises_the_difficulty_of_each_point_of_the_audit(session, skill):
-    audit = make_audit(session, skill, AuditStatus.failed, points_json=json.dumps(points_of(False, None)))
+def test_too_hard_raises_the_difficulty_of_the_points_the_audit_did_not_pass(session, skill):
+    audit = make_audit(session, skill, AuditStatus.failed, points_json=json.dumps(points_of(False, None, True)))
     start = learner.TIER_DIFFICULTY["medium"]
 
     learner.too_hard(session, audit, skill)
 
     assert difficulty(session, skill, "P0") == pytest.approx(start + learner.TOO_HARD_STEP)
     assert difficulty(session, skill, "P1") == pytest.approx(start + learner.TOO_HARD_STEP)
+    assert session.exec(select(LearnerPoint).where(LearnerPoint.title == "P2")).first() is None
 
 
 def test_too_hard_on_an_audit_without_points_raises_the_nodes_own_difficulty(session, skill):

@@ -23,6 +23,7 @@ import contextvars
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Sequence
@@ -173,6 +174,14 @@ def opening_question(
     return t("opening_leaf", title=quote(skill.title))
 
 
+def closed_points(examined: list[dict], turns: list[AuditTurn]) -> list[str]:
+    """The points of this audit that have had their questions (`POINT_TURNS` each): she asks no
+    more about them, so one point cannot take the turns of the others, and a point that was
+    explained is not dug into further."""
+    asked = Counter(t.point for t in turns if t.role == TurnRole.auditor and t.point)
+    return [p["title"] for p in examined if asked[p["title"]] >= POINT_TURNS]
+
+
 def max_turns_for(node_type: NodeType, mode: str, examined: int = 0) -> int:
     """`examined`: how many knowledge points the audit asks about (0: an audit without points)."""
     base = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
@@ -259,12 +268,13 @@ def submit_turn(
     _save_answer(session, audit, content)
 
     # Her turns go back to her whole: what she already explained, then what she asked.
+    turns = audit_turns(session, audit.id)
     history: list[Message] = [
         {
             "role": "user" if t.role == TurnRole.user else "assistant",
             "content": f"{t.feedback}\n\n{t.content}" if t.feedback else t.content,
         }
-        for t in audit_turns(session, audit.id)
+        for t in turns
     ]
 
     lessons = _lessons(session, skill)
@@ -272,6 +282,12 @@ def submit_turn(
     pacing = _pacing(session)
     examined = audit.points
     asked = {p["title"] for p in examined}
+    closed = closed_points(examined, turns)
+    final = (
+        audit.challenged
+        or sum(1 for m in history if m["role"] == "user") >= audit.max_turns
+        or (bool(examined) and len(closed) == len(examined))
+    )
     def judge() -> AuditorTurnResult:
         return Auditor(auditor_provider).next_turn(
             skill.title,
@@ -288,6 +304,7 @@ def submit_turn(
             test_out=bool(audit.test_out),
             points=examined,
             settled=[p["title"] for p in skill.points if p["title"] not in asked] if examined else None,
+            closed=closed,
         )
 
     try:
@@ -305,7 +322,7 @@ def submit_turn(
         result, agreement, challenge = _voted(
             result,
             judge,
-            final=audit.challenged or sum(1 for m in history if m["role"] == "user") >= audit.max_turns,
+            final=final,
             alongside=(lambda: _challenge(skill, history, challenger_provider, misconceptions)) if may_challenge else None,
         )
 
@@ -341,7 +358,9 @@ def _save_answer(session: Session, audit: AuditSession, content: str) -> None:
 def _save_question(
     session: Session, audit: AuditSession, question: str, feedback: str | None = None, point: str | None = None
 ) -> ProbeOutcome:
-    session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=question, feedback=feedback))
+    session.add(
+        AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=question, feedback=feedback, point=point)
+    )
     session.commit()
     return ProbeOutcome(question=question, feedback=feedback, point=point)
 

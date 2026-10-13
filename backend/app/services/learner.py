@@ -172,9 +172,9 @@ def history(session: Session) -> list[tuple[LearnerStep, AuditSession, SkillNode
 
 
 def too_hard(session: Session, audit: AuditSession, skill: SkillNode) -> None:
-    """The user's word that this audit was beyond them: its points get harder at once, without
-    waiting for more results."""
-    titles = [p["title"] for p in audit.points] or [""]
+    """The user's word that this audit was beyond them: the points it did not pass get harder at
+    once, without waiting for more results. A point they explained right is left as it is."""
+    titles = [p["title"] for p in audit.points if p.get("ok") is not True] or [""]
     for title in titles:
         row = point(session, skill, title)
         row.difficulty += TOO_HARD_STEP

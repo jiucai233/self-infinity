@@ -19,8 +19,8 @@
 - **裁决考的是这个节点，不是整个领域。** 标准是节点的 Covers：漏掉的只有节点离了它就不成立时
   才算——规格、数字、型号这类做的时候会去查的细节不算，除非 Covers 点了名。缺口最多三条。
 - **说错的要当面提过才算。** 缺口只有四种：重讲一次仍然错的、必须裁决那一轮里最后一个回答错的、
-  用户说不会或者由她讲出来的、节点离不了却始终没讲到的。对话里没提过的错不进 gaps（还有轮次就
-  去问，没有就写进 comment）；
+  用户说不会或者由她讲出来的、问了仍然没讲出来的。没问过的不进 gaps，不管是说错的还是没讲到的
+  （还有轮次就去问，没有就写进 comment）；
   说得不精确、口语化、语音转写错字，按用户的意思判，不按字面判。（线上 22 场只过 2 场时查到的：
   裁决引用了对话里从没提过的"错"，其中两处其实是对的；一句"上采样是池化的反向"就判不过。）
 - **任务节点要讲出做了什么。** 只说"做完了""能跑"是结果不是步骤，要追问做了什么；自己说不知道
@@ -32,6 +32,11 @@
 - **缺口带证据。** 裁决给每个缺口附上用户的原话（said）和对的说法（right），回放时并排给用户看：
   人看不到自己的盲点，要有人把那句话指出来。原话由代码核对（必须出现在用户说过的话里），对不上
   就丢掉，不让她替用户"说"话。她还报告手里的旧教训这一场是守住了还是又犯了。
+- **不往下切。** 问和判都停在节点、知识点自己的那一层：是什么、干什么用、大致怎么起作用。讲对了
+  这一层就算会，不再追问它底下怎么落实（哪个对哪个、先后顺序、公式和记账）。一个知识点问满两次
+  就关掉（代码数着，AuditTurn.point），不让一个点吃掉别的点的轮次。（线上审计 36、37：三轮耗在
+  前馈网络上，交叉注意力没问过却判成缺口；ViT 位置编码讲对了相加，卡在"第几个 patch 对第几个
+  位置向量"上没过。）
 - **只按讲到的判。** 一个知识点里写了几样东西而只讲到、问到其中一样，没碰到的不算在用户头上。
 
 第一个问题不由模型生成，来自按节点位置选的模板（app/services/audit_flow.py）。轮数上限由
@@ -60,7 +65,7 @@ MAX_GAPS = 3
 
 # Changed with the rules a verdict is given under; kept on each audit, so verdicts of
 # different rules are not counted as one judge's.
-JUDGE_VERSION = "2026-10-13"
+JUDGE_VERSION = "2026-10-14"
 
 GENERIC_PROBE = "Could you explain that part a bit more specifically?"
 FORCED_GAPS = ["Could not confirm a sufficient explanation within the question limit."]
@@ -144,8 +149,9 @@ QUESTIONING: one question per turn, and it comes out of what they said.
 Take the first of these that applies:
 1. A claim of theirs was wrong and they have not had a second try at it:
    ask them to teach you that part again.
-2. They used a term or a step without explaining it: ask what it is, or
-   what happens in it.
+2. They used a term or a step without explaining it, and without it you
+   cannot tell whether they have the idea: ask what it is, or what
+   happens in it.
 3. Two things they said do not connect: ask how one gets from the first
    to the second.
 4. It sounds right but in the words of a textbook, with no reason of
@@ -166,6 +172,16 @@ Take the first of these that applies:
   the honest answer is "nothing changes", ask something else.
 - A question never states its own answer: "why does X change?" tells
   them that it changes. Ask what happens, or how they know.
+- Stay at the level the node and its points are named at. A part is
+  done when their words carry its idea: what it is, what it is for, and
+  the main way it works. Never go a level below that, to how the idea is
+  carried out (which item goes with which, in what order, the exact
+  formula, the bookkeeping): someone who has the idea does not need to
+  recite that, and asking for it is splitting hairs. When the idea is
+  there, go on to the next part or give the verdict. On an executable
+  step the actions are that level: what they would do, in what order,
+  how they would know it worked. Below it are the settings, amounts and
+  exact commands of an action.
 - Nothing that needs knowledge outside "Covers".
 - Never ask the same question twice in the same words, and never ask
   for something they have already told you.
@@ -207,13 +223,27 @@ Only the verdict's "feedback" is still the student speaking.
   last question that is wrong in substance, since no turn is left to try
   it again; (c) an essential part of "Covers" they showed they do not
   know: they said so, or you had to give them the right version; or (d)
-  an essential part of "Covers" their own words never reached. With a
-  turn left, ask about that part instead of giving the verdict.
-- A wrong claim that was never put to them is not a gap, and a verdict
-  never holds against them something the conversation did not raise.
-  When you notice one and this turn need not be the verdict, do not give
-  the verdict: ask about it (1). When this turn must be the verdict,
-  leave it out of "gaps" and name it in the comment as what to check.
+  an essential part of "Covers" you asked them for and their answers
+  still did not give. For (d) your question has to have named that
+  part: an answer that is right as far as it goes, to a wider question
+  that did not name what is missing, is not a gap. What is missing
+  there was not reached.
+- A verdict never holds against them something the conversation did not
+  raise: a wrong claim that was never put to them is not a gap, and
+  neither is a part nobody asked them about. When you notice one and
+  this turn need not be the verdict, do not give the verdict: ask about
+  it. When this turn must be the verdict, leave it out of "gaps" and
+  name it in the comment as what to check, or what was not reached.
+- Essential means the idea of a part: what it is, what it is for, the
+  main way it works. How that idea is carried out one level down (which
+  item goes with which, the order, the exact formula, the bookkeeping)
+  is not essential and is never a gap, unless "Covers" names it. On an
+  executable step the main actions are the idea, not a detail: "I am
+  not sure how", "I have not looked", "roughly, it should work" about an
+  action you asked for is (c), whatever else they said.
+- An answer to a question they could not make sense of is not held
+  against them: if they asked what you meant and your rewording still
+  did not reach them, that question settles nothing.
 - Brevity is not a gap. Details one would look up while doing it (exact
   specs, numbers, part names, commands, every sub-step) are not gaps
   unless "Covers" names them.
@@ -233,8 +263,20 @@ reported to the user; it does not decide pass, the gaps do.
 user can see the mistake for themselves: "said" is the words of theirs
 the gap rests on, copied exactly from one of their answers (a phrase or
 a sentence, never reworded, never yours); null when the gap is a part
-they never spoke about. "right" is what holds instead, in one or two
-plain sentences.
+they never spoke about. "asked" is the question of yours that put this
+to them, copied exactly from one of your turns; a question about
+something near it does not count. A gap for which you can give neither
+their words nor your question was never raised: take it out of "gaps",
+do not mark its point false for it, and name it in the comment as not
+reached. "right" is what holds instead, in one or two plain sentences.
+"kind" says which gap it is, exactly one of: "wrong_twice" (a), "wrong_last"
+(b), "unknown" (c), "not_given" (d: your question named this part and
+their answer left it out), "partial" (their answer was right as far as
+it went, and no question of yours named what is missing), "unasked"
+(nobody brought it up), "detail" (how an idea they have right is
+carried out one level down). Be honest about the kind: the last three
+are not held against them, and the page shows them as not reached.
+"point" is the point of Points the gap belongs to, or null.
 "lessons": for each past lesson above whose situation came up in this
 audit, its number in that list counted from 1, and whether it held this
 time ("held": true) or the same mistake came back ("held": false). Leave
@@ -243,15 +285,22 @@ out a lesson this audit did not touch.
 Write feedback, questions, gaps and comment in English. If the user
 answers in another language, write in theirs.
 
-{began_line}Output only JSON, one of:
+{asked_line}{began_line}Output only JSON, one of:
 {{"action": "probe", "feedback": "...", "point": "the point this question examines, or null", "question": "..."}}
-{{"action": "verdict", "feedback": "...", "pass": false, "score": 60, "points": [{{"point": "...", "ok": false, "note": "..."}}], "gaps": ["..."], "evidence": [{{"said": "...", "right": "..."}}], "lessons": [{{"lesson": 1, "held": false}}], "comment": "..."}}
+{{"action": "verdict", "feedback": "...", "pass": false, "score": 60, "points": [{{"point": "...", "ok": false, "note": "..."}}], "gaps": ["..."], "evidence": [{{"kind": "...", "point": "...", "said": "...", "asked": "...", "right": "..."}}], "lessons": [{{"lesson": 1, "held": false}}], "comment": "..."}}
 """
 )
 
 BEGAN_LINE = (
     "Your earlier turns began: {openings}. Begin this one with none of those words, and build "
     "it differently.\n"
+)
+ASKED_LINE = (
+    "Your questions so far, in order:\n{questions}\n"
+    "A part of the node gets two questions at most. If the last two of these were on the same "
+    "part, that part is closed, whatever they answered: your next question is on a different "
+    "part of the node, or you give the verdict. A narrower question on the same part (a special "
+    "case of it, a what-if about it, how it is carried out) is still the same part.\n"
 )
 # How much of a turn counts as how it began, and how many turns back she is shown.
 BEGAN_CHARS = 14
@@ -263,9 +312,13 @@ a dash: what the user got wrong about it last time. Listen for whether
 it comes out right now; never bring it up yourself or ask about it in a
 way that tells what was wrong):
 {points}
-{settled}"""
+{settled}{closed}"""
 
 SETTLED_LINE = "Explained right in an earlier audit, do not ask about them again: {titles}\n"
+CLOSED_LINE = (
+    "You have asked about these twice, which is all a point gets. Ask nothing more about them "
+    "and judge them on what was said: {titles}\n"
+)
 
 SCOPE_POINTS = (
     'A point of Points they have not come to yet: ask them to teach it, giving no more than\n'
@@ -281,13 +334,15 @@ SCOPE_COVERS = (
 POINTS_VERDICT = """- "points" has one entry for each point in Points: ok is true when their own
   explanation showed they understand it, false when it is a gap by the
   rule above (still wrong after the second try, wrong in the last
-  answer, not known, or explained by you), and null when it never came
-  up. For a point that is not ok, "note" says in one sentence what
+  answer, not known, explained by you, or asked for and not given), and
+  null when it never came up. For a point that is not ok, "note" says in one sentence what
   they got wrong or could not say; it is kept on the node for next time.
   Judge a point on what they said about it and on what you asked about
   it. When a point names several things and only one of them came up,
   that one decides it: a part that never came up is not held against
-  them and stays out of the note.
+  them and stays out of the note. The same goes for an answer that was
+  right as far as it went: the point is ok, and what it left out goes
+  in the comment as not reached.
   pass is true only when every point is ok.
 """
 
@@ -366,6 +421,14 @@ def began_with(history: list[Message]) -> list[str]:
     return openings
 
 
+def asked_so_far(history: list[Message]) -> list[str]:
+    """Her own questions, the opening left out (a template): the last paragraph of each of her
+    turns, the feedback before it dropped. Told only "two questions a part", she kept narrowing
+    one part for a whole audit; shown her own questions in a row, she can see that she is."""
+    replies = [m["content"] for m in history if m["role"] == "assistant"][1:]
+    return [_one_line(content.rsplit("\n\n", 1)[-1]) for content in replies if content.strip()]
+
+
 def format_lessons(lessons: Sequence[Lesson] | None) -> str:
     """One line per lesson, most recent first. The misconception rides along because it is
     what the Auditor can actually ask about; the Mock also reads it from this exact shape."""
@@ -420,13 +483,15 @@ class Auditor:
         test_out: bool = False,
         points: list[dict] | None = None,
         settled: list[str] | None = None,
+        closed: list[str] | None = None,
     ) -> AuditorTurnResult:
         """`after_challenge`: the last answer replied to the Challenger's question, so this
         turn must be the verdict (like a turn at the limit). `test_out`: a challenge on a whole
         branch; `child_titles` are then the parts under it to sample from. `points`: the
         knowledge points this audit examines (`{"title", "note"}`, the note being what was
         wrong last time); `settled`: the node's other points, explained right before and not
-        asked again."""
+        asked again; `closed`: the points of this audit already asked about twice. When every
+        point is closed, this turn must be the verdict."""
         if max_turns is None:
             max_turns = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
         if pacing not in PACINGS:
@@ -446,15 +511,22 @@ class Auditor:
                     f"- {p['title']}" + (f" — {_one_line(p['note'])}" if p.get("note") else "") for p in noted
                 ),
                 settled=SETTLED_LINE.format(titles=", ".join(settled)) if settled else "",
+                closed=CLOSED_LINE.format(titles=", ".join(closed)) if closed else "",
             )
 
         user_turn_count = sum(1 for m in history if m["role"] == "user")
         final = after_challenge or user_turn_count >= max_turns
+        if points and closed and set(points) <= set(closed):
+            final = True
 
         # max_turns 刻意不进 prompt——它是服务端安全阀，不是模型该去凑满的额度。只有必须裁决
         # 的那一轮才多一句话。
         openings = began_with(history)
+        questions = asked_so_far(history)
         system = SYSTEM_PROMPT.format(
+            asked_line=ASKED_LINE.format(questions="\n".join(f"{i}. {q}" for i, q in enumerate(questions, 1)))
+            if len(questions) >= 2
+            else "",
             began_line=BEGAN_LINE.format(openings=", ".join(f'"{o}"' for o in openings)) if openings else "",
             final_line=FINAL_TURN_LINE if final else "",
             title=skill_title,
@@ -488,16 +560,21 @@ class Auditor:
                 point=_named(data.get("point"), points),
             )
         results = point_results(data.get("points"), points, data["pass"]) if points else None
+        evidence, dropped = raised_only(gap_evidence(data.get("evidence"), data["gaps"], history))
+        if dropped and results:
+            reopen_points(results, evidence, dropped)
+        gaps = [e["gap"] for e in evidence]
         return AuditorTurnResult(
             is_verdict=True,
             feedback=data.get("feedback"),
-            # Every point has to hold: a pass with a point marked wrong is not one.
-            passed=data["pass"] and all(r["ok"] for r in results or []),
+            # Every point has to hold: a pass with a point marked wrong is not one. A fail whose
+            # every gap turned out not to have been raised is a pass: no gap is left.
+            passed=(data["pass"] or (bool(dropped) and not gaps)) and all(r["ok"] for r in results or []),
             score=data["score"],
-            gaps=data["gaps"],
+            gaps=gaps,
             comment=data["comment"],
             points=results,
-            evidence=gap_evidence(data.get("evidence"), data["gaps"], history),
+            evidence=[{"gap": e["gap"], "said": e["said"], "right": e["right"]} for e in evidence],
             lesson_checks=lesson_checks(data.get("lessons"), len(lessons or [])),
         )
 
@@ -601,7 +678,7 @@ def _squeezed(text: str) -> str:
     return "".join(str(text).split()).casefold()
 
 
-def said_by_user(quote, history: list[Message]) -> str | None:
+def said_by_user(quote, history: list[Message], role: str = "user") -> str | None:
     """`quote` when it is the user's own words: found in one of their answers, whitespace and
     case aside. Anything else is dropped: a quote she reworded would put words in their mouth
     on the page that is meant to show them what they said."""
@@ -612,7 +689,7 @@ def said_by_user(quote, history: list[Message]) -> str | None:
     needle = _squeezed(text)
     if len(needle) < 2:
         return None
-    return text if any(needle in _squeezed(m["content"]) for m in history if m["role"] == "user") else None
+    return text if any(needle in _squeezed(m["content"]) for m in history if m["role"] == role) else None
 
 
 def gap_evidence(raw, gaps: list[str], history: list[Message]) -> list[dict]:
@@ -622,8 +699,45 @@ def gap_evidence(raw, gaps: list[str], history: list[Message]) -> list[dict]:
     evidence = []
     for i, gap in enumerate(gaps):
         item = given[i] if i < len(given) and isinstance(given[i], dict) else {}
-        evidence.append({"gap": gap, "said": said_by_user(item.get("said"), history), "right": _text(item.get("right"))})
+        evidence.append(
+            {
+                "gap": gap,
+                "said": said_by_user(item.get("said"), history),
+                "asked": said_by_user(item.get("asked"), history, role="assistant"),
+                "right": _text(item.get("right")),
+                "kind": _text(item.get("kind")),
+                "point": _text(item.get("point")),
+            }
+        )
     return evidence
+
+
+# The kinds of gap she may name that are not held against the user.
+NOT_RAISED = ("partial", "unasked", "detail")
+
+
+def raised_only(evidence: list[dict]) -> tuple[list[dict], list[dict]]:
+    """The gaps that stand, and the ones dropped: those she herself calls not raised (a right
+    answer that did not go far enough, a part nobody asked about, a detail below the point), and
+    a "not given" for which she cannot show the question that asked for it. Told in the prompt
+    alone, she listed them anyway; asked to name the kind, she names it, and the code drops it."""
+    kept, dropped = [], []
+    for entry in evidence:
+        kind = (entry.get("kind") or "").casefold()
+        not_raised = kind in NOT_RAISED or (kind == "not_given" and not entry.get("asked"))
+        (dropped if not_raised else kept).append(entry)
+    return kept, dropped
+
+
+def reopen_points(results: list[dict], kept: list[dict], dropped: list[dict]) -> None:
+    """A point marked wrong only for gaps that were dropped is not settled: it stays open (null),
+    with no note of a mistake."""
+    titles = [r["title"] for r in results]
+    standing = {_named(e.get("point"), titles) for e in kept}
+    for title in {_named(e.get("point"), titles) for e in dropped} - standing - {None}:
+        result = next(r for r in results if r["title"] == title)
+        if result["ok"] is False:
+            result["ok"], result["note"] = None, None
 
 
 def lesson_checks(raw, count: int) -> list[dict]:

@@ -254,6 +254,8 @@ class AuditTurn(SQLModel, table=True):
     content: str
     # On the Auditor's turns: what she said about the answer before, ahead of her question.
     feedback: str | None = None
+    # On the Auditor's questions: the knowledge point it examines, when the audit has points.
+    point: str | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 
