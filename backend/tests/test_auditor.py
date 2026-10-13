@@ -5,7 +5,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.agents.auditor import FINAL_TURN_LINE, GENERIC_PROBE, Auditor, AuditorOutputError, format_lessons
+from app.agents.auditor import (
+    FINAL_TURN_LINE,
+    GENERIC_PROBE,
+    Auditor,
+    AuditorOutputError,
+    began_with,
+    format_lessons,
+)
 from app.config import settings
 from app.models import NodePosition, NodeType
 from tests.helpers import ScriptedProvider, probe_json, verdict_json
@@ -254,7 +261,7 @@ def test_the_auditor_is_a_student_and_the_user_does_the_teaching():
 
     assert "You are the student in a Feynman audit. The user is your teacher" in prompt
     assert "You are not setting an exam." in prompt
-    assert "say back in one plain sentence what you now understand" in prompt
+    assert "your reaction to what they just taught, then the one place\nthat lost you" in prompt
     assert "The\n  user does the teaching here, not you." in prompt
 
 
@@ -263,7 +270,7 @@ def test_she_speaks_as_a_student_and_judges_as_an_expert():
     prompt = system_prompt(provider)
 
     assert "HOW YOU SPEAK: as a student to the person teaching you." in prompt
-    assert "Never the words of a teacher or an\n  examiner" in prompt
+    assert "Never the words of a teacher or an examiner" in prompt
     # The verdict is not in the student's voice: it is the record.
     assert "Here you stop playing the\nstudent: you judge with everything you know." in prompt
     assert 'Only the verdict\'s "feedback" is still the student speaking.' in prompt
@@ -273,7 +280,8 @@ def test_a_wrong_claim_gets_a_second_try_before_the_auditor_explains_it():
     _, provider = next_turn(probe_json())
     prompt = system_prompt(provider)
 
-    assert "A wrong claim: be puzzled out loud." in prompt and "Never say what is right\n  instead" in prompt
+    assert "A wrong claim: be puzzled, and let the puzzlement be your question." in prompt
+    assert "Never say what is right instead" in prompt
     assert "say it as something you went and looked up" in prompt
     assert "Give the right version only when they have tried that part twice" in prompt
     assert "Never reveal or hint at the answer to what you are asking now" in prompt
@@ -289,7 +297,7 @@ def test_questions_come_out_of_what_the_user_said_not_from_an_exam_paper():
     assert "QUESTIONING: one question per turn, and it comes out of what they said." in prompt
     assert "They used a term or a step without explaining it" in prompt
     assert "Two things they said do not connect" in prompt
-    assert "Never the wording\n  of an exam paper: no situation set up from nothing" in prompt
+    assert "Never the wording of an exam paper: no situation set up from nothing" in prompt
     assert "A question never states its own answer" in prompt
     assert "Never ask the same question twice in the same words" in prompt
     assert "never ask\n  for something they have already told you" in prompt
@@ -310,6 +318,48 @@ def test_the_auditor_does_not_push_a_user_who_has_had_enough():
     _, provider = next_turn(probe_json())
 
     assert "do not\n  push. Explain it briefly, count it as missed and go on" in system_prompt(provider)
+
+
+def test_she_is_shown_how_her_earlier_turns_began_and_told_to_begin_otherwise():
+    history = [
+        {"role": "assistant", "content": "I have never learned it. Teach it to me from the start."},
+        {"role": "user", "content": "It is a sum."},
+        {"role": "assistant", "content": "Oh, so it adds things up.\n\nWhat does it add?"},
+        {"role": "user", "content": "The terms."},
+        {"role": "assistant", "content": "我听懂了：它把各项加起来。\n\n各项是什么？"},
+        {"role": "user", "content": "The numbers in the series."},
+    ]
+
+    # Her first clause each time, the opening template left out.
+    assert began_with(history) == ["Oh", "我听懂了"]
+    assert began_with(history[:2]) == []
+
+    provider = ScriptedProvider(auditor=probe_json())
+    Auditor(provider).next_turn("Series", "Sums of terms", history)
+    prompt = system_prompt(provider)
+    assert 'Your earlier turns began: "Oh", "我听懂了". Begin this one with none of those words' in prompt
+    assert "No two turns sound alike" in prompt
+
+    _, first = next_turn(probe_json())  # nothing of hers yet: no such line
+    assert "Your earlier turns began" not in system_prompt(first)
+
+
+def test_a_question_at_the_end_of_the_feedback_is_dropped_so_it_is_asked_once():
+    doubled, _ = next_turn(
+        json.dumps(
+            {
+                "action": "probe",
+                "feedback": "You showed why order matters. If two position vectors are swapped, what happens?",
+                "question": "If two position vectors are swapped, what happens?",
+            }
+        )
+    )
+    chinese, _ = next_turn(json.dumps({"action": "probe", "feedback": "这一步我跟上了。那后面呢？", "question": "后面呢？"}))
+    only, _ = next_turn(json.dumps({"action": "probe", "feedback": "What then?", "question": "What then?"}))
+
+    assert doubled.feedback == "You showed why order matters."
+    assert chinese.feedback == "这一步我跟上了。"
+    assert only.feedback is None and only.question == "What then?"
 
 
 def test_feedback_comes_with_the_probe_and_with_the_verdict():

@@ -78,27 +78,34 @@ Each turn, output feedback on what the user just said, then either one
 question (probe) or the final verdict.
 
 HOW YOU SPEAK: as a student to the person teaching you.
-- First person, spoken and casual: "Oh, so ...", "Wait, you lost me at
-  ...", "Hmm, then how does ...?". Never the words of a teacher or an
-  examiner: no "explain", "describe", "state" or "justify" as an order,
-  no "your answer", "correct", "incorrect", "you failed to".
+- First person, spoken and casual, the way a person talks across a
+  table. Never the words of a teacher or an examiner: no "explain",
+  "describe", "state" or "justify" as an order, no "your answer",
+  "correct", "incorrect", "you failed to".
 - You are learning, so you react to what you are taught: what clicked,
   what you cannot picture yet. One plain reaction is enough: no
-  flattery, no acting, no exclamation marks in a row. Do not open every
-  turn with the same word.
+  flattery, no acting, no exclamation marks in a row.
+- No two turns sound alike: a person who starts every reply with "Oh,
+  so" or "I see" is a recording. Read your own earlier turns before you
+  write, and give this one another opening and another sentence shape.
 
-FEEDBACK: what you got, then the one place that lost you.
-- First say back in one plain sentence what you now understand from what
-  they just said ("Oh, so every head looks at the whole sentence."). Only
-  what they said: add nothing of your own, and do not tidy it into the
-  textbook version.
+FEEDBACK: your reaction to what they just taught, then the one place
+that lost you.
+- The reaction takes a different form each turn. Some of the forms:
+  saying back in your own plain words what you now understand; tying it
+  to something they said earlier ("that fits what you said about the
+  order"); saying what it clears up for you; or, when most of it lost
+  you, skipping the reaction and going straight to that place. Whatever
+  the form, it holds only what they said: add nothing of your own, and
+  do not tidy it into the textbook version.
 - Then the one place that lost you: a word they used and did not
   explain, a step that does not follow from the one before, or a claim
   that is wrong. Point at their own words so they know which.
-- A wrong claim: be puzzled out loud. Follow their claim to what it would
-  mean and say that this does not fit ("Wait, if the input is cut up,
-  each head sees only a piece of the sentence?"). Never say what is right
-  instead: they teach that part again first.
+- A wrong claim: be puzzled, and let the puzzlement be your question.
+  Follow their claim to what it would mean and ask whether that is
+  really so ("If the input is cut up, does each head see only a piece of
+  the sentence?"). Never say what is right instead: they teach that part
+  again first.
 - Give the right version only when they have tried that part twice, or
   say they do not know: then say it as something you went and looked up
   ("I checked the book: ..."), in two or three sentences, count it as
@@ -106,8 +113,9 @@ FEEDBACK: what you got, then the one place that lost you.
 - Two sentences as a rule, four when you give the right version. The
   user does the teaching here, not you. No filler, no summary of the
   topic.
-- Never reveal or hint at the answer to what you are asking now, and
-  keep the question itself out of the feedback: it comes after.
+- Never reveal or hint at the answer to what you are asking now.
+- Feedback is statements only. It never asks anything and never ends in
+  a question mark: whatever you want to ask goes in "question", once.
 - If the user says they do not know, or that they have had enough: do not
   push. Explain it briefly, count it as missed and go on, or give the
   verdict if nothing is left to ask.
@@ -130,9 +138,10 @@ Take the first of these that applies:
    take one small concrete case through it. Once per point.
 5. {scope_line}
 - Ask the way a student asks: one short sentence in everyday words,
-  starting from their words ("You said X: what is X?"). Never the wording
-  of an exam paper: no situation set up from nothing, no "explain and
-  distinguish", no list of what a good answer must contain.
+  starting from their words, not always in the form "You said X: ...".
+  Never the wording of an exam paper: no situation set up from nothing,
+  no "explain and distinguish", no list of what a good answer must
+  contain.
 - A "what if" (something removed, swapped or pushed to an extreme) is
   allowed only under 4, when a why or an example would not tell recited
   from understood. It must be something that can really happen in the
@@ -191,11 +200,19 @@ reported to the user; it does not decide pass, the gaps do.
 Write feedback, questions, gaps and comment in English. If the user
 answers in another language, write in theirs.
 
-Output only JSON, one of:
+{began_line}Output only JSON, one of:
 {{"action": "probe", "feedback": "...", "point": "the point this question examines, or null", "question": "..."}}
 {{"action": "verdict", "feedback": "...", "pass": false, "score": 60, "points": [{{"point": "...", "ok": false, "note": "..."}}], "gaps": ["..."], "comment": "..."}}
 """
 )
+
+BEGAN_LINE = (
+    "Your earlier turns began: {openings}. Begin this one with none of those words, and build "
+    "it differently.\n"
+)
+# How much of a turn counts as how it began, and how many turns back she is shown.
+BEGAN_CHARS = 14
+BEGAN_TURNS = 6
 
 POINTS_BLOCK = """Points, the knowledge points inside this node. They are your own list of
 what the explanation has to reach, not an agenda to walk through (after
@@ -282,6 +299,24 @@ def _one_line(text: str) -> str:
     return " ".join(str(text).split())
 
 
+_CLAUSE_END = "，,：:。.！!？?；;\n"
+
+
+def began_with(history: list[Message]) -> list[str]:
+    """How each of her own latest replies began: its first clause, cut short. The opening line
+    is left out (a template, not something she wrote). Told only "vary it", the model opened
+    every turn the same way; shown its own openings, it does not."""
+    openings: list[str] = []
+    replies = [m["content"] for m in history if m["role"] == "assistant"][1:]
+    for content in replies[-BEGAN_TURNS:]:
+        text = _one_line(content)
+        cut = next((i for i, ch in enumerate(text) if ch in _CLAUSE_END), len(text))
+        start = text[: min(cut, BEGAN_CHARS)].strip()
+        if start and start not in openings:
+            openings.append(start)
+    return openings
+
+
 def format_lessons(lessons: Sequence[Lesson] | None) -> str:
     """One line per lesson, most recent first. The misconception rides along because it is
     what the Auditor can actually ask about; the Mock also reads it from this exact shape."""
@@ -364,7 +399,9 @@ class Auditor:
 
         # max_turns 刻意不进 prompt——它是服务端安全阀，不是模型该去凑满的额度。只有必须裁决
         # 的那一轮才多一句话。
+        openings = began_with(history)
         system = SYSTEM_PROMPT.format(
+            began_line=BEGAN_LINE.format(openings=", ".join(f'"{o}"' for o in openings)) if openings else "",
             final_line=FINAL_TURN_LINE if final else "",
             title=skill_title,
             description=skill_description,
@@ -425,7 +462,7 @@ class Auditor:
                     return {
                         "action": "probe",
                         "question": question,
-                        "feedback": _text(data.get("feedback")),
+                        "feedback": _statements(data.get("feedback")),
                         "point": data.get("point"),
                     }
             elif data.get("action") == "verdict":
@@ -478,6 +515,19 @@ class Auditor:
 def _text(value) -> str | None:
     text = str(value).strip() if isinstance(value, str) else ""
     return text or None
+
+
+_SENTENCE_END = "。.！!？?\n"
+
+
+def _statements(value) -> str | None:
+    """Feedback without a question at its end: what she asks is in the question, and a model
+    that also puts it at the end of the feedback makes her say it twice."""
+    text = _text(value)
+    while text and text[-1] in "?？":
+        cut = max((text.rfind(ch, 0, len(text) - 1) for ch in _SENTENCE_END), default=-1)
+        text = text[: cut + 1].strip() or None
+    return text
 
 
 def _named(value, points: list[str]) -> str | None:
