@@ -248,21 +248,33 @@ def test_a_reported_working_result_counts_as_the_check():
     assert "a working result they\n  report" in system_prompt(provider)
 
 
-def test_the_auditor_is_a_listener_and_the_user_does_the_explaining():
+def test_the_auditor_is_a_student_and_the_user_does_the_teaching():
     _, provider = next_turn(probe_json())
     prompt = system_prompt(provider)
 
-    assert "You are the listener in a Feynman audit." in prompt
+    assert "You are the student in a Feynman audit. The user is your teacher" in prompt
     assert "You are not setting an exam." in prompt
     assert "say back in one plain sentence what you now understand" in prompt
-    assert "The user does the\n  explaining here, not you." in prompt
+    assert "The\n  user does the teaching here, not you." in prompt
+
+
+def test_she_speaks_as_a_student_and_judges_as_an_expert():
+    _, provider = next_turn(probe_json())
+    prompt = system_prompt(provider)
+
+    assert "HOW YOU SPEAK: as a student to the person teaching you." in prompt
+    assert "Never the words of a teacher or an\n  examiner" in prompt
+    # The verdict is not in the student's voice: it is the record.
+    assert "Here you stop playing the\nstudent: you judge with everything you know." in prompt
+    assert 'Only the verdict\'s "feedback" is still the student speaking.' in prompt
 
 
 def test_a_wrong_claim_gets_a_second_try_before_the_auditor_explains_it():
     _, provider = next_turn(probe_json())
     prompt = system_prompt(provider)
 
-    assert "say why it cannot be so" in prompt and "not what is right instead" in prompt
+    assert "A wrong claim: be puzzled out loud." in prompt and "Never say what is right\n  instead" in prompt
+    assert "say it as something you went and looked up" in prompt
     assert "Give the right version only when they have tried that part twice" in prompt
     assert "Never reveal or hint at the answer to what you are asking now" in prompt
     # What she explained is not the user's own understanding; a second try of their own is.
@@ -279,7 +291,8 @@ def test_questions_come_out_of_what_the_user_said_not_from_an_exam_paper():
     assert "Two things they said do not connect" in prompt
     assert "Never the wording\n  of an exam paper: no situation set up from nothing" in prompt
     assert "A question never states its own answer" in prompt
-    assert "Never ask the same question twice in the same words." in prompt
+    assert "Never ask the same question twice in the same words" in prompt
+    assert "never ask\n  for something they have already told you" in prompt
     assert "At most two questions on one point" in prompt
 
 
@@ -333,8 +346,8 @@ def test_the_points_to_examine_are_listed_with_the_note_of_the_last_miss():
     # Last time's miss is listened for, not handed back as a leading question.
     assert "never bring it up yourself" in prompt
     assert "do not ask about them again: Completing the square\n" in prompt
-    assert "A point of Points they have not come to yet: ask them to explain it" in prompt
-    assert "Every point has to be explained or asked about before the\n   verdict." in prompt
+    assert "A point of Points they have not come to yet: ask them to teach it" in prompt
+    assert "Every point has to be taught or asked about before the\n   verdict." in prompt
     assert "pass is true only when every point is ok." in prompt
 
 

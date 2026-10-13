@@ -257,20 +257,20 @@ _TEXTS: dict[str, dict[str, str]] = {
     "suggest_learn": {"en": "Tell me what you want to learn", "zh": "告诉我你想学什么", "ko": "배우고 싶은 걸 알려 주세요"},
     # audit opening questions, by tree position (section 5)
     "opening_leaf": {
-        "en": "Explain {title} from scratch to someone who has never heard of it.",
-        "zh": "向一个从没听说过{title}的人，从头讲清楚它。",
-        "ko": "{title}에 대해 처음 듣는 사람에게 처음부터 설명해 보세요.",
+        "en": "I have never learned {title}. Teach it to me from the start.",
+        "zh": "我没学过{title}，你从头给我讲讲吧。",
+        "ko": "{title}, 저는 아직 배운 적이 없어요. 처음부터 가르쳐 주세요.",
     },
-    # a leaf audited again: the points that held before are left out of the explanation
+    # a leaf audited again: the points that held before are left out of the teaching
     "opening_points_again": {
-        "en": "What you already explained right stays cleared. This time explain {points} to someone who has never heard of them, in your own words.",
-        "zh": "上次讲清楚的不用再讲。这次把{points}讲给一个从没听说过的人，用你自己的话。",
-        "ko": "지난번에 제대로 설명한 건 다시 묻지 않아요. 이번엔 {points}만, 처음 듣는 사람에게 본인 말로 설명해 보세요.",
+        "en": "What you taught me last time, I still have. This time teach me {points}, as if I had never heard of them.",
+        "zh": "上次你讲明白的我都记住了。这次给我讲讲{points}吧，就当我完全没学过。",
+        "ko": "지난번에 가르쳐 준 건 잘 기억하고 있어요. 이번엔 {points}만, 제가 처음 듣는다고 생각하고 가르쳐 주세요.",
     },
     "opening_point_again": {
-        "en": "What you already explained right stays cleared. This time explain only {point} to someone who has never heard of it, in your own words.",
-        "zh": "上次讲清楚的不用再讲。这次只把{point}讲给一个从没听说过的人，用你自己的话。",
-        "ko": "지난번에 제대로 설명한 건 다시 묻지 않아요. 이번엔 {point}만, 처음 듣는 사람에게 본인 말로 설명해 보세요.",
+        "en": "What you taught me last time, I still have. This time teach me only {point}, as if I had never heard of it.",
+        "zh": "上次你讲明白的我都记住了。这次只给我讲讲{point}吧，就当我完全没学过。",
+        "ko": "지난번에 가르쳐 준 건 잘 기억하고 있어요. 이번엔 {point}만, 제가 처음 듣는다고 생각하고 가르쳐 주세요.",
     },
     "opening_branch": {
         "en": "{title} covers {children}. Why do these belong together, and when do you use which?",
@@ -283,14 +283,14 @@ _TEXTS: dict[str, dict[str, str]] = {
         "ko": "{title}: 어떤 문제에 필요하고, 어떤 문제엔 필요 없을까요? 어떻게 판단하나요?",
     },
     "opening_test_out": {
-        "en": "So you already know {title}. Prove it, one part at a time. Start with {part}: how does it work?",
-        "zh": "你说{title}已经会了，那我们一块一块来验证。先从{part}开始：它是怎么工作的？",
-        "ko": "{title}은 이미 안다고 했죠. 한 부분씩 확인해 볼게요. {part}부터: 어떻게 작동하나요?",
+        "en": "So you already know {title}? Then teach me, one part at a time. Start with {part}: how does it work?",
+        "zh": "你说{title}已经会了？那教教我，一块一块来。先从{part}开始：它是怎么工作的？",
+        "ko": "{title}은 이미 안다고 했죠? 그럼 저한테 가르쳐 주세요, 한 부분씩요. {part}부터: 어떻게 작동하나요?",
     },
     "opening_test_out_open": {
-        "en": "So you already know {title}. Prove it: what are its main parts, and how does the most important one work?",
-        "zh": "你说{title}已经会了，那来验证一下：它主要由哪几部分组成？最重要的那部分是怎么工作的？",
-        "ko": "{title}은 이미 안다고 했죠. 확인해 볼게요: 주요 부분은 무엇이고, 가장 중요한 부분은 어떻게 작동하나요?",
+        "en": "So you already know {title}? Then teach me: what are its main parts, and how does the most important one work?",
+        "zh": "你说{title}已经会了？那教教我：它主要由哪几部分组成？最重要的那部分是怎么工作的？",
+        "ko": "{title}은 이미 안다고 했죠? 그럼 가르쳐 주세요: 주요 부분은 무엇이고, 가장 중요한 부분은 어떻게 작동하나요?",
     },
     "opening_task": {
         "en": "How exactly will you do {title}?",

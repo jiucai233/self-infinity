@@ -201,7 +201,7 @@ void main() {
       expect(leaf.session.nodePosition, NodePosition.leaf);
       expect(
         leaf.openingQuestion,
-        'Explain “Discriminant” from scratch to someone who has never heard of it.',
+        'I have never learned “Discriminant”. Teach it to me from the start.',
       );
       expect(leaf.session.points.map((p) => p.title), FakeApiClient.fakePointTitles('Discriminant'));
 

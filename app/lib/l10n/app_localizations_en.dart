@@ -1523,7 +1523,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tourAudit =>
-      'The Auditor asks, you answer in your own words. After every answer she says what was right and what to fix, then asks one level deeper. What you get right is not asked again.';
+      'You teach, the Auditor learns. She asks about whatever she could not follow, and where you slip you get to explain it again. What you get right is not asked again.';
 
   @override
   String get tourSyllabus =>

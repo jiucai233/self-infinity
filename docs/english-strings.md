@@ -103,8 +103,8 @@ The whole product is English by default: client UI, backend replies, the Mock / 
 
 ## 5. Backend: audit (endpoint 7 opening questions, by position)
 
-- leaf with knowledge points: on the first audit (all points open) the same text as a leaf without points, `Explain “{title}” from scratch to someone who has never heard of it.`; when some points held before and several are still open: `What you already explained right stays cleared. This time explain {points} to someone who has never heard of them, in your own words.` (`{points}` = the open points' titles joined by `, `, not quoted); with a single point left: `What you already explained right stays cleared. This time explain only “{point}” to someone who has never heard of it, in your own words.`
-- leaf without points: `Explain “{title}” from scratch to someone who has never heard of it.`
+- leaf with knowledge points: on the first audit (all points open) the same text as a leaf without points, `I have never learned “{title}”. Teach it to me from the start.`; when some points held before and several are still open: `What you taught me last time, I still have. This time teach me {points}, as if I had never heard of them.` (`{points}` = the open points' titles joined by `, `, not quoted); with a single point left: `What you taught me last time, I still have. This time teach me only “{point}”, as if I had never heard of it.`
+- leaf without points: `I have never learned “{title}”. Teach it to me from the start.`
 - branch: `“{title}” covers {children}. Why do these belong together, and when do you use which?` — `{children}` joined by `, `
 - root: `Which problems call for “{title}”, and which don't? How do you decide?`
 - task: `How exactly will you do “{title}”?`

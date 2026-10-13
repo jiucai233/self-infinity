@@ -74,10 +74,10 @@ def _node(title: str, node_type: NodeType = NodeType.concept) -> SkillNode:
 
 def test_opening_questions_follow_the_language_with_its_quotation_marks(language):
     assert opening_question(_node("Limits"), NodePosition.leaf, []) == (
-        "Explain “Limits” from scratch to someone who has never heard of it."
+        "I have never learned “Limits”. Teach it to me from the start."
     )
     language("zh")
-    assert opening_question(_node("极限"), NodePosition.leaf, []) == "向一个从没听说过「极限」的人，从头讲清楚它。"
+    assert opening_question(_node("极限"), NodePosition.leaf, []) == "我没学过「极限」，你从头给我讲讲吧。"
     assert "导数、积分" in opening_question(_node("微积分"), NodePosition.branch, ["导数", "积分"])
     language("ko")
     assert opening_question(_node("미적분"), NodePosition.root, []).startswith("“미적분”:")

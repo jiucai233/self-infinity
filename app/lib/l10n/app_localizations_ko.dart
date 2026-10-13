@@ -1506,7 +1506,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get tourAudit =>
-      '심사관이 묻고, 당신은 자기 말로 답해요. 답할 때마다 무엇이 맞았고 무엇을 고쳐야 하는지 말해 주고, 한 단계 더 깊이 물어요. 맞힌 건 다시 묻지 않아요.';
+      '당신이 가르치고, 심사관이 배워요. 이해하지 못한 부분은 되물어 보고, 틀린 곳은 다시 설명할 기회를 줘요. 맞게 설명한 건 다시 묻지 않아요.';
 
   @override
   String get tourSyllabus =>

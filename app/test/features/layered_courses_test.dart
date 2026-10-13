@@ -106,7 +106,7 @@ void main() {
         expect(start.session.testOut, isTrue);
         expect(
           start.openingQuestion,
-          'So you already know “Geometric Vision”. Prove it: what are its main parts, '
+          'So you already know “Geometric Vision”? Then teach me: what are its main parts, '
           'and how does the most important one work?',
         );
       },
@@ -118,7 +118,7 @@ void main() {
       final start = await api.startAudit(2, testOut: true);
       expect(
         start.openingQuestion,
-        startsWith('So you already know “Algebra”. Prove it, one part at a time.'),
+        startsWith('So you already know “Algebra”? Then teach me, one part at a time.'),
       );
       await api.submitTurn(start.session.id, longAnswer);
       final verdict = await api.submitTurn(start.session.id, longAnswer) as VerdictResult;

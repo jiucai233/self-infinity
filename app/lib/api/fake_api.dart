@@ -2412,10 +2412,10 @@ class FakeApiClient implements SelfInfinityApi {
           n.title,
     ];
     if (parts.isEmpty) {
-      return 'So you already know “${node.title}”. Prove it: what are its main parts, '
+      return 'So you already know “${node.title}”? Then teach me: what are its main parts, '
           'and how does the most important one work?';
     }
-    return 'So you already know “${node.title}”. Prove it, one part at a time. '
+    return 'So you already know “${node.title}”? Then teach me, one part at a time. '
         'Start with “${parts.first}”: how does it work?';
   }
 
@@ -2424,7 +2424,7 @@ class FakeApiClient implements SelfInfinityApi {
     if (node.nodeType == NodeType.task) return 'How exactly will you do “$title”?';
     switch (position) {
       case NodePosition.leaf:
-        return 'Explain “$title” from scratch to someone who has never heard of it.';
+        return 'I have never learned “$title”. Teach it to me from the start.';
       case NodePosition.branch:
         final children = containsChildren(
           node.id,
@@ -2438,16 +2438,16 @@ class FakeApiClient implements SelfInfinityApi {
     }
   }
 
-  /// The opening of an audit on a leaf with points: an explanation, like a leaf
+  /// The opening of an audit on a leaf with points: the Auditor is a student being taught, like a leaf
   /// without points — narrowed to the points still open when some held before.
   String _pointsQuestion(SkillNode node, List<SkillPoint> examined) {
     if (examined.length == 1 && node.points.length > 1) {
-      return 'What you already explained right stays cleared. This time explain only '
-          '“${examined.first.title}” to someone who has never heard of it, in your own words.';
+      return 'What you taught me last time, I still have. This time teach me only '
+          '“${examined.first.title}”, as if I had never heard of it.';
     }
     if (examined.length < node.points.length) {
-      return 'What you already explained right stays cleared. This time explain '
-          '${examined.map((p) => p.title).join(', ')} to someone who has never heard of them, in your own words.';
+      return 'What you taught me last time, I still have. This time teach me '
+          '${examined.map((p) => p.title).join(', ')}, as if I had never heard of them.';
     }
     return _openingQuestion(node, NodePosition.leaf);
   }

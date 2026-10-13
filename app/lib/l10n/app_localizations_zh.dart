@@ -1500,7 +1500,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tourProve => '想通关一个节点，就把它讲出来。点这里，审核官接手。';
 
   @override
-  String get tourAudit => '审核官提问，你用自己的话回答。每答一次，她会说哪里对、哪里要改，再往深一层问。讲对的不会再考。';
+  String get tourAudit => '你来教，审核官来学。她听不懂的地方会追问；你讲错了，可以再讲一遍。讲对的不会再问。';
 
   @override
   String get tourSyllabus =>

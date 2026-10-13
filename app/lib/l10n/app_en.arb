@@ -841,7 +841,7 @@
   "tourTree": "Your life tree. Every course is a branch and every dot a node; a node lights up when you clear it. Drag to turn it, scroll to zoom, tap a node to open it.",
   "tourNode": "A node is one thing to learn. Here is what it covers and its knowledge points: a check for what you explained right, a cross for what you missed.",
   "tourProve": "To clear a node you explain it. Press here and the Auditor takes over.",
-  "tourAudit": "The Auditor asks, you answer in your own words. After every answer she says what was right and what to fix, then asks one level deeper. What you get right is not asked again.",
+  "tourAudit": "You teach, the Auditor learns. She asks about whatever she could not follow, and where you slip you get to explain it again. What you get right is not asked again.",
   "tourSyllabus": "That was an example. Next we set up your character and build your first tree. I will ask what you want to learn: a topic is enough, and a syllabus file is better, because its items become the first level of your tree as they are.",
   "tourLessonsTitle": "Every miss becomes a lesson.",
   "tourProveTitle": "Explain it. The Auditor decides.",

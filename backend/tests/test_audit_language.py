@@ -59,7 +59,7 @@ def node_fixture(client, client_engine):
 def test_a_chinese_node_is_asked_in_chinese_under_an_english_interface(client, node):
     body = client.post(f"/api/skills/{node}/audits").json()
 
-    assert body["opening_question"] == "向一个从没听说过「判别式」的人，从头讲清楚它。"
+    assert body["opening_question"] == "我没学过「判别式」，你从头给我讲讲吧。"
 
 
 def test_an_english_node_keeps_the_interface_language(client, client_engine):
@@ -68,11 +68,11 @@ def test_an_english_node_keeps_the_interface_language(client, client_engine):
         set_status(session, ids["discriminant"], SkillStatus.available)
 
     english = client.post(f"/api/skills/{ids['discriminant']}/audits").json()
-    assert english["opening_question"] == "Explain “Discriminant” from scratch to someone who has never heard of it."
+    assert english["opening_question"] == "I have never learned “Discriminant”. Teach it to me from the start."
     chinese = client.post(
         f"/api/skills/{ids['discriminant']}/audits", json={"restart": True}, headers={"Accept-Language": "zh"}
     ).json()
-    assert chinese["opening_question"] == "向一个从没听说过「Discriminant」的人，从头讲清楚它。"
+    assert chinese["opening_question"] == "我没学过「Discriminant」，你从头给我讲讲吧。"
 
 
 def test_she_answers_in_the_language_they_answer_in(client, client_engine, monkeypatch, node):

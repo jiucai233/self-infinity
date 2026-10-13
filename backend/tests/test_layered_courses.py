@@ -241,7 +241,7 @@ def test_an_unexpanded_node_is_broken_down_or_challenged_not_audited(client, cv)
     assert challenge.status_code == 200
     assert challenge.json()["session"]["test_out"] is True
     assert challenge.json()["opening_question"] == (
-        "So you already know “Object Detection”. Prove it: what are its main parts, and how does the most "
+        "So you already know “Object Detection”? Then teach me: what are its main parts, and how does the most "
         "important one work?"
     )
 
@@ -264,7 +264,7 @@ def test_a_locked_branch_can_be_challenged_and_its_parts_are_sampled(client):
 
     # The smallest units under Algebra, nearest first: the leaves under its two sections.
     assert started["opening_question"] == (
-        "So you already know “Algebra”. Prove it, one part at a time. Start with “Discriminant”: how does it work?"
+        "So you already know “Algebra”? Then teach me, one part at a time. Start with “Discriminant”: how does it work?"
     )
     assert started["session"]["node_position"] == "branch"
 

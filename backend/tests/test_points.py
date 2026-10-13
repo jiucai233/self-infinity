@@ -143,7 +143,7 @@ def test_a_failing_point_lister_leaves_the_audit_as_it_was(client, monkeypatch, 
     body = begin(client, math["discriminant"])
 
     assert body["session"]["points"] == []
-    assert body["opening_question"] == "Explain “Discriminant” from scratch to someone who has never heard of it."
+    assert body["opening_question"] == "I have never learned “Discriminant”. Teach it to me from the start."
 
 
 # ---------------------------------------------------------------- what an audit does with them
@@ -170,8 +170,8 @@ def test_the_next_audit_asks_only_about_what_was_missed(client, client_engine, m
     answer_turns(client, body["session"]["id"], FIRST)
 
     assert body["opening_question"] == (
-        "What you already explained right stays cleared. This time explain only “What Discriminant is” "
-        "to someone who has never heard of it, in your own words."
+        "What you taught me last time, I still have. This time teach me only “What Discriminant is”, "
+        "as if I had never heard of it."
     )
     assert body["session"]["points"] == [{"title": POINTS[0], "ok": None, "note": NOTE}]
     with Session(client_engine) as session:
@@ -198,7 +198,7 @@ def test_a_review_of_a_mastered_node_asks_every_point_again(client, math):
     body = begin(client, math["discriminant"])
 
     assert [p["title"] for p in body["session"]["points"]] == POINTS
-    assert body["opening_question"] == "Explain “Discriminant” from scratch to someone who has never heard of it."
+    assert body["opening_question"] == "I have never learned “Discriminant”. Teach it to me from the start."
 
 
 def test_several_points_still_open_are_all_named_in_the_opening(client, client_engine, math):
@@ -209,10 +209,10 @@ def test_several_points_still_open_are_all_named_in_the_opening(client, client_e
         first = audit_flow.opening_question(skill, position, [], examined=POINTS, again=False)
 
     assert again == (
-        f"What you already explained right stays cleared. This time explain {POINTS[1]}, {POINTS[2]} "
-        "to someone who has never heard of them, in your own words."
+        f"What you taught me last time, I still have. This time teach me {POINTS[1]}, {POINTS[2]}, "
+        "as if I had never heard of them."
     )
-    assert first == "Explain “Discriminant” from scratch to someone who has never heard of it."
+    assert first == "I have never learned “Discriminant”. Teach it to me from the start."
 
 
 def test_a_point_the_audit_did_not_settle_keeps_what_it_had():

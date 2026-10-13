@@ -76,7 +76,7 @@ void main() {
 
       final again = await api.startAudit(6);
       expect(again.session.points, [SkillPoint(title: points[0], note: FakeApiClient.failNote)]);
-      expect(again.openingQuestion, startsWith('What you already explained right stays cleared.'));
+      expect(again.openingQuestion, startsWith('What you taught me last time, I still have.'));
       expect(api.debugMaxTurns(again.session.id), 4);
     });
 

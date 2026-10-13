@@ -143,8 +143,8 @@ def opening_question(
     examined: list[str] | None = None,
     again: bool = False,
 ) -> str:
-    """An audit opens by asking for the explanation, never with a question about one point: the
-    user explains, and what she asks afterwards comes out of what they said. `examined`: the
+    """An audit opens with the student asking to be taught, never with a question about one
+    point: the user teaches, and what she asks afterwards comes out of what they said. `examined`: the
     knowledge points this audit is on (a leaf that has them); `again`: some of the node's
     points held before, so only the ones still open are to be explained."""
     if examined and again and not test_out:

@@ -98,7 +98,7 @@ void main() {
       'A node is one thing to learn',
       'This side keeps your attempts at this node',
       'To clear a node you explain it',
-      'The Auditor asks, you answer in your own words',
+      'You teach, the Auditor learns',
       'That was an example',
     ]);
     expect(pages, [
