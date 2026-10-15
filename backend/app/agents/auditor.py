@@ -37,6 +37,9 @@
   就关掉（代码数着，AuditTurn.point），不让一个点吃掉别的点的轮次。（线上审计 36、37：三轮耗在
   前馈网络上，交叉注意力没问过却判成缺口；ViT 位置编码讲对了相加，卡在"第几个 patch 对第几个
   位置向量"上没过。）
+- **讲给谁、问多深，每场不同。** 听众（同行 / 大学生 / 十岁小孩）和深度（0 只问是什么、1 问到怎么起作用、
+  2 再往下一层）由 app/services/audit_style.py 按用户状态选；默认（大学生、深度 1）就是上面这些规则调出来
+  的样子，提示词一字不变。上面"不往下切"那条是深度 1 的写法。
 - **只按讲到的判。** 一个知识点里写了几样东西而只讲到、问到其中一样，没碰到的不算在用户头上。
 
 第一个问题不由模型生成，来自按节点位置选的模板（app/services/audit_flow.py）。轮数上限由
@@ -65,7 +68,7 @@ MAX_GAPS = 3
 
 # Changed with the rules a verdict is given under; kept on each audit, so verdicts of
 # different rules are not counted as one judge's.
-JUDGE_VERSION = "2026-10-14"
+JUDGE_VERSION = "2026-10-15"
 
 GENERIC_PROBE = "Could you explain that part a bit more specifically?"
 FORCED_GAPS = ["Could not confirm a sufficient explanation within the question limit."]
@@ -79,8 +82,7 @@ SYSTEM_PROMPT = (
     agent_tag("auditor")
     + """
 You are the student in a Feynman audit. The user is your teacher: they
-teach you a topic in their own words, and you are bright, keen and have
-never learned it. In truth you know the topic fully, and you use that
+teach you a topic in their own words, and {persona} In truth you know the topic fully, and you use that
 for one thing: to notice where their teaching does not hold. Everything
 you say in the conversation is said as that student: what you got, what
 lost you, what you want to know next. You are not setting an exam.
@@ -98,7 +100,7 @@ Each turn, output feedback on what the user just said, then either one
 question (probe) or the final verdict.
 
 HOW YOU SPEAK: as a student to the person teaching you.
-- First person, spoken and casual, the way a person talks across a
+{voice_line}- First person, spoken and casual, the way a person talks across a
   table. Never the words of a teacher or an examiner: no "explain",
   "describe", "state" or "justify" as an order, no "your answer",
   "correct", "incorrect", "you failed to".
@@ -172,17 +174,7 @@ Take the first of these that applies:
   the honest answer is "nothing changes", ask something else.
 - A question never states its own answer: "why does X change?" tells
   them that it changes. Ask what happens, or how they know.
-- Stay at the level the node and its points are named at. A part is
-  done when their words carry its idea: what it is, what it is for, and
-  the main way it works. Never go a level below that, to how the idea is
-  carried out (which item goes with which, in what order, the exact
-  formula, the bookkeeping): someone who has the idea does not need to
-  recite that, and asking for it is splitting hairs. When the idea is
-  there, go on to the next part or give the verdict. On an executable
-  step the actions are that level: what they would do, in what order,
-  how they would know it worked. Below it are the settings, amounts and
-  exact commands of an action.
-- Nothing that needs knowledge outside "Covers".
+{depth_line}- Nothing that needs knowledge outside "Covers".
 - Never ask the same question twice in the same words, and never ask
   for something they have already told you.
 - If the user's explanation touches the situation of a past lesson above,
@@ -234,14 +226,7 @@ Only the verdict's "feedback" is still the student speaking.
   this turn need not be the verdict, do not give the verdict: ask about
   it. When this turn must be the verdict, leave it out of "gaps" and
   name it in the comment as what to check, or what was not reached.
-- Essential means the idea of a part: what it is, what it is for, the
-  main way it works. How that idea is carried out one level down (which
-  item goes with which, the order, the exact formula, the bookkeeping)
-  is not essential and is never a gap, unless "Covers" names it. On an
-  executable step the main actions are the idea, not a detail: "I am
-  not sure how", "I have not looked", "roughly, it should work" about an
-  action you asked for is (c), whatever else they said.
-- An answer to a question they could not make sense of is not held
+{essential_line}{audience_verdict}- An answer to a question they could not make sense of is not held
   against them: if they asked what you meant and your rewording still
   did not reach them, that question settles nothing.
 - Brevity is not a gap. Details one would look up while doing it (exact
@@ -290,6 +275,63 @@ answers in another language, write in theirs.
 {{"action": "verdict", "feedback": "...", "pass": false, "score": 60, "points": [{{"point": "...", "ok": false, "note": "..."}}], "gaps": ["..."], "evidence": [{{"kind": "...", "point": "...", "said": "...", "asked": "...", "right": "..."}}], "lessons": [{{"lesson": 1, "held": false}}], "comment": "..."}}
 """
 )
+
+# Who she is (app/services/audit_style.py). The student is the default the rules were tuned on.
+PERSONAS = {
+    "student": "you are bright, keen and have\nnever learned it.",
+    "child": (
+        "you are a bright, curious ten-year-old\nwho has never heard of it. You know what a ten-year-old knows and no\n"
+        "more: a word or an idea a ten-year-old would not know is one they\nstill have to explain, in everyday words or with something you can\n"
+        "picture."
+    ),
+    "expert": (
+        "you know the field around it\nwell, as a colleague from a neighbouring area does, but have never\n"
+        "studied this topic itself. Its basic vocabulary needs no explaining to\nyou; what you listen for is whether what they say about how it works\n"
+        "is right and precise."
+    ),
+}
+VOICE_LINES = {
+    "student": "",
+    "child": (
+        "- You are ten: short sentences, simple words, and \"why?\" more than\n  anything. A term they use that a ten-year-old would not know is the\n"
+        "  place that lost you, until they say it in everyday words.\n"
+    ),
+    "expert": "- You talk as a colleague does: plain and direct; technical words are\n  fine both ways.\n",
+}
+# How deep she asks: 0 what a part is and what it is for, 1 also the main way it works (the
+# default), 2 also how that is carried out, one level down.
+DEPTH_LINES = {
+    0: (
+        "- Ask what each part is, what it is for, and how the parts fit\n  together; how a part works inside is not asked this time. When they\n"
+        "  have said what a part is and what it is for, it is done: go on to\n  the next part or give the verdict.\n"
+    ),
+    1: '- Stay at the level the node and its points are named at. A part is\n  done when their words carry its idea: what it is, what it is for, and\n  the main way it works. Never go a level below that, to how the idea is\n  carried out (which item goes with which, in what order, the exact\n  formula, the bookkeeping): someone who has the idea does not need to\n  recite that, and asking for it is splitting hairs. When the idea is\n  there, go on to the next part or give the verdict. On an executable\n  step the actions are that level: what they would do, in what order,\n  how they would know it worked. Below it are the settings, amounts and\n  exact commands of an action.\n',
+    2: (
+        "- Go one level below the idea of each part. Once their words carry\n  what it is, what it is for and the main way it works, ask how it is\n"
+        "  carried out: which item goes with which, in what order, why a step\n  is needed. One level only, and never what one would look up while\n"
+        "  doing it (exact figures, commands, settings).\n"
+    ),
+}
+ESSENTIAL_LINES = {
+    0: (
+        "- Essential means what a part is and what it is for. How it works\n  inside is not asked at this depth and is never a gap. On an\n"
+        "  executable step the main actions are what it is: an action you asked\n  for that they cannot say even roughly is (c).\n"
+    ),
+    1: '- Essential means the idea of a part: what it is, what it is for, the\n  main way it works. How that idea is carried out one level down (which\n  item goes with which, the order, the exact formula, the bookkeeping)\n  is not essential and is never a gap, unless "Covers" names it. On an\n  executable step the main actions are the idea: an action you asked\n  for that they cannot say even roughly is (c). An action they did say,\n  roughly, is known; the exact command, option or amount they do not\n  remember is a detail.\n',
+    2: (
+        "- Essential means the idea of a part (what it is, what it is for, the\n  main way it works) and, one level down, how it is carried out, as\n"
+        "  far as you asked about it. Exact figures, commands and what one would\n  look up are never essential. On an executable step: an action you\n"
+        "  asked for that they cannot say even roughly is (c); the exact\n  command, option or amount they do not remember is a detail.\n"
+    ),
+}
+AUDIENCE_VERDICTS = {
+    "student": "",
+    "child": (
+        "- Your listener is ten. A term a ten-year-old would not know, that\n  they used and still had not put in everyday words after you asked,\n"
+        "  is a gap of kind (d).\n"
+    ),
+    "expert": "",
+}
 
 BEGAN_LINE = (
     "Your earlier turns began: {openings}. Begin this one with none of those words, and build "
@@ -375,7 +417,10 @@ POSITION_BLOCKS = {
         "vouches for the routine actions it could not have been reached without: one of those "
         "left unsaid is not a gap. An action they say they do not know how to do, have not thought "
         'through, or would do "somehow" is not known. That is not the same as a spec, a command '
-        "or a setting they would look up while doing it, which is not required."
+        "or a setting they would look up while doing it, which is not required: nobody recites "
+        "commands. An action said roughly (\"make a venv and install the packages\", \"boil the "
+        "tofu for a bit\", \"follow the setup screens\") is known, even when they add that they "
+        "do not remember the exact command, option or amount."
     ),
 }
 
@@ -484,6 +529,8 @@ class Auditor:
         points: list[dict] | None = None,
         settled: list[str] | None = None,
         closed: list[str] | None = None,
+        audience: str = "student",
+        depth: int = 1,
     ) -> AuditorTurnResult:
         """`after_challenge`: the last answer replied to the Challenger's question, so this
         turn must be the verdict (like a turn at the limit). `test_out`: a challenge on a whole
@@ -491,7 +538,8 @@ class Auditor:
         knowledge points this audit examines (`{"title", "note"}`, the note being what was
         wrong last time); `settled`: the node's other points, explained right before and not
         asked again; `closed`: the points of this audit already asked about twice. When every
-        point is closed, this turn must be the verdict."""
+        point is closed, this turn must be the verdict. `audience` and `depth`: the style this audit is
+        held in (app/services/audit_style.py); the defaults are the rules as tuned."""
         if max_turns is None:
             max_turns = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
         if pacing not in PACINGS:
@@ -529,6 +577,11 @@ class Auditor:
             else "",
             began_line=BEGAN_LINE.format(openings=", ".join(f'"{o}"' for o in openings)) if openings else "",
             final_line=FINAL_TURN_LINE if final else "",
+            persona=PERSONAS.get(audience, PERSONAS["student"]),
+            voice_line=VOICE_LINES.get(audience, ""),
+            depth_line=DEPTH_LINES.get(depth, DEPTH_LINES[1]),
+            essential_line=ESSENTIAL_LINES.get(depth, ESSENTIAL_LINES[1]),
+            audience_verdict=AUDIENCE_VERDICTS.get(audience, ""),
             title=skill_title,
             description=skill_description,
             position="challenge on the whole area" if test_out else position.value,

@@ -14,6 +14,7 @@ from app.schemas import (
     AuditFeedbackIn,
     LearnerNodeOut,
     LearnerOut,
+    StyleOut,
     LearnerStepOut,
     AuditSessionOut,
     AuditSummaryOut,
@@ -27,7 +28,7 @@ from app.schemas import (
     TurnResult,
     VerdictResult,
 )
-from app.services import audit_flow, bandit, learner, linking, points
+from app.services import audit_flow, audit_style, bandit, learner, linking, points
 from app.services.courses import live_nodes
 from app.services.tree import depth_map
 from app.services.audit_flow import AuditClosed, AuditorUnavailable, ProbeOutcome
@@ -53,6 +54,8 @@ def _session_out(session: Session, audit: AuditSession) -> AuditSessionOut:
         agreement=audit.agreement,
         too_hard=bool(audit.too_hard),
         disputed=bool(audit.disputed),
+        audience=audit.audience,
+        depth=audit.depth,
         id=audit.id,
         skill_id=audit.skill_id,
         node_position=audit.node_position,
@@ -166,6 +169,7 @@ def get_learner(session: Session = Depends(get_session)):
             )
             for step, audit, skill in learner.history(session)
         ],
+        styles=[StyleOut(**row) for row in audit_style.summary(session)],
     )
 
 

@@ -2132,6 +2132,17 @@ class FakeApiClient implements SelfInfinityApi {
           if (n.isAvailable) LearnerNode(skillId: n.id, title: n.title, chance: 0.5),
       ],
       history: List.unmodifiable(_learnerSteps),
+      styles: const [
+        StyleStat(audience: 'expert', depth: 0, audits: 3, meanReward: 0.12),
+        StyleStat(audience: 'expert', depth: 1, audits: 1, meanReward: 0.05),
+        StyleStat(audience: 'expert', depth: 2),
+        StyleStat(audience: 'student', depth: 0, audits: 6, meanReward: 0.31),
+        StyleStat(audience: 'student', depth: 1, audits: 4, meanReward: 0.22),
+        StyleStat(audience: 'student', depth: 2, audits: 2, meanReward: -0.04),
+        StyleStat(audience: 'child', depth: 0, audits: 2, meanReward: 0.18),
+        StyleStat(audience: 'child', depth: 1),
+        StyleStat(audience: 'child', depth: 2),
+      ],
     );
   }
 

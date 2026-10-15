@@ -229,6 +229,12 @@ class AuditSession(SQLModel, table=True):
     # something they did not say.
     too_hard: bool | None = None
     disputed: bool | None = None
+    # Who the user explains to and how deep she asks (app/services/audit_style.py), and the
+    # context the style was chosen in, kept so its reward updates the same features. None:
+    # an audit from before styles, held as the default (student, depth 1).
+    audience: str | None = None
+    depth: int | None = None
+    style_context_json: str | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
     @property
@@ -321,6 +327,20 @@ class LearnerPoint(SQLModel, table=True):
     title: str = ""
     difficulty: float = 0.0
     attempts: int = 0
+
+
+class StyleArm(SQLModel, table=True):
+    """One audit style's posterior in the linear Thompson Sampling bandit
+    (app/services/audit_style.py): precision A and vector b of a Bayesian linear regression of
+    the reward on the context, as JSON (a 6x6 matrix and 6 numbers)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    audience: str
+    depth: int
+    a_json: str
+    b_json: str
+    pulls: int = 0
+    reward_sum: float = 0.0
 
 
 class BanditArm(SQLModel, table=True):

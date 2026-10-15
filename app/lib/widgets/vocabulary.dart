@@ -32,6 +32,20 @@ extension ConditionFlagUi on ConditionFlag {
   };
 }
 
+/// Who the Auditor listens as (`expert`, `student`, `child`).
+String audienceLabel(AppLocalizations l, String audience) => switch (audience) {
+  'expert' => l.audienceExpert,
+  'child' => l.audienceChild,
+  _ => l.audienceStudent,
+};
+
+/// How deep it asks: 0 what it is, 1 how it works, 2 one level deeper.
+String depthLabel(AppLocalizations l, int depth) => switch (depth) {
+  0 => l.depthWhat,
+  1 => l.depthHow,
+  _ => l.depthDeeper,
+};
+
 /// Display names of the agents (the label in the history lists).
 String agentLabel(AppLocalizations l, String? agent) => switch (agent) {
   'front_desk' => l.agentGuide,

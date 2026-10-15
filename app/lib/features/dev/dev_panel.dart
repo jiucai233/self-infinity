@@ -10,6 +10,7 @@ import '../../l10n/l10n.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/empty_view.dart';
 import '../../widgets/status_chip.dart';
+import '../../widgets/vocabulary.dart';
 import 'learner_chart.dart';
 
 /// Opens the developer panel (contract #34) over the current scene.
@@ -660,6 +661,31 @@ class _Learner extends StatelessWidget {
                   const SizedBox(width: AppSpacing.md),
                   Text(
                     _pct(n.chance),
+                    style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+        ],
+        if (m.styles.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xl),
+          Text(l.devAuditStyles, style: theme.labelLarge),
+          const SizedBox(height: AppSpacing.sm),
+          for (final (i, s) in m.styles.indexed)
+            Padding(
+              key: Key('learner-style-$i'),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${audienceLabel(l, s.audience)} · ${depthLabel(l, s.depth)}',
+                      style: theme.bodyMedium,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(
+                    '${s.audits} ${l.devStyleAudits} · ${l.devStyleReward} ${_pct(s.meanReward)}',
                     style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
                   ),
                 ],

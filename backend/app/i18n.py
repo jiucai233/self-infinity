@@ -292,6 +292,17 @@ _TEXTS: dict[str, dict[str, str]] = {
         "zh": "你说{title}已经会了？那教教我：它主要由哪几部分组成？最重要的那部分是怎么工作的？",
         "ko": "{title}은 이미 안다고 했죠? 그럼 가르쳐 주세요: 주요 부분은 무엇이고, 가장 중요한 부분은 어떻게 작동하나요?",
     },
+    # who the student is this time (app/services/audit_style.py), said before the opening
+    "audience_child": {
+        "en": "I'm ten, so please don't use words a ten-year-old wouldn't know.",
+        "zh": "我是个十岁的小学生，别用我听不懂的词哦。",
+        "ko": "저는 열 살이에요. 열 살이 모르는 말은 쓰지 말아 주세요.",
+    },
+    "audience_expert": {
+        "en": "I work in a neighbouring field, so the basic terms need no explaining. Get straight to how it works.",
+        "zh": "我是做相关方向的，基础术语不用解释，直接讲它是怎么起作用的就行。",
+        "ko": "저는 가까운 분야에서 일해요. 기본 용어는 설명 안 해도 되니, 바로 어떻게 작동하는지 얘기해 주세요.",
+    },
     "opening_task": {
         "en": "How exactly will you do {title}?",
         "zh": "你具体打算怎么完成{title}？",

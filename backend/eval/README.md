@@ -34,6 +34,24 @@ and compares the verdict's `passed` against the scenario's
   Auditor incorrectly passed — this is the false-pass / grade-inflation risk
 - both metrics broken down by `node_type` (concept vs task)
 
+## Labels changed on 2026-10-15
+
+The owner's decision: nobody recites commands, so an action said roughly counts as known even
+when the exact command, option or amount is not remembered. Six task scenarios whose students
+name the actions but not the details are now labelled pass (`python-venv-setup-fail`,
+`mapo-tofu-blanch-tofu-fail`, `home-wifi-setup-fail`, `change-flat-tire-fail`,
+`pour-over-coffee-ratio-fail`, `assemble-bookshelf-fail`; the ids keep their old names). Two stay
+fail: `nginx-reverse-proxy-fail` and `crontab-backup-job-fail` name no action at all. The set
+is now 21 pass / 9 fail.
+
+| Auditor | accuracy | false pass | false fail |
+|---|---|---|---|
+| 2026-10-14 rules, four earlier runs rescored with the new labels | 24, 24, 22, 25 /30 | 0, 1, 1, 0 /9 | 6, 5, 7, 5 /21 |
+| with the rule written in (a rough action is known), one run | 27/30 | 1/9 | 2/21 |
+
+The rescored runs fail the relabelled scenarios; written into the task rule, they pass. The run
+with the rule missed two concept passes and passed `nginx-reverse-proxy-fail`.
+
 ## Runs of 2026-10-13 (`gpt-6-luna`, the student Auditor)
 
 | Auditor | run | accuracy before / after the Challenger | leniency before / after | false fail |

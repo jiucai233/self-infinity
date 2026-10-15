@@ -189,6 +189,7 @@ def test_the_session_response_matches_the_contract_shape(client, math):
     assert set(body["session"]) == {
         "id", "skill_id", "node_position", "status", "score", "gaps", "comment", "turns", "test_out", "points",
         "evidence", "lessons", "principle", "skill_title", "created_at", "agreement", "too_hard", "disputed",
+        "audience", "depth",
     }
     assert body["session"]["test_out"] is False
     assert body["session"]["skill_id"] == math["discriminant"]
@@ -949,7 +950,9 @@ def test_an_unknown_kind_of_feedback_is_a_422(client, math):
 def test_the_learner_has_exactly_these_keys_and_aims_at_three_quarters(client, math):
     body = client.get("/api/learner").json()
 
-    assert set(body) == {"ability", "target_chance", "judge_false_pass", "judge_false_fail", "nodes", "history"}
+    assert set(body) == {
+        "ability", "target_chance", "judge_false_pass", "judge_false_fail", "nodes", "history", "styles",
+    }
     assert body["target_chance"] == 0.75
     assert body["ability"] == 0
     assert body["nodes"] and all(set(n) == {"skill_id", "title", "chance"} for n in body["nodes"])

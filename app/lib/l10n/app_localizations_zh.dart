@@ -87,7 +87,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get auditPassed => '已通过';
 
   @override
-  String get auditorTagline => '先评判你的回答，再讲解';
+  String get auditorTagline => '听你讲，哪里没跟上就问';
 
   @override
   String get authAlreadyRegistered => '这个邮箱已经注册过了，直接登录吧。';
@@ -1642,6 +1642,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String devLearnerNodes(String target) {
     return '开放的节点 · 目标 $target';
   }
+
+  @override
+  String get audienceExpert => '懂行的同事';
+
+  @override
+  String get audienceStudent => '大学生';
+
+  @override
+  String get audienceChild => '十岁的小学生';
+
+  @override
+  String get depthWhat => '只问是什么';
+
+  @override
+  String get depthHow => '问到怎么起作用';
+
+  @override
+  String get depthDeeper => '再往下一层';
+
+  @override
+  String get devAuditStyles => '审计风格';
+
+  @override
+  String get devStyleAudits => '次审计';
+
+  @override
+  String get devStyleReward => '平均奖励';
 
   @override
   String get youSaid => '你当时说';

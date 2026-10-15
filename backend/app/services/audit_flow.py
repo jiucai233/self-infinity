@@ -51,7 +51,7 @@ from app.models import (
     utcnow,
 )
 from app.i18n import join_list, language_of, quote, t
-from app.services import bandit, learner, points
+from app.services import audit_style, bandit, learner, points
 from app.services.condition import audit_pacing
 from app.services.incentive import compute_reward
 from app.services.course_edit import sync_links
@@ -152,11 +152,26 @@ def opening_question(
     test_out: bool = False,
     examined: list[str] | None = None,
     again: bool = False,
+    audience: str | None = None,
 ) -> str:
     """An audit opens with the student asking to be taught, never with a question about one
     point: the user teaches, and what she asks afterwards comes out of what they said. `examined`: the
     knowledge points this audit is on (a leaf that has them); `again`: some of the node's
-    points held before, so only the ones still open are to be explained."""
+    points held before, so only the ones still open are to be explained. `audience`: who she is
+    this time; a child or a colleague says so before asking (the default student says nothing)."""
+    question = _opening(skill, position, children, test_out, examined, again)
+    intro = t(f"audience_{audience}") if audience in ("child", "expert") else ""
+    return f"{intro} {question}" if intro else question
+
+
+def _opening(
+    skill: SkillNode,
+    position: NodePosition,
+    children: list[str],
+    test_out: bool,
+    examined: list[str] | None,
+    again: bool,
+) -> str:
     if examined and again and not test_out:
         if len(examined) == 1:
             return t("opening_point_again", point=quote(examined[0]))
@@ -229,6 +244,12 @@ def start_audit(
 
     position = node_position(session, skill)
     examined = points.to_examine(skill) if not test_out and points.has_points(session, skill) else []
+    # A challenge keeps its own standard (every part asked must hold); a style is for the
+    # ordinary audit of one node.
+    style, style_context = None, None
+    if settings.audit_styles and not test_out:
+        style_context = audit_style.context(session, skill)
+        style = audit_style.choose(session, style_context)
     audit = AuditSession(
         skill_id=skill.id,
         node_position=position,
@@ -237,6 +258,9 @@ def start_audit(
         max_turns=max_turns_for(NodeType.concept if test_out else skill.node_type, mode, len(examined)),
         test_out=True if test_out else None,
         points_json=points.dump(examined) if examined else None,
+        audience=style.audience if style else None,
+        depth=style.depth if style else None,
+        style_context_json=json.dumps(style_context) if style_context else None,
     )
     session.add(audit)
     session.flush()
@@ -249,6 +273,7 @@ def start_audit(
         test_out,
         examined=[p["title"] for p in examined],
         again=len(examined) < len(skill.points),
+        audience=audit.audience,
     )
     session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=question))
     session.commit()
@@ -305,6 +330,8 @@ def submit_turn(
             points=examined,
             settled=[p["title"] for p in skill.points if p["title"] not in asked] if examined else None,
             closed=closed,
+            audience=audit.audience or audit_style.DEFAULT_STYLE[0],
+            depth=audit.depth if audit.depth is not None else audit_style.DEFAULT_STYLE[1],
         )
 
     try:
@@ -494,10 +521,17 @@ def _finalize(
             )
     # The learner model moves by what was settled; the bandit is rewarded with the progress
     # made, not with the pass.
-    progress = learner.record(session, skill, bool(verdict.passed), verdict.points, agreement, tier, audit.id)
+    offset = audit_style.difficulty_offset(audit.audience, audit.depth)
+    progress = learner.record(
+        session, skill, bool(verdict.passed), verdict.points, agreement, tier, audit.id, offset=offset
+    )
     if progress is not None:
         split = agreement is not None and agreement < 1
-        bandit.update_arm(session, bucket, tier, reward=progress, weight=learner.SPLIT_WEIGHT if split else 1.0)
+        weight = learner.SPLIT_WEIGHT if split else 1.0
+        bandit.update_arm(session, bucket, tier, reward=progress, weight=weight)
+        if audit.audience is not None and audit.style_context_json:
+            x = json.loads(audit.style_context_json)
+            audit_style.update(session, audit.audience, audit.depth, x, reward=progress, weight=weight)
     session.flush()
 
     outcome = VerdictOutcome(

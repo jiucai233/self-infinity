@@ -867,6 +867,8 @@ class AuditSession {
     this.agreement,
     this.tooHard = false,
     this.disputed = false,
+    this.audience,
+    this.depth,
   });
 
   factory AuditSession.fromJson(Json json) => AuditSession(
@@ -888,6 +890,8 @@ class AuditSession {
     agreement: _doubleN(json, 'agreement'),
     tooHard: _boolN(json, 'too_hard') ?? false,
     disputed: _boolN(json, 'disputed') ?? false,
+    audience: _strN(json, 'audience'),
+    depth: _intN(json, 'depth'),
   );
 
   final int id;
@@ -928,6 +932,13 @@ class AuditSession {
 
   /// The user said the judge quoted words they did not say (a fail only).
   final bool disputed;
+
+  /// Who the Auditor listens as: `expert`, `student` or `child`. Null for a
+  /// challenge and for audits from before it was kept.
+  final String? audience;
+
+  /// How deep it asks: 0 what it is, 1 how it works, 2 one level deeper.
+  final int? depth;
 }
 
 /// Body of `POST /skills/{id}/audits`. Contract endpoint 7.
@@ -2875,6 +2886,7 @@ class LearnerModel {
     this.judgeFalseFail = 0,
     this.nodes = const [],
     this.history = const [],
+    this.styles = const [],
   });
 
   factory LearnerModel.fromJson(Json json) => LearnerModel(
@@ -2884,6 +2896,7 @@ class LearnerModel {
     judgeFalseFail: _double(json, 'judge_false_fail'),
     nodes: _list(json, 'nodes', LearnerNode.fromJson),
     history: _list(json, 'history', LearnerStep.fromJson),
+    styles: json['styles'] == null ? const [] : _list(json, 'styles', StyleStat.fromJson),
   );
 
   final double ability;
@@ -2902,4 +2915,29 @@ class LearnerModel {
 
   /// One step per finished audit, oldest first. Empty on a server from before.
   final List<LearnerStep> history;
+
+  /// How the audits went per listener and depth (nine). Empty on a server
+  /// from before.
+  final List<StyleStat> styles;
+}
+
+/// One audit style in `GET /learner`: how many audits it held and what they
+/// were worth.
+@immutable
+class StyleStat {
+  const StyleStat({required this.audience, required this.depth, this.audits = 0, this.meanReward});
+
+  factory StyleStat.fromJson(Json json) => StyleStat(
+    audience: _str(json, 'audience'),
+    depth: _int(json, 'depth'),
+    audits: _int(json, 'audits'),
+    meanReward: _doubleN(json, 'mean_reward'),
+  );
+
+  final String audience;
+  final int depth;
+  final int audits;
+
+  /// Null until an audit of this style has been rewarded.
+  final double? meanReward;
 }

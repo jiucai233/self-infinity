@@ -87,7 +87,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get auditPassed => '통과';
 
   @override
-  String get auditorTagline => '먼저 답을 평가하고, 그다음 설명해요';
+  String get auditorTagline => '당신에게 배우고, 따라가지 못한 곳을 물어봐요';
 
   @override
   String get authAlreadyRegistered => '이미 가입된 이메일이에요. 로그인해 주세요.';
@@ -1648,6 +1648,33 @@ class AppLocalizationsKo extends AppLocalizations {
   String devLearnerNodes(String target) {
     return '열린 노드 · 목표 $target';
   }
+
+  @override
+  String get audienceExpert => '같은 분야 동료';
+
+  @override
+  String get audienceStudent => '대학생';
+
+  @override
+  String get audienceChild => '열 살 초등학생';
+
+  @override
+  String get depthWhat => '무엇인지만';
+
+  @override
+  String get depthHow => '어떻게 작동하는지까지';
+
+  @override
+  String get depthDeeper => '한 단계 더 깊이';
+
+  @override
+  String get devAuditStyles => '감사 스타일';
+
+  @override
+  String get devStyleAudits => '회 감사';
+
+  @override
+  String get devStyleReward => '평균 보상';
 
   @override
   String get youSaid => '내가 한 말';

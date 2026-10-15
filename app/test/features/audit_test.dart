@@ -95,6 +95,38 @@ class _LiveVoiceApi extends FakeApiClient {
       (url: Uri.parse('http://127.0.0.1:8000/api$path'), headers: const <String, String>{});
 }
 
+/// An audit held for a listener and a depth, as the server now starts them.
+class _Styled extends FakeApiClient {
+  _Styled(this.audience, this.depth) : super(latency: Duration.zero);
+
+  final String? audience;
+  final int? depth;
+
+  @override
+  Future<AuditStart> startAudit(
+    int skillId, {
+    String mode = 'day',
+    bool testOut = false,
+    bool restart = false,
+  }) async {
+    final start = await super.startAudit(skillId, mode: mode, testOut: testOut, restart: restart);
+    final s = start.session;
+    return AuditStart(
+      openingQuestion: start.openingQuestion,
+      session: AuditSession(
+        id: s.id,
+        skillId: s.skillId,
+        nodePosition: s.nodePosition,
+        status: s.status,
+        turns: s.turns,
+        skillTitle: s.skillTitle,
+        audience: audience,
+        depth: depth,
+      ),
+    );
+  }
+}
+
 void main() {
   late FakeApiClient api;
 
@@ -106,6 +138,20 @@ void main() {
   });
 
   group('opening', () {
+    testWidgets('the header says who she listens as and how deep; nothing for a challenge', (tester) async {
+      final styled = _Styled('child', 2);
+      await styled.generateCourse(const GenerateRequest(topic: 'math'));
+      styled.debugSetStatus(1, SkillStatus.available);
+      await pumpAudit(tester, styled, 1);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('audit-style'))).data,
+        'A ten-year-old · One level deeper',
+      );
+
+      await pumpAudit(tester, api, 1);
+      expect(find.byKey(const Key('audit-style')), findsNothing);
+    });
+
     testWidgets(
       'the title bar names the node (with an In progress chip); the auditor (stern) asks',
       (

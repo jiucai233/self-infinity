@@ -290,8 +290,8 @@
     "student_turns": [
       "大概就是把豆腐扔水里煮一下吧，具体煮多久、水里放不放盐我也不知道，应该可以。"
     ],
-    "expected_passed": false,
-    "label_rationale": "承认不知道具体细节，用'应该可以'搪塞，没有可执行的步骤。"
+    "expected_passed": true,
+    "label_rationale": "说出了放进水里煮一下这个动作；煮多久、放不放盐是参数，做的时候会去查，按 2026-10-15 的标准算会。"
   },
   {
     "id": "change-flat-tire-fail",
@@ -301,8 +301,8 @@
     "student_turns": [
       "反正找个地方停车，把轮胎卸下来换上新的呗，具体螺丝怎么拧我不太清楚，应该可以吧。"
     ],
-    "expected_passed": false,
-    "label_rationale": "缺少千斤顶支撑位置、螺丝对角顺序等关键具体步骤，用'应该可以吧'敷衍。"
+    "expected_passed": true,
+    "label_rationale": "说出了停车、卸胎、换新胎；螺丝怎么拧属于做的时候再确认的细节，按 2026-10-15 的标准算会。"
   },
   {
     "id": "crontab-backup-job-fail",
@@ -323,8 +323,8 @@
     "student_turns": [
       "大概放点粉，加点水冲一冲就行了，比例我没细算过，应该可以吧。"
     ],
-    "expected_passed": false,
-    "label_rationale": "没有给出任何具体比例数字或注水节奏，属于空泛应付。"
+    "expected_passed": true,
+    "label_rationale": "说出了放粉、加水冲；比例是参数，按 2026-10-15 的标准算会。"
   },
   {
     "id": "assemble-bookshelf-fail",
@@ -334,8 +334,8 @@
     "student_turns": [
       "反正照着说明书装呗，具体哪块板先装我没细看，大概能装上吧。"
     ],
-    "expected_passed": false,
-    "label_rationale": "承认没看清楚说明书，无法说出具体装配顺序，用'大概'糊弄过去。"
+    "expected_passed": true,
+    "label_rationale": "照着说明书装本身就是做法，哪块板先装看说明书就知道；按 2026-10-15 的标准算会。"
   },
   {
     "id": "home-wifi-setup-fail",
@@ -345,8 +345,8 @@
     "student_turns": [
       "随便插上电，设置里改改名字密码应该就行了，具体哪个选项我不太确定。"
     ],
-    "expected_passed": false,
-    "label_rationale": "没有说明具体的设置项和验证联网成功的方式，回答空洞。"
+    "expected_passed": true,
+    "label_rationale": "说出了插电、改名字和密码；具体在哪个选项里是按提示找的东西，按 2026-10-15 的标准算会。"
   },
   {
     "id": "python-venv-setup-fail",
@@ -356,7 +356,7 @@
     "student_turns": [
       "大概用什么命令建一个环境吧，然后把包装上就行，具体命令我不太记得，应该可以吧。"
     ],
-    "expected_passed": false,
-    "label_rationale": "承认记不清具体命令，无法给出可执行步骤，是典型空话套话。"
+    "expected_passed": true,
+    "label_rationale": "记不清确切命令，但说出了建环境、装包这两个动作；按 2026-10-15 定的标准（没人背命令，说个大概就算会）算会。"
   }
 ]

@@ -417,6 +417,14 @@ class _AuditSceneState extends State<AuditScene> {
     });
   }
 
+  /// "Listener · depth" of this audit, or null when it has no style.
+  String? _styleLabel(BuildContext context) {
+    final s = _session;
+    if (s?.audience == null || s?.depth == null) return null;
+    final l = context.l10n;
+    return '${audienceLabel(l, s!.audience!)} · ${depthLabel(l, s.depth!)}';
+  }
+
   // -- build -------------------------------------------------------------------------------
 
   @override
@@ -546,6 +554,7 @@ class _AuditSceneState extends State<AuditScene> {
                     agent: speaker.agent,
                     mood: speaker.mood,
                     state: state,
+                    style: speaker.agent == 'auditor' ? _styleLabel(context) : null,
                     onTap: _voiceMode.interrupt,
                   ),
                 ),
@@ -730,8 +739,11 @@ class _SpeakerHeader extends StatelessWidget {
     required this.mood,
     required this.state,
     required this.onTap,
+    this.style,
   });
 
+  /// "Listener · depth"; null for a challenge.
+  final String? style;
   final String agent;
   final AvatarMood mood;
   final AvatarState state;
@@ -762,6 +774,12 @@ class _SpeakerHeader extends StatelessWidget {
               Text(agentLabel(context.l10n, agent), style: theme.titleMedium),
               const SizedBox(height: AppSpacing.xs),
               Text(doing, style: theme.bodySmall?.copyWith(color: AppColors.textTertiary)),
+              if (style != null)
+                Text(
+                  style!,
+                  key: const Key('audit-style'),
+                  style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                ),
             ],
           ),
         ),

@@ -118,6 +118,17 @@ def node_chance(session: Session, skill: SkillNode, tier: str = "medium") -> flo
     return sum(chance(ability, known.get(t, start)) for t in titles) / len(titles)
 
 
+def node_difficulty(session: Session, skill: SkillNode, tier: str = "medium") -> float:
+    """The mean difficulty of what an audit of this node would ask about."""
+    known = {
+        row.title: row.difficulty
+        for row in session.exec(select(LearnerPoint).where(LearnerPoint.skill_id == skill.id)).all()
+    }
+    start = TIER_DIFFICULTY.get(tier, 0.0)
+    titles = open_titles(skill)
+    return sum(known.get(t, start) for t in titles) / len(titles)
+
+
 def results_of(passed: bool, points: list[dict] | None) -> list[tuple[str, bool]]:
     """The results an audit gives: one for each point it settled, or the node's own."""
     settled = [(p["title"], p["ok"]) for p in points or [] if isinstance(p.get("ok"), bool)]
@@ -132,9 +143,12 @@ def record(
     agreement: float | None,
     tier: str = "medium",
     audit_id: int | None = None,
+    offset: float = 0.0,
 ) -> float | None:
     """Moves the ability and the difficulties by an audit's results and returns its progress,
-    0 to 1: how far the results went beyond what was expected. None: nothing was settled."""
+    0 to 1: how far the results went beyond what was expected. None: nothing was settled.
+    `offset`: how much harder the audit's style made it (app/services/audit_style.py): a point
+    explained to a child counts as harder than the same point explained to a colleague."""
     results = results_of(passed, points)
     if not results:
         return None
@@ -145,7 +159,7 @@ def record(
     progress = 0.0
     for title, ok in results:
         row = point(session, skill, title, tier)
-        expected = chance(ability, row.difficulty)
+        expected = chance(ability, row.difficulty + offset)
         worth = corrected(ok, expected, false_pass, false_fail)
         progress += worth * (1 - expected)
         move = STEP * weight * (worth - expected)

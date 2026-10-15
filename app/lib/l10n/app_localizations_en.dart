@@ -87,7 +87,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auditPassed => 'Passed';
 
   @override
-  String get auditorTagline => 'Judges your answer first, then explains';
+  String get auditorTagline => 'Learns from you and asks where it loses the thread';
 
   @override
   String get authAlreadyRegistered => 'That email already has an account. Sign in instead.';
@@ -1665,6 +1665,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String devLearnerNodes(String target) {
     return 'Open nodes · aims at $target';
   }
+
+  @override
+  String get audienceExpert => 'A colleague';
+
+  @override
+  String get audienceStudent => 'A university student';
+
+  @override
+  String get audienceChild => 'A ten-year-old';
+
+  @override
+  String get depthWhat => 'What it is';
+
+  @override
+  String get depthHow => 'How it works';
+
+  @override
+  String get depthDeeper => 'One level deeper';
+
+  @override
+  String get devAuditStyles => 'Audit styles';
+
+  @override
+  String get devStyleAudits => 'audits';
+
+  @override
+  String get devStyleReward => 'mean reward';
 
   @override
   String get youSaid => 'You said';

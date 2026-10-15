@@ -35,6 +35,8 @@ def _force_mock_provider():
         mp.setattr(settings, "llm_model_overrides", "")
         # 搜索是独立的一层，同理不能让本地 key 把测试悄悄切到真实网络。
         mp.setattr(settings, "tavily_api_key", "")
+        # 审计风格是随机采样的；默认关掉，测试里的开场白和提示词才是确定的。专门的测试再打开。
+        mp.setattr(settings, "audit_styles", False)
         yield
 
 

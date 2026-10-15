@@ -247,7 +247,7 @@ abstract class AppLocalizations {
   /// No description provided for @auditorTagline.
   ///
   /// In en, this message translates to:
-  /// **'Judges your answer first, then explains'**
+  /// **'Learns from you and asks where it loses the thread'**
   String get auditorTagline;
 
   /// No description provided for @authAlreadyRegistered.
@@ -3147,6 +3147,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open nodes · aims at {target}'**
   String devLearnerNodes(String target);
+
+  /// No description provided for @audienceExpert.
+  ///
+  /// In en, this message translates to:
+  /// **'A colleague'**
+  String get audienceExpert;
+
+  /// No description provided for @audienceStudent.
+  ///
+  /// In en, this message translates to:
+  /// **'A university student'**
+  String get audienceStudent;
+
+  /// No description provided for @audienceChild.
+  ///
+  /// In en, this message translates to:
+  /// **'A ten-year-old'**
+  String get audienceChild;
+
+  /// No description provided for @depthWhat.
+  ///
+  /// In en, this message translates to:
+  /// **'What it is'**
+  String get depthWhat;
+
+  /// No description provided for @depthHow.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get depthHow;
+
+  /// No description provided for @depthDeeper.
+  ///
+  /// In en, this message translates to:
+  /// **'One level deeper'**
+  String get depthDeeper;
+
+  /// No description provided for @devAuditStyles.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit styles'**
+  String get devAuditStyles;
+
+  /// No description provided for @devStyleAudits.
+  ///
+  /// In en, this message translates to:
+  /// **'audits'**
+  String get devStyleAudits;
+
+  /// No description provided for @devStyleReward.
+  ///
+  /// In en, this message translates to:
+  /// **'mean reward'**
+  String get devStyleReward;
 
   /// No description provided for @youSaid.
   ///

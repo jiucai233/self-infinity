@@ -599,6 +599,28 @@ void main() {
       expect((second.passed, second.ability, second.agreement), (true, 0.12, null));
     });
 
+    test('AuditSession: the listener and depth, null when it has none', () {
+      const base = '"id": 1, "skill_id": 2, "node_position": "leaf", "status": "active"';
+      final styled = AuditSession.fromJson(obj('{$base, "audience": "child", "depth": 2}'));
+      expect((styled.audience, styled.depth), ('child', 2));
+      final plain = AuditSession.fromJson(obj('{$base, "audience": null, "depth": null}'));
+      expect((plain.audience, plain.depth), (null, null));
+      expect(AuditSession.fromJson(obj('{$base}')).audience, isNull);
+    });
+
+    test('LearnerModel: a row per audit style, a null reward before any audit', () {
+      final m = LearnerModel.fromJson(
+        obj('''
+        {"ability": 0, "target_chance": 0.75, "judge_false_pass": 0.05, "judge_false_fail": 0.3,
+         "nodes": [], "styles": [
+           {"audience": "student", "depth": 1, "audits": 4, "mean_reward": 0.22},
+           {"audience": "child", "depth": 0, "audits": 0, "mean_reward": null}]}'''),
+      );
+      final [a, b] = m.styles;
+      expect((a.audience, a.depth, a.audits, a.meanReward), ('student', 1, 4, 0.22));
+      expect((b.audience, b.depth, b.audits, b.meanReward), ('child', 0, 0, null));
+    });
+
     test('LearnerModel from a server without a history has none', () {
       final m = LearnerModel.fromJson(
         obj('''

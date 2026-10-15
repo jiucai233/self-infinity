@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     task_max_turns: int = 4
     # Challenger 总开关；留成配置项是为了评估时能做 Auditor 单独 vs Auditor+Challenger 的消融。
     challenger_enabled: bool = True
+    # Each audit's listener and question depth chosen by the style bandit; off, every audit is
+    # held as the default (student, depth 1).
+    audit_styles: bool = True
     # 注入 Challenger 的历史 misconception 条数上限，取最近的若干条。
     challenger_misconception_limit: int = 5
     # A course plan from a reasoning model (gpt-6-luna) takes ~25 s; Vercel allows 300 s a request.

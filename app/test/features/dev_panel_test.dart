@@ -122,6 +122,10 @@ class _WithLearner extends FakeApiClient {
       LearnerNode(skillId: 3, title: 'U-Net', chance: 0.62),
       LearnerNode(skillId: 4, title: 'Attention', chance: 0.41),
     ],
+    styles: const [
+      StyleStat(audience: 'student', depth: 1, audits: 4, meanReward: 0.22),
+      StyleStat(audience: 'child', depth: 2),
+    ],
     history: [
       for (final (i, (title, passed, ability, progress, agreement)) in const [
         ('Convolution', true, 0.2, 0.5, 1.0),
@@ -321,6 +325,23 @@ void main() {
     expect(textIn(tester, 'learner-step-2'), startsWith('Convolution | Passed | '));
     expect(textIn(tester, 'learner-step-2'), endsWith('Ability +0.20 · Progress 50%')); // all agreed
     expect(find.byKey(const Key('learner-step-3')), findsNothing);
+  });
+
+  testWidgets('the learner tab: the audit styles, a dash where nothing is rewarded yet', (tester) async {
+    final api = _WithLearner();
+    await api.generateCourse(const GenerateRequest(topic: 'math'));
+    await openPanel(tester, api);
+    await tester.tap(find.byKey(const Key('dev-tab-learner')));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Audit styles'), 200, scrollable: find.byType(Scrollable).first);
+    expect(textIn(tester, 'learner-style-0'), 'A university student · How it works | 4 audits · mean reward 22%');
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('learner-style-1')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(textIn(tester, 'learner-style-1'), 'A ten-year-old · One level deeper | 0 audits · mean reward —');
   });
 
   testWidgets('the learner tab: the judge\'s two error rates, and the open nodes under the target', (tester) async {

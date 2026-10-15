@@ -256,6 +256,10 @@ class AuditSessionOut(BaseModel):
     # The user's word on a failed audit.
     too_hard: bool = False
     disputed: bool = False
+    # Who the user explains to (`expert` | `student` | `child`) and how deep she asks (0-2);
+    # null on a challenge and on audits from before styles (held as student, depth 1).
+    audience: str | None = None
+    depth: int | None = None
 
 
 class AuditFeedbackIn(BaseModel):
@@ -287,6 +291,15 @@ class LearnerStepOut(BaseModel):
     created_at: datetime
 
 
+class StyleOut(BaseModel):
+    """One audit style of the style bandit (app/services/audit_style.py)."""
+
+    audience: str
+    depth: int
+    audits: int
+    mean_reward: float | None = None
+
+
 class LearnerOut(BaseModel):
     """The learner model (app/services/learner.py)."""
 
@@ -299,6 +312,8 @@ class LearnerOut(BaseModel):
     nodes: list[LearnerNodeOut]
     # The ability after each audit, oldest first (it starts at 0).
     history: list[LearnerStepOut] = []
+    # The audit styles: how many audits each was chosen for and their mean reward.
+    styles: list[StyleOut] = []
 
 
 class StartAuditResponse(BaseModel):
