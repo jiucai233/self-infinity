@@ -78,10 +78,28 @@ class AppLocalizationsKo extends AppLocalizations {
   String get auditFailed => '미통과';
 
   @override
+  String get replayRetry => '다시 도전';
+
+  @override
+  String get findMaterials => '자료 찾기';
+
+  @override
+  String get materialsHeading => '자료';
+
+  @override
+  String get materialsNone => '이 빈틈에 맞는 자료를 찾지 못했어요.';
+
+  @override
+  String get materialsFailed => '검색이 되지 않았어요. 잠시 후 다시 해 보세요.';
+
+  @override
   String get auditHistory => '심사 기록';
 
   @override
   String get auditInProgress => '진행 중';
+
+  @override
+  String get verdictDetails => '자세히 보기 →';
 
   @override
   String get auditPassed => '통과';
@@ -180,6 +198,15 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get checkInbox => '받은편지함을 확인하세요';
+
+  @override
+  String get confirmNotArrived => '몇 분이 지나도 안 오면 스팸함을 확인하거나 다시 보내 주세요.';
+
+  @override
+  String get confirmResend => '링크 다시 보내기';
+
+  @override
+  String get confirmResent => '다시 보냈어요';
 
   @override
   String get chooseMainQuest => '메인 퀘스트 선택';
@@ -952,6 +979,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get devTitle => '감사 검토';
+
+  @override
+  String get statProgress => '진행률';
 
   @override
   String get devHint => '아래 판정을 하나씩 검토하세요. 첫 줄은 검토 결과로 계산돼요.';

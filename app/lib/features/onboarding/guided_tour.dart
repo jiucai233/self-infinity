@@ -503,7 +503,7 @@ class _TourCard extends StatelessWidget {
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
-                            text,
+                            keepAll(text),
                             key: const Key('tour-text'),
                             style: theme.bodyLarge?.copyWith(height: 1.45),
                           ),

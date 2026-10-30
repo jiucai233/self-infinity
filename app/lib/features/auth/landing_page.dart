@@ -814,7 +814,7 @@ class _HeroScreen extends StatelessWidget {
         _DropIn(
           delay: const Duration(milliseconds: 100),
           child: Text(
-            l.heroLead,
+            keepAll(l.heroLead),
             style: (wide ? theme.titleLarge : theme.bodyLarge)?.copyWith(
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w400,
@@ -874,7 +874,7 @@ class _HeroScreen extends StatelessWidget {
                     const Icon(Icons.south_rounded, size: 16, color: AppColors.textTertiary),
                     const SizedBox(width: AppSpacing.sm),
                     Text(
-                      l.scrollHint,
+                      keepAll(l.scrollHint),
                       style: theme.labelMedium?.copyWith(color: AppColors.textTertiary),
                     ),
                   ],
@@ -912,17 +912,17 @@ class _ChapterScreen extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          chapter.kicker,
+          keepAll(chapter.kicker),
           style: theme.labelLarge?.copyWith(color: AppColors.textTertiary, letterSpacing: 0.4),
         ),
         const SizedBox(height: AppSpacing.md),
         Text(
-          chapter.title,
+          keepAll(chapter.title),
           style: (wide ? theme.displaySmall : theme.headlineLarge)?.copyWith(height: 1.1),
         ),
         const SizedBox(height: AppSpacing.lg),
         Text(
-          chapter.body,
+          keepAll(chapter.body),
           style: (wide ? theme.titleMedium : theme.bodyLarge)?.copyWith(
             color: AppColors.textSecondary,
             fontWeight: FontWeight.w400,
@@ -1010,7 +1010,7 @@ class _EndScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    l.treeStartsWithYou,
+                    keepAll(l.treeStartsWithYou),
                     textAlign: TextAlign.center,
                     style: (wide ? theme.displayMedium : theme.displaySmall)?.copyWith(
                       color: AppColors.nightText,
@@ -1368,7 +1368,7 @@ class _TypewriterState extends State<_Typewriter> {
         child: Text.rich(
           key: const Key('hero-headline'),
           TextSpan(
-            text: shown,
+            text: keepAll(shown),
             children: [
               if (!_done)
                 WidgetSpan(

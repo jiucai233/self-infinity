@@ -148,3 +148,10 @@ def test_a_fixed_reply_follows_the_message_language_too(client, monkeypatch):
     monkeypatch.setattr(decisions, "decide", deciding("open_map"))
 
     assert chat(client, "给我看看地图", "en")[1]["content"] == "这是你的人生树。"
+
+
+def test_the_offline_guide_knows_the_question_too(client):
+    for message in ("what did I get wrong last time?", "我上次哪里错了", "지난번에 뭐 틀렸어?"):
+        body = client.post("/api/chat", json={"message": message}).json()
+        replies = " ".join(m["content"] for m in body["messages"] if m["role"] != "user")
+        assert any(word in replies for word in ("finished an audit", "完成过审计", "끝낸 감사")), body

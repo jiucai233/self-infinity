@@ -415,6 +415,26 @@ void main() {
       await failAudit(api, 5);
       await scene(tester, size: size, name: 'replay-lesson-$tag', location: '/audit/3', api: api);
     });
+    testWidgets(skip: dir == null, 'replay with material found ($tag)', (tester) async {
+      final api = await _seed();
+      await failAudit(api, 5);
+      await scene(
+        tester,
+        size: size,
+        name: 'replay-materials-$tag',
+        location: '/audit/3',
+        api: api,
+        act: (t) async {
+          final button = find.byKey(const Key('replay-find-materials'));
+          await t.ensureVisible(button);
+          await t.pumpAndSettle();
+          await t.tap(button);
+          await t.pumpAndSettle();
+          await t.ensureVisible(find.byKey(const Key('replay-materials')));
+          await t.pumpAndSettle();
+        },
+      );
+    });
     testWidgets(skip: dir == null, 'scene 4-1 asking ($tag)', (tester) async {
       await scene(tester, size: size, name: '41-asking-$tag', location: '/skill/9/audit');
     });

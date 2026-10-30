@@ -78,10 +78,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String get auditFailed => '未通过';
 
   @override
+  String get replayRetry => '再挑战一次';
+
+  @override
+  String get findMaterials => '找资料';
+
+  @override
+  String get materialsHeading => '资料';
+
+  @override
+  String get materialsNone => '没找到针对这些漏洞的资料。';
+
+  @override
+  String get materialsFailed => '搜索没成功，稍后再试。';
+
+  @override
   String get auditHistory => '审核记录';
 
   @override
   String get auditInProgress => '进行中';
+
+  @override
+  String get verdictDetails => '查看详情 →';
 
   @override
   String get auditPassed => '已通过';
@@ -177,6 +195,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get checkInbox => '去收件箱看看';
+
+  @override
+  String get confirmNotArrived => '几分钟后还没收到？看看垃圾邮件，或者再发一次。';
+
+  @override
+  String get confirmResend => '重新发送链接';
+
+  @override
+  String get confirmResent => '已重新发送';
 
   @override
   String get chooseMainQuest => '选择主线任务';
@@ -949,6 +976,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get devTitle => '审计复核';
+
+  @override
+  String get statProgress => '进度';
 
   @override
   String get devHint => '在下面逐个标注裁决；第一行由你的标注算出。';

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../api/life_tree.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/tokens.dart';
 
 /// Your progress over every course, as big numbers with small labels:
@@ -17,6 +18,7 @@ class StatStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     return Wrap(
       key: const Key('stat-strip'),
       spacing: AppSpacing.xxl,
@@ -28,12 +30,12 @@ class StatStrip extends StatelessWidget {
           value: stats.progress,
           label: '${stats.mastered}/${stats.total}',
         ),
-        _Stat(key: const Key('stat-cleared'), label: 'Cleared', value: '${stats.mastered}', suffix: ' / ${stats.total}'),
-        _Stat(key: const Key('stat-progress'), label: 'Progress', value: '${stats.percent}', suffix: '%'),
+        _Stat(key: const Key('stat-cleared'), label: l.dotCleared, value: '${stats.mastered}', suffix: ' / ${stats.total}'),
+        _Stat(key: const Key('stat-progress'), label: l.statProgress, value: '${stats.percent}', suffix: '%'),
         if (!compact) ...[
-          _Stat(key: const Key('stat-ready'), label: 'Ready', value: '${stats.ready}'),
-          _Stat(key: const Key('stat-audits'), label: 'Audits', value: '${stats.audits}'),
-          _Stat(key: const Key('stat-lessons'), label: 'Lessons', value: '${stats.lessons}'),
+          _Stat(key: const Key('stat-ready'), label: l.dotReady, value: '${stats.ready}'),
+          _Stat(key: const Key('stat-audits'), label: l.lifeAudits, value: '${stats.audits}'),
+          _Stat(key: const Key('stat-lessons'), label: l.lessons, value: '${stats.lessons}'),
         ],
       ],
     );

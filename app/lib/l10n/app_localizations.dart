@@ -226,6 +226,36 @@ abstract class AppLocalizations {
   /// **'Failed'**
   String get auditFailed;
 
+  /// No description provided for @replayRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get replayRetry;
+
+  /// No description provided for @findMaterials.
+  ///
+  /// In en, this message translates to:
+  /// **'Find material'**
+  String get findMaterials;
+
+  /// No description provided for @materialsHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Material'**
+  String get materialsHeading;
+
+  /// No description provided for @materialsNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found for these gaps.'**
+  String get materialsNone;
+
+  /// No description provided for @materialsFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The search didn\'t go through. Try again later.'**
+  String get materialsFailed;
+
   /// No description provided for @auditHistory.
   ///
   /// In en, this message translates to:
@@ -237,6 +267,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'In progress'**
   String get auditInProgress;
+
+  /// No description provided for @verdictDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'See details →'**
+  String get verdictDetails;
 
   /// No description provided for @auditPassed.
   ///
@@ -423,6 +459,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Check your inbox'**
   String get checkInbox;
+
+  /// No description provided for @confirmNotArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing after a few minutes? Check your spam folder, or send it again.'**
+  String get confirmNotArrived;
+
+  /// No description provided for @confirmResend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the link again'**
+  String get confirmResend;
+
+  /// No description provided for @confirmResent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent again'**
+  String get confirmResent;
 
   /// No description provided for @chooseMainQuest.
   ///
@@ -1875,6 +1929,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Audit review'**
   String get devTitle;
+
+  /// Stat strip on the map: the share of all points cleared, shown as a percentage.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get statProgress;
 
   /// No description provided for @devHint.
   ///

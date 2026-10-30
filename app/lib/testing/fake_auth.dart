@@ -65,6 +65,15 @@ class FakeAuthService extends AuthService {
     return AuthResult.ok;
   }
 
+  /// The emails a confirmation link was sent to again.
+  final List<String> resent = [];
+
+  @override
+  Future<AuthResult> resendConfirmation(String email) async {
+    resent.add(email.trim());
+    return AuthResult.ok;
+  }
+
   @override
   Future<AuthResult> sendPasswordReset(String email) async {
     resets.add(email.trim());

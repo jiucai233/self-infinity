@@ -11,6 +11,7 @@ import 'package:self_infinity/api/http_api.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/l10n/l10n.dart';
 import 'package:self_infinity/testing/test_app.dart';
+import 'package:self_infinity/widgets/keep_all.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _arb(String lang) =>
@@ -103,6 +104,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('내 캐릭터'), findsWidgets);
-    expect(find.text('오늘은 뭘 배워 볼까요?'), findsOneWidget);
+    // Korean prose is drawn with word joiners, so it breaks only at spaces.
+    expect(find.text(keepAll('오늘은 뭘 배워 볼까요?')), findsOneWidget);
   });
 }

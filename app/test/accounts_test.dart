@@ -270,6 +270,28 @@ void main() {
       expect(auth.signedIn, isFalse);
     });
 
+    testWidgets('the confirmation link can be sent again from the inbox screen, once', (tester) async {
+      final auth = FakeAuthService(confirmEmail: true);
+      await pumpApp(
+        tester,
+        api: FakeApiClient(latency: Duration.zero, onboarded: false),
+        auth: auth,
+      );
+      await tapKey(tester, 'hero-sign-in');
+      await tapKey(tester, 'auth-switch');
+      await enter(tester, 'auth-email', 'new@x.io');
+      await enter(tester, 'auth-password', 'secret1');
+      await tapKey(tester, 'auth-submit');
+      expect(find.textContaining('spam folder'), findsOneWidget);
+
+      await tapKey(tester, 'resend-confirmation');
+
+      expect(auth.resent, ['new@x.io']);
+      expect(find.text('Sent again'), findsOneWidget);
+      final button = tester.widget<TextButton>(key('resend-confirmation'));
+      expect(button.onPressed, isNull);
+    });
+
     testWidgets('sign up → check your inbox → confirm → sign in → the tutorial', (tester) async {
       final auth = FakeAuthService(confirmEmail: true);
       await pumpApp(

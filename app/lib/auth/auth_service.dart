@@ -51,6 +51,9 @@ abstract class AuthService extends ChangeNotifier {
   /// Sends a "reset your password" email.
   Future<AuthResult> sendPasswordReset(String email);
 
+  /// Sends the "confirm your email" link of a sign-up again.
+  Future<AuthResult> resendConfirmation(String email) async => AuthResult.ok;
+
   /// Whether "Continue with Google" is offered.
   bool get supportsGoogle => false;
 

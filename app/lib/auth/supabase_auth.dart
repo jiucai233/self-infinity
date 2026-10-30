@@ -51,6 +51,11 @@ class SupabaseAuthService extends AuthService {
         password: password,
         emailRedirectTo: redirectUrl,
       );
+      // An email that already has a confirmed account comes back as a user with no
+      // identities and no email is sent (Supabase hides which emails exist).
+      if (response.user?.identities?.isEmpty ?? false) {
+        return AuthResult(error: l10nNow.authAlreadyRegistered);
+      }
       // With "Confirm email" on, Supabase returns the user but no session.
       return response.session == null ? const AuthResult(needsConfirmation: true) : AuthResult.ok;
     } on AuthException catch (e) {
@@ -59,6 +64,11 @@ class SupabaseAuthService extends AuthService {
       return AuthResult(error: l10nNow.authOffline);
     }
   }
+
+  @override
+  Future<AuthResult> resendConfirmation(String email) => _guard(
+    () => _auth.resend(type: OtpType.signup, email: email.trim(), emailRedirectTo: redirectUrl),
+  );
 
   @override
   Future<AuthResult> sendPasswordReset(String email) =>

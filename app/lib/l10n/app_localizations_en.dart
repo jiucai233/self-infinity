@@ -78,10 +78,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auditFailed => 'Failed';
 
   @override
+  String get replayRetry => 'Try again';
+
+  @override
+  String get findMaterials => 'Find material';
+
+  @override
+  String get materialsHeading => 'Material';
+
+  @override
+  String get materialsNone => 'Nothing found for these gaps.';
+
+  @override
+  String get materialsFailed => 'The search didn\'t go through. Try again later.';
+
+  @override
   String get auditHistory => 'Audit history';
 
   @override
   String get auditInProgress => 'In progress';
+
+  @override
+  String get verdictDetails => 'See details →';
 
   @override
   String get auditPassed => 'Passed';
@@ -182,6 +200,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checkInbox => 'Check your inbox';
+
+  @override
+  String get confirmNotArrived =>
+      'Nothing after a few minutes? Check your spam folder, or send it again.';
+
+  @override
+  String get confirmResend => 'Send the link again';
+
+  @override
+  String get confirmResent => 'Sent again';
 
   @override
   String get chooseMainQuest => 'Choose a main quest';
@@ -957,6 +985,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devTitle => 'Audit review';
+
+  @override
+  String get statProgress => 'Progress';
 
   @override
   String get devHint => 'Review each verdict below; the first row adds up your reviews.';

@@ -7,6 +7,7 @@ import 'package:self_infinity/api/api_exception.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/app_state.dart';
+import 'package:self_infinity/app/router.dart';
 import 'package:self_infinity/features/audit/audit_scene.dart';
 import 'package:self_infinity/features/audit/celebration_card.dart';
 import 'package:self_infinity/features/audit/lesson_card.dart';
@@ -593,6 +594,36 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('audit-next')), findsNothing);
       expect(find.byKey(const Key('audit-done')), findsOneWidget);
+    });
+
+    testWidgets('on a phone the whole card fits, and See details opens the replay', (
+      tester,
+    ) async {
+      await pumpAudit(tester, api, 1, size: phoneScreen);
+      await failIt(tester);
+      expect(tester.getSize(verdictCard).height, lessThan(phoneScreen.height));
+      final id = (await api.listAudits()).first.id;
+      await tester.tap(find.byKey(const Key('verdict-details')));
+      await tester.pumpAndSettle();
+      expect(find.text('route:${AppRoutes.replay(id)}'), findsOneWidget);
+    });
+
+    testWidgets('Too hard for now is in the ⋯ menu; once told, a toast and a noted line', (
+      tester,
+    ) async {
+      await pumpAudit(tester, api, 1);
+      await failIt(tester);
+      expect(find.text('Too hard for now'), findsNothing);
+      await tester.tap(find.byKey(const Key('verdict-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('verdict-too-hard')));
+      await tester.pumpAndSettle();
+      expect(find.text('Noted: too hard for now'), findsOneWidget); // the toast
+      await tester.tap(find.byKey(const Key('verdict-more')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('verdict-too-hard')), findsNothing);
+      expect(find.byKey(const Key('verdict-too-hard-noted')), findsOneWidget);
+      expect(find.byKey(const Key('verdict-misheard')), findsOneWidget);
     });
 
     testWidgets('→ brings the Recorder, who asks What did you misunderstand?', (tester) async {

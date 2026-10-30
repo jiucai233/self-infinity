@@ -306,14 +306,14 @@ class _HomeSceneState extends State<HomeScene> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          greeting,
+          keepAll(greeting),
           key: const Key('greeting'),
           textAlign: TextAlign.center,
           style: AppLayout.isWide(context) ? theme.displayMedium : theme.headlineMedium,
         ),
         const SizedBox(height: AppSpacing.md),
         Text(
-          hint,
+          keepAll(hint),
           key: const Key('greeting-hint'),
           textAlign: TextAlign.center,
           style: theme.bodyLarge?.copyWith(color: AppColors.textTertiary),
@@ -396,7 +396,7 @@ class _ReplyBubbleContent extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(message.content, key: const Key('bubble-text'), style: theme.bodyLarge),
+        Text(keepAll(message.content), key: const Key('bubble-text'), style: theme.bodyLarge),
         if (action is CourseAction) ...[
           const SizedBox(height: AppSpacing.sm),
           TextButton.icon(
@@ -497,7 +497,7 @@ class _SuggestionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
     final text = Text(
-      label,
+      keepAll(label),
       maxLines: 3,
       overflow: TextOverflow.ellipsis,
       style: theme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),

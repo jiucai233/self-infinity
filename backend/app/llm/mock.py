@@ -753,7 +753,10 @@ _FRONT_REPLIES = {
     "plan": "Let me pick today's quests.",
     "briefing": "Let me sum up where you are.",
     "open_map": "Opening your life tree.",
+    "audit_review": "Let me look at your audits.",
 }
+# "what did I get wrong last time", in the three languages.
+_AUDIT_REVIEW_WORDS_RE = re.compile(r"(get|got) wrong|my last audit|哪里错|错在哪|上次.*(审计|没过)|뭐 틀렸|어디 틀렸|지난.*감사", re.I)
 _ASK_TOPIC = "What topic should I build?"
 
 
@@ -779,6 +782,8 @@ def _front_desk(messages: list[Message]) -> str:
         if not topic or topic.casefold() in _NO_TOPIC:
             return out("none", _ASK_TOPIC)
         return out("generate_course", f"I'll build a world for “{topic}”.", {"topic": topic})
+    if _AUDIT_REVIEW_WORDS_RE.search(message):
+        return out("audit_review", _FRONT_REPLIES["audit_review"])
     if _PLAN_WORDS_RE.search(message):
         return out("plan", _FRONT_REPLIES["plan"])
     if _BRIEFING_WORDS_RE.search(message):

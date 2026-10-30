@@ -182,7 +182,7 @@ void main() {
       expect(key('audit-bubble-text'), findsOneWidget); // her question is current again
     });
 
-    testWidgets('the verdict lists each point with what was wrong, and can be copied', (
+    testWidgets('the verdict lists each point in a line, and copies them with what was wrong', (
       tester,
     ) async {
       final copied = watchClipboard(tester);
@@ -198,9 +198,10 @@ void main() {
           findsOneWidget,
         );
       }
+      // Why it was missed is on the replay; the card keeps to one line.
       expect(
         find.descendant(of: key('verdict-point-0'), matching: find.text(FakeApiClient.failNote)),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.descendant(of: key('verdict-point-0'), matching: find.byIcon(Icons.close_rounded)),
@@ -211,10 +212,10 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.ensureVisible(key('verdict-copy'));
-      await tester.pumpAndSettle(); // the card is taller than the window now
+      await tester.tap(key('verdict-more'));
+      await tester.pumpAndSettle();
       await tester.tap(key('verdict-copy'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(copied.single, startsWith('Not yet. · 45\n'));
       expect(copied.single, contains('✗ ${points[0]} — ${FakeApiClient.failNote}'));

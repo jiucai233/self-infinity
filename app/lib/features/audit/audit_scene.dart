@@ -603,8 +603,8 @@ class _AuditSceneState extends State<AuditScene> {
     );
   }
 
-  /// Tells the backend what the user says about the fail; on an error the
-  /// button stays and a toast says why.
+  /// Tells the backend what the user says about the fail; a toast says it was
+  /// noted, or on an error why not (and the menu item stays).
   Future<void> _tell(AuditFeedback kind) async {
     final id = _session?.id;
     if (id == null || _telling != null) return;
@@ -620,6 +620,11 @@ class _AuditSceneState extends State<AuditScene> {
           _disputed = true;
         }
       });
+      // The menu that said it is closed: a toast says it was heard.
+      showToast(
+        context,
+        kind == AuditFeedback.tooHard ? context.l10n.feedbackTooHardNoted : context.l10n.feedbackMisheardNoted,
+      );
     } on Object catch (e) {
       if (!mounted) return;
       setState(() => _telling = null);
@@ -647,6 +652,10 @@ class _AuditSceneState extends State<AuditScene> {
               onMisheard: verdict.passed || _telling != null ? null : () => unawaited(_tell(AuditFeedback.misheard)),
               tooHardNoted: _tooHard,
               misheardNoted: _disputed,
+              onDetails: switch (_session?.id) {
+                final id? => () => context.go(AppRoutes.replay(id)),
+                null => null,
+              },
               onBack: () => context.go(AppRoutes.skill(widget.skillId)),
             ),
           ],

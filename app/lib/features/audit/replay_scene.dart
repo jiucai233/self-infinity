@@ -20,10 +20,14 @@ import '../../l10n/l10n.dart';
 /// next to what holds, the past lessons that held or came back, and the whole
 /// dialogue folded away.
 ///
-/// A fail without a lesson card ends in a field to write (or dictate) what
-/// the user believed at the time; `Make a lesson card` sends it to the
-/// Recorder. The words are the user's own: nothing is suggested. An audit
-/// with a card shows it, and how often it has held or come back since.
+/// A fail leads with what to do next: `Try again` starts a new audit of the
+/// node, and right under the gaps a field to write (or dictate) what the user
+/// believed at the time; `Make a lesson card` sends it to the Recorder. The
+/// words are the user's own: nothing is suggested. An audit with a card shows
+/// it, how often it has held or come back since, and `Find material`, which
+/// asks the Material Finder for at most three sources on the gaps (only on a
+/// tap: it costs a search). The two things to say about a fail (too hard for
+/// now, I didn't say that) sit in the ⋯ menu of the title bar.
 ///
 /// Route `/audit/:auditId`.
 class ReplayScene extends StatefulWidget {
@@ -55,6 +59,11 @@ class _ReplaySceneState extends State<ReplayScene> {
   /// The card made here, just now (it flips over); null for one that was
   /// already there.
   Principle? _made;
+
+  // Material for the gaps: null until found; the search in flight; a failed one.
+  List<SearchItem>? _materials;
+  bool _searching = false;
+  bool _searchFailed = false;
 
   @override
   void initState() {
@@ -116,7 +125,8 @@ class _ReplaySceneState extends State<ReplayScene> {
     }
   }
 
-  /// Tells the backend; the audit it sends back says what is noted now.
+  /// Tells the backend; the audit it sends back says what is noted now, and
+  /// a toast says so.
   Future<void> _tell(AuditFeedback kind) async {
     if (_telling != null) return;
     setState(() => _telling = kind);
@@ -127,10 +137,40 @@ class _ReplaySceneState extends State<ReplayScene> {
         _audit = audit;
         _telling = null;
       });
+      final l = context.l10n;
+      showToast(
+        context,
+        kind == AuditFeedback.tooHard ? l.feedbackTooHardNoted : l.feedbackMisheardNoted,
+      );
     } on Object catch (e) {
       if (!mounted) return;
       setState(() => _telling = null);
       showToast(context, ErrorView.messageFor(e));
+    }
+  }
+
+  /// Asks the Material Finder for sources on this audit's gaps (all of them,
+  /// as one gap). A failure is said quietly and the button stays.
+  Future<void> _findMaterials(AuditSession audit, List<String> gaps) async {
+    if (_searching || gaps.isEmpty) return;
+    setState(() {
+      _searching = true;
+      _searchFailed = false;
+    });
+    try {
+      final plan = await _api.createSearchPlan(audit.skillId, gap: gaps.join('; '));
+      if (!mounted) return;
+      setState(() {
+        _materials = plan.items.take(3).toList();
+        _searching = false;
+      });
+      _appState.markDataChanged();
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _searching = false;
+        _searchFailed = true;
+      });
     }
   }
 
@@ -141,10 +181,16 @@ class _ReplaySceneState extends State<ReplayScene> {
       title: audit == null || audit.skillTitle.isEmpty ? null : audit.skillTitle,
       titleChip: audit == null
           ? null
-          : StatusChip(
-              label: audit.status.label(context.l10n),
-              color: audit.status.color,
-              fill: audit.status.fill,
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                StatusChip(
+                  label: audit.status.label(context.l10n),
+                  color: audit.status.color,
+                  fill: audit.status.fill,
+                ),
+                if (audit.status == AuditStatus.failed) _feedbackMenu(context, audit),
+              ],
             ),
       topLeading: audit == null
           ? null
@@ -173,6 +219,15 @@ class _ReplaySceneState extends State<ReplayScene> {
         ? audit.evidence
         : [for (final gap in audit.gaps) GapEvidence(gap: gap)];
     final principle = _made ?? audit.principle;
+    final points = [
+      if (audit.points.isNotEmpty) ...[
+        const SizedBox(height: AppSpacing.xxl),
+        Text(l.knowledgePoints, style: theme.labelMedium),
+        const SizedBox(height: AppSpacing.sm),
+        for (final (i, point) in audit.points.indexed)
+          PointRow(key: Key('replay-point-$i'), point: point),
+      ],
+    ];
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
@@ -212,13 +267,20 @@ class _ReplaySceneState extends State<ReplayScene> {
                   const SizedBox(height: AppSpacing.md),
                   Text(comment, key: const Key('replay-comment'), style: theme.bodyLarge),
                 ],
-                if (audit.points.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.xxl),
-                  Text(l.knowledgePoints, style: theme.labelMedium),
-                  const SizedBox(height: AppSpacing.sm),
-                  for (final (i, point) in audit.points.indexed)
-                    PointRow(key: Key('replay-point-$i'), point: point),
+                if (failed) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.icon(
+                      key: const Key('replay-retry'),
+                      icon: const Icon(Icons.replay_rounded, size: 18),
+                      label: Text(l.replayRetry),
+                      onPressed: () => context.go(AppRoutes.audit(audit.skillId)),
+                    ),
+                  ),
                 ],
+                // A pass reads its points first; a fail leads with its gaps.
+                if (!failed) ...points,
                 if (gaps.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.xxl),
                   Text(failed ? l.whatWasMissing : l.worthSecondLook, style: theme.labelMedium),
@@ -229,31 +291,6 @@ class _ReplaySceneState extends State<ReplayScene> {
                       evidence: gap,
                       color: failed ? AppColors.danger : AppColors.textTertiary,
                     ),
-                ],
-                if (audit.lessons.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.xxl),
-                  Text(l.pastLessons, style: theme.labelMedium),
-                  const SizedBox(height: AppSpacing.sm),
-                  for (final (i, lesson) in audit.lessons.indexed)
-                    LessonCheckRow(key: Key('replay-lesson-check-$i'), check: lesson),
-                ],
-                if (failed) ...[
-                  const SizedBox(height: AppSpacing.xl),
-                  _feedbackRow(context, audit),
-                ],
-                if (audit.turns.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.xxl),
-                  CollapsibleSection(
-                    title: l.replayDialogue,
-                    folded: _dialogueFolded,
-                    onToggle: () => setState(() => _dialogueFolded = !_dialogueFolded),
-                    compact: true,
-                    toggleKey: const Key('replay-dialogue'),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [for (final turn in audit.turns) _Turn(turn: turn)],
-                    ),
-                  ),
                 ],
                 if (principle != null) ...[
                   const SizedBox(height: AppSpacing.xxl),
@@ -275,9 +312,35 @@ class _ReplaySceneState extends State<ReplayScene> {
                       ),
                     ),
                   ],
+                  if (failed && gaps.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.xl),
+                    _materialsSection(context, audit, [for (final g in gaps) g.gap]),
+                  ],
                 ] else if (failed) ...[
-                  const SizedBox(height: AppSpacing.xxl),
+                  const SizedBox(height: AppSpacing.lg),
                   _reflectionField(context),
+                ],
+                if (failed) ...points,
+                if (audit.lessons.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xxl),
+                  Text(l.pastLessons, style: theme.labelMedium),
+                  const SizedBox(height: AppSpacing.sm),
+                  for (final (i, lesson) in audit.lessons.indexed)
+                    _LessonLine(key: Key('replay-lesson-check-$i'), check: lesson),
+                ],
+                if (audit.turns.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xxl),
+                  CollapsibleSection(
+                    title: l.replayDialogue,
+                    folded: _dialogueFolded,
+                    onToggle: () => setState(() => _dialogueFolded = !_dialogueFolded),
+                    compact: true,
+                    toggleKey: const Key('replay-dialogue'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [for (final turn in audit.turns) _Turn(turn: turn)],
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -287,42 +350,90 @@ class _ReplaySceneState extends State<ReplayScene> {
     );
   }
 
-  /// Two quiet things to say about a fail: it was too hard for now, or the
-  /// judge quoted words the user did not say. Once sent, a line says so.
-  Widget _feedbackRow(BuildContext context, AuditSession audit) {
+  /// The ⋯ of the title bar: two quiet things to say about a fail, it was
+  /// too hard for now, or the judge quoted words the user did not say. One
+  /// already sent stays in the menu, greyed, saying it was noted.
+  Widget _feedbackMenu(BuildContext context, AuditSession audit) {
     final l = context.l10n;
-    final theme = Theme.of(context).textTheme;
-    Widget one(AuditFeedback kind, bool noted, String label, String done, String name) => noted
-        ? Text(
-            done,
-            key: Key('replay-$name-noted'),
-            style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
-          )
-        : TextButton(
-            key: Key('replay-$name'),
-            style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
-            onPressed: _telling == null ? () => unawaited(_tell(kind)) : null,
-            child: Text(label),
-          );
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.xs,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        one(
+    PopupMenuEntry<AuditFeedback> item(
+      AuditFeedback kind,
+      bool noted,
+      String label,
+      String done,
+      String name,
+    ) => PopupMenuItem<AuditFeedback>(
+      key: Key(noted ? 'replay-$name-noted' : 'replay-$name'),
+      value: kind,
+      enabled: !noted && _telling == null,
+      child: Text(noted ? done : label),
+    );
+    return PopupMenuButton<AuditFeedback>(
+      key: const Key('replay-menu'),
+      tooltip: l.more,
+      icon: const Icon(Icons.more_horiz_rounded, size: 18),
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(28, 28),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      onSelected: (kind) => unawaited(_tell(kind)),
+      itemBuilder: (_) => [
+        item(
           AuditFeedback.tooHard,
           audit.tooHard,
           l.feedbackTooHard,
           l.feedbackTooHardNoted,
           'too-hard',
         ),
-        one(
+        item(
           AuditFeedback.misheard,
           audit.disputed,
           l.feedbackMisheard,
           l.feedbackMisheardNoted,
           'misheard',
         ),
+      ],
+    );
+  }
+
+  /// After the card: `Find material` for the gaps, then at most three
+  /// sources (title, site), a quiet line when nothing came back or the search
+  /// failed.
+  Widget _materialsSection(BuildContext context, AuditSession audit, List<String> gaps) {
+    final theme = Theme.of(context).textTheme;
+    final l = context.l10n;
+    final materials = _materials;
+    final quiet = theme.bodySmall?.copyWith(color: AppColors.textTertiary);
+    return Column(
+      key: const Key('replay-materials'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (materials == null || materials.isEmpty)
+          OutlinedButton.icon(
+            key: const Key('replay-find-materials'),
+            icon: _searching
+                ? const SizedBox.square(
+                    dimension: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.search_rounded, size: 18),
+            label: Text(l.findMaterials),
+            onPressed: _searching ? null : () => unawaited(_findMaterials(audit, gaps)),
+          )
+        else ...[
+          Text(l.materialsHeading, style: theme.labelMedium),
+          const SizedBox(height: AppSpacing.xs),
+          for (final (i, item) in materials.indexed)
+            _MaterialLink(key: Key('replay-material-$i'), item: item),
+        ],
+        if (_searchFailed || (materials != null && materials.isEmpty)) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            _searchFailed ? l.materialsFailed : l.materialsNone,
+            key: const Key('replay-materials-note'),
+            style: quiet,
+          ),
+        ],
       ],
     );
   }
@@ -374,6 +485,81 @@ class _ReplaySceneState extends State<ReplayScene> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A past lesson the audit touched: one that held in amber, one that came
+/// back in plain text with a ↻ (it is a lesson to look at again, not an error).
+class _LessonLine extends StatelessWidget {
+  const _LessonLine({super.key, required this.check});
+
+  final LessonCheck check;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyMedium;
+    final text = LessonCheckRow.textOf(context, check);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: check.held
+          ? Text(text, style: style?.copyWith(color: AppColors.success))
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 3, right: AppSpacing.xs + 2),
+                  child: Icon(Icons.refresh_rounded, size: 15, color: AppColors.textTertiary),
+                ),
+                Expanded(
+                  child: Text(text, style: style?.copyWith(color: AppColors.textSecondary)),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// One source: its title, and under it the site; a tap opens it.
+class _MaterialLink extends StatelessWidget {
+  const _MaterialLink({super.key, required this.item});
+
+  final SearchItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+    return InkWell(
+      onTap: () => unawaited(openExternalUrl(context, item.url)),
+      borderRadius: AppRadius.chipBorder,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                  ),
+                  Text(
+                    displayDomain(item.url),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            const Icon(Icons.open_in_new_rounded, size: 16, color: AppColors.textTertiary),
+          ],
+        ),
+      ),
     );
   }
 }

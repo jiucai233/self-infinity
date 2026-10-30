@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import '../../widgets/keep_all.dart';
 
 /// The user's last sent line on the stage (`docs/ux-chat.md` 5.4): it appears
 /// above the input bar as a small right-aligned bubble when a line is sent
@@ -135,7 +136,7 @@ class _LastSaidBubbleState extends State<LastSaidBubble> with SingleTickerProvid
                           vertical: AppSpacing.sm + 2,
                         ),
                         child: Text(
-                          text,
+                          keepAll(text),
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium,

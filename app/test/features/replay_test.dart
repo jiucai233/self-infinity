@@ -1,6 +1,8 @@
 // The replay of an audit: each gap with the user's own words next to what
 // holds, the past lessons that held or came back, and the reflection the user
 // writes themselves.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/api.dart';
@@ -108,13 +110,31 @@ void main() {
   });
 
   group('the verdict card', () {
-    testWidgets('shows the quote and what holds under the gap it belongs to', (tester) async {
+    Future<void> openMenu(WidgetTester tester) async {
+      await tester.tap(key('verdict-more'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('lists the gap titles; what each rests on is left to the replay', (tester) async {
       await pumpCard(tester, VerdictCard(verdict: failedVerdict, onBack: () {}));
-      expect(
-        textsIn(tester, key('verdict-gap-0')),
-        containsAll(['It just works', 'The range pins it down']),
-      );
+      expect(textsIn(tester, key('verdict-gap-0')), ['No reason given']);
       expect(textsIn(tester, key('verdict-gap-1')), ['No exceptions']);
+      expect(find.text('It just works'), findsNothing);
+      expect(find.text('The range pins it down'), findsNothing);
+      expect(find.byType(GapEvidenceView), findsNothing);
+    });
+
+    testWidgets('two gap titles, then +N', (tester) async {
+      await pumpCard(
+        tester,
+        VerdictCard(
+          verdict: const VerdictResult(passed: false, score: 30, gaps: ['A', 'B', 'C', 'D']),
+          onBack: () {},
+        ),
+      );
+      expect(key('verdict-gap-1'), findsOneWidget);
+      expect(key('verdict-gap-2'), findsNothing);
+      expect(tester.widget<Text>(key('verdict-gaps-more')).data, '+2');
     });
 
     testWidgets('a verdict without evidence lists its gaps as before', (tester) async {
@@ -126,7 +146,7 @@ void main() {
         ),
       );
       expect(textsIn(tester, key('verdict-gap-0')), ['No reason given']);
-      expect(find.text('You said'), findsNothing);
+      expect(key('verdict-gaps-more'), findsNothing);
       expect(find.text('Past lessons'), findsNothing);
     });
 
@@ -137,14 +157,35 @@ void main() {
       );
       expect(row(0).data, 'Came back: State the range first');
       expect(row(0).style!.color, AppColors.danger);
+      expect(row(0).maxLines, 1);
       expect(row(1).data, 'Held: Reason before conclusion');
       expect(row(1).style!.color, AppColors.success);
     });
 
-    testWidgets('the feedback buttons show only for a fail with their callbacks', (tester) async {
+    testWidgets('See details opens the replay', (tester) async {
       await pumpCard(tester, VerdictCard(verdict: failedVerdict, onBack: () {}));
+      expect(key('verdict-details'), findsNothing);
+
+      var opened = 0;
+      await pumpCard(
+        tester,
+        VerdictCard(verdict: failedVerdict, onDetails: () => opened++, onBack: () {}),
+      );
+      expect(find.text('See details →'), findsOneWidget);
+      await tester.tap(key('verdict-details'));
+      expect(opened, 1);
+    });
+
+    testWidgets('the feedback is in the ⋯ menu, only for a fail, with its callbacks', (
+      tester,
+    ) async {
+      await pumpCard(tester, VerdictCard(verdict: failedVerdict, onBack: () {}));
+      await openMenu(tester);
+      expect(key('verdict-copy'), findsOneWidget);
       expect(key('verdict-too-hard'), findsNothing);
       expect(key('verdict-misheard'), findsNothing);
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
 
       var told = 0;
       await pumpCard(
@@ -156,10 +197,15 @@ void main() {
           onBack: () {},
         ),
       );
+      expect(find.text('Too hard for now'), findsNothing); // not on the card itself
+      await openMenu(tester);
       expect(find.text('Too hard for now'), findsOneWidget);
       expect(find.text("I didn't say that"), findsOneWidget);
       await tester.tap(key('verdict-too-hard'));
+      await tester.pumpAndSettle();
+      await openMenu(tester);
       await tester.tap(key('verdict-misheard'));
+      await tester.pumpAndSettle();
       expect(told, 11);
 
       await pumpCard(
@@ -171,11 +217,13 @@ void main() {
           onBack: () {},
         ),
       );
+      await openMenu(tester);
+      expect(key('verdict-copy'), findsOneWidget);
       expect(key('verdict-too-hard'), findsNothing);
       expect(key('verdict-misheard'), findsNothing);
     });
 
-    testWidgets('a button already used gives way to a line saying it was noted', (tester) async {
+    testWidgets('an item already used gives way to a line saying it was noted', (tester) async {
       await pumpCard(
         tester,
         VerdictCard(
@@ -186,6 +234,7 @@ void main() {
           onBack: () {},
         ),
       );
+      await openMenu(tester);
       expect(key('verdict-too-hard'), findsNothing);
       expect(key('verdict-too-hard-noted'), findsOneWidget);
       expect(find.text('Noted: too hard for now'), findsOneWidget);
@@ -193,13 +242,12 @@ void main() {
       expect(key('verdict-misheard-noted'), findsNothing);
     });
 
-    testWidgets('after a real fail the card quotes the last answer', (tester) async {
+    testWidgets('after a real fail the card names the gap without the quote', (tester) async {
       final failed = await failAudit(api, 6);
       await pumpCard(tester, VerdictCard(verdict: failed.verdict, onBack: () {}));
-      expect(
-        textsIn(tester, key('verdict-gap-0')),
-        containsAll(['You said', shortAnswer, 'What holds', FakeApiClient.failRight]),
-      );
+      expect(textsIn(tester, key('verdict-gap-0')), isNotEmpty);
+      expect(find.text('You said'), findsNothing);
+      expect(find.text(FakeApiClient.failRight), findsNothing);
     });
   });
 
@@ -336,33 +384,51 @@ void main() {
         find.descendant(of: key('replay-lesson-check-0'), matching: find.byType(Text)),
       );
       expect(row.data, 'Came back: ${lesson.title}');
-      expect(row.style!.color, AppColors.danger);
+      // A lesson to look at again, not an error: plain text with a ↻.
+      expect(row.style!.color, AppColors.textSecondary);
+      expect(
+        find.descendant(
+          of: key('replay-lesson-check-0'),
+          matching: find.byIcon(Icons.refresh_rounded),
+        ),
+        findsOneWidget,
+      );
       expect(key('replay-reflection'), findsOneWidget); // this one has not been reflected on
     });
   });
 
   group('the feedback on a fail', () {
-    testWidgets('a failed audit offers both; tapping one sends it and says it was noted', (
-      tester,
-    ) async {
+    Future<void> openMenu(WidgetTester tester) async {
+      await tester.tap(key('replay-menu'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('both sit in the ⋯ menu; one sent is noted there, greyed', (tester) async {
       final failed = await failAudit(api, 6);
       await pumpReplay(tester, api, failed.sessionId);
+      // Not on the page itself.
+      expect(find.text('Too hard for now'), findsNothing);
+      expect(find.text("I didn't say that"), findsNothing);
+
+      await openMenu(tester);
       expect(find.text('Too hard for now'), findsOneWidget);
       expect(find.text("I didn't say that"), findsOneWidget);
-      await tester.ensureVisible(key('replay-too-hard'));
-      await tester.pumpAndSettle();
       await tester.tap(key('replay-too-hard'));
       await tester.pumpAndSettle();
-      expect(key('replay-too-hard'), findsNothing);
-      expect(find.text('Noted: too hard for now'), findsOneWidget);
-      expect(key('replay-misheard'), findsOneWidget);
-      expect(key('replay-misheard-noted'), findsNothing);
       final audit = await api.getAudit(failed.sessionId);
       expect([audit.tooHard, audit.disputed], [true, false]);
+      expect(find.text('Noted: too hard for now'), findsOneWidget); // the toast
 
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      await openMenu(tester);
+      expect(key('replay-too-hard'), findsNothing);
+      expect(
+        tester.widget<PopupMenuItem<AuditFeedback>>(key('replay-too-hard-noted')).enabled,
+        isFalse,
+      );
       await tester.tap(key('replay-misheard'));
       await tester.pumpAndSettle();
-      expect(find.text('Noted: you didn\'t say that'), findsOneWidget);
       expect((await api.getAudit(failed.sessionId)).disputed, isTrue);
     });
 
@@ -370,24 +436,120 @@ void main() {
       final failed = await failAudit(api, 6);
       await api.auditFeedback(failed.sessionId, AuditFeedback.misheard);
       await pumpReplay(tester, api, failed.sessionId);
+      await openMenu(tester);
       expect(key('replay-misheard-noted'), findsOneWidget);
       expect(key('replay-misheard'), findsNothing);
       expect(key('replay-too-hard'), findsOneWidget);
     });
 
-    testWidgets('a failed call leaves the button to try again', (tester) async {
+    testWidgets('a failed call leaves the item to try again', (tester) async {
       final failed = await failAudit(api, 6);
       await pumpReplay(tester, api, failed.sessionId);
       api.failNext(method: 'auditFeedback');
-      await tester.ensureVisible(key('replay-too-hard'));
-      await tester.pumpAndSettle();
+      await openMenu(tester);
       await tester.tap(key('replay-too-hard'));
       await tester.pumpAndSettle();
-      expect(key('replay-too-hard-noted'), findsNothing);
-      expect(tester.widget<TextButton>(key('replay-too-hard')).onPressed, isNotNull);
+      expect((await api.getAudit(failed.sessionId)).tooHard, isFalse);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      await openMenu(tester);
       await tester.tap(key('replay-too-hard'));
       await tester.pumpAndSettle();
-      expect(key('replay-too-hard-noted'), findsOneWidget);
+      expect((await api.getAudit(failed.sessionId)).tooHard, isTrue);
+    });
+  });
+
+  group('the next step after a fail', () {
+    testWidgets('Try again sits above the gaps and starts a new audit of the node', (
+      tester,
+    ) async {
+      final failed = await failAudit(api, 6);
+      await pumpReplay(tester, api, failed.sessionId, size: phoneScreen);
+      expect(find.text('Try again'), findsOneWidget);
+      final retry = tester.getTopLeft(key('replay-retry')).dy;
+      expect(retry, lessThan(tester.getTopLeft(key('replay-gap-0')).dy));
+      await tester.tap(key('replay-retry'));
+      await tester.pumpAndSettle();
+      expect(find.text('route:${AppRoutes.audit(6)}'), findsOneWidget);
+    });
+
+    testWidgets('the reflection field comes right after the gaps, before the points', (
+      tester,
+    ) async {
+      final failed = await failAudit(api, 6);
+      await pumpReplay(tester, api, failed.sessionId);
+      final field = tester.getTopLeft(key('replay-reflection')).dy;
+      expect(field, greaterThan(tester.getTopLeft(key('replay-gap-1')).dy));
+      expect(field, lessThan(tester.getTopLeft(key('replay-point-0')).dy));
+    });
+  });
+
+  group('material for the gaps', () {
+    Future<void> findMaterials(WidgetTester tester) async {
+      await tester.ensureVisible(key('replay-find-materials'));
+      await tester.pumpAndSettle();
+      await tester.tap(key('replay-find-materials'));
+    }
+
+    testWidgets('offered only once the card is made, and never searched by itself', (
+      tester,
+    ) async {
+      final failed = await failAudit(api, 6);
+      await pumpReplay(tester, api, failed.sessionId);
+      expect(key('replay-find-materials'), findsNothing);
+      await reflect(tester, 'I thought the formula was the whole idea');
+      expect(key('replay-find-materials'), findsOneWidget);
+      expect(find.text('Find material'), findsOneWidget);
+      expect((await api.getSkillOverview(6)).materials, isEmpty);
+    });
+
+    testWidgets('a tap searches the node for the gaps and lists at most three', (tester) async {
+      final failed = await failAudit(api, 6);
+      await api.submitReflection(failed.sessionId, 'I memorized the formula');
+      await pumpReplay(tester, api, failed.sessionId);
+      await findMaterials(tester);
+      await tester.pumpAndSettle();
+
+      final plan = (await api.getSkillOverview(6)).materials.single;
+      expect(plan.gap, failed.verdict.gaps.join('; '));
+      final shown = plan.items.take(3).toList();
+      expect(key('replay-find-materials'), findsNothing);
+      expect(find.text('Material'), findsOneWidget);
+      for (final (i, item) in shown.indexed) {
+        expect(textsIn(tester, key('replay-material-$i')), [item.title, displayDomain(item.url)]);
+      }
+      expect(key('replay-material-3'), findsNothing);
+    });
+
+    testWidgets('while it searches the button waits; a failure is said quietly', (
+      tester,
+    ) async {
+      final gated = _GatedApi();
+      await gated.generateCourse(const GenerateRequest(topic: 'math'));
+      final failed = await failAudit(gated, 6);
+      await gated.submitReflection(failed.sessionId, 'I memorized the formula');
+      await pumpReplay(tester, gated, failed.sessionId);
+
+      gated.gate = Completer<void>();
+      await findMaterials(tester);
+      await tester.pump();
+      expect(tester.widget<OutlinedButton>(key('replay-find-materials')).onPressed, isNull);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      gated.failNext(method: 'createSearchPlan');
+      gated.gate!.complete();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(key('replay-materials-note')).data,
+        "The search didn't go through. Try again later.",
+      );
+      expect(tester.widget<OutlinedButton>(key('replay-find-materials')).onPressed, isNotNull);
+
+      gated.gate = null;
+      await findMaterials(tester);
+      await tester.pumpAndSettle();
+      expect(key('replay-materials-note'), findsNothing);
+      expect(key('replay-material-0'), findsOneWidget);
     });
   });
 
@@ -402,8 +564,8 @@ void main() {
       expect(key('replay-reflection'), findsNothing);
       expect(key('replay-submit'), findsNothing);
       expect(key('replay-lesson'), findsNothing);
-      expect(key('replay-too-hard'), findsNothing);
-      expect(key('replay-misheard'), findsNothing);
+      expect(key('replay-menu'), findsNothing);
+      expect(key('replay-retry'), findsNothing);
     });
   });
 
@@ -434,4 +596,17 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+}
+
+/// A fake whose material search waits for [gate], when there is one.
+class _GatedApi extends FakeApiClient {
+  _GatedApi() : super(latency: Duration.zero);
+
+  Completer<void>? gate;
+
+  @override
+  Future<SearchPlan> createSearchPlan(int skillId, {String? gap, int? misconceptionId}) async {
+    await gate?.future;
+    return super.createSearchPlan(skillId, gap: gap, misconceptionId: misconceptionId);
+  }
 }

@@ -224,12 +224,12 @@ class _Numbers extends StatelessWidget {
   }
 }
 
-Widget _statusChip(LifeNode n) {
+Widget _statusChip(AppLocalizations l, LifeNode n) {
   if (n.status == null) return const SizedBox.shrink();
-  if (n.isMastered) return const StatusChip.success('Cleared', key: Key('node-sheet-status'));
-  if (n.failed) return const StatusChip.danger('Failed', key: Key('node-sheet-status'));
-  if (n.isAvailable) return const StatusChip.primary('Ready', key: Key('node-sheet-status'));
-  return const StatusChip.neutral('Locked', key: Key('node-sheet-status'));
+  if (n.isMastered) return StatusChip.success(l.dotCleared, key: const Key('node-sheet-status'));
+  if (n.failed) return StatusChip.danger(l.auditFailed, key: const Key('node-sheet-status'));
+  if (n.isAvailable) return StatusChip.primary(l.dotReady, key: const Key('node-sheet-status'));
+  return StatusChip.neutral(l.dotLocked, key: const Key('node-sheet-status'));
 }
 
 // ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ class _SkillBodyState extends State<_SkillBody> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (n.boss && n.status != null) const _BossChip(),
-                _statusChip(n),
+                _statusChip(context.l10n, n),
                 if (n.unexpanded)
                   StatusChip.neutral(context.l10n.dotUnexpanded, key: const Key('node-sheet-unexpanded')),
                 if (_courseName != null)
@@ -365,11 +365,11 @@ class _BossChip extends StatelessWidget {
   const _BossChip();
 
   @override
-  Widget build(BuildContext context) => const StatusChip(
-    label: 'Boss',
+  Widget build(BuildContext context) => StatusChip(
+    label: context.l10n.boss,
     color: AppColors.onAccent,
     fill: AppColors.primary,
-    key: Key('node-sheet-boss'),
+    key: const Key('node-sheet-boss'),
   );
 }
 

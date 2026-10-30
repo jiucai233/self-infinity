@@ -38,6 +38,22 @@ class _SignInSceneState extends State<SignInScene> {
   bool _busy = false;
   bool _showPassword = false;
   String? _error;
+  // The confirmation link was sent again: once per visit to this screen.
+  bool _resent = false;
+
+  Future<void> _resend(AuthService auth) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final result = await auth.resendConfirmation(_email.text);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _resent = result.error == null;
+      _error = result.error;
+    });
+  }
 
   static final Map<String, LifeTree> _samples = {};
   static LifeTree _sample(AppLocalizations l) => _samples[l.localeName] ??= _sampleTree(l);
@@ -107,6 +123,7 @@ class _SignInSceneState extends State<SignInScene> {
   void _switch(_Mode mode) => setState(() {
     _mode = mode;
     _error = null;
+    _resent = false;
   });
 
   void _open(_Mode mode) => setState(() {
@@ -235,6 +252,20 @@ class _SignInSceneState extends State<SignInScene> {
                   : context.l10n.resetLinkSent(_email.text.trim()),
               style: theme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
+            if (inbox) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                context.l10n.confirmNotArrived,
+                style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              ),
+              TextButton(
+                key: const Key('resend-confirmation'),
+                onPressed: _busy || _resent ? null : () => unawaited(_resend(auth)),
+                child: Text(_resent ? context.l10n.confirmResent : context.l10n.confirmResend),
+              ),
+              if (_error case final e?)
+                Text(e, style: theme.bodySmall?.copyWith(color: AppColors.danger)),
+            ],
             const SizedBox(height: AppSpacing.xl),
             OutlinedButton(
               key: const Key('back-to-sign-in'),

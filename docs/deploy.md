@@ -22,6 +22,7 @@
 1. 在 https://supabase.com 新建项目。**Region 选 Northeast Asia (Seoul)**，和 Vercel 的函数区域 `icn1` 一致，否则每个请求都要跨洋。数据库密码记下来。
 2. **Authentication → Sign In / Providers → Email**：保持开启。
    - 开发阶段可以先关掉 **Confirm email**（免得每次注册都要收信；Supabase 自带的发信每小时只有几封）。正式给人用再打开，最好配自己的 SMTP。
+   - **Confirm email 开着就必须配 SMTP**（Authentication → Emails → SMTP Settings）。Supabase 自带的发信只投递到项目团队成员的邮箱，外人注册时界面会说"去收件箱看看"，信却永远不来。可用 Resend、SendGrid 之类，或 Gmail 的应用专用密码（smtp.gmail.com:465）。配好后把 Rate Limits 里的邮件上限调高。
 3. **Authentication → URL Configuration**：Site URL 填 Vercel 的网址（第 2 步之后才有）；Redirect URLs 加上同一个网址，以及手机 App 用的 `selfinfinity://login-callback`，确认邮件和重置密码的链接才会跳回来。
 4. 记下三样东西：
    - **Project URL**：`https://<ref>.supabase.co`（Project Settings → API）

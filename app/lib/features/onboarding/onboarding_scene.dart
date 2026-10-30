@@ -698,7 +698,7 @@ class _Page extends StatelessWidget {
                     speaker: 'front_desk',
                     tail: BubbleTail.left,
                     maxWidth: 320,
-                    child: Text(guideLine!, style: theme.bodyLarge),
+                    child: Text(keepAll(guideLine!), style: theme.bodyLarge),
                   ),
                 ),
               ),
@@ -714,12 +714,12 @@ class _Page extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
         ],
         Text(
-          title,
+          keepAll(title),
           key: const Key('onboarding-title'),
           style: wide ? theme.displaySmall : theme.headlineMedium,
         ),
         const SizedBox(height: AppSpacing.md),
-        Text(body, style: theme.bodyLarge?.copyWith(color: AppColors.textTertiary)),
+        Text(keepAll(body), style: theme.bodyLarge?.copyWith(color: AppColors.textTertiary)),
         if (field != null) ...[const SizedBox(height: AppSpacing.xl), field!],
         if (error != null) ...[
           const SizedBox(height: AppSpacing.sm),
@@ -766,7 +766,7 @@ class _ScoutOptionTile extends StatelessWidget {
                       if (option.why.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
-                          option.why,
+                          keepAll(option.why),
                           style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
                         ),
                       ],
