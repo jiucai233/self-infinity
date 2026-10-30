@@ -9,10 +9,12 @@ import 'auth/auth_service.dart';
 import 'auth/supabase_auth.dart';
 import 'l10n/l10n.dart';
 import 'widgets/avatar.dart';
+import 'widgets/live2d_figure.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerDafeiyuLicense();
+  registerLive2DLicense();
   unawaited(Avatar.precache());
   final locale = await LocaleController.load();
   AuthService auth = LocalAuth();

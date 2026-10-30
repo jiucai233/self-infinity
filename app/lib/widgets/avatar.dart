@@ -13,6 +13,16 @@ enum AvatarMood { smile, neutral, stern, angry, happy }
 /// What the avatar is doing.
 enum AvatarState { idle, listening, thinking, speaking }
 
+/// A short reaction that overrides her picture while it lasts.
+enum AvatarReaction {
+  /// She turns to look at something beside her (her left, the viewer's
+  /// right, where [OrbAvatar]'s ball floats).
+  lookAside,
+
+  /// Hands to her face, eyes wide.
+  surprised,
+}
+
 /// The agent's mood when nothing else is said.
 AvatarMood defaultMoodOf(String agent) => switch (agent) {
   'front_desk' || 'recommender' || 'checkin_converter' => AvatarMood.smile,
@@ -33,14 +43,15 @@ void registerDafeiyuLicense() {
       const ['大肥鱼 (character art)'],
       '作者：YunYueSama\n'
       '仓库：https://github.com/YunYueSama/codex-deepseek-pet\n\n'
-      'Modified for this app: the expression sheet is downscaled to 256 px cells '
-      'and re-encoded as WebP. Not endorsed by YunYueSama or DeepSeek.\n\n$text',
+      'Modified for this app: 29 frames of the 512 px expression, action, idle '
+      'and wave sheets are cut out, rescaled to one figure height, packed into '
+      'one atlas and re-encoded as WebP. Not endorsed by YunYueSama or DeepSeek.\n\n$text',
     );
   });
 }
 
 /// 大肥鱼, the one companion every agent is (`assets/dafeiyu/`): a chibi
-/// whale-girl maid drawn from two sheets.
+/// whale-girl maid drawn from one sprite atlas.
 ///
 /// * [agent] is kept for the label and for a later 3D model; every agent is
 ///   drawn as the same character.
@@ -48,12 +59,12 @@ void registerDafeiyuLicense() {
 ///   chin while thinking, talking while speaking, a tilted head while
 ///   listening.
 /// * [wave] waves a few times.
-/// * [holdOrb] holds her hands together in front of her chest; [OrbAvatar]
-///   puts the crystal ball there ([orbHandAt]).
+/// * [holdOrb] holds her own little whale ball in both hands.
+/// * [reaction], when set, shows that still picture instead (no movement).
 /// * [animate] turns the movement off (the picture is then one still frame).
 ///   It defaults to [animationsEnabled], which tests switch off.
 ///
-/// The sheets are decoded once and shared; until they are, the box is empty.
+/// The atlas is decoded once and shared; until it is, the box is empty.
 class Avatar extends StatefulWidget {
   const Avatar({
     super.key,
@@ -64,19 +75,25 @@ class Avatar extends StatefulWidget {
     this.holdOrb = false,
     this.size = 160,
     this.animate,
+    this.reaction,
   });
 
   /// Global switch for the movement; `false` in widget tests.
   static bool animationsEnabled = true;
 
-  /// Decodes the sheets (once). Tests await it so she is drawn at once.
+  /// Decodes the atlas (once). Tests await it so she is drawn at once.
   static Future<void> precache() => _Sheets.load();
 
-  /// Where the hands of a [holdOrb] figure are, in the avatar's own
-  /// coordinates (the box is `size * aspect` wide and `size` high).
+  /// One loop of her idle blink; things that move with her use it.
+  static Duration get idleLoop => _Clip.idle.duration;
+
+  /// Where a crystal ball floats beside her: at chest height, just past her
+  /// hair on her left (the viewer's right), in the avatar's own coordinates
+  /// (the box is `size * aspect` wide and `size` high). [OrbAvatar] centres
+  /// its ball here.
   static Offset orbHandAt(String agent, double size) {
     final k = unit(agent, size);
-    return Offset(size * aspect / 2, 0) + _orbHand * k;
+    return Offset(size * aspect / 2, 0) + _orbFloat * k;
   }
 
   /// Scale from figure units to logical pixels: the box is 100 x 140 units.
@@ -86,8 +103,9 @@ class Avatar extends StatefulWidget {
   /// its sides.
   static const double aspect = 100 / 140;
 
-  /// The hands of the ball-holding pose, from the box's top centre, in units.
-  static final Offset _orbHand = _Sheet.expressions.toUnits(122, 168);
+  /// The floating ball's centre, from the box's top centre, in units: her
+  /// hair reaches 47 units right of her middle at chest height.
+  static const Offset _orbFloat = Offset(76, 58);
 
   final String agent;
   final AvatarMood mood;
@@ -98,68 +116,35 @@ class Avatar extends StatefulWidget {
   /// Height of the figure; it is 5/7 of that wide.
   final double size;
   final bool? animate;
+  final AvatarReaction? reaction;
 
   @override
   State<Avatar> createState() => _AvatarState();
 }
 
-/// One of the two sheets and where the figure sits in its cells.
-class _Sheet {
-  const _Sheet({
-    required this.asset,
-    required this.cellWidth,
-    required this.cellHeight,
-    required this.columns,
-    required this.centerX,
-    required this.top,
-    required this.bottom,
-  });
-
-  final String asset;
-  final double cellWidth;
-  final double cellHeight;
-  final int columns;
+/// The atlas (`assets/dafeiyu/dafeiyu.webp`) and where the figure sits in
+/// its cells: 8 columns of 352 x 432 px cells, every frame scaled so a
+/// standing figure is equally tall and her soles on the same line.
+abstract final class _Sheet {
+  static const String asset = 'assets/dafeiyu/dafeiyu.webp';
+  static const double cellWidth = 352;
+  static const double cellHeight = 432;
+  static const int columns = 8;
 
   /// The figure's middle, the top of her hair and her soles, in cell pixels.
-  /// Both sheets are cropped so she is the same size in either.
-  final double centerX;
-  final double top;
-  final double bottom;
+  static const double centerX = 176;
+  static const double top = 24;
+  static const double bottom = 428;
+  static const double height = bottom - top;
 
-  double get height => bottom - top;
-
-  /// 4 x 4 still expressions, 256 px cells.
-  static const expressions = _Sheet(
-    asset: 'assets/dafeiyu/expressions.webp',
-    cellWidth: 256,
-    cellHeight: 256,
-    columns: 4,
-    centerX: 128,
-    top: 36,
-    bottom: 238,
-  );
-
-  /// The animated pet sheet: 8 columns x 9 rows of 192 x 208 cells.
-  static const sprites = _Sheet(
-    asset: 'assets/dafeiyu/spritesheet.webp',
-    cellWidth: 192,
-    cellHeight: 208,
-    columns: 8,
-    centerX: 95,
-    top: 37,
-    bottom: 195,
-  );
-
-  ui.Image? get image => identical(this, expressions) ? _Sheets.expressions : _Sheets.sprites;
-
-  /// Cell pixel ([x], [y]) of [cell] as figure units from the box's top centre.
-  Offset toUnits(double x, double y) => Offset(x - centerX, y - top) * (140 / height);
+  /// Her head, for the badge: a square of [headSide] around [headCenter].
+  static const Offset headCenter = Offset(centerX, bottom - 264);
+  static const double headSide = 224;
 }
 
-/// The decoded sheets, shared by every avatar.
+/// The decoded atlas, shared by every avatar.
 abstract final class _Sheets {
-  static ui.Image? expressions;
-  static ui.Image? sprites;
+  static ui.Image? atlas;
   static final ValueNotifier<bool> ready = ValueNotifier(false);
   static Future<void>? _loading;
 
@@ -167,81 +152,97 @@ abstract final class _Sheets {
 
   static Future<void> _load() async {
     try {
-      final images = await Future.wait([
-        _decode(_Sheet.expressions.asset),
-        _decode(_Sheet.sprites.asset),
-      ]);
-      expressions = images[0];
-      sprites = images[1];
+      final data = await rootBundle.load(_Sheet.asset);
+      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final frame = await codec.getNextFrame();
+      codec.dispose();
+      atlas = frame.image;
       ready.value = true;
     } on Object catch (e) {
       // The box stays empty; nothing else depends on her picture.
-      debugPrint('大肥鱼: the sheets did not load ($e)');
+      debugPrint('大肥鱼: the atlas did not load ($e)');
     }
   }
-
-  static Future<ui.Image> _decode(String asset) async {
-    final data = await rootBundle.load(asset);
-    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
-    final frame = await codec.getNextFrame();
-    codec.dispose();
-    return frame.image;
-  }
 }
 
-/// One picture: a cell of a sheet.
-class _Frame {
-  const _Frame(this.sheet, this.index);
-
-  final _Sheet sheet;
-
-  /// Row-major cell index.
-  final int index;
-
-  // Cells of the expression sheet.
-  static const neutral = _Frame(_Sheet.expressions, 0);
-  static const curious = _Frame(_Sheet.expressions, 1);
-  static const sideGlance = _Frame(_Sheet.expressions, 3);
-  static const holding = _Frame(_Sheet.expressions, 6);
-  static const eyesClosed = _Frame(_Sheet.expressions, 7);
-  static const thinking = _Frame(_Sheet.expressions, 8);
-  static const pouting = _Frame(_Sheet.expressions, 10);
-
-  // A smile with closed lips, from the talking row.
-  static const smile = _Frame(_Sheet.sprites, 8 * 8 + 1);
+/// One picture: a cell of the atlas (the order of
+/// `assets/dafeiyu/README.md`).
+extension type const _Frame(int index) {
+  static const neutral = _Frame(0);
+  static const curious = _Frame(1);
+  static const sideGlance = _Frame(2);
+  static const holding = _Frame(3);
+  static const eyesClosed = _Frame(4);
+  static const thinking = _Frame(5);
+  static const pouting = _Frame(6);
+  static const surprised = _Frame(7);
+  static const lookAside = _Frame(8);
+  static const smile = _Frame(9);
+  static const talkOpen = _Frame(10);
+  static const talkSmile = _Frame(11);
+  static const thinkA = _Frame(12);
+  static const thinkB = _Frame(13);
+  static const idleOpen = _Frame(14);
+  static const idleClosed = _Frame(15);
+  static const listen0 = _Frame(16);
+  static const listen1 = _Frame(17);
+  static const listen2 = _Frame(18);
+  static const listen3 = _Frame(19);
+  static const wave0 = 20; // the first of nine wave frames
 
   Rect get source => Rect.fromLTWH(
-    (index % sheet.columns) * sheet.cellWidth,
-    (index ~/ sheet.columns) * sheet.cellHeight,
-    sheet.cellWidth,
-    sheet.cellHeight,
+    (index % _Sheet.columns) * _Sheet.cellWidth,
+    (index ~/ _Sheet.columns) * _Sheet.cellHeight,
+    _Sheet.cellWidth,
+    _Sheet.cellHeight,
   );
-
-  @override
-  bool operator ==(Object other) =>
-      other is _Frame && identical(other.sheet, sheet) && other.index == index;
-
-  @override
-  int get hashCode => Object.hash(sheet.asset, index);
 }
 
-/// A row of the pet sheet played as a loop.
+/// Frames played as a loop, each held [frameMs].
 class _Clip {
-  const _Clip(this.row, this.frames, this.frameMs);
+  const _Clip(this.frames, this.frameMs);
 
-  final int row;
-  final int frames;
+  final List<_Frame> frames;
   final int frameMs;
 
-  Duration get duration => Duration(milliseconds: frames * frameMs);
+  int get length => frames.length;
 
-  _Frame at(int i) => _Frame(_Sheet.sprites, row * 8 + i % frames);
+  Duration get duration => Duration(milliseconds: length * frameMs);
 
-  static const idle = _Clip(0, 6, 260); // blinks
-  static const wave = _Clip(3, 4, 160);
-  static const listening = _Clip(5, 8, 240); // looks around, tilts her head
-  static const thinking = _Clip(7, 6, 220); // a hand on her chin
-  static const talking = _Clip(8, 6, 170);
+  _Frame at(int i) => frames[i % length];
+
+  /// Eyes open for three seconds, one blink.
+  static const idle = _Clip([
+    ...[
+      _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen,
+      _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen,
+      _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen,
+      _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen,
+      _Frame.idleOpen, _Frame.idleOpen, _Frame.idleOpen,
+    ],
+    _Frame.idleClosed,
+  ], 130);
+
+  static const wave = _Clip([
+    _Frame(_Frame.wave0), _Frame(_Frame.wave0 + 1), _Frame(_Frame.wave0 + 2),
+    _Frame(_Frame.wave0 + 3), _Frame(_Frame.wave0 + 4), _Frame(_Frame.wave0 + 5),
+    _Frame(_Frame.wave0 + 6), _Frame(_Frame.wave0 + 7), _Frame(_Frame.wave0 + 8),
+  ], 140);
+
+  /// Looks around, tilts her head.
+  static const listening = _Clip([
+    _Frame.listen0, _Frame.listen1, _Frame.listen1, _Frame.listen0,
+    _Frame.listen3, _Frame.listen3, _Frame.listen0, _Frame.listen2,
+  ], 300);
+
+  /// A finger on her chin.
+  static const thinking = _Clip([
+    _Frame.thinkA, _Frame.thinkA, _Frame.thinkB, _Frame.thinkB, _Frame.thinkB, _Frame.thinkA,
+  ], 300);
+
+  static const talking = _Clip([
+    _Frame.talkOpen, _Frame.smile, _Frame.talkOpen, _Frame.talkSmile,
+  ], 200);
 }
 
 /// The still picture of [mood].
@@ -254,17 +255,17 @@ _Frame _moodFrame(AvatarMood mood) => switch (mood) {
 };
 
 class _AvatarState extends State<Avatar> with SingleTickerProviderStateMixin {
-  static const int _waveCycles = 3;
+  static const int _waveCycles = 2;
   late final AnimationController _controller = AnimationController(vsync: this);
 
-  /// The frame of the playing clip; repaints only when it changes.
+  /// The step of the playing clip; rebuilds only when it changes.
   final ValueNotifier<int> _tick = ValueNotifier(0);
 
   bool get _animate => widget.animate ?? Avatar.animationsEnabled;
 
   /// What plays while moving, or null for a still picture.
   _Clip? get _clip {
-    if (!_animate || widget.holdOrb) return null;
+    if (!_animate || widget.holdOrb || widget.reaction != null) return null;
     return switch (widget.state) {
       AvatarState.speaking => _Clip.talking,
       AvatarState.thinking => _Clip.thinking,
@@ -295,7 +296,9 @@ class _AvatarState extends State<Avatar> with SingleTickerProviderStateMixin {
     final clip = _clip;
     if (clip == null) return;
     final cycles = _controller.duration!.inMicroseconds / clip.duration.inMicroseconds;
-    _tick.value = (_controller.value * cycles * clip.frames).floor();
+    final step = (_controller.value * cycles * clip.length).floor();
+    // The step as the cell it shows, so a held frame does not rebuild.
+    _tick.value = clip.at(step).index;
   }
 
   @override
@@ -335,23 +338,31 @@ class _AvatarState extends State<Avatar> with SingleTickerProviderStateMixin {
 
   /// The picture when nothing moves.
   _Frame get _still {
+    switch (widget.reaction) {
+      case AvatarReaction.lookAside:
+        return _Frame.lookAside;
+      case AvatarReaction.surprised:
+        return _Frame.surprised;
+      case null:
+    }
     if (widget.holdOrb) return _Frame.holding;
     return switch (widget.state) {
       AvatarState.thinking => _Frame.thinking,
       AvatarState.listening => _Frame.curious,
-      AvatarState.speaking => _Clip.talking.at(2), // mouth open
-      AvatarState.idle => widget.wave ? _Clip.wave.at(1) : _moodFrame(widget.mood),
+      AvatarState.speaking => _Frame.talkOpen,
+      AvatarState.idle => widget.wave ? _Clip.wave.at(2) : _moodFrame(widget.mood),
     };
   }
 
-  /// The picture at [tick] of the playing clip.
+  /// The picture of the playing clip ([tick] is its current cell).
   _Frame _frameAt(int tick) {
     final clip = _clip;
     if (clip == null) return _still;
     final waving = widget.state == AvatarState.idle && widget.wave;
     // A wave that has run its cycles settles on the mood's picture.
     if (waving && !_controller.isAnimating) return _moodFrame(widget.mood);
-    return clip.at(tick);
+    // Before the first tick of a new clip the old cell may still be there.
+    return clip.frames.contains(_Frame(tick)) ? _Frame(tick) : clip.at(0);
   }
 
   @override
@@ -380,20 +391,21 @@ class _FigurePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final sheet = frame.sheet;
-    final image = sheet.image;
+    final image = _Sheets.atlas;
     if (image == null) return;
-    final s = size.height / sheet.height;
+    final s = size.height / _Sheet.height;
     final dst = Rect.fromLTWH(
-      size.width / 2 - sheet.centerX * s,
-      -sheet.top * s,
-      sheet.cellWidth * s,
-      sheet.cellHeight * s,
+      size.width / 2 - _Sheet.centerX * s,
+      -_Sheet.top * s,
+      _Sheet.cellWidth * s,
+      _Sheet.cellHeight * s,
     );
     canvas.drawImageRect(
       image,
       frame.source,
       dst,
+      // Mipmapped sampling keeps her line art crisp when the cell is drawn
+      // much smaller than its 432 px (the audit header, the badges).
       Paint()..filterQuality = FilterQuality.medium,
     );
   }
@@ -453,18 +465,12 @@ class _HeadPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final sheet = frame.sheet;
-    final image = sheet.image;
+    final image = _Sheets.atlas;
     if (image == null) return;
-    // The head in the expression sheet: 112 px around (128, 106); the same
-    // part of the figure in the other sheet.
-    final k = sheet.height / _Sheet.expressions.height;
-    final side = 112 * k;
-    final cell = frame.source;
     final src = Rect.fromCenter(
-      center: cell.topLeft + Offset(sheet.centerX, sheet.top + (106 - _Sheet.expressions.top) * k),
-      width: side,
-      height: side,
+      center: frame.source.topLeft + _Sheet.headCenter,
+      width: _Sheet.headSide,
+      height: _Sheet.headSide,
     );
     canvas.drawImageRect(
       image,

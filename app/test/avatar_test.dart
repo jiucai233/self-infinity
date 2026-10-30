@@ -158,17 +158,56 @@ void main() {
       }
     });
 
-    testWidgets('holding the orb: her hands are in front of her chest', (tester) async {
+    testWidgets('holding her own ball is its own picture', (tester) async {
       await pumpWidgetUnderTest(
         tester,
         const Avatar(agent: 'front_desk', holdOrb: true, size: 140, animate: false),
       );
       final held = await pixels(tester);
       expect(same(held, await pixelsOf(tester, mood: AvatarMood.smile)), isFalse);
-      final hand = Avatar.orbHandAt('front_desk', 140);
-      expect(hand.dx, inInclusiveRange(30, 70));
-      expect(hand.dy, inInclusiveRange(60, 110));
+    });
+
+    test('a crystal ball floats beside her at chest height, right of her box', () {
+      final at = Avatar.orbHandAt('front_desk', 140);
+      expect(at.dx, greaterThan(100 + 20), reason: 'clear of her hair');
+      expect(at.dy, inInclusiveRange(45, 80));
       expect(Avatar.unit('front_desk', 140), 1);
+      expect(Avatar.orbHandAt('front_desk', 280), at * 2);
+    });
+
+    testWidgets('a reaction overrides the picture and stops the movement', (tester) async {
+      final idle = await pixelsOf(tester);
+      final faces = <Uint8List>[];
+      for (final reaction in AvatarReaction.values) {
+        await pumpWidgetUnderTest(
+          tester,
+          Avatar(agent: 'front_desk', reaction: reaction, size: 140, animate: true),
+        );
+        expect(tester.hasRunningAnimations, isFalse, reason: '$reaction');
+        faces.add(await pixels(tester));
+        expect(same(idle, faces.last), isFalse, reason: '$reaction');
+      }
+      expect(same(faces[0], faces[1]), isFalse);
+      // Without the reaction she moves again.
+      await pumpWidgetUnderTest(tester, const Avatar(agent: 'front_desk', size: 140, animate: true));
+      expect(tester.hasRunningAnimations, isTrue);
+      await pumpWidgetUnderTest(tester, const SizedBox());
+    });
+
+    testWidgets('idle she blinks: the eyes close once a loop', (tester) async {
+      await pumpWidgetUnderTest(
+        tester,
+        const Avatar(agent: 'front_desk', size: 140, animate: true),
+      );
+      final open = await pixels(tester);
+      final loop = Avatar.idleLoop;
+      // The blink is the last frame of the loop.
+      await tester.pump(loop - const Duration(milliseconds: 60));
+      final closed = await pixels(tester);
+      expect(same(open, closed), isFalse);
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(same(open, await pixels(tester)), isTrue);
+      await pumpWidgetUnderTest(tester, const SizedBox());
     });
 
     testWidgets('the same input always gives the same picture', (tester) async {

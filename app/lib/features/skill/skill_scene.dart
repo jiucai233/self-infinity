@@ -881,12 +881,19 @@ class _AvatarColumn extends StatelessWidget {
               : Text(keepAll(_line(context.l10n)), style: theme.bodyLarge),
         ),
         const SizedBox(height: AppSpacing.sm),
-        Avatar(
-          agent: agent,
+        Live2DFigure(
           mood: AvatarMood.smile,
           state: busy ? AvatarState.thinking : AvatarState.idle,
           wave: !node.isLocked && !_unexpanded && !node.isLinked && reply == null,
           size: size,
+          framing: 'upper',
+          fallback: Avatar(
+            agent: agent,
+            mood: AvatarMood.smile,
+            state: busy ? AvatarState.thinking : AvatarState.idle,
+            wave: !node.isLocked && !_unexpanded && !node.isLinked && reply == null,
+            size: size,
+          ),
         ),
       ],
     );

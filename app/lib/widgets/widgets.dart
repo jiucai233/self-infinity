@@ -23,3 +23,4 @@ export 'toast.dart';
 export 'vocabulary.dart';
 export 'dictation_button.dart';
 export 'voice_wave.dart';
+export 'live2d_figure.dart';

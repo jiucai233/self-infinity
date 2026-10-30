@@ -773,7 +773,14 @@ class _SpeakerHeader extends StatelessWidget {
       children: [
         GestureDetector(
           onTap: onTap,
-          child: Avatar(agent: agent, mood: mood, state: state, size: 76),
+          // On the web she is the Live2D student at her desk; the sprite stands in until it loads.
+          child: Live2DFigure(
+            mood: mood,
+            state: state,
+            size: 76,
+            framing: 'upper',
+            fallback: Avatar(agent: agent, mood: mood, state: state, size: 76),
+          ),
         ),
         const SizedBox(width: AppSpacing.lg),
         Expanded(

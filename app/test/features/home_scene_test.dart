@@ -44,7 +44,7 @@ void main() {
     ) async {
       await pumpHome(tester, FakeApiClient(latency: Duration.zero));
       expect(avatar(tester).agent, 'front_desk');
-      expect(avatar(tester).holdOrb, isTrue);
+      expect(avatar(tester).holdOrb, isFalse); // the ball floats beside her
       expect(avatar(tester).mood, AvatarMood.smile);
       final tree = tester.widget<LifeConstellation>(find.byType(LifeConstellation));
       expect(tree.compact, isTrue);
