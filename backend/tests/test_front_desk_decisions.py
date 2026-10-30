@@ -98,7 +98,7 @@ def test_the_questions_carry_every_intent_and_every_node_once():
     assert input_text == "Player's nodes:\n- Quadratic Equations\n- Discriminant\n\nChat message:\nwhat now"
     intent, node = questions
     assert [c["value"] for c in intent["choices"]] == [
-        "generate_course", "open_skill", "checkin", "plan", "briefing", "open_map", "none",
+        "generate_course", "open_skill", "checkin", "plan", "briefing", "open_map", "audit_review", "none",
     ]
     assert all(c["description"] for c in intent["choices"])
     assert node["choices"] == [{"value": "Quadratic Equations"}, {"value": "Discriminant"}, {"value": NO_NODE, "description": "It names none of them."}]

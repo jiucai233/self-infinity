@@ -87,6 +87,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get auditPassed => '통과';
 
   @override
+  String get coursesTranslateFailed => '코스를 번역하지 못했어요. 지금은 원래 언어로 남아 있어요.';
+
+  @override
   String get auditorTagline => '당신에게 배우고, 따라가지 못한 곳을 물어봐요';
 
   @override
@@ -1643,6 +1646,33 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get devLearnerFalsePass => '미통과여야 할 것을 통과로';
+
+  @override
+  String devAuditCount(int count) {
+    return '감사 $count회';
+  }
+
+  @override
+  String get devLearnerPrediction => '예측 정확도';
+
+  @override
+  String get devBrierModel => '모델';
+
+  @override
+  String get devBrierBaseline => '통과율만';
+
+  @override
+  String devBrierHint(int count) {
+    return '감사 $count회의 Brier 점수, 낮을수록 좋아요';
+  }
+
+  @override
+  String get devRejudge => '이전 감사 다시 판정';
+
+  @override
+  String devRejudgeStatus(String version, int judged, int changed, int left) {
+    return '규칙 $version: $judged회 다시 판정, $changed회 결론이 달라짐, $left회 남음';
+  }
 
   @override
   String devLearnerNodes(String target) {

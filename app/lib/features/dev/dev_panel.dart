@@ -235,6 +235,8 @@ class _DevPanelState extends State<DevPanel> {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       _Metrics(metrics: data.metrics),
+                      const SizedBox(height: AppSpacing.lg),
+                      _Rejudge(api: _api),
                       const SizedBox(height: AppSpacing.xl),
                       if (data.audits.isEmpty)
                         Text(l.devNoAudits, style: theme.bodyMedium)
@@ -488,7 +490,7 @@ class _LlmCosts extends StatelessWidget {
             for (final r in d.audits)
               (
                 name(r),
-                '${r.audits} ${l.devAudits} · ${_num(r.avgCalls)} ${l.devLlmCalls} · ${_usdFine(r.avgCost)}',
+                '${l.devAuditCount(r.audits ?? 0)} · ${_num(r.avgCalls)} ${l.devLlmCalls} · ${_usdFine(r.avgCost)}',
               ),
           ]),
           _rows(context, l.devLlmByModel, 'model', [
@@ -599,7 +601,7 @@ class _Learner extends StatelessWidget {
                   text: _signed(m.ability),
                   style: theme.titleSmall?.copyWith(color: AppColors.textPrimary),
                 ),
-                TextSpan(text: ' · ${m.history.length} ${l.devAudits}'),
+                TextSpan(text: ' · ${l.devAuditCount(m.history.length)}'),
               ],
             ),
             style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
@@ -647,6 +649,21 @@ class _Learner extends StatelessWidget {
             ('false-pass', l.devLearnerFalsePass, _pct(m.judgeFalsePass)),
           ]),
         ),
+        if (m.evaluation case final e? when e.results > 0) ...[
+          const SizedBox(height: AppSpacing.lg),
+          KeyedSubtree(
+            key: const Key('learner-evaluation'),
+            child: _tiles(context, l.devLearnerPrediction, prefix: 'learner-brier-', [
+              ('model', l.devBrierModel, e.brier?.toStringAsFixed(3) ?? '—'),
+              ('baseline', l.devBrierBaseline, e.brierBaseline?.toStringAsFixed(3) ?? '—'),
+            ]),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            l.devBrierHint(e.results),
+            style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
+          ),
+        ],
         if (m.nodes.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.xl),
           Text(l.devLearnerNodes(_pct(m.targetChance)), style: theme.labelLarge),
@@ -849,3 +866,85 @@ class _AuditCard extends StatelessWidget {
     );
   }
 }
+
+/// The audits given under older rules, judged again under the current ones
+/// a few at a time (each is a model call): how many came out the other way.
+class _Rejudge extends StatefulWidget {
+  const _Rejudge({required this.api});
+
+  final SelfInfinityApi api;
+
+  @override
+  State<_Rejudge> createState() => _RejudgeState();
+}
+
+class _RejudgeState extends State<_Rejudge> {
+  RejudgeStatus? _status;
+  bool _busy = false;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_run(() => widget.api.getRejudge()));
+  }
+
+  Future<void> _run(Future<RejudgeStatus> Function() call, {bool add = false}) async {
+    setState(() => _busy = true);
+    try {
+      final now = await call();
+      if (!mounted) return;
+      final before = _status;
+      setState(() {
+        _error = null;
+        // A batch answers for itself: it is added to what was judged before.
+        _status = add && before != null
+            ? RejudgeStatus(
+                version: now.version,
+                judged: before.judged + now.judged,
+                changed: before.changed + now.changed,
+                left: now.left,
+              )
+            : now;
+      });
+    } on Object catch (e) {
+      if (mounted) setState(() => _error = e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context).textTheme;
+    final s = _status;
+    final e = _error;
+    return Column(
+      key: const Key('dev-rejudge'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (s != null)
+          Text(
+            l.devRejudgeStatus(s.version, s.judged, s.changed, s.left),
+            key: const Key('dev-rejudge-status'),
+            style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+        if (e != null)
+          Text(
+            e is ApiException ? e.userMessage : '$e',
+            style: theme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+        if (s != null && s.left > 0) ...[
+          const SizedBox(height: AppSpacing.sm),
+          OutlinedButton(
+            key: const Key('dev-rejudge-run'),
+            onPressed: _busy ? null : () => unawaited(_run(() => widget.api.rejudge(), add: true)),
+            child: Text(l.devRejudge),
+          ),
+        ],
+      ],
+    );
+  }
+}
+

@@ -80,6 +80,13 @@ abstract class SelfInfinityApi {
   /// searched for (404 when none is found). Answers the course map.
   Future<CourseMap> applySyllabus(int courseId, {List<int> uploadIds = const []});
 
+  /// `POST /courses/translate` (LLM). Body `{"language"}`: `en`, `zh` or
+  /// `ko`. Puts every course not already in [language] into it (course
+  /// title, node titles and descriptions, knowledge points), one LLM call per
+  /// course; a course whose translation fails is left as it was and counted
+  /// as skipped.
+  Future<CourseTranslation> translateCourses(String language);
+
   /// `POST /skills/{skillId}/audits`. Body `{"mode", "test_out"}`.
   ///
   /// Starts an audit. [mode] is `'day'` or `'night'` (night doubles the turn
@@ -369,6 +376,15 @@ abstract class SelfInfinityApi {
   /// finished audit, the Auditor's estimated error rates for this account,
   /// and the nodes open to study with the chance of passing each.
   Future<LearnerModel> getLearner();
+
+  /// `GET /dev/rejudge` (contract #51; developers only): how many finished
+  /// audits the Auditor's current rules have judged again, and decide the
+  /// other way.
+  Future<RejudgeStatus> getRejudge();
+
+  /// `POST /dev/rejudge` (developers only; one model call per audit): judges
+  /// the next few audits given under older rules again.
+  Future<RejudgeStatus> rejudge({int limit = 5});
 }
 
 /// What the user says about a failed audit (`POST /audits/{id}/feedback`).

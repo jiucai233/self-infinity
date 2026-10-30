@@ -258,3 +258,40 @@ def test_converter_failure_is_not_an_error(client, monkeypatch):
 )
 def test_invalid_check_ins_are_422(client, body):
     assert client.post("/api/checkins", json=body).status_code == 422
+
+
+# ---------------------------------------------------------------- verbal ratings
+
+
+def test_the_prompt_has_word_to_number_anchors_in_three_languages():
+    provider = reply()
+    convert("x", provider)
+
+    prompt = provider.calls_for("checkin_converter")[0][0]["content"]
+    assert "only if the user said a number" not in prompt
+    for anchor in ("完全没压力", "压力有点大", "스트레스 별로 없어", "pretty relaxed", "脑子转不动", "terrible"):
+        assert anchor in prompt
+    assert "1 = none" in prompt and "5 = extreme" in prompt
+    assert "wins over any words" in prompt
+
+
+def test_a_verbal_value_from_the_converter_is_stored(client, monkeypatch):
+    provider = reply(focus=1, stress=4)
+    monkeypatch.setattr("app.routers.checkins.get_provider", lambda agent=None: provider)
+
+    response = client.post("/api/checkins", json={"transcript": "压力有点大，今天脑子转不动"})
+
+    checkin = response.json()["checkin"]
+    assert (checkin["focus"], checkin["stress"]) == (1, 4)
+    assert "focus" not in response.json()["missing_fields"]
+
+
+def test_a_field_not_mentioned_stays_null(client, monkeypatch):
+    provider = reply(stress=2)
+    monkeypatch.setattr("app.routers.checkins.get_provider", lambda agent=None: provider)
+
+    response = client.post("/api/checkins", json={"transcript": "pretty relaxed today"})
+
+    checkin = response.json()["checkin"]
+    assert (checkin["stress"], checkin["focus"], checkin["sleep_quality"]) == (2, None, None)
+    assert "focus" in response.json()["missing_fields"]

@@ -244,6 +244,12 @@ abstract class AppLocalizations {
   /// **'Passed'**
   String get auditPassed;
 
+  /// No description provided for @coursesTranslateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your courses could not be translated; they stay in their language for now.'**
+  String get coursesTranslateFailed;
+
   /// No description provided for @auditorTagline.
   ///
   /// In en, this message translates to:
@@ -3141,6 +3147,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Passes what should fail'**
   String get devLearnerFalsePass;
+
+  /// No description provided for @devAuditCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 audit} other{{count} audits}}'**
+  String devAuditCount(int count);
+
+  /// No description provided for @devLearnerPrediction.
+  ///
+  /// In en, this message translates to:
+  /// **'How well it predicts'**
+  String get devLearnerPrediction;
+
+  /// No description provided for @devBrierModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get devBrierModel;
+
+  /// No description provided for @devBrierBaseline.
+  ///
+  /// In en, this message translates to:
+  /// **'Pass rate only'**
+  String get devBrierBaseline;
+
+  /// No description provided for @devBrierHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Brier score over {count, plural, =1{1 audit} other{{count} audits}}, lower is better'**
+  String devBrierHint(int count);
+
+  /// No description provided for @devRejudge.
+  ///
+  /// In en, this message translates to:
+  /// **'Judge old audits again'**
+  String get devRejudge;
+
+  /// No description provided for @devRejudgeStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules {version}: {judged} judged again, {changed} the other way, {left} left'**
+  String devRejudgeStatus(String version, int judged, int changed, int left);
 
   /// No description provided for @devLearnerNodes.
   ///

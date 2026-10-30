@@ -788,6 +788,11 @@ def _front_desk(messages: list[Message]) -> str:
     return out("none", _FRONT_REPLIES["none"])
 
 
+def _translate(messages: list[Message]) -> str:
+    """The Mock has no second language: it answers the course back as it was given."""
+    return _first_user(messages) or "{}"
+
+
 _SCRIPTS = {
     "clarifier": _clarify,
     "course_scout": _scout,
@@ -805,6 +810,7 @@ _SCRIPTS = {
     "front_desk": _front_desk,
     "life_coach": _life_coach,
     "fact_keeper": _fact_keeper,
+    "translator": _translate,
 }
 
 

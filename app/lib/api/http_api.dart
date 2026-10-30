@@ -138,6 +138,13 @@ class HttpApi implements SelfInfinityApi {
     parse: (j) => CourseMap.fromJson(_object(j)),
   );
 
+  @override
+  Future<CourseTranslation> translateCourses(String language) => _post(
+    '/courses/translate',
+    body: {'language': language},
+    parse: (j) => CourseTranslation.fromJson(_object(j)),
+  );
+
   // -- 7–9: audits ------------------------------------------------------------
 
   @override
@@ -513,6 +520,17 @@ class HttpApi implements SelfInfinityApi {
 
   @override
   Future<LearnerModel> getLearner() => _get('/learner', parse: (j) => LearnerModel.fromJson(_object(j)));
+
+  @override
+  Future<RejudgeStatus> getRejudge() => _get('/dev/rejudge', parse: (j) => RejudgeStatus.fromJson(_object(j)));
+
+  @override
+  Future<RejudgeStatus> rejudge({int limit = 5}) => _send(
+    'POST',
+    '/dev/rejudge',
+    query: {'limit': '$limit'},
+    parse: (j) => RejudgeStatus.fromJson(_object(j)),
+  );
 
   static List<ChatMessage> _chatMessages(Object? j) =>
       _array(_object(j)['messages']).map((e) => ChatMessage.fromJson(_object(e))).toList();

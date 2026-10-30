@@ -951,7 +951,7 @@ def test_the_learner_has_exactly_these_keys_and_aims_at_three_quarters(client, m
     body = client.get("/api/learner").json()
 
     assert set(body) == {
-        "ability", "target_chance", "judge_false_pass", "judge_false_fail", "nodes", "history", "styles",
+        "ability", "target_chance", "judge_false_pass", "judge_false_fail", "nodes", "history", "styles", "evaluation",
     }
     assert body["target_chance"] == 0.75
     assert body["ability"] == 0

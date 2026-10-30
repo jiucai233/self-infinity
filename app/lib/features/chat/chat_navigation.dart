@@ -5,8 +5,8 @@ import '../../api/models.dart';
 import '../../app/router.dart';
 
 /// Carries out the first `navigate` action among the assistant [messages] of a
-/// chat answer (`docs/api-contract.md` Section 5): switch to the skill graph or
-/// to a node's overview.
+/// chat answer (`docs/api-contract.md` Section 5): switch to the skill graph,
+/// to a node's overview or to the replay of an audit.
 ///
 /// Returns whether the scene was switched.
 bool followNavigation(BuildContext context, Iterable<ChatMessage> messages) {
@@ -21,6 +21,11 @@ bool followNavigation(BuildContext context, Iterable<ChatMessage> messages) {
         final id = action.skillId;
         if (id == null) continue;
         context.go(AppRoutes.skill(id));
+        return true;
+      case NavScene.audit:
+        final id = action.auditId;
+        if (id == null) continue;
+        context.go(AppRoutes.replay(id));
         return true;
     }
   }

@@ -87,6 +87,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get auditPassed => '已通过';
 
   @override
+  String get coursesTranslateFailed => '课程没能翻译，暂时保持原来的语言。';
+
+  @override
   String get auditorTagline => '听你讲，哪里没跟上就问';
 
   @override
@@ -1637,6 +1640,33 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get devLearnerFalsePass => '不该过的判成通过';
+
+  @override
+  String devAuditCount(int count) {
+    return '$count 场审计';
+  }
+
+  @override
+  String get devLearnerPrediction => '预测准不准';
+
+  @override
+  String get devBrierModel => '模型';
+
+  @override
+  String get devBrierBaseline => '只猜通过率';
+
+  @override
+  String devBrierHint(int count) {
+    return '$count 场审计的 Brier 分数，越低越好';
+  }
+
+  @override
+  String get devRejudge => '按现行规则重判旧审计';
+
+  @override
+  String devRejudgeStatus(String version, int judged, int changed, int left) {
+    return '规则 $version：已重判 $judged 场，$changed 场结论不同，还剩 $left 场';
+  }
 
   @override
   String devLearnerNodes(String target) {

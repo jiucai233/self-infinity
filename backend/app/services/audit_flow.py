@@ -242,6 +242,8 @@ def start_audit(
             if first is not None:
                 return unfinished, first.content, True
 
+    # The style is chosen on the learner model, so it must hold every audit before then.
+    learner.catch_up(session)
     position = node_position(session, skill)
     examined = points.to_examine(skill) if not test_out and points.has_points(session, skill) else []
     # A challenge keeps its own standard (every part asked must hold); a style is for the

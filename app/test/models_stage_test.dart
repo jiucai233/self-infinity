@@ -127,6 +127,13 @@ void main() {
       expect(a.skillId, 5);
     });
 
+    test('action navigate: audit carries the audit id', () {
+      final a = message('{"type": "navigate", "scene": "audit", "audit_id": 31}').action as NavigateAction;
+      expect(a.scene, NavScene.audit);
+      expect(a.auditId, 31);
+      expect(a.skillId, isNull);
+    });
+
     test('unknown action types, scenes and roles are rejected', () {
       expect(() => message('{"type": "teleport"}'), throwsFormatException);
       expect(() => message('{"type": "navigate", "scene": "moon"}'), throwsFormatException);

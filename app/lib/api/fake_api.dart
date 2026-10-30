@@ -127,6 +127,7 @@ class FakeApiClient implements SelfInfinityApi {
     'addSkillPart',
     'linkSkill',
     'applySyllabus',
+    'translateCourses',
     'startAudit',
     'submitTurn',
     'submitReflection',
@@ -178,11 +179,14 @@ class FakeApiClient implements SelfInfinityApi {
     'getDevLlm',
     'getDevVoice',
     'getLearner',
+    'getRejudge',
+    'rejudge',
   };
 
   // -- state ------------------------------------------------------------------
 
   final List<Course> _courses = [];
+  final Map<int, String> _courseLanguages = {}; // set by translateCourses
   final Map<int, SkillNode> _nodes = {}; // insertion order == id order
   final List<SkillEdge> _edges = []; // per course: contains edges, then requires
   final Map<int, _FakeAudit> _audits = {};
@@ -594,6 +598,21 @@ class FakeApiClient implements SelfInfinityApi {
     }
     _openNext(courseId);
     return _mapOf(course);
+  }
+
+  /// The fake has no second language: every course stays as it is, counted
+  /// as translated once per language it was not in yet.
+  @override
+  Future<CourseTranslation> translateCourses(String language) async {
+    await _begin('translateCourses');
+    var translated = 0;
+    for (final course in _courses) {
+      if (_courseLanguages[course.id] != language) {
+        _courseLanguages[course.id] = language;
+        translated++;
+      }
+    }
+    return CourseTranslation(translated: translated, skipped: 0);
   }
 
   @override
@@ -2143,8 +2162,35 @@ class FakeApiClient implements SelfInfinityApi {
         StyleStat(audience: 'child', depth: 1),
         StyleStat(audience: 'child', depth: 2),
       ],
+      evaluation: _learnerSteps.isEmpty
+          ? const LearnerEvaluation()
+          : LearnerEvaluation(results: _learnerSteps.length, brier: 0.21, brierBaseline: 0.25),
     );
   }
+
+  /// Offline, two old audits wait to be judged again; the first comes out
+  /// the other way.
+  int _rejudgeLeft = 2;
+  int _rejudged = 0;
+
+  @override
+  Future<RejudgeStatus> getRejudge() async {
+    await _begin('getRejudge');
+    return _rejudgeStatus(_rejudged, _rejudged > 0 ? 1 : 0);
+  }
+
+  @override
+  Future<RejudgeStatus> rejudge({int limit = 5}) async {
+    await _begin('rejudge');
+    final now = limit < _rejudgeLeft ? limit : _rejudgeLeft;
+    final changed = _rejudged == 0 && now > 0 ? 1 : 0;
+    _rejudgeLeft -= now;
+    _rejudged += now;
+    return _rejudgeStatus(now, changed);
+  }
+
+  RejudgeStatus _rejudgeStatus(int judged, int changed) =>
+      RejudgeStatus(version: '2026-10-15', judged: judged, changed: changed, left: _rejudgeLeft);
 
   void _recordLearnerStep(_FakeAudit audit, {required bool passed}) {
     final before = _learnerSteps.lastOrNull?.ability ?? 0;

@@ -144,6 +144,7 @@ def record(
     tier: str = "medium",
     audit_id: int | None = None,
     offset: float = 0.0,
+    at=None,
 ) -> float | None:
     """Moves the ability and the difficulties by an audit's results and returns its progress,
     0 to 1: how far the results went beyond what was expected. None: nothing was settled.
@@ -157,9 +158,11 @@ def record(
     me = learner(session)
     ability = me.ability
     progress = 0.0
+    predicted = 0.0
     for title, ok in results:
         row = point(session, skill, title, tier)
         expected = chance(ability, row.difficulty + offset)
+        predicted += expected
         worth = corrected(ok, expected, false_pass, false_fail)
         progress += worth * (1 - expected)
         move = STEP * weight * (worth - expected)
@@ -171,7 +174,16 @@ def record(
     session.add(me)
     progress /= len(results)
     if audit_id is not None:
-        session.add(LearnerStep(session_id=audit_id, ability=me.ability, progress=progress))
+        step = LearnerStep(
+            session_id=audit_id,
+            ability=me.ability,
+            progress=progress,
+            predicted=predicted / len(results),
+            observed=sum(1 for _, ok in results if ok) / len(results),
+        )
+        if at is not None:
+            step.created_at = at
+        session.add(step)
     return progress
 
 
@@ -183,6 +195,78 @@ def history(session: Session) -> list[tuple[LearnerStep, AuditSession, SkillNode
         .join(SkillNode, SkillNode.id == AuditSession.skill_id)
         .order_by(col(LearnerStep.id))
     ).all()
+
+
+def _settled(session: Session) -> list[AuditSession]:
+    """The finished audits that settled something, oldest first."""
+    rows = session.exec(
+        select(AuditSession)
+        .where(AuditSession.status != AuditStatus.active)
+        .order_by(col(AuditSession.created_at), col(AuditSession.id))
+    ).all()
+    return [a for a in rows if results_of(a.status == AuditStatus.passed, a.points)]
+
+
+def catch_up(session: Session) -> bool:
+    """Rebuilds the model from every finished audit, oldest first, when one of them is not in it:
+    the audits from before the model existed, kept by the account but never counted. The model
+    is a sequence of updates, so it is replayed from the start rather than appended to out of
+    order; a "too hard" the user gave is replayed right after its audit. True: it was rebuilt."""
+    audits = [(a, session.get(SkillNode, a.skill_id)) for a in _settled(session)]
+    audits = [(a, skill) for a, skill in audits if skill is not None]
+    steps = session.exec(select(LearnerStep)).all()
+    counted = {s.session_id for s in steps}
+    # A step from before predictions were kept is replayed too, so the evaluation has them all.
+    if all(a.id in counted for a, _ in audits) and all(s.predicted is not None for s in steps):
+        return False
+    from app.services import audit_style, bandit  # they read the learner model
+
+    for row in steps:
+        session.delete(row)
+    for row in session.exec(select(LearnerPoint)).all():
+        session.delete(row)
+    me = learner(session)
+    me.ability = 0.0
+    session.add(me)
+    session.flush()
+    for audit, skill in audits:
+        record(
+            session,
+            skill,
+            audit.status == AuditStatus.passed,
+            audit.points or None,
+            audit.agreement,
+            bandit.difficulty_tier(session, skill),
+            audit.id,
+            offset=audit_style.difficulty_offset(audit.audience, audit.depth),
+            at=audit.created_at,
+        )
+        if audit.too_hard:
+            too_hard(session, audit, skill)
+        session.flush()
+    return True
+
+
+def evaluation(session: Session) -> dict:
+    """How well the model predicts the next verdict: the Brier score of the chance it gave before
+    each audit against the share of results that were right, next to the Brier score of always
+    guessing the share right so far (from an even 0.5). Lower is better; the model is worth its
+    keep when it beats that guess."""
+    steps = [s for s in session.exec(select(LearnerStep).order_by(col(LearnerStep.id))).all() if s.predicted is not None]
+    if not steps:
+        return {"results": 0, "brier": None, "brier_baseline": None}
+    model = baseline = 0.0
+    seen = 0.0
+    for i, step in enumerate(steps):
+        guess = (0.5 + seen) / (1 + i)
+        model += (step.predicted - step.observed) ** 2
+        baseline += (guess - step.observed) ** 2
+        seen += step.observed
+    return {
+        "results": len(steps),
+        "brier": round(model / len(steps), 4),
+        "brier_baseline": round(baseline / len(steps), 4),
+    }
 
 
 def too_hard(session: Session, audit: AuditSession, skill: SkillNode) -> None:

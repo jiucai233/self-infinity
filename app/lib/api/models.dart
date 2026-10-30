@@ -412,6 +412,19 @@ enum GraphEdgeKind {
 // Courses and the skill graph
 // ---------------------------------------------------------------------------
 
+/// What `POST /courses/translate` did: courses put into the new language,
+/// and courses left as they were because their translation failed.
+@immutable
+class CourseTranslation {
+  const CourseTranslation({required this.translated, required this.skipped});
+
+  factory CourseTranslation.fromJson(Json json) =>
+      CourseTranslation(translated: _int(json, 'translated'), skipped: _int(json, 'skipped'));
+
+  final int translated;
+  final int skipped;
+}
+
 /// A learning course (UI name: quest line). Contract: `Course`.
 @immutable
 class Course {
@@ -1877,7 +1890,8 @@ enum ChatRole {
 /// Where a `navigate` chat action points.
 enum NavScene {
   map('map'),
-  skill('skill');
+  skill('skill'),
+  audit('audit');
 
   const NavScene(this.value);
   final String value;
@@ -1906,6 +1920,7 @@ sealed class ChatAction {
         return NavigateAction(
           scene: NavScene.fromJson(json['scene']),
           skillId: _intN(json, 'skill_id'),
+          auditId: _intN(json, 'audit_id'),
         );
       default:
         throw _bad('type', json['type']);
@@ -1942,12 +1957,14 @@ final class BriefingAction extends ChatAction {
   final Briefing briefing;
 }
 
-/// Switch scene. [skillId] is set only for [NavScene.skill].
+/// Switch scene. [skillId] is set only for [NavScene.skill], [auditId] only for [NavScene.audit]
+/// (the replay of that audit).
 final class NavigateAction extends ChatAction {
-  const NavigateAction({required this.scene, this.skillId});
+  const NavigateAction({required this.scene, this.skillId, this.auditId});
 
   final NavScene scene;
   final int? skillId;
+  final int? auditId;
 }
 
 /// One message of the front-desk conversation (endpoints 18–19).
@@ -2887,6 +2904,7 @@ class LearnerModel {
     this.nodes = const [],
     this.history = const [],
     this.styles = const [],
+    this.evaluation,
   });
 
   factory LearnerModel.fromJson(Json json) => LearnerModel(
@@ -2897,6 +2915,9 @@ class LearnerModel {
     nodes: _list(json, 'nodes', LearnerNode.fromJson),
     history: _list(json, 'history', LearnerStep.fromJson),
     styles: json['styles'] == null ? const [] : _list(json, 'styles', StyleStat.fromJson),
+    evaluation: json['evaluation'] is Map<String, dynamic>
+        ? LearnerEvaluation.fromJson(json['evaluation'] as Json)
+        : null,
   );
 
   final double ability;
@@ -2919,6 +2940,47 @@ class LearnerModel {
   /// How the audits went per listener and depth (nine). Empty on a server
   /// from before.
   final List<StyleStat> styles;
+
+  /// How well the model predicts verdicts. Null on a server from before.
+  final LearnerEvaluation? evaluation;
+}
+
+/// `GET /learner` `evaluation`: Brier scores (lower is better) of the
+/// model's predictions and of guessing the pass rate so far, over [results]
+/// audits. Both null before any.
+@immutable
+class LearnerEvaluation {
+  const LearnerEvaluation({this.results = 0, this.brier, this.brierBaseline});
+
+  factory LearnerEvaluation.fromJson(Json json) => LearnerEvaluation(
+    results: _int(json, 'results'),
+    brier: _doubleN(json, 'brier'),
+    brierBaseline: _doubleN(json, 'brier_baseline'),
+  );
+
+  final int results;
+  final double? brier;
+  final double? brierBaseline;
+}
+
+/// `GET`/`POST /dev/rejudge`: audits judged again under the Auditor's
+/// current rules ([version]); of those [changed] came out the other way;
+/// [left] are still to judge.
+@immutable
+class RejudgeStatus {
+  const RejudgeStatus({required this.version, this.judged = 0, this.changed = 0, this.left = 0});
+
+  factory RejudgeStatus.fromJson(Json json) => RejudgeStatus(
+    version: _str(json, 'version'),
+    judged: _int(json, 'judged'),
+    changed: _int(json, 'changed'),
+    left: _int(json, 'left'),
+  );
+
+  final String version;
+  final int judged;
+  final int changed;
+  final int left;
 }
 
 /// One audit style in `GET /learner`: how many audits it held and what they

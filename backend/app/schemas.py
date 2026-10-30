@@ -163,6 +163,19 @@ class CourseSyllabusIn(BaseModel):
     upload_ids: list[int] = []
 
 
+class CourseTranslateIn(BaseModel):
+    """POST /courses/translate: the language the courses should be in."""
+
+    language: Literal["en", "zh", "ko"]
+
+
+class CourseTranslateOut(BaseModel):
+    """Courses translated, and courses left as they were because the translation failed."""
+
+    translated: int
+    skipped: int
+
+
 class SkillEdgeOut(_Out):
     from_id: int
     to_id: int
@@ -300,6 +313,12 @@ class StyleOut(BaseModel):
     mean_reward: float | None = None
 
 
+class LearnerEvaluationOut(BaseModel):
+    results: int
+    brier: float | None = None
+    brier_baseline: float | None = None
+
+
 class LearnerOut(BaseModel):
     """The learner model (app/services/learner.py)."""
 
@@ -314,6 +333,9 @@ class LearnerOut(BaseModel):
     history: list[LearnerStepOut] = []
     # The audit styles: how many audits each was chosen for and their mean reward.
     styles: list[StyleOut] = []
+    # How well the model predicts verdicts: Brier scores of the model and of the running pass
+    # rate, over `results` audits (lower is better; None before any).
+    evaluation: LearnerEvaluationOut | None = None
 
 
 class StartAuditResponse(BaseModel):
@@ -1186,3 +1208,15 @@ class DevLLMOut(BaseModel):
     agents: list[DevLLMAgentOut]
     audits: list[DevLLMAuditsOut]
     all_on: list[DevLLMAllOnOut] = []
+
+
+class RejudgeOut(BaseModel):
+    """Audits judged again under the Auditor's current rules (app/services/rejudge.py)."""
+
+    version: str
+    # Judged again under these rules (so far, or by this request).
+    judged: int
+    # Of those, how many the rules decide the other way.
+    changed: int
+    # Finished audits given under other rules and not yet judged again.
+    left: int

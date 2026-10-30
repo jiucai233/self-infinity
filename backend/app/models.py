@@ -142,6 +142,10 @@ class Course(SQLModel, table=True):
     # Set when the course was deleted keeping its nodes (app/services/courses.py): it is hidden
     # everywhere, its nodes and their history stay.
     archived_at: datetime | None = Field(default=None, sa_type=UTCDateTime)
+    # The language its titles, descriptions and points were last translated into ("en", "zh",
+    # "ko"; POST /api/courses/translate, app/services/translation.py). None: never translated,
+    # in the language it was generated in.
+    language: str | None = None
 
 
 class SkillNode(SQLModel, table=True):
@@ -225,6 +229,10 @@ class AuditSession(SQLModel, table=True):
     agreement: float | None = None
     # The Auditor's rules the verdict was given under (app/agents/auditor.py JUDGE_VERSION).
     judge_version: str | None = None
+    # The verdict the current rules give the same transcript, when they are not the ones it was
+    # given under (app/services/rejudge.py): kept beside it, never in its place.
+    rejudged_version: str | None = None
+    rejudged_passed: bool | None = None
     # The user's word on a failed audit: it was too hard for them now / a gap rests on
     # something they did not say.
     too_hard: bool | None = None
@@ -316,6 +324,11 @@ class LearnerStep(SQLModel, table=True):
     ability: float
     # How far the audit's results went beyond what was expected, 0 to 1 (the bandit's reward).
     progress: float
+    # The chance of a right result the model gave before the audit, and the share of its results
+    # that were right: how well it predicts (app/services/learner.py `evaluation`). None: a step
+    # from before they were kept.
+    predicted: float | None = None
+    observed: float | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 

@@ -8,8 +8,9 @@ from sqlmodel import Session
 from app.auth import CurrentUser, current_user
 from app.config import settings
 from app.db import get_session
-from app.schemas import AuditReviewIn, DevAuditOut, DevAuditsOut, DevLLMOut, DevVoiceOut
-from app.services import audit_review, llm_usage, voice_usage
+from app.llm import get_provider
+from app.schemas import AuditReviewIn, DevAuditOut, DevAuditsOut, DevLLMOut, DevVoiceOut, RejudgeOut
+from app.services import audit_review, llm_usage, rejudge, voice_usage
 
 router = APIRouter(prefix="/api/dev", tags=["dev"])
 
@@ -50,3 +51,15 @@ def voice_costs(limit: int = Query(50, ge=1, le=200), session: Session = Depends
 @router.get("/llm", response_model=DevLLMOut, dependencies=[Depends(require_dev)])
 def llm_costs(session: Session = Depends(get_session)):
     return llm_usage.overview(session)
+
+
+@router.get("/rejudge", response_model=RejudgeOut, dependencies=[Depends(require_dev)])
+def rejudge_summary(session: Session = Depends(get_session)):
+    """How many finished audits the current rules have judged again, and decide otherwise."""
+    return rejudge.summary(session)
+
+
+@router.post("/rejudge", response_model=RejudgeOut, dependencies=[Depends(require_dev)])
+def rejudge_batch(limit: int = Query(rejudge.BATCH, ge=1, le=10), session: Session = Depends(get_session)):
+    """Judges the next few stale audits again under the current rules (one model call each)."""
+    return rejudge.run(session, get_provider("auditor"), limit)

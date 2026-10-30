@@ -19,12 +19,12 @@ from pathlib import PurePath
 
 from sqlmodel import Session, col, select
 
-from app.i18n import join_list, quote, t
+from app.i18n import join_list, language_of, quote, t, use_language
 from app.agents.front_desk import FrontDesk, FrontDeskResult
 from app.llm import decisions
 from app.llm.base import LLMProvider
 from app.agents.planner import SyllabusText
-from app.models import AuditSession, ChatMessage, Course, EdgeKind, SkillNode, SkillStatus, Upload
+from app.models import AuditSession, AuditStatus, ChatMessage, Course, EdgeKind, SkillNode, SkillStatus, Upload
 from app.schemas import (
     ChatMessageOut,
     ChatSuggestionOut,
@@ -244,6 +244,45 @@ def _run_briefing(session: Session, provider_for: ProviderFor) -> ChatMessage:
     )
 
 
+# ---------------------------------------------------------------- audit review
+
+REVIEW_AUDITS = 10  # how many finished audits the Guide looks back over
+REVIEW_GAPS = 3
+
+
+def audit_review(session: Session) -> tuple[str, dict | None]:
+    """What the user got wrong lately, from the stored audits (no LLM): the gaps of the last
+    failed audit with what is right, and how many of the recent ones passed. The action opens
+    that audit's replay."""
+    rows = session.exec(
+        select(AuditSession, SkillNode)
+        .join(SkillNode, SkillNode.id == AuditSession.skill_id)
+        .join(Course, Course.id == SkillNode.course_id)
+        .where(col(Course.archived_at).is_(None), AuditSession.status != AuditStatus.active)
+        .order_by(col(AuditSession.created_at).desc(), col(AuditSession.id).desc())
+        .limit(REVIEW_AUDITS)
+    ).all()
+    if not rows:
+        return t("audit_review_none"), None
+    lines: list[str] = []
+    action = None
+    failed = next(((a, n) for a, n in rows if a.status == AuditStatus.failed), None)
+    if failed is not None:
+        audit, node = failed
+        lines.append(t("audit_review_failed", title=quote(node.title)))
+        evidence = audit.evidence[:REVIEW_GAPS]
+        for item in evidence:
+            lines.append(f"- {item['gap']} — {item['right']}" if item.get("right") else f"- {item['gap']}")
+        if not evidence:
+            lines.append(t("audit_review_no_gaps"))
+        action = {"type": "navigate", "scene": "audit", "audit_id": audit.id}
+    else:
+        lines.append(t("audit_review_clean"))
+    passed = sum(1 for a, _ in rows if a.status == AuditStatus.passed)
+    lines.append(t("audit_review_count", passed=passed, total=len(rows)))
+    return "\n".join(lines), action
+
+
 # ---------------------------------------------------------------- the endpoint
 
 def handle_message(
@@ -267,9 +306,13 @@ def handle_message(
         return [message_out(m) for m in (user, first, built)]
 
     nodes = _nodes_newest_course_first(session)
+    # The Guide answers in the language the user wrote in, whatever the interface is set to
+    # (language_of is the detector audits use; None keeps the request's language).
+    spoken = language_of(message)
     try:
         desk = FrontDesk(provider_for("front_desk"), decide=decisions.decide if decisions.available() else None)
-        routed: FrontDeskResult = desk.route(message, [n.title for n in nodes])
+        with use_language(spoken):
+            routed: FrontDeskResult = desk.route(message, [n.title for n in nodes])
     except Exception as exc:
         logger.warning("front desk failed", exc_info=True)
         session.rollback()
@@ -289,6 +332,9 @@ def handle_message(
             action = {"type": "navigate", "scene": "skill", "skill_id": node.id}
     elif intent == "open_map":
         action = {"type": "navigate", "scene": "map"}
+    elif intent == "audit_review":
+        with use_language(spoken):
+            content, action = audit_review(session)
 
     # Saved before the pipeline runs, so ids stay in reading order: user, front desk, result.
     first = _save(session, "assistant", content, "front_desk", action)
@@ -312,7 +358,7 @@ def handle_message(
 # ---------------------------------------------------------------- the realtime Guide (contract #36)
 
 # The intents the realtime Guide runs as tools: the front desk's, minus "none" (it talks itself).
-ACTIONS = ("generate_course", "open_skill", "checkin", "plan", "briefing", "open_map")
+ACTIONS = ("generate_course", "open_skill", "checkin", "plan", "briefing", "open_map")  # audit_review: chat only
 # The realtime Guide is the Guide: its lines are the front desk's in the history.
 VOICE_AGENT = "front_desk"
 

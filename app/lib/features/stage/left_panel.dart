@@ -8,6 +8,7 @@ import '../../api/api.dart';
 import '../../api/api_exception.dart';
 import '../../api/models.dart';
 import '../../auth/auth_service.dart';
+import '../../app/app_state.dart';
 import '../../app/panel_layout.dart';
 import '../../app/router.dart';
 import '../../theme/tokens.dart';
@@ -403,6 +404,29 @@ class _SettingsButtonState extends State<_SettingsButton> {
     unawaited(_checkDev());
   }
 
+  /// Puts the courses into the language just picked, in the background
+  /// (`POST /courses/translate`), and reloads them when it is done. Nothing
+  /// waits on it; a failure only says so in a snackbar.
+  static Future<void> _translateCourses(
+    SelfInfinityApi api,
+    AppState appState,
+    ScaffoldMessengerState? messenger,
+    AppLanguage language,
+  ) async {
+    try {
+      final result = await api.translateCourses(language.code);
+      if (result.translated > 0) appState.markDataChanged();
+      if (result.skipped > 0) _sayTranslationFailed(messenger);
+    } on Object {
+      _sayTranslationFailed(messenger);
+    }
+  }
+
+  static void _sayTranslationFailed(ScaffoldMessengerState? messenger) {
+    if (messenger == null || !messenger.mounted) return;
+    messenger.showSnackBar(SnackBar(content: Text(l10nNow.coursesTranslateFailed)));
+  }
+
   Future<void> _checkDev() async {
     try {
       final me = await context.read<SelfInfinityApi>().getMe();
@@ -426,9 +450,14 @@ class _SettingsButtonState extends State<_SettingsButton> {
         offset: const Offset(0, -8),
         onSelected: (value) async {
           if (value.startsWith('lang:')) {
-            await context.read<LocaleController>().setLanguage(
-              AppLanguage.fromCode(value.substring(5)),
-            );
+            final locale = context.read<LocaleController>();
+            final language = AppLanguage.fromCode(value.substring(5));
+            final changed = language != locale.language;
+            final api = context.read<SelfInfinityApi>();
+            final appState = context.read<AppState>();
+            final messenger = ScaffoldMessenger.maybeOf(context);
+            await locale.setLanguage(language);
+            if (changed) unawaited(_translateCourses(api, appState, messenger, language));
             return;
           }
           switch (value) {

@@ -6,12 +6,21 @@ from sqlmodel import Session, col
 from app.db import get_session
 from app.llm import get_provider
 from app.models import Course
-from app.schemas import CourseGraphOut, CourseOut, CourseSyllabusIn, SkillEdgeOut, SkillNodeOut
+from app.schemas import (
+    CourseGraphOut,
+    CourseOut,
+    CourseSyllabusIn,
+    CourseTranslateIn,
+    CourseTranslateOut,
+    SkillEdgeOut,
+    SkillNodeOut,
+)
 from app.search import get_search_provider
 from app.services import course_generation
 from app.services.chat import UploadNotFound, load_uploads, syllabus_text
 from app.services.course_edit import course_root
 from app.services.courses import CourseNotFound, delete_course, get_live_course, live_courses
+from app.services.translation import translate_courses
 from app.services.tree import course_graph
 
 logger = logging.getLogger(__name__)
@@ -23,6 +32,15 @@ router = APIRouter(prefix="/api/courses", tags=["courses"])
 def list_courses(session: Session = Depends(get_session)):
     """Newest first."""
     return session.exec(live_courses().order_by(col(Course.created_at).desc(), col(Course.id).desc())).all()
+
+
+@router.post("/translate", response_model=CourseTranslateOut)
+def translate(body: CourseTranslateIn, session: Session = Depends(get_session)):
+    """Puts every course not already in `language` into it: the course title, the nodes' titles
+    and descriptions, the leaves' knowledge points. One LLM call per course; a course whose
+    translation fails or comes back incomplete is left as it was and counted as skipped."""
+    result = translate_courses(session, get_provider("translator"), body.language)
+    return CourseTranslateOut(translated=result.translated, skipped=result.skipped)
 
 
 @router.get("/{course_id}/map", response_model=CourseGraphOut)

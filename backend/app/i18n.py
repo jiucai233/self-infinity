@@ -152,6 +152,32 @@ _TEXTS: dict[str, dict[str, str]] = {
     "logging_day": {"en": "Logging your day.", "zh": "我来记下你的今天。", "ko": "오늘 하루를 기록할게요."},
     "picking_quests": {"en": "Let me pick today's quests.", "zh": "我来挑今天的任务。", "ko": "오늘의 퀘스트를 골라 볼게요."},
     "status_coming": {"en": "Here is where you stand.", "zh": "这是你现在的状态。", "ko": "지금 상태를 정리해 볼게요."},
+    "reviewing_audits": {"en": "Let me look at your audits.", "zh": "我来看看你的审计记录。", "ko": "감사 기록을 살펴볼게요."},
+    "audit_review_none": {
+        "en": "You haven't finished an audit yet. Challenge a node and I'll have something to show.",
+        "zh": "你还没有完成过审计。去挑战一个节点，我才有东西可以给你看。",
+        "ko": "아직 끝낸 감사가 없어요. 노드에 도전하면 보여 드릴 게 생겨요.",
+    },
+    "audit_review_failed": {
+        "en": "Your last failed audit was on {title}. Where it fell short:",
+        "zh": "你最近一次没通过的审计是{title}。问题出在：",
+        "ko": "가장 최근에 통과하지 못한 감사는 {title}였어요. 부족했던 부분:",
+    },
+    "audit_review_no_gaps": {
+        "en": "No gap was recorded for it.",
+        "zh": "这次没有记录具体的漏洞。",
+        "ko": "구체적으로 기록된 빈틈은 없어요.",
+    },
+    "audit_review_clean": {
+        "en": "No failed audit lately.",
+        "zh": "最近没有未通过的审计。",
+        "ko": "최근에 통과하지 못한 감사는 없어요.",
+    },
+    "audit_review_count": {
+        "en": "{passed} of your last {total} audits passed.",
+        "zh": "最近 {total} 次审计里通过了 {passed} 次。",
+        "ko": "최근 감사 {total}번 중 {passed}번 통과했어요.",
+    },
     "checkin_logged": {"en": "Logged: {parts}", "zh": "已记录：{parts}", "ko": "기록했어요: {parts}"},
     "checkin_sleep": {"en": "sleep {hours} h", "zh": "睡眠 {hours} 小时", "ko": "수면 {hours}시간"},
     "checkin_exercise_yes": {"en": "exercise yes", "zh": "运动 有", "ko": "운동 함"},

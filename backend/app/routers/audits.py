@@ -138,6 +138,7 @@ def audit_feedback(audit_id: int, body: AuditFeedbackIn, session: Session = Depe
 def get_learner(session: Session = Depends(get_session)):
     """The learner model as it stands: the ability, the judge's error rates, and for each node
     open to study the chance of explaining it right, nearest the target first."""
+    learner.catch_up(session)
     false_pass, false_fail = learner.judge_rates(session)
     depths = depth_map(session)
     nodes = [
@@ -170,6 +171,7 @@ def get_learner(session: Session = Depends(get_session)):
             for step, audit, skill in learner.history(session)
         ],
         styles=[StyleOut(**row) for row in audit_style.summary(session)],
+        evaluation=learner.evaluation(session),
     )
 
 

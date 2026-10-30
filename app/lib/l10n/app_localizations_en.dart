@@ -87,6 +87,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auditPassed => 'Passed';
 
   @override
+  String get coursesTranslateFailed =>
+      'Your courses could not be translated; they stay in their language for now.';
+
+  @override
   String get auditorTagline => 'Learns from you and asks where it loses the thread';
 
   @override
@@ -1660,6 +1664,45 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devLearnerFalsePass => 'Passes what should fail';
+
+  @override
+  String devAuditCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count audits',
+      one: '1 audit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get devLearnerPrediction => 'How well it predicts';
+
+  @override
+  String get devBrierModel => 'Model';
+
+  @override
+  String get devBrierBaseline => 'Pass rate only';
+
+  @override
+  String devBrierHint(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count audits',
+      one: '1 audit',
+    );
+    return 'Brier score over $_temp0, lower is better';
+  }
+
+  @override
+  String get devRejudge => 'Judge old audits again';
+
+  @override
+  String devRejudgeStatus(String version, int judged, int changed, int left) {
+    return 'Rules $version: $judged judged again, $changed the other way, $left left';
+  }
 
   @override
   String devLearnerNodes(String target) {

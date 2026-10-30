@@ -5,7 +5,7 @@ It only classifies and words a short reply. It never runs anything: code does th
 FrontDeskError, which the chat endpoint turns into a 502.
 
 With a `decide` (the Decisions API, ~0.3 s) it first picks the intent and the node from fixed
-choices. Intents that need no words of their own (check-in, plan, briefing, map, a named node)
+choices. Intents that need no words of their own (check-in, plan, briefing, map, audit review, a named node)
 answer from fixed texts right there. A new course (its topic must be read out of the message),
 small talk (it needs a reply) and anything unsure go to the LLM as before.
 """
@@ -21,7 +21,7 @@ from app.llm.decisions import choice
 
 logger = logging.getLogger(__name__)
 
-INTENTS = ("none", "generate_course", "open_skill", "checkin", "plan", "briefing", "open_map")
+INTENTS = ("none", "generate_course", "open_skill", "checkin", "plan", "briefing", "open_map", "audit_review")
 MAX_TITLES = 80
 
 SYSTEM_PROMPT = (
@@ -38,6 +38,7 @@ Intents:
 - plan: the user asks what to study today.
 - briefing: the user asks for a status report.
 - open_map: the user wants to see their life tree (the map).
+- audit_review: the user asks what they got wrong or missed in their audits, how their last audit went.
 - none: anything else, including small talk. Never start an audit from chat.
 
 Existing nodes (newest course first):
@@ -65,9 +66,10 @@ INTENT_CHOICES = (
     ("plan", "Asks what to study today or what to do next."),
     ("briefing", "Asks for a status report on their progress."),
     ("open_map", "Wants to see their life tree, the map of everything."),
+    ("audit_review", "Asks what they got wrong or missed in their audits, or how their last audit went."),
     ("none", "Anything else: small talk, questions, unclear requests."),
 )
-FIXED_REPLIES = {"checkin": "logging_day", "plan": "picking_quests", "briefing": "status_coming", "open_map": "opening_map"}
+FIXED_REPLIES = {"checkin": "logging_day", "plan": "picking_quests", "briefing": "status_coming", "open_map": "opening_map", "audit_review": "reviewing_audits"}
 NO_NODE = "(none)"
 CONFIDENT = 0.75
 

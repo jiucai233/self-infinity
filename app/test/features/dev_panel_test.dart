@@ -288,8 +288,8 @@ void main() {
     expect(metric(tester, 'llm-per-call'), '\$0.00038');
     expect(metric(tester, 'llm-unpriced'), '2');
     // One audit on OpenAI next to one on Claude.
-    expect(find.textContaining('2 Audits · 3.0 Calls · \$0.0015'), findsOneWidget);
-    expect(find.textContaining('1 Audits · 4.0 Calls · \$0.0018'), findsOneWidget);
+    expect(find.textContaining('2 audits · 3.0 Calls · \$0.0015'), findsOneWidget);
+    expect(find.textContaining('1 audit · 4.0 Calls · \$0.0018'), findsOneWidget);
     expect(find.text('claude · claude-haiku-5-5'), findsNWidgets(3));
     expect(find.textContaining('6 Calls (1 Failed) · 2000 → 300 tok · 2.4 s'), findsOneWidget);
     expect(find.text('auditor · gpt-6-luna'), findsOneWidget);
@@ -316,7 +316,7 @@ void main() {
     expect(find.byKey(const Key('learner-chart')), findsOneWidget);
     expect(
       tester.widget<Text>(find.byKey(const Key('learner-ability'))).textSpan!.toPlainText(),
-      'Ability now +0.12 · 3 Audits',
+      'Ability now +0.12 · 3 audits',
     );
     expect(textIn(tester, 'learner-step-0'), startsWith('Pooling | Passed | '));
     expect(textIn(tester, 'learner-step-0'), endsWith('Ability +0.12 · Progress 60%')); // not voted on
@@ -325,6 +325,38 @@ void main() {
     expect(textIn(tester, 'learner-step-2'), startsWith('Convolution | Passed | '));
     expect(textIn(tester, 'learner-step-2'), endsWith('Ability +0.20 · Progress 50%')); // all agreed
     expect(find.byKey(const Key('learner-step-3')), findsNothing);
+  });
+
+  testWidgets('the learner tab: how well the model predicts, next to the pass rate alone', (tester) async {
+    final api = await seededFakeApi();
+    await failAudit(api, 6);
+    await openPanel(tester, api);
+    await tester.tap(find.byKey(const Key('dev-tab-learner')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('learner-evaluation')), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const Key('learner-brier-model'))).data, '0.210');
+    expect(tester.widget<Text>(find.byKey(const Key('learner-brier-baseline'))).data, '0.250');
+    expect(find.text('Brier score over 1 audit, lower is better'), findsOneWidget);
+  });
+
+  testWidgets('old audits are judged again a batch at a time until none is left', (tester) async {
+    final api = await seededFakeApi();
+    await failAudit(api, 6);
+    await openPanel(tester, api);
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('dev-rejudge-status'))).data,
+      'Rules 2026-10-15: 0 judged again, 0 the other way, 2 left',
+    );
+    await tester.tap(find.byKey(const Key('dev-rejudge-run')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('dev-rejudge-status'))).data,
+      'Rules 2026-10-15: 2 judged again, 1 the other way, 0 left',
+    );
+    expect(find.byKey(const Key('dev-rejudge-run')), findsNothing);
   });
 
   testWidgets('the learner tab: the audit styles, a dash where nothing is rewarded yet', (tester) async {
@@ -372,7 +404,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.widget<Text>(find.byKey(const Key('learner-ability'))).textSpan!.toPlainText(),
-      'Ability now -1.20 · 12 Audits',
+      'Ability now -1.20 · 12 audits',
     );
     await tester.drag(find.byKey(const Key('dev-learner')), const Offset(0, -400));
     await tester.pumpAndSettle();
