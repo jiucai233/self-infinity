@@ -76,6 +76,12 @@ class Settings(BaseSettings):
     audit_max_turns: int = 8
     # How many times a verdict is judged (in parallel); the majority decides. 1: once.
     auditor_votes: int = 3
+    # A provider of another model family that gives one of those votes (deepseek, gemini, claude,
+    # openai), on AUDITOR_SECOND_MODEL or its own default model. Empty: every vote is the
+    # Auditor's own model. One model judging three times repeats its own mistakes; on the
+    # calibration set another family's mistakes fell on other items (backend/eval/README.md).
+    auditor_second_provider: str = ""
+    auditor_second_model: str = ""
     task_max_turns: int = 4
     # Challenger 总开关；留成配置项是为了评估时能做 Auditor 单独 vs Auditor+Challenger 的消融。
     challenger_enabled: bool = True

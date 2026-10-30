@@ -80,6 +80,32 @@ def get_provider(agent: str | None = None) -> LLMProvider:
     return _load(server, _server_model(server, agent))
 
 
+def second_auditor_provider() -> LLMProvider | None:
+    """The provider of the verdict's second-family vote (AUDITOR_SECOND_PROVIDER), on
+    AUDITOR_SECOND_MODEL or that provider's own default model (never LLM_MODEL, which names the
+    server provider's models). None when it is not set or has no key."""
+    name = settings.auditor_second_provider.strip().lower()
+    if not name or name not in _KEY_FIELDS or not has_key(name):
+        if name:
+            logger.warning("AUDITOR_SECOND_PROVIDER=%r has no key configured, ignoring it", name)
+        return None
+    return _load(name, settings.auditor_second_model.strip() or _own_model(name))
+
+
+def _own_model(name: str) -> str:
+    if name == "claude":
+        return settings.claude_model
+    if name == "deepseek":
+        from app.llm.deepseek import DeepSeekProvider as cls
+    elif name == "kimi":
+        from app.llm.kimi import KimiProvider as cls
+    elif name == "gemini":
+        from app.llm.gemini import GeminiProvider as cls
+    else:
+        from app.llm.openai import OpenAIProvider as cls
+    return cls.default_model
+
+
 def has_key(name: str) -> bool:
     field = _KEY_FIELDS.get(name)
     return bool(field and getattr(settings, field))

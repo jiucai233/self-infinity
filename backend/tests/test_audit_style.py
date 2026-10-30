@@ -191,6 +191,32 @@ def test_depth_zero_stops_at_what_and_what_for_and_depth_two_goes_one_level_down
     assert "One level only" in deep
 
 
+def test_depth_zero_asks_nothing_about_how_a_part_works_inside_whoever_listens():
+    # A hash table at depth 0 told to a colleague: she asked how collisions are handled and
+    # why a lookup is O(1) on average, and failed the user on it.
+    for audience in ("expert", "student", "child"):
+        prompt = system_prompt(audience=audience, depth=0)
+        rules = prompt.index("At this depth every question asks what a part is")
+        assert rules < prompt.index("Take the first of these that applies")
+        assert 'no "what happens when ..."' in prompt
+        assert 'a gap about it is of\n  kind "detail"' in prompt
+        assert "how a part works inside is not judged at this depth" in prompt
+        assert "Judge whether the mechanism is right" not in prompt
+
+
+def test_depths_one_and_two_keep_the_mechanism_and_no_depth_zero_rule():
+    for depth in (1, 2):
+        prompt = system_prompt(depth=depth)
+        assert "At this depth every question asks" not in prompt
+        assert "Judge whether the mechanism is right" in prompt
+
+
+def test_the_expert_listens_for_what_is_right_not_for_how_it_works():
+    prompt = system_prompt(audience="expert", depth=0)
+    assert "whether what they say is right and\nprecise" in prompt
+    assert "about how it works" not in prompt
+
+
 # ---------------------------------------------------------------- in an audit
 
 

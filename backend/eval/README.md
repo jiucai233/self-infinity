@@ -52,6 +52,56 @@ is now 21 pass / 9 fail.
 The rescored runs fail the relabelled scenarios; written into the task rule, they pass. The run
 with the rule missed two concept passes and passed `nginx-reverse-proxy-fail`.
 
+## Rules of 2026-10-30 (`gpt-6-luna`)
+
+Three changes, `JUDGE_VERSION` 2026-10-30:
+
+- **A "not given" gap needs the words that asked for it.** Production audit 36 (a Transformer
+  node) was failed for "how the decoder uses the encoder's output" after the only question near
+  it was "what do the encoder and the decoder each do, and what does the mask limit?", which the
+  user answered right. The verdict called it `not_given` and cited that question. Now a
+  `not_given` gap must also quote (`named`) the words of the question that name the missing
+  thing; the code checks they are in that question and drops the gap otherwise, and the rule
+  says a question on what each part does names nothing inside or between them. That audit
+  judged again: the gap came back 5 of 12 times before (4 with the old notes, 4 more with
+  them, 4 without), 0 of 8 after (4 and 4). Judging an audit again also no longer shows the old
+  verdict's own notes as "what was wrong last time" (`app/services/rejudge.py`).
+- **Depth 0 holds.** A hash-table node told to the expert at depth 0 was asked how collisions
+  are handled (3 of 3 trials) and why a lookup is O(1) on average (2 of 3), and failed on it
+  (2 of 3). The depth-0 rule now comes before the questioning rules, the expert no longer
+  "listens for how it works", a depth-0 leaf is judged on what each part is and is for, and a
+  gap about how a part works inside is kind `detail` (dropped by the code). After, 3 trials
+  each: (expert, 0) asked what a collision is and what "on average" means, never how; 3 of 3
+  passed. (student, 1) asked what happens when two keys share a bucket and why lookup is fast.
+  (child, 2) also went one level down (how a key becomes a number, why the bucket's list is
+  short).
+- The calibration run after both:
+
+| run | accuracy | false pass | false fail |
+|---|---|---|---|
+| 2026-10-30, one run | 28/30 | 1/9 (`nginx-reverse-proxy-fail`) | 1/21 (`mutex-deadlock-pass`) |
+
+## A judge from another model family (2026-10-30)
+
+The verdict is voted three times by one model (`audit_flow._voted`). To see whether another
+family would add independent signal, the final verdict of each transcript of the run above was
+judged again, on the same transcript: twice by `gpt-6-luna`, once by `deepseek-chat` (the
+Gemini key was not set, so Gemini was not measured).
+
+| judge | right | false pass | false fail |
+|---|---|---|---|
+| the run's own verdict (luna) | 28/30 | nginx | mutex-deadlock |
+| luna again, 1 | 27/30 | nginx, crontab | mutex-deadlock |
+| luna again, 2 | 26/30 | nginx, crontab | recursion, mutex-deadlock |
+| deepseek-chat | 26/30 | none | hash-table, dynamic-programming, consistent-hashing, change-flat-tire |
+| majority, luna x3 | 27/30 | 2/9 | 1/21 |
+| majority, luna x2 + deepseek | 28/30 | 1/9 | 1/21 |
+
+Every mistake of the run's verdict came back in both of luna's other judgements; deepseek's four
+share none with any of luna's (it is stricter: no false pass, four false fails). One vote from
+another family is therefore `AUDITOR_SECOND_PROVIDER` (empty by default: no change). One run of
+30 items: the majority gained one item, read it as "the errors do not overlap", not as a size.
+
 ## Runs of 2026-10-13 (`gpt-6-luna`, the student Auditor)
 
 | Auditor | run | accuracy before / after the Challenger | leniency before / after | false fail |

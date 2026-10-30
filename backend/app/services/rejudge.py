@@ -62,7 +62,9 @@ def _job(session: Session, audit: AuditSession) -> _Job | None:
     answers = sum(1 for m in history if m["role"] == "user")
     if skill is None or not answers or history[-1]["role"] != "user":
         return None
-    examined = [{"title": p["title"], "note": p.get("note")} for p in audit.points]
+    # A finished audit's points hold its own verdict's notes, not the ones it was held with: given
+    # back as "what was wrong last time", they would hand the new judge the old one's verdict.
+    examined = [{"title": p["title"], "note": None} for p in audit.points]
     parts = audit_flow.test_out_parts(session, skill) if audit.test_out else child_titles(session, skill)
     return _Job(
         audit_id=audit.id,

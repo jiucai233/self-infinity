@@ -10,6 +10,7 @@ from app.agents.auditor import (
     GENERIC_PROBE,
     Auditor,
     AuditorOutputError,
+    _within,
     asked_so_far,
     began_with,
     format_lessons,
@@ -688,7 +689,9 @@ def test_missing_short_or_malformed_evidence_still_gives_one_entry_per_gap(evide
 def test_gap_evidence_keeps_the_gap_order_when_the_model_gave_more_entries_than_gaps():
     evidence = gap_evidence([{"right": "One"}, {"right": "Two"}], ["Only gap"], spoken("x"))
 
-    assert evidence == [{"gap": "Only gap", "said": None, "asked": None, "right": "One", "kind": None, "point": None}]
+    assert evidence == [
+        {"gap": "Only gap", "said": None, "asked": None, "named": None, "right": "One", "kind": None, "point": None}
+    ]
 
 
 # ---------------------------------------------------------------- gaps that were never raised
@@ -711,11 +714,58 @@ def test_a_gap_she_calls_not_raised_is_dropped_and_a_fail_with_none_left_is_a_pa
 
 def test_a_not_given_gap_stands_only_with_the_question_that_asked_for_it():
     asked = history(1)[0]["content"]
-    with_question, _ = next_turn(kinds_verdict({"gap": "G", "kind": "not_given", "asked": asked}))
-    without, _ = next_turn(kinds_verdict({"gap": "G", "kind": "not_given", "asked": "Something I never asked"}))
+    with_question, _ = next_turn(kinds_verdict({"gap": "G", "kind": "not_given", "asked": asked, "named": "scratch"}))
+    without, _ = next_turn(
+        kinds_verdict({"gap": "G", "kind": "not_given", "asked": "Something I never asked", "named": "never"})
+    )
 
     assert with_question.gaps == ["G"] and with_question.passed is False
     assert without.gaps == [] and without.passed is True
+
+
+@pytest.mark.parametrize("named", [None, "", "how the decoder uses the encoder's output", 42])
+def test_a_not_given_gap_whose_question_has_no_words_naming_what_is_missing_is_dropped(named):
+    # Audit 36: "what do the encoder and the decoder each do?" answered right, then held against
+    # the user for how the decoder uses the encoder's output, which the question never named.
+    messages = [
+        {"role": "assistant", "content": "What do the encoder and the decoder each do?"},
+        {"role": "user", "content": "The encoder compresses the input, the decoder generates."},
+    ]
+    entry = {"gap": "How the decoder uses the encoder's output", "kind": "not_given", "point": None}
+    entry.update(asked="What do the encoder and the decoder each do?", named=named)
+
+    result, _ = next_turn_with_history(kinds_verdict(entry), messages, max_turns=1)
+
+    assert result.gaps == [] and result.passed is True
+
+
+def test_a_not_given_gap_stands_when_its_question_named_the_missing_thing():
+    messages = [
+        {"role": "assistant", "content": "How does the decoder use what the encoder gives it?"},
+        {"role": "user", "content": "It just generates the next word."},
+    ]
+    entry = {"gap": "How the decoder uses the encoder's output", "kind": "not_given"}
+    entry.update(asked="How does the decoder use what the encoder gives it?", named="“use what the encoder gives it”")
+
+    result, _ = next_turn_with_history(kinds_verdict(entry), messages, max_turns=1)
+
+    assert result.gaps == ["How the decoder uses the encoder's output"] and result.passed is False
+
+
+def test_the_naming_words_are_checked_against_the_question_and_kept_as_quoted():
+    assert _within("Each DO", "What do A and B each do?") == "Each DO"
+    assert _within("“each do”", "What do A and B each do?") == "each do"
+    assert _within("how B uses A", "What do A and B each do?") is None
+    assert _within("x", "What do A and B each do?") is None
+    assert _within("each do", None) is None
+
+
+def test_the_prompt_asks_for_the_words_that_name_what_is_missing():
+    _, provider = next_turn(verdict_json(True))
+
+    prompt = system_prompt(provider)
+    assert '"named"' in prompt
+    assert "what do A and B each do?" in prompt
 
 
 def test_gaps_of_the_other_kinds_or_of_no_kind_stand():

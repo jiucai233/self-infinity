@@ -40,6 +40,11 @@
 - **讲给谁、问多深，每场不同。** 听众（同行 / 大学生 / 十岁小孩）和深度（0 只问是什么、1 问到怎么起作用、
   2 再往下一层）由 app/services/audit_style.py 按用户状态选；默认（大学生、深度 1）就是上面这些规则调出来
   的样子，提示词一字不变。上面"不往下切"那条是深度 1 的写法。
+  深度 0 的规则放在提问规则之前，否则"问它里面发生了什么、为什么"那几条会盖过它（同行、深度 0 的
+  哈希表照样追问碰撞怎么处理、为什么平均 O(1)）；判到"内部怎么起作用"的缺口记为 detail，代码丢掉。
+- **"问了没讲出来"要指得出问的哪几个字。** not_given 的缺口必须从那道问题里原样摘出点名缺失之物的
+  词（named），代码核对，摘不出就丢掉。（线上审计 36：问的是"编码器和解码器各做什么"，答对了，
+  却判"解码器怎样利用编码器的输出"为缺口。）
 - **只按讲到的判。** 一个知识点里写了几样东西而只讲到、问到其中一样，没碰到的不算在用户头上。
 
 第一个问题不由模型生成，来自按节点位置选的模板（app/services/audit_flow.py）。轮数上限由
@@ -68,7 +73,7 @@ MAX_GAPS = 3
 
 # Changed with the rules a verdict is given under; kept on each audit, so verdicts of
 # different rules are not counted as one judge's.
-JUDGE_VERSION = "2026-10-15"
+JUDGE_VERSION = "2026-10-30"
 
 GENERIC_PROBE = "Could you explain that part a bit more specifically?"
 FORCED_GAPS = ["Could not confirm a sufficient explanation within the question limit."]
@@ -148,7 +153,7 @@ that lost you.
   still without a hint. It does not count as a second question.
 
 QUESTIONING: one question per turn, and it comes out of what they said.
-Take the first of these that applies:
+{depth_rule}Take the first of these that applies:
 1. A claim of theirs was wrong and they have not had a second try at it:
    ask them to teach you that part again.
 2. They used a term or a step without explaining it, and without it you
@@ -219,7 +224,10 @@ Only the verdict's "feedback" is still the student speaking.
   still did not give. For (d) your question has to have named that
   part: an answer that is right as far as it goes, to a wider question
   that did not name what is missing, is not a gap. What is missing
-  there was not reached.
+  there was not reached. A question on what each of several parts does,
+  or on a whole point, names those parts and nothing inside or between
+  them: asked "what do A and B each do?", they said what each does, and
+  how B uses what A gives it, or how either works inside, was not asked.
 - A verdict never holds against them something the conversation did not
   raise: a wrong claim that was never put to them is not a gap, and
   neither is a part nobody asked them about. When you notice one and
@@ -261,6 +269,10 @@ it went, and no question of yours named what is missing), "unasked"
 (nobody brought it up), "detail" (how an idea they have right is
 carried out one level down). Be honest about the kind: the last three
 are not held against them, and the page shows them as not reached.
+"named", for "not_given" only: the few words of "asked" that name the
+missing thing itself, copied exactly from that question. Words that name
+only the point, or the parts around it, are not it; when your question
+has no such words, the kind is "partial".
 "point" is the point of Points the gap belongs to, or null.
 "lessons": for each past lesson above whose situation came up in this
 audit, its number in that list counted from 1, and whether it held this
@@ -272,7 +284,7 @@ answers in another language, write in theirs.
 
 {asked_line}{began_line}Output only JSON, one of:
 {{"action": "probe", "feedback": "...", "point": "the point this question examines, or null", "question": "..."}}
-{{"action": "verdict", "feedback": "...", "pass": false, "score": 60, "points": [{{"point": "...", "ok": false, "note": "..."}}], "gaps": ["..."], "evidence": [{{"kind": "...", "point": "...", "said": "...", "asked": "...", "right": "..."}}], "lessons": [{{"lesson": 1, "held": false}}], "comment": "..."}}
+{{"action": "verdict", "feedback": "...", "pass": false, "score": 60, "points": [{{"point": "...", "ok": false, "note": "..."}}], "gaps": ["..."], "evidence": [{{"kind": "...", "point": "...", "said": "...", "asked": "...", "named": "...", "right": "..."}}], "lessons": [{{"lesson": 1, "held": false}}], "comment": "..."}}
 """
 )
 
@@ -286,8 +298,8 @@ PERSONAS = {
     ),
     "expert": (
         "you know the field around it\nwell, as a colleague from a neighbouring area does, but have never\n"
-        "studied this topic itself. Its basic vocabulary needs no explaining to\nyou; what you listen for is whether what they say about how it works\n"
-        "is right and precise."
+        "studied this topic itself. Its basic vocabulary needs no explaining to\nyou; what you listen for is whether what they say is right and\n"
+        "precise."
     ),
 }
 VOICE_LINES = {
@@ -312,10 +324,25 @@ DEPTH_LINES = {
         "  doing it (exact figures, commands, settings).\n"
     ),
 }
+# Depth 0 only, ahead of the questioning rules: rules 2 and 4 ask what happens in a step and
+# why, and the depth line after them did not hold the expert listener back (collisions and why a
+# lookup is O(1) on average, asked of a hash table at depth 0).
+DEPTH_RULES = {
+    0: (
+        "At this depth every question asks what a part is, what it is for, or\nhow the parts fit "
+        "together, and nothing about how a part works\ninside: no \"what happens when ...\", no \"how "
+        "does it handle ...\", no\n\"why is it fast\", no case walked through it. Where a rule below "
+        "says\nto ask what happens in a step, or why, ask what it is or what it is\nfor instead. "
+        "Their saying that something happens (a case, a speed)\nwithout saying how is complete at "
+        "this depth.\n"
+    ),
+}
 ESSENTIAL_LINES = {
     0: (
-        "- Essential means what a part is and what it is for. How it works\n  inside is not asked at this depth and is never a gap. On an\n"
-        "  executable step the main actions are what it is: an action you asked\n  for that they cannot say even roughly is (c).\n"
+        "- Essential means what a part is and what it is for. How it works\n  inside (how it handles a "
+        "case, why it is fast, what happens in it)\n  is not asked at this depth and is never a gap: "
+        "a gap about it is of\n  kind \"detail\". On an executable step the main actions are what "
+        "it is:\n  an action you asked for that they cannot say even roughly is (c).\n"
     ),
     1: '- Essential means the idea of a part: what it is, what it is for, the\n  main way it works. How that idea is carried out one level down (which\n  item goes with which, the order, the exact formula, the bookkeeping)\n  is not essential and is never a gap, unless "Covers" names it. On an\n  executable step the main actions are the idea: an action you asked\n  for that they cannot say even roughly is (c). An action they did say,\n  roughly, is known; the exact command, option or amount they do not\n  remember is a detail.\n',
     2: (
@@ -388,6 +415,12 @@ POINTS_VERDICT = """- "points" has one entry for each point in Points: ok is tru
   pass is true only when every point is ok.
 """
 
+# A leaf held at depth 0: what each part is and is for, not whether the mechanism is right.
+LEAF_DEPTH0 = (
+    'This is a specific topic. Judge whether they can say what each part named in "Covers" is '
+    "and what it is for; how a part works inside is not judged at this depth."
+)
+
 POSITION_BLOCKS = {
     "leaf": (
         'This is a specific topic. Judge whether the mechanism is right, and the cases named in '
@@ -437,10 +470,12 @@ class Lesson(Protocol):
     misconception: str | None
 
 
-def position_block(node_type: NodeType, position: NodePosition) -> str:
+def position_block(node_type: NodeType, position: NodePosition, depth: int = 1) -> str:
     # task 不分位置：一个具体步骤做没做到，和它在课程里挂在哪儿无关。
     if node_type == NodeType.task:
         return POSITION_BLOCKS["task"]
+    if depth == 0 and position == NodePosition.leaf:
+        return LEAF_DEPTH0
     return POSITION_BLOCKS[position.value]
 
 
@@ -579,6 +614,7 @@ class Auditor:
             final_line=FINAL_TURN_LINE if final else "",
             persona=PERSONAS.get(audience, PERSONAS["student"]),
             voice_line=VOICE_LINES.get(audience, ""),
+            depth_rule=DEPTH_RULES.get(depth, ""),
             depth_line=DEPTH_LINES.get(depth, DEPTH_LINES[1]),
             essential_line=ESSENTIAL_LINES.get(depth, ESSENTIAL_LINES[1]),
             audience_verdict=AUDIENCE_VERDICTS.get(audience, ""),
@@ -591,7 +627,7 @@ class Auditor:
             points_verdict=POINTS_VERDICT if points else "",
             lessons=format_lessons(lessons),
             pacing=pacing,
-            position_block=POSITION_BLOCKS["test_out"] if test_out else position_block(node_type, position),
+            position_block=POSITION_BLOCKS["test_out"] if test_out else position_block(node_type, position, depth),
         )
         messages: list[Message] = [{"role": "system", "content": system}, *history]
 
@@ -752,17 +788,29 @@ def gap_evidence(raw, gaps: list[str], history: list[Message]) -> list[dict]:
     evidence = []
     for i, gap in enumerate(gaps):
         item = given[i] if i < len(given) and isinstance(given[i], dict) else {}
+        asked = said_by_user(item.get("asked"), history, role="assistant")
         evidence.append(
             {
                 "gap": gap,
                 "said": said_by_user(item.get("said"), history),
-                "asked": said_by_user(item.get("asked"), history, role="assistant"),
+                "asked": asked,
+                "named": _within(item.get("named"), asked),
                 "right": _text(item.get("right")),
                 "kind": _text(item.get("kind")),
                 "point": _text(item.get("point")),
             }
         )
     return evidence
+
+
+def _within(quote, text: str | None) -> str | None:
+    """`quote` when it is words of `text` (whitespace, case and the quote marks at its ends aside)."""
+    quoted = _text(quote)
+    if quoted is None or not text:
+        return None
+    quoted = quoted.strip(_QUOTE_EDGES)
+    needle = _squeezed(quoted)
+    return quoted if len(needle) >= 2 and needle in _squeezed(text) else None
 
 
 # The kinds of gap she may name that are not held against the user.
@@ -772,12 +820,16 @@ NOT_RAISED = ("partial", "unasked", "detail")
 def raised_only(evidence: list[dict]) -> tuple[list[dict], list[dict]]:
     """The gaps that stand, and the ones dropped: those she herself calls not raised (a right
     answer that did not go far enough, a part nobody asked about, a detail below the point), and
-    a "not given" for which she cannot show the question that asked for it. Told in the prompt
-    alone, she listed them anyway; asked to name the kind, she names it, and the code drops it."""
+    a "not given" for which she cannot show the question that asked for it, and the words in it
+    that name what is missing. Told in the prompt alone, she listed them anyway; asked to name
+    the kind, she names it, and the code drops it. A wide question ("what do the encoder and the
+    decoder each do?") answered right was still held against the user for what it did not name
+    (how the decoder uses the encoder's output, audit 36): having to quote the naming words, she
+    finds none."""
     kept, dropped = [], []
     for entry in evidence:
         kind = (entry.get("kind") or "").casefold()
-        not_raised = kind in NOT_RAISED or (kind == "not_given" and not entry.get("asked"))
+        not_raised = kind in NOT_RAISED or (kind == "not_given" and not (entry.get("asked") and entry.get("named")))
         (dropped if not_raised else kept).append(entry)
     return kept, dropped
 

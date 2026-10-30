@@ -35,6 +35,7 @@ from app.agents.auditor import JUDGE_VERSION, Auditor, AuditorTurnResult
 from app.agents.challenger import Challenger
 from app.agents.memory_retriever import recent_misconceptions, retrieve_lessons
 from app.config import settings
+from app.llm import second_auditor_provider
 from app.llm.base import LLMProvider, Message
 from app.models import (
     AuditSession,
@@ -315,8 +316,8 @@ def submit_turn(
         or sum(1 for m in history if m["role"] == "user") >= audit.max_turns
         or (bool(examined) and len(closed) == len(examined))
     )
-    def judge() -> AuditorTurnResult:
-        return Auditor(auditor_provider).next_turn(
+    def judge(provider: LLMProvider = auditor_provider) -> AuditorTurnResult:
+        return Auditor(provider).next_turn(
             skill.title,
             skill.description,
             history,
@@ -348,11 +349,13 @@ def submit_turn(
         # 用户等的是一次调用的时间；票数最后没判通过，它的结果就不用。
         may_challenge = bool(result.passed) and settings.challenger_enabled and not audit.challenged
         misconceptions = recent_misconceptions(session, settings.challenger_misconception_limit) if may_challenge else []
+        second = second_auditor_provider()
         result, agreement, challenge = _voted(
             result,
             judge,
             final=final,
             alongside=(lambda: _challenge(skill, history, challenger_provider, misconceptions)) if may_challenge else None,
+            second=(lambda: judge(second)) if second is not None else None,
         )
 
     if not result.is_verdict:
@@ -428,7 +431,7 @@ def _challenge(
 
 
 def _voted(
-    first: AuditorTurnResult, judge, final: bool = False, alongside=None
+    first: AuditorTurnResult, judge, final: bool = False, alongside=None, second=None
 ) -> tuple[AuditorTurnResult, float | None, str | None]:
     """What the majority of `settings.auditor_votes` judgements of this answer says, the share
     of them that agreed, and the result of `alongside` (the Challenger, run at the same time so
@@ -439,6 +442,10 @@ def _voted(
     already a forced fail). Two that agree decide. With no two agreeing, or with most wanting
     to ask on, the audit goes on with a question when it may, and is not a pass when it may not:
     passing what should fail is the costlier mistake. A judgement that fails does not vote.
+
+    `second` (AUDITOR_SECOND_PROVIDER): the same judgement on a model of another family, which
+    takes the place of the last extra vote. Its mistakes are not the first model's, so it can
+    break a tie the first model's own votes would repeat.
     """
     extra = settings.auditor_votes - 1
 
@@ -449,7 +456,10 @@ def _voted(
             logger.warning("a call beside the verdict failed", exc_info=True)
             return None
 
-    calls = [judge] * max(extra, 0) + ([alongside] if alongside is not None else [])
+    calls = [judge] * max(extra, 0)
+    if second is not None and calls:
+        calls[-1] = second
+    calls += [alongside] if alongside is not None else []
     if not calls:
         return first, None, None
     with ThreadPoolExecutor(len(calls)) as pool:

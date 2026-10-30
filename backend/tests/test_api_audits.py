@@ -1020,6 +1020,86 @@ def test_the_challenger_runs_beside_the_votes_and_its_question_is_kept_for_a_pas
     assert chosen.passed and agreement == 1.0 and challenge == "Why does it hold?"
 
 
+# ---------------------------------------------------------------- a vote from another model family
+
+
+def test_without_a_second_provider_every_vote_is_the_auditors_own(client, client_engine, monkeypatch, math):
+    calls = []
+    monkeypatch.setattr("app.services.audit_flow.second_auditor_provider", lambda: calls.append(1))
+    audit_id, verdict, provider = judged(client, client_engine, monkeypatch, math, True, True, True)
+
+    assert verdict["passed"] is True and provider.counts["auditor"] == 4
+    assert len(calls) == 1  # asked once, on the verdict; None means no other family
+
+
+def test_a_second_provider_gives_one_vote_in_place_of_an_extra_one(client, client_engine, monkeypatch, math):
+    other = ScriptedProvider(auditor=verdict_json(False, 30))
+    monkeypatch.setattr("app.services.audit_flow.second_auditor_provider", lambda: other)
+    audit_id, verdict, provider = judged(client, client_engine, monkeypatch, math, True, True, True)
+
+    assert provider.counts["auditor"] == 3  # a probe, then two of the three judgements
+    assert len(other.calls_for("auditor")) == 1
+    assert verdict["passed"] is True
+    assert client.get(f"/api/audits/{audit_id}").json()["agreement"] == pytest.approx(2 / 3)
+
+
+def test_the_second_providers_vote_can_turn_a_split_into_a_fail(client, client_engine, monkeypatch, math):
+    other = ScriptedProvider(auditor=verdict_json(False, 30))
+    monkeypatch.setattr("app.services.audit_flow.second_auditor_provider", lambda: other)
+    audit_id, verdict, _ = judged(client, client_engine, monkeypatch, math, True, False)
+
+    assert verdict["passed"] is False
+    assert client.get(f"/api/audits/{audit_id}").json()["agreement"] == pytest.approx(2 / 3)
+
+
+def test_a_second_provider_that_fails_does_not_vote(client, client_engine, monkeypatch, math):
+    def down(messages):
+        raise RuntimeError("down")
+
+    other = ScriptedProvider(auditor=down)
+    monkeypatch.setattr("app.services.audit_flow.second_auditor_provider", lambda: other)
+    audit_id, verdict, _ = judged(client, client_engine, monkeypatch, math, True, True)
+
+    assert verdict["passed"] is True
+    assert client.get(f"/api/audits/{audit_id}").json()["agreement"] == 1.0
+
+
+def test_with_one_vote_the_second_provider_is_not_called():
+    from app.agents.auditor import AuditorTurnResult
+    from app.services import audit_flow
+
+    passed = AuditorTurnResult(is_verdict=True, passed=True, score=90, gaps=[], comment="ok")
+    called = []
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(audit_flow.settings, "auditor_votes", 1)
+        chosen, agreement, _ = audit_flow._voted(passed, lambda: passed, second=lambda: called.append(1))
+
+    assert chosen is passed and agreement is None and called == []
+
+
+def test_the_second_provider_is_read_from_the_settings_on_its_own_model(monkeypatch):
+    from app import llm
+
+    monkeypatch.setattr(settings, "llm_model", "gpt-6-luna")
+    monkeypatch.setattr(settings, "deepseek_api_key", "k")
+    monkeypatch.setattr(settings, "gemini_api_key", "")
+    monkeypatch.setattr(settings, "auditor_second_model", "")
+
+    monkeypatch.setattr(settings, "auditor_second_provider", "")
+    assert llm.second_auditor_provider() is None
+    monkeypatch.setattr(settings, "auditor_second_provider", "gemini")  # no key
+    assert llm.second_auditor_provider() is None
+    monkeypatch.setattr(settings, "auditor_second_provider", "nonsense")
+    assert llm.second_auditor_provider() is None
+
+    monkeypatch.setattr(settings, "auditor_second_provider", "DeepSeek")
+    provider = llm.second_auditor_provider()
+    assert (provider.name, provider.model) == ("deepseek", "deepseek-chat")  # not LLM_MODEL
+    monkeypatch.setattr(settings, "auditor_second_model", "deepseek-reasoner")
+    assert llm.second_auditor_provider().model == "deepseek-reasoner"
+
+
 def test_the_learner_keeps_the_ability_after_each_audit(client, math):
     assert client.get("/api/learner").json()["history"] == []
 

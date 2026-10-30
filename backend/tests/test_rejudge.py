@@ -49,3 +49,18 @@ def test_a_judgement_that_fails_leaves_the_audit_for_next_time(client, client_en
     body = client.post("/api/dev/rejudge").json()
 
     assert (body["judged"], body["left"]) == (0, 1)
+
+
+def test_a_judgement_again_is_not_shown_the_old_verdicts_notes_as_last_times_mistakes(client, client_engine):
+    from app.services import rejudge
+
+    ids = ids_by_slug(generate(client, "Math"))
+    failed = fail_node(client, ids["discriminant"])
+    with Session(client_engine) as session:
+        row = session.get(AuditSession, failed)
+        row.points_json = '[{"title": "Signs", "ok": false, "note": "Did not say how the decoder uses it."}]'
+        session.add(row)
+        session.commit()
+        job = rejudge._job(session, session.get(AuditSession, failed))
+
+    assert job.kwargs["points"] == [{"title": "Signs", "note": None}]
