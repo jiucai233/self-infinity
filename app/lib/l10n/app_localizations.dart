@@ -238,6 +238,72 @@ abstract class AppLocalizations {
   /// **'Failed'**
   String get auditFailed;
 
+  /// No description provided for @lineNotYet.
+  ///
+  /// In en, this message translates to:
+  /// **'I don\'t get it yet. Explain it once more?'**
+  String get lineNotYet;
+
+  /// No description provided for @lineGotIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Oh! Now I get it!'**
+  String get lineGotIt;
+
+  /// No description provided for @lineCloser.
+  ///
+  /// In en, this message translates to:
+  /// **'One step closer.'**
+  String get lineCloser;
+
+  /// No description provided for @lineCloserQuest.
+  ///
+  /// In en, this message translates to:
+  /// **'One step closer.'**
+  String get lineCloserQuest;
+
+  /// No description provided for @auditOnceMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Once more'**
+  String get auditOnceMore;
+
+  /// No description provided for @attemptNth.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempt {n}'**
+  String attemptNth(int n);
+
+  /// No description provided for @attemptDelta.
+  ///
+  /// In en, this message translates to:
+  /// **'{delta} from last time'**
+  String attemptDelta(String delta);
+
+  /// No description provided for @attemptSame.
+  ///
+  /// In en, this message translates to:
+  /// **'Same as last time'**
+  String get attemptSame;
+
+  /// No description provided for @attemptFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'First'**
+  String get attemptFirst;
+
+  /// No description provided for @attemptThis.
+  ///
+  /// In en, this message translates to:
+  /// **'This time'**
+  String get attemptThis;
+
+  /// No description provided for @nodeServesQuest.
+  ///
+  /// In en, this message translates to:
+  /// **'Main quest · {title}'**
+  String nodeServesQuest(String title);
+
   /// No description provided for @replayRetry.
   ///
   /// In en, this message translates to:

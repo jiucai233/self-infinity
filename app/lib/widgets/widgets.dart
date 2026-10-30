@@ -2,6 +2,7 @@
 library;
 
 export 'avatar.dart';
+export 'character_lines.dart';
 export 'collapsible_section.dart';
 export 'composer.dart';
 export 'orb_avatar.dart';

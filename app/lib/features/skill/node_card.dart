@@ -10,7 +10,7 @@ import '../../widgets/widgets.dart';
 /// The node card at the top of scene 4, the same card the life tree's sheet
 /// shows (`docs/DESIGN.md`, node card): a stack of paper with a kicker
 /// (`BOSS` / `NODE`) and the `⋯` [menu] → the title (wraps on a phone) →
-/// [chips] on their own line → Best / Attempts / Lessons → the audit history
+/// the main [quest] it serves, in one muted line → [chips] on their own line → Best / Attempts / Lessons → the audit history
 /// (each row opens its replay) → lesson cards → [actions] (the ink
 /// `Take it on`, full width).
 class SkillNodeCard extends StatelessWidget {
@@ -22,7 +22,12 @@ class SkillNodeCard extends StatelessWidget {
     required this.lessons,
     this.menu,
     this.actions = const [],
+    this.quest,
   });
+
+  /// The title of the main quest this node's course serves; null hides the
+  /// line.
+  final String? quest;
 
   final SkillOverview overview;
   final bool boss;
@@ -75,6 +80,17 @@ class SkillNodeCard extends StatelessWidget {
               style: theme.headlineMedium,
             ),
           ),
+          if (quest case final quest? when quest.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs, right: AppSpacing.md),
+              child: Text(
+                keepAll(l.nodeServesQuest(quest.trim())),
+                key: const Key('skill-quest'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
+              ),
+            ),
           if (chips.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
             Wrap(

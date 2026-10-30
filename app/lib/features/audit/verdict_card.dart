@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../api/models.dart';
+import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
 import '../../l10n/l10n.dart';
@@ -18,6 +19,11 @@ enum _Action { copy, tooHard, misheard }
 /// point held or missed, the titles of the gaps (two, then "+N") and the past
 /// lessons it touched, one line each. What each gap rests on — the user's own
 /// words next to what holds — is on the replay, behind [onDetails].
+///
+/// A fail is told in her voice ([CharacterSituation.notYet]): she has not
+/// understood yet and asks for it again, in neutral colors. With [attempt],
+/// the top line says which explanation of the node this was and how the
+/// score moved from the last one ([delta]).
 ///
 /// The "⋯" menu at the top right copies all of it as text and, on a fail,
 /// holds "Too hard for now" / "I didn't say that". A pass gets an ember edge
@@ -34,9 +40,18 @@ class VerdictCard extends StatelessWidget {
     this.misheardNoted = false,
     this.onDetails,
     required this.onBack,
+    this.attempt,
+    this.delta,
   });
 
   final VerdictResult verdict;
+
+  /// Which audit of this node this was (1 = the first); null shows the plain
+  /// `VERDICT` label.
+  final int? attempt;
+
+  /// This score minus the last attempt's; null on a first attempt.
+  final int? delta;
 
   /// "Make a lesson card" (a fail only); null hides it.
   final VoidCallback? onLesson;
@@ -65,13 +80,32 @@ class VerdictCard extends StatelessWidget {
       ? verdict.evidence
       : [for (final gap in verdict.gaps) GapEvidence(gap: gap)];
 
+  /// "+8" / "−6" / "Same as last time": how the score moved.
+  static String deltaText(AppLocalizations l, int delta) => delta == 0
+      ? l.attemptSame
+      : l.attemptDelta(delta > 0 ? '+$delta' : '−${-delta}');
+
+  /// "Attempt 2 · +8 from last time", or `VERDICT` without an [attempt].
+  String _kicker(AppLocalizations l) {
+    final n = attempt;
+    if (n == null) return l.verdict;
+    final d = delta;
+    return d == null ? l.attemptNth(n) : '${l.attemptNth(n)} · ${deltaText(l, d)}';
+  }
+
+  /// The title: her line on a fail.
+  String _title(BuildContext context) => verdict.passed
+      ? context.l10n.verdictCleared
+      : CharacterLines.of(context).say(CharacterSituation.notYet);
+
   /// The verdict as plain text, for the clipboard (with the evidence the card
   /// leaves to the replay).
   String _asText(BuildContext context) {
     final l = context.l10n;
     final comment = verdict.comment?.trim() ?? '';
     return [
-      '${verdict.passed ? l.verdictCleared : l.verdictNotYet} · ${verdict.score}',
+      if (attempt != null) _kicker(l),
+      '${_title(context)} · ${verdict.score}',
       if (comment.isNotEmpty) comment,
       for (final p in verdict.points)
         '${p.ok == true
@@ -156,8 +190,25 @@ class VerdictCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(l.verdict, style: theme.labelSmall?.copyWith(letterSpacing: 1.6)),
+                child: Text(
+                  _kicker(l),
+                  key: const Key('verdict-kicker'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.labelSmall?.copyWith(letterSpacing: attempt == null ? 1.6 : 0.4),
+                ),
               ),
+              // On a fail the score steps back to this line; her line is the headline.
+              if (!passed) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  '${verdict.score}',
+                  key: const Key('verdict-score'),
+                  style: AppTheme.serif(theme.headlineSmall)?.copyWith(color: AppColors.textSecondary),
+                ),
+                const SizedBox(width: 2),
+                Text(l.pointsUnit, style: theme.labelSmall),
+              ],
               _menu(context),
             ],
           ),
@@ -167,25 +218,31 @@ class VerdictCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        passed ? l.verdictCleared : l.verdictNotYet,
-                        key: const Key('verdict-title'),
-                        style: theme.displaySmall?.copyWith(
-                          color: passed ? AppColors.success : AppColors.textPrimary,
+                if (passed)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          l.verdictCleared,
+                          key: const Key('verdict-title'),
+                          style: theme.displaySmall?.copyWith(color: AppColors.success),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.lg),
-                    Text('${verdict.score}', key: const Key('verdict-score'), style: theme.headlineLarge),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(l.pointsUnit, style: theme.labelMedium),
-                  ],
-                ),
+                      const SizedBox(width: AppSpacing.lg),
+                      Text('${verdict.score}', key: const Key('verdict-score'), style: theme.headlineLarge),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(l.pointsUnit, style: theme.labelMedium),
+                    ],
+                  )
+                else
+                  // Her line, a question back to the user rather than a grade.
+                  Text(
+                    keepAll(_title(context)),
+                    key: const Key('verdict-title'),
+                    style: AppTheme.serif(theme.headlineSmall)?.copyWith(height: 1.2),
+                  ),
                 if (passed && xp != null) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(
@@ -195,7 +252,7 @@ class VerdictCard extends StatelessWidget {
                   ),
                 ],
                 if (comment.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.sm),
+                  SizedBox(height: passed ? AppSpacing.sm : 2),
                   Text(
                     comment,
                     key: const Key('verdict-comment'),

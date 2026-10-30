@@ -84,6 +84,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auditFailed => 'Failed';
 
   @override
+  String get lineNotYet => 'I don\'t get it yet. Explain it once more?';
+
+  @override
+  String get lineGotIt => 'Oh! Now I get it!';
+
+  @override
+  String get lineCloser => 'One step closer.';
+
+  @override
+  String get lineCloserQuest => 'One step closer.';
+
+  @override
+  String get auditOnceMore => 'Once more';
+
+  @override
+  String attemptNth(int n) {
+    return 'Attempt $n';
+  }
+
+  @override
+  String attemptDelta(String delta) {
+    return '$delta from last time';
+  }
+
+  @override
+  String get attemptSame => 'Same as last time';
+
+  @override
+  String get attemptFirst => 'First';
+
+  @override
+  String get attemptThis => 'This time';
+
+  @override
+  String nodeServesQuest(String title) {
+    return 'Main quest · $title';
+  }
+
+  @override
   String get replayRetry => 'Try again';
 
   @override

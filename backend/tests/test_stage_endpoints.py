@@ -218,7 +218,37 @@ def test_overview_audits_are_this_nodes_newest_first(client):
         (first, "failed", ids["root-coefficient"], "Roots and Coefficients"),
     ]
     assert audits[0]["score"] == verdict["score"] and audits[1]["score"] == 45
-    assert set(audits[0]) == {"id", "skill_id", "skill_title", "status", "score", "created_at", "test_out", "reflected"}
+    assert set(audits[0]) == {
+        "id", "skill_id", "skill_title", "status", "score", "created_at", "test_out", "reflected", "first_answer",
+    }
+
+
+def test_overview_audits_carry_the_users_first_answer(client):
+    ids = ids_by_slug(generate(client, "Math"))
+    fresh = start(client, ids["discriminant"])
+    # Not answered yet: none.
+    assert client.get(f"/api/skills/{ids['discriminant']}/overview").json()["audits"][0]["first_answer"] is None
+    answer_turns(client, fresh, FIRST, LONG)
+    first = fail_node(client, ids["root-coefficient"])
+    second = start(client, ids["root-coefficient"])
+    opening = "  A root   and its coefficients " + "x" * 400
+    answer_turns(client, second, opening, LONG)
+
+    audits = {a["id"]: a for a in client.get(f"/api/skills/{ids['root-coefficient']}/overview").json()["audits"]}
+
+    # Whitespace folded, trimmed to 240 characters with an ellipsis.
+    trimmed = audits[second]["first_answer"]
+    assert trimmed.startswith("A root and its coefficients x") and trimmed.endswith("…")
+    assert len(trimmed) == 240
+    # The first answer of each audit, not a later one.
+    assert audits[first]["first_answer"] == FIRST
+
+
+def test_the_audit_list_has_no_first_answer(client):
+    ids = ids_by_slug(generate(client, "Math"))
+    pass_node(client, ids["discriminant"])
+
+    assert "first_answer" not in client.get("/api/audits").json()[0]
 
 
 def test_overview_materials_are_this_nodes_search_plans_newest_first(client):

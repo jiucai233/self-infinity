@@ -2041,6 +2041,7 @@ class AuditSummary {
     required this.createdAt,
     this.testOut = false,
     this.reflected = false,
+    this.firstAnswer,
   });
 
   factory AuditSummary.fromJson(Json json) => AuditSummary(
@@ -2052,6 +2053,7 @@ class AuditSummary {
     createdAt: _time(json, 'created_at'),
     testOut: _boolN(json, 'test_out') ?? false,
     reflected: _boolN(json, 'reflected') ?? false,
+    firstAnswer: _strN(json, 'first_answer'),
   );
 
   final int id;
@@ -2066,6 +2068,10 @@ class AuditSummary {
 
   /// A lesson card was made from this audit.
   final bool reflected;
+
+  /// The user's first answer in it, cut to 240 characters; only in a node's
+  /// audit history (`SkillOverview.audits`), null before they answered.
+  final String? firstAnswer;
 }
 
 /// A prerequisite of a node with the reason (`SkillOverview.requires`).

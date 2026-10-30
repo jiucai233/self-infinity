@@ -473,6 +473,7 @@ Response:
 ```
 - `requires` = nodes this node requires (the sources of requires edges into it).
 - `audits` = this node's audits, newest first. `materials` = its search plans, newest first.
+- Each of these `audits` also has `first_answer` **(2026-10-31)**: the user's first turn of that audit, whitespace folded and cut to 240 characters (ending in `…` when cut), or `null` before they answered. No LLM. The app sets the first attempt's beside the passing one in the celebration. Endpoint 23 does not carry it.
 Errors: 404 `skill not found`.
 
 ### AuditSummary

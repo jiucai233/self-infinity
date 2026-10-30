@@ -827,6 +827,14 @@ class AuditSummaryOut(BaseModel):
     reflected: bool = False
 
 
+class NodeAuditOut(AuditSummaryOut):
+    """An audit in a node's history (the node overview): with the user's first answer, so the
+    pass can set their first explanation of the node beside this one."""
+
+    # The user's first turn, trimmed to FIRST_ANSWER_CHARS; None before they answered.
+    first_answer: str | None = None
+
+
 class RequiredSkillOut(BaseModel):
     skill: SkillNodeOut
     reason: str | None
@@ -837,7 +845,7 @@ class SkillOverviewOut(BaseModel):
     course: CourseOut
     contains_parents: list[SkillNodeOut]
     requires: list[RequiredSkillOut]
-    audits: list[AuditSummaryOut]
+    audits: list[NodeAuditOut]
     materials: list[SearchPlanOut]
 
 

@@ -84,6 +84,45 @@ class AppLocalizationsKo extends AppLocalizations {
   String get auditFailed => '미통과';
 
   @override
+  String get lineNotYet => '아직 잘 모르겠어요. 한 번 더 설명해 줄래요?';
+
+  @override
+  String get lineGotIt => '아! 이제 알겠어요!';
+
+  @override
+  String get lineCloser => '한 걸음 더 가까워졌어요.';
+
+  @override
+  String get lineCloserQuest => '한 걸음 더 가까워졌어요.';
+
+  @override
+  String get auditOnceMore => '한 번 더';
+
+  @override
+  String attemptNth(int n) {
+    return '$n번째 설명';
+  }
+
+  @override
+  String attemptDelta(String delta) {
+    return '지난번보다 $delta';
+  }
+
+  @override
+  String get attemptSame => '지난번과 같아요';
+
+  @override
+  String get attemptFirst => '처음';
+
+  @override
+  String get attemptThis => '이번';
+
+  @override
+  String nodeServesQuest(String title) {
+    return '메인 퀘스트 · $title';
+  }
+
+  @override
   String get replayRetry => '다시 도전';
 
   @override

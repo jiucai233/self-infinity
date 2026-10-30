@@ -265,6 +265,30 @@ class FakeApiClient implements SelfInfinityApi {
     _nodes[skillId] = node.copyWith(nodeType: type);
   }
 
+  /// Adds a finished failed audit on [skillId] to its history, with [score]
+  /// and the user's first [answer] — a node tried several times, for
+  /// screenshots and tests. The node itself is left as it is.
+  void debugAddFailedAttempt(int skillId, {required int score, required String answer}) {
+    final node = _nodes[skillId] ?? (throw StateError('No skill node $skillId'));
+    final audit =
+        _FakeAudit(
+            id: _nextAuditId++,
+            skillId: skillId,
+            position: positionOf(node.id, _edges),
+            maxTurns: 4,
+            createdAt: _clock(),
+          )
+          ..turns.addAll([
+            AuditTurn(role: AuditRole.auditor, content: _openingQuestion(node, NodePosition.leaf)),
+            AuditTurn(role: AuditRole.user, content: answer),
+          ])
+          ..status = AuditStatus.failed
+          ..score = score
+          ..gaps = const ['You stated the definition but not why it works.']
+          ..comment = 'The answer stops at the conclusion and lacks reasons.';
+    _audits[audit.id] = audit;
+  }
+
   /// Sets a node's status directly, e.g. to open a node further along the
   /// learning order than the one the course has open.
   void debugSetStatus(int skillId, SkillStatus status) {
@@ -1886,7 +1910,7 @@ class FakeApiClient implements SelfInfinityApi {
       ],
       audits: [
         for (final a in _audits.values.toList().reversed)
-          if (a.skillId == skillId) _summaryOf(a),
+          if (a.skillId == skillId) _summaryOf(a, withFirstAnswer: true),
       ],
       materials: [
         for (final p in _searchPlans.reversed)
@@ -1902,7 +1926,9 @@ class FakeApiClient implements SelfInfinityApi {
     return [for (final a in _audits.values.toList().reversed.take(limit)) _summaryOf(a)];
   }
 
-  AuditSummary _summaryOf(_FakeAudit a) => AuditSummary(
+  /// [withFirstAnswer]: a node's audit history carries the user's first
+  /// answer (cut to 240 characters); the list of all audits does not.
+  AuditSummary _summaryOf(_FakeAudit a, {bool withFirstAnswer = false}) => AuditSummary(
     id: a.id,
     skillId: a.skillId,
     skillTitle: (_nodes[a.skillId] ?? _hiddenNodes[a.skillId])!.title,
@@ -1911,7 +1937,17 @@ class FakeApiClient implements SelfInfinityApi {
     createdAt: a.createdAt,
     testOut: a.testOut,
     reflected: a.principleId != null,
+    firstAnswer: withFirstAnswer ? _firstAnswerOf(a) : null,
   );
+
+  static String? _firstAnswerOf(_FakeAudit a) {
+    final first = a.turns.where((t) => t.isUser).firstOrNull?.content;
+    if (first == null) return null;
+    final folded = first.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).join(' ');
+    if (folded.isEmpty) return null;
+    final runes = folded.runes.toList();
+    return runes.length <= 240 ? folded : '${String.fromCharCodes(runes.take(239)).trimRight()}…';
+  }
 
   // ===========================================================================
   // 32, 34: who is signed in; the developer panel

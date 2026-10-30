@@ -84,6 +84,45 @@ class AppLocalizationsZh extends AppLocalizations {
   String get auditFailed => '未通过';
 
   @override
+  String get lineNotYet => '我还没听懂……再讲一次嘛？';
+
+  @override
+  String get lineGotIt => '啊！我懂了！';
+
+  @override
+  String get lineCloser => '离那个人又近了一步。';
+
+  @override
+  String get lineCloserQuest => '离它又近了一步。';
+
+  @override
+  String get auditOnceMore => '再讲一次';
+
+  @override
+  String attemptNth(int n) {
+    return '第 $n 次讲解';
+  }
+
+  @override
+  String attemptDelta(String delta) {
+    return '比上次 $delta';
+  }
+
+  @override
+  String get attemptSame => '和上次一样';
+
+  @override
+  String get attemptFirst => '第一次';
+
+  @override
+  String get attemptThis => '这一次';
+
+  @override
+  String nodeServesQuest(String title) {
+    return '主线任务 · $title';
+  }
+
+  @override
   String get replayRetry => '再挑战一次';
 
   @override

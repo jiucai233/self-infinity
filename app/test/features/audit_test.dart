@@ -39,7 +39,9 @@ Future<void> pumpAudit(
   state: state,
 );
 
-Avatar avatar(WidgetTester tester) => tester.widget<Avatar>(find.byType(Avatar));
+Avatar avatar(WidgetTester tester) => tester.widget<Avatar>(
+  find.descendant(of: find.byKey(const Key('audit-speaker')), matching: find.byType(Avatar)),
+);
 
 String bubble(WidgetTester tester) =>
     tester.widget<Text>(find.byKey(const Key('audit-bubble-text'))).data!;
@@ -552,19 +554,19 @@ void main() {
   });
 
   group('a fail', () {
-    testWidgets('angry face and the verdict card: Not yet., the score, the comment', (
+    testWidgets('her face, not cross, and the verdict card: her line, the score, the comment', (
       tester,
     ) async {
       await pumpAudit(tester, api, 1);
       await failIt(tester);
-      expect(textOf(tester, 'verdict-title'), 'Not yet.');
+      expect(textOf(tester, 'verdict-title'), "I don't get it yet. Explain it once more?");
       expect(textOf(tester, 'verdict-score'), '${(await api.listAudits()).first.score}');
       expect(
         textOf(tester, 'verdict-comment'),
         'The answer stops at the conclusion and lacks reasons.',
       );
       expect(find.byKey(const Key('audit-bubble-text')), findsNothing); // the card is the line
-      expect(avatar(tester).mood, AvatarMood.angry);
+      expect(avatar(tester).mood, AvatarMood.neutral);
       expect(avatar(tester).agent, 'auditor');
       expect(inputVisible(tester), isFalse);
       expect(find.byKey(const Key('audit-next')), findsOneWidget);
@@ -848,8 +850,8 @@ void main() {
 
       voice.hear("I'm not sure");
       await tester.pumpAndSettle();
-      expect(voice.spoken.last, contains('Not quite.'));
-      expect(textOf(tester, 'verdict-title'), 'Not yet.');
+      expect(voice.spoken.last, contains("I don't get it yet. Explain it once more?"));
+      expect(textOf(tester, 'verdict-title'), "I don't get it yet. Explain it once more?");
       expect(find.byKey(const Key('voice-wave-row')), findsNothing); // the loop ended
     });
 

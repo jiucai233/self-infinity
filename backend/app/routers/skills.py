@@ -9,7 +9,19 @@ from app.agents.course_scout import CourseScout, PlayerContext
 from app.agents.material_finder import MaterialFinder
 from app.db import account_engine, get_session
 from app.llm import get_provider
-from app.models import AuditSession, Course, EdgeKind, Goal, Principle, Profile, SearchPlan, SkillEdge, SkillNode
+from app.models import (
+    AuditSession,
+    AuditTurn,
+    Course,
+    EdgeKind,
+    Goal,
+    Principle,
+    Profile,
+    SearchPlan,
+    SkillEdge,
+    SkillNode,
+    TurnRole,
+)
 from app.routers.audits import audit_summary, reflected_ids
 from app.schemas import (
     ClarifyRequest,
@@ -18,6 +30,7 @@ from app.schemas import (
     CourseOut,
     GenerateCourseRequest,
     GeneratedCourseOut,
+    NodeAuditOut,
     RecommendationOut,
     RequiredSkillOut,
     ScoutOptionOut,
@@ -272,6 +285,31 @@ def create_search_plan(skill_id: int, body: SearchPlanRequest, session: Session 
     return search_plan_out(plan)
 
 
+# How much of the user's first answer a node's audit history carries.
+FIRST_ANSWER_CHARS = 240
+
+
+def _trimmed(text: str, limit: int = FIRST_ANSWER_CHARS) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def first_answers(session: Session, audit_ids: list[int]) -> dict[int, str]:
+    """The user's first turn of each audit, trimmed (no LLM)."""
+    if not audit_ids:
+        return {}
+    turns = session.exec(
+        select(AuditTurn)
+        .where(col(AuditTurn.session_id).in_(audit_ids), AuditTurn.role == TurnRole.user)
+        .order_by(col(AuditTurn.created_at), col(AuditTurn.id))
+    ).all()
+    first: dict[int, str] = {}
+    for turn in turns:
+        if turn.session_id not in first and turn.content.strip():
+            first[turn.session_id] = _trimmed(turn.content)
+    return first
+
+
 @router.get("/{skill_id}/overview", response_model=SkillOverviewOut)
 def get_overview(skill_id: int, session: Session = Depends(get_session)):
     """One node with its course, contains parents, required nodes, audits and materials (no LLM)."""
@@ -292,6 +330,7 @@ def get_overview(skill_id: int, session: Session = Depends(get_session)):
         .order_by(col(AuditSession.created_at).desc(), col(AuditSession.id).desc())
     ).all()
     reflected = reflected_ids(session)
+    answers = first_answers(session, [a.id for a in audits])
     plans = session.exec(
         select(SearchPlan)
         .where(SearchPlan.skill_id == skill.id)
@@ -302,6 +341,9 @@ def get_overview(skill_id: int, session: Session = Depends(get_session)):
         course=CourseOut.model_validate(course),
         contains_parents=[SkillNodeOut.model_validate(p) for p in contains_parents(session, skill.id)],
         requires=[RequiredSkillOut(skill=SkillNodeOut.model_validate(n), reason=e.reason) for e, n in required],
-        audits=[audit_summary(a, skill, reflected) for a in audits],
+        audits=[
+            NodeAuditOut(**audit_summary(a, skill, reflected).model_dump(), first_answer=answers.get(a.id))
+            for a in audits
+        ],
         materials=[search_plan_out(p) for p in plans],
     )

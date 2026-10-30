@@ -16,6 +16,7 @@ import '../../voice/live_voice.dart';
 import '../../voice/voice_mode.dart';
 import '../../voice/voice_service.dart';
 import '../../widgets/widgets.dart';
+import '../stage/profile_controller.dart';
 import '../stage/stage_controller.dart';
 import '../stage/stage_input_bar.dart';
 import '../stage/stage_scaffold.dart';
@@ -35,8 +36,12 @@ import '../../l10n/l10n.dart';
 /// and copied. On a fail, "Make a lesson card" brings the
 /// Recorder (`What did you misunderstand?`); the answer becomes a lesson card
 /// that flips over in the column, and material is searched for the first gap
-/// in the background. A pass also floats a [CelebrationCard] up (XP, level up,
-/// the nodes it opened). To try again, go back to scene 4.
+/// in the background. A fail is her not understanding yet: the card asks for
+/// the explanation again and says which attempt on the node it was and how
+/// the score moved. A pass also floats a [CelebrationCard] up (her line, XP,
+/// level up, the node's score curve, the user's first explanation beside this
+/// one, their identity line read back, the nodes it opened). To try again, go
+/// back to scene 4.
 ///
 /// Route `/skill/:id/audit`. Starts a session when opened, or goes on with the
 /// node's unfinished one (`Start over` begins a new one).
@@ -86,12 +91,24 @@ class _Celebration {
     this.levelBefore,
     this.levelAfter,
     this.unlocked = const [],
+    this.scores = const [],
+    this.firstAnswer,
+    this.thisAnswer,
+    this.identity,
+    this.identityIsQuest = false,
   });
 
   final VerdictResult verdict;
   final int? levelBefore;
   final int? levelAfter;
   final List<UnlockedNode> unlocked;
+
+  /// The node's scores, oldest first, this one last.
+  final List<int> scores;
+  final String? firstAnswer;
+  final String? thisAnswer;
+  final String? identity;
+  final bool identityIsQuest;
 }
 
 class _AuditSceneState extends State<AuditScene> {
@@ -111,6 +128,13 @@ class _AuditSceneState extends State<AuditScene> {
 
   /// An unfinished audit was picked up: the column offers `Start over`.
   bool _resumed = false;
+
+  /// The node's finished audits before this one, newest first, and its course.
+  List<AuditSummary> _before = const [];
+  int? _courseId;
+
+  /// Her Live2D figure on the web, for the reaction to a pass.
+  final GlobalKey<Live2DFigureState> _figure = GlobalKey();
 
   // Dialogue.
   final List<_Line> _lines = [];
@@ -192,6 +216,11 @@ class _AuditSceneState extends State<AuditScene> {
       if (!mounted) return;
       setState(() {
         _title = overview.skill.title;
+        _courseId = overview.course.id;
+        _before = [
+          for (final a in overview.audits)
+            if (a.status != AuditStatus.active && a.id != start.session.id) a,
+        ];
         _session = start.session;
         _resumed = start.resumed;
         _lines.addAll([
@@ -259,7 +288,11 @@ class _AuditSceneState extends State<AuditScene> {
             _sending = false;
           });
           _appState.markDataChanged();
-          if (result.passed) unawaited(_celebrate(result, levelBefore));
+          if (result.passed) {
+            // It clicked: she lights up (on the web, the Live2D figure plays it).
+            _figure.currentState?.react('happy');
+            unawaited(_celebrate(result, levelBefore));
+          }
           return _spoken(feedback, _verdictLine(result));
       }
     } on Object catch (e) {
@@ -287,15 +320,44 @@ class _AuditSceneState extends State<AuditScene> {
       }
     }
     if (!mounted) return;
+    final (:identity, :isQuest) = _whoTheyAreBecoming();
+    final first = _before.lastOrNull;
     setState(() {
       _celebration = _Celebration(
         verdict: verdict,
         levelBefore: levelBefore,
         levelAfter: _stats.facts?.xp.level,
         unlocked: unlocked,
+        scores: [
+          for (final a in _before.reversed) ?a.score,
+          verdict.score,
+        ],
+        firstAnswer: first?.firstAnswer,
+        thisAnswer: _lines.where((l) => l.fromUser).firstOrNull?.text,
+        identity: identity,
+        identityIsQuest: isQuest,
       );
       _celebrationOpen = true;
     });
+  }
+
+  /// The user's identity sentence, or else the main quest this node's course
+  /// serves; null when there is neither.
+  ({String? identity, bool isQuest}) _whoTheyAreBecoming() {
+    final identity = context.read<ProfileController>().profile.identity.trim();
+    if (identity.isNotEmpty) return (identity: identity, isQuest: false);
+    final quest = _stats.goals.where((g) => g.courseIds.contains(_courseId)).firstOrNull;
+    return (identity: quest?.title, isQuest: quest != null);
+  }
+
+  /// Which audit of this node this one is (1 = the first).
+  int get _attempt => _before.length + 1;
+
+  /// This score minus the last attempt's; null when there is none.
+  int? get _delta {
+    final verdict = _verdict;
+    final last = _before.where((a) => a.score != null).firstOrNull?.score;
+    return verdict == null || last == null ? null : verdict.score - last;
   }
 
   Future<String?> _submitReflection(String raw, {required bool restoreOnError}) async {
@@ -375,10 +437,12 @@ class _AuditSceneState extends State<AuditScene> {
   String _verdictLine(VerdictResult v) {
     if (v.passed) {
       final xp = v.rewardAmount == null ? '' : ' · +${v.rewardAmount} XP';
-      return '${context.l10n.clearedWithScore(v.score)}$xp';
+      final gotIt = CharacterLines.of(context).say(CharacterSituation.gotIt);
+      return '$gotIt ${context.l10n.clearedWithScore(v.score)}$xp';
     }
     final comment = v.comment ?? '';
-    return comment.isEmpty ? context.l10n.notQuite : '${context.l10n.notQuite} $comment';
+    final ask = CharacterLines.of(context).say(CharacterSituation.notYet);
+    return comment.isEmpty ? ask : '$comment $ask';
   }
 
   /// The chip in the title bar.
@@ -388,7 +452,8 @@ class _AuditSceneState extends State<AuditScene> {
     if (verdict == null) {
       return StatusChip.primary(_session?.testOut ?? false ? l.challengeInProgress : l.auditInProgress);
     }
-    return verdict.passed ? StatusChip.success(l.auditPassed) : StatusChip.danger(l.auditFailed);
+    // A fail is not an alarm: she asks for it once more.
+    return verdict.passed ? StatusChip.success(l.auditPassed) : StatusChip.neutral(l.auditOnceMore);
   }
 
   void _askRecorder() => setState(() {
@@ -490,6 +555,11 @@ class _AuditSceneState extends State<AuditScene> {
                 levelBefore: celebration.levelBefore,
                 levelAfter: celebration.levelAfter,
                 unlocked: celebration.unlocked,
+                scores: celebration.scores,
+                firstAnswer: celebration.firstAnswer,
+                thisAnswer: celebration.thisAnswer,
+                identity: celebration.identity,
+                identityIsQuest: celebration.identityIsQuest,
                 boss: _session != null && _session!.nodePosition != NodePosition.leaf,
                 onClose: () => setState(() => _celebrationOpen = false),
                 onContinue: () => context.go(AppRoutes.skill(widget.skillId)),
@@ -509,7 +579,8 @@ class _AuditSceneState extends State<AuditScene> {
       return (agent: 'recorder', mood: AvatarMood.neutral);
     }
     if (verdict != null) {
-      return (agent: 'auditor', mood: verdict.passed ? AvatarMood.happy : AvatarMood.angry);
+      // A fail: she has not understood yet, she is not cross.
+      return (agent: 'auditor', mood: verdict.passed ? AvatarMood.happy : AvatarMood.neutral);
     }
     return (agent: 'auditor', mood: AvatarMood.stern);
   }
@@ -551,6 +622,7 @@ class _AuditSceneState extends State<AuditScene> {
                     AppSpacing.md,
                   ),
                   child: _SpeakerHeader(
+                    figureKey: _figure,
                     agent: speaker.agent,
                     mood: speaker.mood,
                     state: state,
@@ -647,6 +719,8 @@ class _AuditSceneState extends State<AuditScene> {
             ],
             VerdictCard(
               verdict: verdict,
+              attempt: _attempt,
+              delta: _delta,
               onLesson: verdict.passed || _recorderAsks ? null : _askRecorder,
               onTooHard: verdict.passed || _telling != null ? null : () => unawaited(_tell(AuditFeedback.tooHard)),
               onMisheard: verdict.passed || _telling != null ? null : () => unawaited(_tell(AuditFeedback.misheard)),
@@ -744,12 +818,15 @@ class _Feedback extends StatelessWidget {
 /// what she is doing.
 class _SpeakerHeader extends StatelessWidget {
   const _SpeakerHeader({
+    required this.figureKey,
     required this.agent,
     required this.mood,
     required this.state,
     required this.onTap,
     this.style,
   });
+
+  final GlobalKey<Live2DFigureState> figureKey;
 
   /// "Listener · depth"; null for a challenge.
   final String? style;
@@ -775,6 +852,7 @@ class _SpeakerHeader extends StatelessWidget {
           onTap: onTap,
           // On the web she is the Live2D student at her desk; the sprite stands in until it loads.
           child: Live2DFigure(
+            key: figureKey,
             mood: mood,
             state: state,
             size: 76,

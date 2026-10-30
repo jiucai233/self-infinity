@@ -511,11 +511,16 @@ class _SkillSceneState extends State<SkillScene> {
           if (p.skillId == node.id) p,
       ],
     );
+    // The main quest this node's course serves, if any.
+    final quest = context.select<StageController, String?>(
+      (s) => s.goals.where((g) => g.courseIds.contains(overview.course.id)).firstOrNull?.title,
+    );
     return LayoutBuilder(
       builder: (context, box) {
         final map = _courseMap;
         final card = SkillNodeCard(
           overview: overview,
+          quest: quest,
           boss: _boss,
           chips: _chips(overview),
           lessons: lessons,

@@ -217,7 +217,7 @@ void main() {
       await tester.tap(key('verdict-copy'));
       await tester.pumpAndSettle();
 
-      expect(copied.single, startsWith('Not yet. · 45\n'));
+      expect(copied.single, startsWith("Attempt 1\nI don't get it yet. Explain it once more? · 45\n"));
       expect(copied.single, contains('✗ ${points[0]} — ${FakeApiClient.failNote}'));
       expect(copied.single, contains('✓ ${points[1]}'));
       expect(copied.single, contains("- You didn't cover the exceptions."));

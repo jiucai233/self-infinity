@@ -86,6 +86,16 @@ Future<FakeApiClient> _seed() async {
   return api;
 }
 
+/// [_seed] with Linear Functions (9) tried and failed twice before: the
+/// verdict counts the attempt, a pass shows the curve and the first answer.
+Future<FakeApiClient> _seedTries() async {
+  final api = await _seed();
+  api
+    ..debugAddFailedAttempt(9, score: 62, answer: 'A linear function is a straight line. You draw it with a ruler.')
+    ..debugAddFailedAttempt(9, score: 68, answer: 'It is y = ax + b, where a is the slope and b is where it starts.');
+  return api;
+}
+
 /// Taps the point [key] of the life tree.
 Future<void> tapLifeNode(WidgetTester tester, String key) async {
   final state = tester.state<LifeConstellationState>(find.byType(LifeConstellation));
@@ -444,6 +454,7 @@ void main() {
         size: size,
         name: '41-failed-$tag',
         location: '/skill/9/audit',
+        api: await _seedTries(),
         act: (t) async {
           for (var i = 0; i < 2; i++) {
             await t.enterText(find.byKey(const Key('stage-input')), shortAnswer);
@@ -478,6 +489,7 @@ void main() {
         size: size,
         name: '41-passed-$tag',
         location: '/skill/9/audit',
+        api: await _seedTries(),
         act: (t) async {
           for (var i = 0; i < 3; i++) {
             if (find.byKey(const Key('send')).evaluate().isEmpty) break;

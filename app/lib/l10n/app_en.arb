@@ -36,6 +36,38 @@
   "askTodaysQuests": "What should I do today?",
   "attempts": "Attempts",
   "auditFailed": "Failed",
+  "lineNotYet": "I don't get it yet. Explain it once more?",
+  "lineGotIt": "Oh! Now I get it!",
+  "lineCloser": "One step closer.",
+  "lineCloserQuest": "One step closer.",
+  "auditOnceMore": "Once more",
+  "attemptNth": "Attempt {n}",
+  "@attemptNth": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "attemptDelta": "{delta} from last time",
+  "@attemptDelta": {
+    "placeholders": {
+      "delta": {
+        "type": "String"
+      }
+    }
+  },
+  "attemptSame": "Same as last time",
+  "attemptFirst": "First",
+  "attemptThis": "This time",
+  "nodeServesQuest": "Main quest · {title}",
+  "@nodeServesQuest": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "replayRetry": "Try again",
   "findMaterials": "Find material",
   "materialsHeading": "Material",
