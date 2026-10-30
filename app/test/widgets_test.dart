@@ -209,17 +209,21 @@ void main() {
       expect(find.text('Message…'), findsOneWidget);
     });
 
-    testWidgets('without callbacks there is no ⊕ and no ∿', (tester) async {
+    testWidgets('without callbacks there is no ⊕, and the voice key dictates instead of ∿', (
+      tester,
+    ) async {
       await pumpBar(tester);
       expect(find.byKey(const Key('upload')), findsNothing);
       expect(find.byKey(const Key('voice-mode')), findsNothing);
+      expect(find.byKey(const Key('dictation-button')), findsOneWidget);
     });
 
-    testWidgets('search variant: a magnifier, a send, nothing else', (tester) async {
+    testWidgets('search variant: a magnifier, a send and the dictation key', (tester) async {
       await pumpBar(tester, search: true);
       expect(find.byIcon(Icons.search_rounded), findsOneWidget);
       expect(find.byKey(const Key('upload')), findsNothing);
       expect(find.byKey(const Key('voice-mode')), findsNothing);
+      expect(find.byKey(const Key('dictation-button')), findsOneWidget);
       expect(find.byKey(const Key('send')), findsOneWidget);
     });
 

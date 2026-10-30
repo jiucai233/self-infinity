@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -6,9 +8,12 @@ import 'app/app_state.dart';
 import 'auth/auth_service.dart';
 import 'auth/supabase_auth.dart';
 import 'l10n/l10n.dart';
+import 'widgets/avatar.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerDafeiyuLicense();
+  unawaited(Avatar.precache());
   final locale = await LocaleController.load();
   AuthService auth = LocalAuth();
   if (kAccountsEnabled) {

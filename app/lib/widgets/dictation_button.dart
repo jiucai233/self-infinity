@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../theme/tokens.dart';
 import '../voice/voice_service.dart';
+import 'composer.dart';
 import 'toast.dart';
 import 'morph_icon.dart';
 import 'voice_wave.dart';
@@ -23,6 +24,7 @@ class DictationButton extends StatefulWidget {
     this.maxLength,
     this.enabled = true,
     this.pauseFor = const Duration(seconds: 3),
+    this.round = false,
   });
 
   final TextEditingController controller;
@@ -34,6 +36,9 @@ class DictationButton extends StatefulWidget {
 
   /// Thinking out loud takes longer pauses than chatting, hence 3 s.
   final Duration pauseFor;
+
+  /// The 40 px round voice key outside a [Composer] instead of a bare icon.
+  final bool round;
 
   static String get unavailableText => l10nNow.voiceUnavailable;
 
@@ -133,16 +138,22 @@ class _DictationButtonState extends State<DictationButton> {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (_listening) SizedBox(width: 56, height: 22, child: VoiceWave(level: _level)),
+        if (_listening && widget.round) const SizedBox(width: AppSpacing.xs),
         IconButton(
           key: Key(_listening ? 'dictation-stop' : 'dictation-button'),
           tooltip: _listening ? context.l10n.stopListening : context.l10n.speakYourAnswer,
           onPressed: _listening || widget.enabled ? _toggle : null,
+          style: widget.round ? composerVoiceKeyStyle() : null,
           icon: MorphIcon(
             key: _icon,
             from: MorphShapes.mic,
             to: MorphShapes.stop,
             morphed: _listening,
-            color: _listening ? AppColors.primary : AppColors.textSecondary,
+            color: _listening
+                ? AppColors.primary
+                : widget.round
+                ? (widget.enabled ? AppColors.textPrimary : AppColors.textTertiary)
+                : AppColors.textSecondary,
           ),
         ),
       ],

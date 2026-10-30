@@ -61,11 +61,14 @@ class GraphLayout {
   final Map<int, int> depths;
 
   /// Lays out [nodes]; [measure] gives the width of a label (it is cut to
-  /// [maxLabelWidth]).
+  /// [maxLabelWidth]). [gap] and [side] replace [columnGap] and [hMargin]
+  /// (a phone packs the columns closer).
   factory GraphLayout.compute({
     required List<SkillNode> nodes,
     required List<SkillEdge> edges,
     required double Function(String label) measure,
+    double gap = columnGap,
+    double side = hMargin,
   }) {
     final byId = {for (final n in nodes) n.id: n};
     final y = <int, double>{};
@@ -109,12 +112,12 @@ class GraphLayout {
       columnWidth[d] = math.max(columnWidth[d], dot + labelGap + labelWidths[n.id]!);
     }
     final columnX = <double>[];
-    var x = hMargin;
+    var x = side;
     for (var d = 0; d < columns; d++) {
       columnX.add(x);
-      x += columnWidth[d] + columnGap;
+      x += columnWidth[d] + gap;
     }
-    final width = x - columnGap + hMargin;
+    final width = x - gap + side;
     final height = margin * 2 + math.max(0, rows - 1) * rowGap + dot;
 
     final centers = <int, Offset>{

@@ -10,6 +10,12 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get tabHome => '首页';
+
+  @override
+  String get tabMe => '我';
+
+  @override
   String get about => '简介';
 
   @override
@@ -280,6 +286,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dotLocked => '未解锁';
 
   @override
+  String get legend => '圆点的含义';
+
+  @override
   String get dotReady => '可挑战';
 
   @override
@@ -420,6 +429,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get lessons => '教训';
+
+  @override
+  String get challengeWholeHint => '讲清其中几个部分，通过后它下面的节点全部算通关。';
 
   @override
   String levelBar(int level, int progress) {
@@ -617,8 +629,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get onbTopicBody =>
-      '你的回答决定第一棵树怎么长。给个主题就够了：我会去找真实的课程大纲，它的条目就是树的第一层。自己有大纲？直接用文件（PDF、TXT 或 MD），条目原样使用。';
+  String get onbTopicBody => '你的回答决定第一棵树。给个主题就够，也可以用课程大纲文件（PDF、TXT、MD）。';
 
   @override
   String get onbTopicHint => '例如：微积分';
@@ -635,8 +646,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onbWantToLearnThis => '我想学这个';
 
   @override
-  String get onbWelcomeBody =>
-      '在 Self-Infinity 里，你靠证明自己真的懂了来升级：用自己的话讲出来，由审核官来判定。先回答几个问题，每个一两句话就行（打字，或者点麦克风说出来）；之后都可以改。';
+  String get onbWelcomeBody => '把学到的讲出来，就能升级。先回答几个小问题，之后都能改。';
 
   @override
   String get onbWhoGuide => '谁能做到？';
@@ -1093,7 +1103,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unexpandedLine => '这部分还没拆开。拆开看看里面有什么；已经会了就整块挑战。';
 
   @override
-  String get challengeWhole => '整块挑战';
+  String get challengeWhole => '一次挑战整个分支';
 
   @override
   String get challengeInProgress => '整块挑战';
@@ -1506,38 +1516,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tourSkip => '跳过导览';
 
   @override
+  String get tourVerdict => '然后你会得到分数、漏掉的点和一条教训。';
+
+  @override
   String get tourBegin => '开始设置我的角色';
 
   @override
-  String get tourWelcome => '你好，我是向导。开始设置之前，先带你转一圈。现在看到的都是示例。';
+  String get tourTalk => '想学什么，在这里打字或说给我听。';
 
   @override
-  String get tourCharacter => '这一侧是你自己：等级、已通关的节点，还有今天的状态。';
+  String get tourTree => '每通关一个节点，人生树就亮一处。';
 
   @override
-  String get tourQuests => '每日任务。我会按时段和你的状态，挑出今天该学和该复习的内容。点一下就能打开。';
-
-  @override
-  String get tourTalk => '在这里和我说话，打字或语音都行：想学什么、今天过得怎样、接下来做什么，都可以说。';
-
-  @override
-  String get tourAttempts => '这一侧是你在这个节点上的每次尝试：时间、分数、过没过。';
-
-  @override
-  String get tourTree => '这是你的人生树。每门课是一根枝，每个点是一个节点，通关后会亮起来。拖动旋转，滚轮缩放，点节点打开。';
-
-  @override
-  String get tourNode => '一个节点就是一块要学的内容。这里是它讲什么，以及它的知识点：打勾的是讲清楚的，打叉的是上次没讲清的。';
-
-  @override
-  String get tourProve => '想通关一个节点，就把它讲出来。点这里，审核官接手。';
-
-  @override
-  String get tourAudit => '你来教，审核官来学。她听不懂的地方会追问；你讲错了，可以再讲一遍。讲对的不会再问。';
-
-  @override
-  String get tourSyllabus =>
-      '刚才都是示例。接下来设置你的角色，建你的第一棵树。我会问你想学什么：给一个主题就够，有课程大纲文件更好，因为大纲里的条目会原样成为树的第一层。';
+  String get tourAudit => '想通关节点，就把它教给审核官。';
 
   @override
   String get tourLessonsTitle => '每次失误都会变成教训。';

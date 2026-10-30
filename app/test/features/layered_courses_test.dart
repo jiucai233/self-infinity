@@ -223,6 +223,7 @@ void main() {
     await pumpOutline(tester, api: await visionApi());
     expect(find.text('Geometric Vision +'), findsOneWidget);
     expect(find.text('Image Features'), findsOneWidget);
+    await openLegend(tester);
     expect(find.byKey(const Key('legend-unexpanded')), findsOneWidget);
     expect(find.text('Not broken down'), findsOneWidget);
   });

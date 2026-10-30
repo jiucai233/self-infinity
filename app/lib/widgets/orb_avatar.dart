@@ -7,7 +7,7 @@ import '../theme/tokens.dart';
 import 'avatar.dart';
 import '../l10n/l10n.dart';
 
-/// Scene 1: the wizard holding a crystal ball (`docs/ux-chat.md` Scene 1,
+/// Scene 1: 大肥鱼 holding a crystal ball (`docs/ux-chat.md` Scene 1,
 /// `docs/DESIGN.md` §4).
 ///
 /// The ball is drawn in layers, back to front:
@@ -90,11 +90,11 @@ class _OrbAvatarState extends State<OrbAvatar> with SingleTickerProviderStateMix
     final agent = widget.agent;
     final k = Avatar.unit(agent, size);
     final hand = Avatar.orbHandAt(agent, size);
-    final d = 84 * k; // ball diameter
-    // A bigger ball than the hand: it sits a little outwards, clear of her face.
-    final center = Offset(hand.dx + 10 * k, hand.dy - d / 2 - 2 * k);
+    final d = 56 * k; // ball diameter
+    // Held in both hands in front of her chest, below her face.
+    final center = hand;
     final figureWidth = size * Avatar.aspect;
-    final width = center.dx + d / 2 + 14 * k;
+    final width = math.max(figureWidth, center.dx + d / 2 + 14 * k);
     final scale = _down ? 0.97 : (_hover ? 1.04 : 1.0);
     final halo = d + 36 * k;
 

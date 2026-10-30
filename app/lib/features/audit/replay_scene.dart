@@ -439,30 +439,18 @@ class _ReplaySceneState extends State<ReplayScene> {
   }
 
   /// The user's own account of the miss: typed or dictated, never suggested.
+  /// No send key: `Make a lesson card` below sends it.
   Widget _reflectionField(BuildContext context) {
     final theme = Theme.of(context).textTheme;
-    OutlineInputBorder border(Color color) => OutlineInputBorder(
-      borderRadius: AppRadius.cardBorder,
-      borderSide: color == Colors.transparent ? BorderSide.none : BorderSide(color: color),
-    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextField(
-          key: const Key('replay-reflection'),
+        Composer(
+          fieldKey: const Key('replay-reflection'),
           controller: _reflection,
-          minLines: 3,
-          maxLines: 8,
+          hint: context.l10n.replayReflectHint,
+          multiline: true,
           enabled: !_sending,
-          style: theme.bodyLarge,
-          decoration: InputDecoration(
-            hintText: context.l10n.replayReflectHint,
-            suffixIcon: DictationButton(controller: _reflection, enabled: !_sending),
-            border: border(Colors.transparent),
-            enabledBorder: border(Colors.transparent),
-            disabledBorder: border(Colors.transparent),
-            focusedBorder: border(AppColors.primary),
-          ),
         ),
         if (_problem != null) ...[
           const SizedBox(height: AppSpacing.sm),

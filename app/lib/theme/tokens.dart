@@ -174,6 +174,15 @@ abstract final class AppColors {
   static const Color nightText = Color(0xFFEEEEE9);
   static const Color nightMuted = Color(0xFF6F6F69);
 
+  /// Small text on [night] ([nightText] at 70%): about 8:1, where
+  /// [nightMuted] (3.4:1) is too faint for words.
+  static const Color nightHint = Color(0xB3EEEEE9);
+
+  /// A cleared node, in the Tree and the Outline alike: the one gold of a
+  /// mastered node (`docs/DESIGN.md`: `ember`). Words keep [success], which
+  /// reads on paper.
+  static const Color cleared = ember;
+
   /// The crystal ball's smoky glass: lit centre, body, shaded edge (`OrbAvatar`).
   static const List<Color> glass = [Color(0xFF45453F), Color(0xFF242422), Color(0xFF0E0E0D)];
 

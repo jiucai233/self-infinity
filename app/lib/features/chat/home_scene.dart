@@ -220,7 +220,8 @@ class _HomeSceneState extends State<HomeScene> {
   Widget build(BuildContext context) {
     final chat = context.watch<ChatController>();
     return StageScaffold(
-      history: _chatting ? const ChatHistoryPanel() : null,
+      history: const ChatHistoryPanel(),
+      showHistoryPanel: _chatting,
       stage: CallbackShortcuts(
         bindings: {const SingleActivator(LogicalKeyboardKey.escape): () => _voiceMode.stop()},
         child: Focus(

@@ -39,7 +39,7 @@
 | `locked` / `requires` | `#C9C9C2` / `#8F8F88` | 锁住的节点 / 技能图的边 |
 | `night` / `nightHigh` | `#1A1A19` / `#2A2A28` | 人生树面板、水晶球内部 |
 | `nightLine` / `nightText` / `nightMuted` | `#8E8E87` / `#EEEEE9` / `#6F6F69` | 夜色上的网格线 / 文字 / 暗点 |
-| `ember` / `emberHot` / `emberRed` | `#F0B23E` / `#FFE0A0` / `#E0644E` | 夜色上的掌握节点与火花 / 失败节点 |
+| `ember` / `emberHot` / `emberRed` | `#F0B23E` / `#FFE0A0` / `#E0644E` | 掌握节点与火花 / 失败节点。`cleared` = `ember`：Tree 与 Outline 里「已通关」节点的唯一颜色（文字仍用 `success`） |
 | `glass` | `#45453F → #242422 → #0E0E0D` | 烟色水晶球 |
 | `magic` | `#3A2A10 → #B7791F → #F0B23E` | 古铜到金：思考微光、语音、庆祝 |
 
@@ -75,7 +75,7 @@
 | 组件 | 规则 |
 |---|---|
 | **面板** | 白底、圆角 20、无边框；顶部 56 高的标题栏（`titleMedium` + 右侧折叠图标）。 |
-| **输入栏** | `surfaceHigh` 填充的胶囊，无边框、聚焦时 1px 墨色边；左 ⊕，右侧发送键是墨色圆形（空输入时灰色）。语音键在框外，40px 圆形 `surfaceHigh`。 |
+| **输入栏** | `surfaceHigh` 填充的胶囊，无边框、聚焦时 1px 墨色边；左 ⊕，右侧发送键是墨色圆形（空输入时灰色）。语音键在框外，40px 圆形 `surfaceHigh`：有语音模式时是 ∿，否则是听写麦克风。全 App 只有这一个输入栏（`widgets/composer.dart` 的 `Composer`：首页、节点页、审计、人生树搜索、复盘反思、教程），各页只换左侧（⊕ / 🔍 / 无）、是否多行、有没有发送键。 |
 | **问候语**（scene 1） | `displayMedium`（手机 `headlineMedium`），墨色，居中；下面一行 `bodyLarge` 三级灰。 |
 | **推荐卡片**（scene 1） | `surfaceHigh` 底、圆角 16、内边距 16，左上一个小图标，文字 `labelLarge`；最多两张并排（窄屏竖排）；hover 时底色加深。 |
 | **她的气泡**（舞台） | `surfaceHigh` 底、圆角 20、尾巴指向 avatar；气泡上方一行小字是说话的 agent 名（`labelMedium`）。思考时气泡里是一条流动的古铜到金微光（三行骨架）。 |
@@ -85,10 +85,10 @@
 | **聊天面板** | 你的话右对齐 `userBubble` 气泡（圆角 20，右上角 4）；她的话左对齐无气泡，左侧 28px 圆形 agent 小头像 + 名字 + 时间，正文 `bodyLarge`。日期分隔是居中的小字。新消息自动滚到底。 |
 | **左栏** | 标题栏 `My character`：身份宣言、Win condition、Stakes、Main quests、Rules；三条属性条（`Lv 2 · 3/5`、`Cleared 4/12`、`Condition: …`），条高 8、圆角 4，填充墨色（Cleared 为琥珀，状态差为砖红）；Daily quests；Today。 |
 | **统计条**（scene 2） | 进度环（细墨线，中间 `3/22`）+ 大数字小标签：`Cleared 3 / 22`、`Progress 13%`、`Ready`、`Audits`、`Lessons`。 |
-| **人生树面板**（scene 2） | `night` 底、圆角 20。左上 `Tree | Outline` 胶囊切换；上方居中一行斜体身份宣言；左下图例；右下 `Drag to turn · tap a point`。 |
-| **节点卡片**（scene 2） | 一叠纸：前面一张 `surface` 卡片（1px `glow` 边、`float` 阴影），后面错开两张更暗的纸。小号大写 kicker（`BOSS` / `MAIN QUEST` / `COURSE` / `YOU`）→ 标题 → 状态 chip → 大数字（Best / Attempts / Lessons）→ `Audit history`（日期、Passed/Failed、分数条）→ 教训卡 → 墨色 `Take it on`。 |
+| **人生树面板**（scene 2） | `night` 底、圆角 20。左上 `Tree | Outline` 胶囊切换；上方居中一行斜体身份宣言；左下图例；右下 `Drag to turn · tap a point`。小字用 `nightHint`（`nightText` 70%，约 8:1），不用 `nightMuted`。网格球壳很淡，节点才是主角；每个节点有 48px 的隐形点击区（最近的节点胜出）。名字只标选中节点及其父子、搜索结果、课程（手机上选中或搜索时课程名让位），标签互不重叠、不出面板。 |
+| **节点卡片**（scene 2） | 一叠纸：前面一张 `surface` 卡片（1px `glow` 边、`float` 阴影），后面错开两张更暗的纸。小号大写 kicker（`BOSS` / `MAIN QUEST` / `COURSE` / `YOU`）→ 标题 → 状态 chip → 大数字（Best / Attempts / Lessons）→ `Audit history`（日期、Passed/Failed、分数条）→ 教训卡 → 墨色 `Take it on`。手机（宽 < 600）上是 Material 底部面板：顶部拖动条，打开约 2/3 高，可拖到整个舞台，往下拖关闭。 |
 | **contents 卡片**（scene 4） | 白卡、1px `outline`、圆角 16。资料是一行一个：网站小图标位（首字母圆点）+ 标题 + 域名（次要色），整行可点。 |
-| **技能图**（Outline 视图） | 圆点 14；可挑战 = 白底墨色描边，掌握 = 琥珀实心，失败 = 砖红实心，锁住 = 灰实心，Boss 多一圈；左下角图例。 |
+| **技能图**（Outline 视图） | 圆点 14；可挑战 = 白底墨色描边，掌握 = `cleared` 金色实心（与 Tree 同色），失败 = 砖红实心，锁住 = 灰实心，Boss 多一圈；图例收在左下角的 `?` 按钮后。窄屏上列距收紧，放得下就缩小到整宽（最小 0.66），放不下就横向拖动，有更多内容的一侧边缘渐隐。 |
 | **庆祝卡片**（审计通过） | 舞台中央浮出的纸卡（`float` 阴影、圆角 20）：古铜到金的星光散开，`Cleared!` / `Boss cleared!` + 分数，`+N XP`（琥珀），等级提升时 `Lv N → N+1`，新解锁节点为浅柠檬 chip（点了进 scene 4）。 |
 | **教训卡**（反思之后） | 卡片从背面翻到正面（300ms）：标题、正文、误解（红色小标签）。 |
 | **形变图标**（`MorphIcon`，参考 Morphicons） | 线条图标放在 24 网格上，用折线描述；每笔重采样到同样多的点，在弹簧上移动（stiffness 420、damping 30，略过冲后很快停下）。笔画数不同时，多出来的那笔从另一形状最后一点长出或缩回。用在：发送键 → 等她回答时变成转圈（`ring`，转动），回来后变回箭头；∿ 悬停时竖条换一个节拍；听写麦克风 ↔ 停止方块；落地页 `Sign in` 悬停时箭头穿过一扇门（`signIn`）。动画关闭时直接到终态。 |

@@ -1,6 +1,9 @@
-import 'dart:math' as math;
+import 'dart:async';
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/tokens.dart';
 
@@ -10,24 +13,6 @@ enum AvatarMood { smile, neutral, stern, angry, happy }
 /// What the avatar is doing.
 enum AvatarState { idle, listening, thinking, speaking }
 
-/// The one small thing that tells the agents apart.
-enum _Accessory { none, hair, glasses, hat, bowTie, wizard }
-
-const Map<String, _Accessory> _agentLooks = {
-  'front_desk': _Accessory.wizard,
-  'narrator': _Accessory.bowTie,
-  'recommender': _Accessory.hat,
-  'planner': _Accessory.glasses,
-  'clarifier': _Accessory.bowTie,
-  'syllabus_finder': _Accessory.hat,
-  'material_finder': _Accessory.glasses,
-  'auditor': _Accessory.glasses,
-  'challenger': _Accessory.hat,
-  'recorder': _Accessory.hat,
-  'linker': _Accessory.bowTie,
-  'checkin_converter': _Accessory.hair,
-};
-
 /// The agent's mood when nothing else is said.
 AvatarMood defaultMoodOf(String agent) => switch (agent) {
   'front_desk' || 'recommender' || 'checkin_converter' => AvatarMood.smile,
@@ -35,20 +20,40 @@ AvatarMood defaultMoodOf(String agent) => switch (agent) {
   _ => AvatarMood.neutral,
 };
 
-/// A thin dark line stick figure, one per agent (the user's sketch).
+/// The author's credit for 大肥鱼, which her license asks to be shown with the
+/// repository (`assets/dafeiyu/README.md`).
+const String dafeiyuCredit =
+    '大肥鱼 · YunYueSama · https://github.com/YunYueSama/codex-deepseek-pet';
+
+/// Puts 大肥鱼's license on Flutter's license page.
+void registerDafeiyuLicense() {
+  LicenseRegistry.addLicense(() async* {
+    final text = await rootBundle.loadString('assets/dafeiyu/LICENSE.txt');
+    yield LicenseEntryWithLineBreaks(
+      const ['大肥鱼 (character art)'],
+      '作者：YunYueSama\n'
+      '仓库：https://github.com/YunYueSama/codex-deepseek-pet\n\n'
+      'Modified for this app: the expression sheet is downscaled to 256 px cells '
+      'and re-encoded as WebP. Not endorsed by YunYueSama or DeepSeek.\n\n$text',
+    );
+  });
+}
+
+/// 大肥鱼, the one companion every agent is (`assets/dafeiyu/`): a chibi
+/// whale-girl maid drawn from two sheets.
 ///
-/// * [agent] picks the accessory (hair / glasses / hat / bow tie); an unknown
-///   name gets none.
-/// * [mood] shapes the face; [state] adds what she is doing: a moving mouth
-///   while speaking, sound marks while listening.
-/// * [wave] raises the right arm and waves a few times.
-/// * [holdOrb] holds the right hand out, palm up, at about (104, 88) of the
-///   100 x 140 figure box — [OrbAvatar] puts the crystal ball there. The hand
-///   reaches past the figure's box; the caller must leave room for it.
-/// * [animate] turns the movement off (the figure is then static). It defaults
-///   to [animationsEnabled], which tests switch off.
+/// * [agent] is kept for the label and for a later 3D model; every agent is
+///   drawn as the same character.
+/// * [mood] picks her expression; [state] what she is doing: a hand on her
+///   chin while thinking, talking while speaking, a tilted head while
+///   listening.
+/// * [wave] waves a few times.
+/// * [holdOrb] holds her hands together in front of her chest; [OrbAvatar]
+///   puts the crystal ball there ([orbHandAt]).
+/// * [animate] turns the movement off (the picture is then one still frame).
+///   It defaults to [animationsEnabled], which tests switch off.
 ///
-/// A 3D model will replace it later, picked by the same `agent` name.
+/// The sheets are decoded once and shared; until they are, the box is empty.
 class Avatar extends StatefulWidget {
   const Avatar({
     super.key,
@@ -64,19 +69,25 @@ class Avatar extends StatefulWidget {
   /// Global switch for the movement; `false` in widget tests.
   static bool animationsEnabled = true;
 
-  /// Where the open palm of a [holdOrb] figure is, in the avatar's own
+  /// Decodes the sheets (once). Tests await it so she is drawn at once.
+  static Future<void> precache() => _Sheets.load();
+
+  /// Where the hands of a [holdOrb] figure are, in the avatar's own
   /// coordinates (the box is `size * aspect` wide and `size` high).
   static Offset orbHandAt(String agent, double size) {
-    final (k, origin) = _AvatarPainter.frame(agent, Size(size * aspect, size));
-    return origin + _AvatarPainter.orbHand * k;
+    final k = unit(agent, size);
+    return Offset(size * aspect / 2, 0) + _orbHand * k;
   }
 
-  /// Scale from figure units to logical pixels.
-  static double unit(String agent, double size) =>
-      _AvatarPainter.frame(agent, Size(size * aspect, size)).$1;
+  /// Scale from figure units to logical pixels: the box is 100 x 140 units.
+  static double unit(String agent, double size) => size / 140;
 
-  /// Width / height of the avatar's box.
-  static const double aspect = _AvatarPainter.aspect;
+  /// Width / height of the avatar's box. Her hair and tail reach a little past
+  /// its sides.
+  static const double aspect = 100 / 140;
+
+  /// The hands of the ball-holding pose, from the box's top centre, in units.
+  static final Offset _orbHand = _Sheet.expressions.toUnits(122, 168);
 
   final String agent;
   final AvatarMood mood;
@@ -92,22 +103,199 @@ class Avatar extends StatefulWidget {
   State<Avatar> createState() => _AvatarState();
 }
 
+/// One of the two sheets and where the figure sits in its cells.
+class _Sheet {
+  const _Sheet({
+    required this.asset,
+    required this.cellWidth,
+    required this.cellHeight,
+    required this.columns,
+    required this.centerX,
+    required this.top,
+    required this.bottom,
+  });
+
+  final String asset;
+  final double cellWidth;
+  final double cellHeight;
+  final int columns;
+
+  /// The figure's middle, the top of her hair and her soles, in cell pixels.
+  /// Both sheets are cropped so she is the same size in either.
+  final double centerX;
+  final double top;
+  final double bottom;
+
+  double get height => bottom - top;
+
+  /// 4 x 4 still expressions, 256 px cells.
+  static const expressions = _Sheet(
+    asset: 'assets/dafeiyu/expressions.webp',
+    cellWidth: 256,
+    cellHeight: 256,
+    columns: 4,
+    centerX: 128,
+    top: 36,
+    bottom: 238,
+  );
+
+  /// The animated pet sheet: 8 columns x 9 rows of 192 x 208 cells.
+  static const sprites = _Sheet(
+    asset: 'assets/dafeiyu/spritesheet.webp',
+    cellWidth: 192,
+    cellHeight: 208,
+    columns: 8,
+    centerX: 95,
+    top: 37,
+    bottom: 195,
+  );
+
+  ui.Image? get image => identical(this, expressions) ? _Sheets.expressions : _Sheets.sprites;
+
+  /// Cell pixel ([x], [y]) of [cell] as figure units from the box's top centre.
+  Offset toUnits(double x, double y) => Offset(x - centerX, y - top) * (140 / height);
+}
+
+/// The decoded sheets, shared by every avatar.
+abstract final class _Sheets {
+  static ui.Image? expressions;
+  static ui.Image? sprites;
+  static final ValueNotifier<bool> ready = ValueNotifier(false);
+  static Future<void>? _loading;
+
+  static Future<void> load() => _loading ??= _load();
+
+  static Future<void> _load() async {
+    try {
+      final images = await Future.wait([
+        _decode(_Sheet.expressions.asset),
+        _decode(_Sheet.sprites.asset),
+      ]);
+      expressions = images[0];
+      sprites = images[1];
+      ready.value = true;
+    } on Object catch (e) {
+      // The box stays empty; nothing else depends on her picture.
+      debugPrint('大肥鱼: the sheets did not load ($e)');
+    }
+  }
+
+  static Future<ui.Image> _decode(String asset) async {
+    final data = await rootBundle.load(asset);
+    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    return frame.image;
+  }
+}
+
+/// One picture: a cell of a sheet.
+class _Frame {
+  const _Frame(this.sheet, this.index);
+
+  final _Sheet sheet;
+
+  /// Row-major cell index.
+  final int index;
+
+  // Cells of the expression sheet.
+  static const neutral = _Frame(_Sheet.expressions, 0);
+  static const curious = _Frame(_Sheet.expressions, 1);
+  static const sideGlance = _Frame(_Sheet.expressions, 3);
+  static const holding = _Frame(_Sheet.expressions, 6);
+  static const eyesClosed = _Frame(_Sheet.expressions, 7);
+  static const thinking = _Frame(_Sheet.expressions, 8);
+  static const pouting = _Frame(_Sheet.expressions, 10);
+
+  // A smile with closed lips, from the talking row.
+  static const smile = _Frame(_Sheet.sprites, 8 * 8 + 1);
+
+  Rect get source => Rect.fromLTWH(
+    (index % sheet.columns) * sheet.cellWidth,
+    (index ~/ sheet.columns) * sheet.cellHeight,
+    sheet.cellWidth,
+    sheet.cellHeight,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is _Frame && identical(other.sheet, sheet) && other.index == index;
+
+  @override
+  int get hashCode => Object.hash(sheet.asset, index);
+}
+
+/// A row of the pet sheet played as a loop.
+class _Clip {
+  const _Clip(this.row, this.frames, this.frameMs);
+
+  final int row;
+  final int frames;
+  final int frameMs;
+
+  Duration get duration => Duration(milliseconds: frames * frameMs);
+
+  _Frame at(int i) => _Frame(_Sheet.sprites, row * 8 + i % frames);
+
+  static const idle = _Clip(0, 6, 260); // blinks
+  static const wave = _Clip(3, 4, 160);
+  static const listening = _Clip(5, 8, 240); // looks around, tilts her head
+  static const thinking = _Clip(7, 6, 220); // a hand on her chin
+  static const talking = _Clip(8, 6, 170);
+}
+
+/// The still picture of [mood].
+_Frame _moodFrame(AvatarMood mood) => switch (mood) {
+  AvatarMood.smile => _Frame.smile,
+  AvatarMood.neutral => _Frame.neutral,
+  AvatarMood.stern => _Frame.sideGlance,
+  AvatarMood.angry => _Frame.pouting,
+  AvatarMood.happy => _Frame.eyesClosed,
+};
+
 class _AvatarState extends State<Avatar> with SingleTickerProviderStateMixin {
   static const int _waveCycles = 3;
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1100),
-  );
+  late final AnimationController _controller = AnimationController(vsync: this);
+
+  /// The frame of the playing clip; repaints only when it changes.
+  final ValueNotifier<int> _tick = ValueNotifier(0);
 
   bool get _animate => widget.animate ?? Avatar.animationsEnabled;
 
-  bool get _looping =>
-      widget.state == AvatarState.speaking || widget.state == AvatarState.listening;
+  /// What plays while moving, or null for a still picture.
+  _Clip? get _clip {
+    if (!_animate || widget.holdOrb) return null;
+    return switch (widget.state) {
+      AvatarState.speaking => _Clip.talking,
+      AvatarState.thinking => _Clip.thinking,
+      AvatarState.listening => _Clip.listening,
+      AvatarState.idle => widget.wave ? _Clip.wave : _Clip.idle,
+    };
+  }
 
   @override
   void initState() {
     super.initState();
+    _controller.addListener(_onTick);
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) setState(() {});
+    });
+    if (!_Sheets.ready.value) {
+      _Sheets.ready.addListener(_onReady);
+      unawaited(_Sheets.load());
+    }
     _sync(null);
+  }
+
+  void _onReady() {
+    if (mounted) setState(() {});
+  }
+
+  void _onTick() {
+    final clip = _clip;
+    if (clip == null) return;
+    final cycles = _controller.duration!.inMicroseconds / clip.duration.inMicroseconds;
+    _tick.value = (_controller.value * cycles * clip.frames).floor();
   }
 
   @override
@@ -117,24 +305,53 @@ class _AvatarState extends State<Avatar> with SingleTickerProviderStateMixin {
   }
 
   void _sync(Avatar? old) {
-    if (!_animate) {
+    final clip = _clip;
+    if (clip == null) {
       _controller.stop();
       return;
     }
-    if (_looping) {
-      if (!_controller.isAnimating || old?.state != widget.state) _controller.repeat();
-    } else if (widget.wave) {
+    final waving = widget.state == AvatarState.idle && widget.wave;
+    if (waving) {
       // A finished wave is not started again by a rebuild.
-      if (old == null || !old.wave) _controller.repeat(count: _waveCycles);
-    } else {
-      _controller.stop();
+      if (old == null || !old.wave || old.state != AvatarState.idle) {
+        _controller
+          ..duration = clip.duration * _waveCycles
+          ..forward(from: 0);
+      }
+    } else if (!_controller.isAnimating || old?.state != widget.state || old?.wave != widget.wave) {
+      _controller
+        ..duration = clip.duration
+        ..repeat();
     }
   }
 
   @override
   void dispose() {
+    _Sheets.ready.removeListener(_onReady);
     _controller.dispose();
+    _tick.dispose();
     super.dispose();
+  }
+
+  /// The picture when nothing moves.
+  _Frame get _still {
+    if (widget.holdOrb) return _Frame.holding;
+    return switch (widget.state) {
+      AvatarState.thinking => _Frame.thinking,
+      AvatarState.listening => _Frame.curious,
+      AvatarState.speaking => _Clip.talking.at(2), // mouth open
+      AvatarState.idle => widget.wave ? _Clip.wave.at(1) : _moodFrame(widget.mood),
+    };
+  }
+
+  /// The picture at [tick] of the playing clip.
+  _Frame _frameAt(int tick) {
+    final clip = _clip;
+    if (clip == null) return _still;
+    final waving = widget.state == AvatarState.idle && widget.wave;
+    // A wave that has run its cycles settles on the mood's picture.
+    if (waving && !_controller.isAnimating) return _moodFrame(widget.mood);
+    return clip.at(tick);
   }
 
   @override
@@ -142,21 +359,12 @@ class _AvatarState extends State<Avatar> with SingleTickerProviderStateMixin {
     return Semantics(
       label: '${widget.agent} avatar',
       child: SizedBox(
-        width: widget.size * _AvatarPainter.aspect,
+        width: widget.size * Avatar.aspect,
         height: widget.size,
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) => CustomPaint(
-            painter: _AvatarPainter(
-              agent: widget.agent,
-              mood: widget.mood,
-              state: widget.state,
-              wave: widget.wave,
-              holdOrb: widget.holdOrb,
-              // Static figures hold the raised hand still.
-              t: _animate && _controller.isAnimating ? _controller.value : 0,
-              stroke: (widget.size / 90).clamp(1.8, 3.0),
-            ),
+        child: ValueListenableBuilder<int>(
+          valueListenable: _tick,
+          builder: (context, tick, _) => CustomPaint(
+            painter: _FigurePainter(_frameAt(tick)),
           ),
         ),
       ),
@@ -164,348 +372,39 @@ class _AvatarState extends State<Avatar> with SingleTickerProviderStateMixin {
   }
 }
 
-class _AvatarPainter extends CustomPainter {
-  _AvatarPainter({
-    required this.agent,
-    required this.mood,
-    required this.state,
-    required this.wave,
-    this.holdOrb = false,
-    this.headOnly = false,
-    required this.t,
-    required this.stroke,
-  });
+/// Draws one frame scaled so her hair-top to soles fill the box height.
+class _FigurePainter extends CustomPainter {
+  _FigurePainter(this.frame) : super(repaint: _Sheets.ready);
 
-  /// Width / height of the figure's box.
-  static const double aspect = 100 / 140;
-
-  final String agent;
-  final AvatarMood mood;
-  final AvatarState state;
-  final bool wave;
-  final bool holdOrb;
-
-  /// Draws only the head (a close-up for the 28 px chat portraits).
-  final bool headOnly;
-
-  /// Where the held orb's hand is, in the 100 x 140 figure box.
-  static const Offset orbHand = Offset(104, 88);
-
-  /// Animation value 0–1.
-  final double t;
-
-  /// Line width in logical pixels.
-  final double stroke;
-
-  // The figure is drawn in a 100 x 140 box.
-  static const Offset _head = Offset(50, 30);
-  static const double _headR = 20;
-
-  /// Extra room above the head (the wizard's hat), in figure units.
-  static double topRoom(String agent) => _agentLooks[agent] == _Accessory.wizard ? 20 : 0;
-
-  /// Scale and origin of the 100 x 140 figure box inside [size].
-  static (double, Offset) frame(String agent, Size size) {
-    final top = topRoom(agent);
-    final k = math.min(size.width / 100, size.height / (140 + top));
-    return (k, Offset((size.width - 100 * k) / 2, (size.height - (140 + top) * k) / 2 + top * k));
-  }
-
-  /// The part of the 100 x 140 figure that a head close-up shows.
-  static Rect headBox(String agent) => _agentLooks[agent] == _Accessory.wizard
-      ? const Rect.fromLTWH(12, -20, 76, 76)
-      : const Rect.fromLTWH(18, -4, 64, 64);
+  final _Frame frame;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double k;
-    if (headOnly) {
-      final box = headBox(agent);
-      k = size.width / box.width;
-      canvas
-        ..scale(k)
-        ..translate(-box.left, -box.top);
-    } else {
-      final (scale, origin) = frame(agent, size);
-      k = scale;
-      canvas
-        ..translate(origin.dx, origin.dy)
-        ..scale(k);
-    }
-    final ink = Paint()
-      ..color = AppColors.textPrimary
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke / k
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    final dot = Paint()..color = AppColors.textPrimary;
-
-    final look = _agentLooks[agent] ?? _Accessory.none;
-
-    // Head, body, legs (the wizard wears a robe instead).
-    canvas.drawCircle(_head, _headR, ink);
-    if (headOnly) {
-      _accessory(canvas, look, ink);
-      _face(canvas, ink, dot);
-      return;
-    }
-    if (look == _Accessory.wizard) {
-      _robe(canvas, ink);
-    } else {
-      canvas.drawLine(const Offset(50, 50), const Offset(50, 96), ink);
-      canvas
-        ..drawLine(const Offset(50, 96), const Offset(36, 132), ink)
-        ..drawLine(const Offset(36, 132), const Offset(29, 132), ink)
-        ..drawLine(const Offset(50, 96), const Offset(64, 132), ink)
-        ..drawLine(const Offset(64, 132), const Offset(71, 132), ink);
-    }
-
-    // Arms.
-    canvas.drawLine(const Offset(50, 62), const Offset(30, 86), ink);
-    if (holdOrb) {
-      // Elbow down, forearm up to the open palm under the ball.
-      canvas
-        ..drawPath(
-          Path()
-            ..moveTo(50, 62)
-            ..lineTo(76, 96)
-            ..lineTo(orbHand.dx - 2, orbHand.dy + 2),
-          ink,
-        )
-        ..drawPath(
-          Path()
-            ..moveTo(orbHand.dx - 9, orbHand.dy - 2)
-            ..quadraticBezierTo(orbHand.dx, orbHand.dy + 6, orbHand.dx + 9, orbHand.dy - 2),
-          ink,
-        );
-    } else if (wave) {
-      final hand = 80 + 7 * math.sin(t * 2 * math.pi * 2);
-      canvas.drawPath(
-        Path()
-          ..moveTo(50, 62)
-          ..lineTo(76, 62)
-          ..lineTo(hand, 38),
-        ink,
-      );
-    } else {
-      canvas.drawLine(const Offset(50, 62), const Offset(70, 86), ink);
-    }
-
-    _accessory(canvas, look, ink);
-    _face(canvas, ink, dot);
-    if (state == AvatarState.listening) _listening(canvas, ink);
-  }
-
-  void _face(Canvas canvas, Paint ink, Paint dot) {
-    const left = Offset(42, 27);
-    const right = Offset(58, 27);
-    final speakingOpen = state == AvatarState.speaking && (t * 4).floor().isEven;
-
-    // Eyes (and brows).
-    switch (mood) {
-      case AvatarMood.angry:
-        for (final c in [left, right]) {
-          canvas.drawPath(_scribble(c), ink);
-        }
-        canvas
-          ..drawLine(const Offset(37, 20), const Offset(47, 24), ink)
-          ..drawLine(const Offset(63, 20), const Offset(53, 24), ink);
-      case AvatarMood.happy:
-        for (final c in [left, right]) {
-          canvas.drawPath(
-            Path()
-              ..moveTo(c.dx - 4, c.dy + 2)
-              ..quadraticBezierTo(c.dx, c.dy - 5, c.dx + 4, c.dy + 2),
-            ink,
-          );
-        }
-      case AvatarMood.stern:
-        canvas
-          ..drawCircle(left, 2, dot)
-          ..drawCircle(right, 2, dot)
-          ..drawLine(const Offset(37, 21), const Offset(47, 21), ink)
-          ..drawLine(const Offset(53, 21), const Offset(63, 21), ink);
-      case AvatarMood.smile:
-      case AvatarMood.neutral:
-        canvas
-          ..drawCircle(left, 2, dot)
-          ..drawCircle(right, 2, dot);
-    }
-
-    // Mouth.
-    if (speakingOpen) {
-      canvas.drawOval(Rect.fromCenter(center: const Offset(50, 39), width: 9, height: 7), ink);
-      return;
-    }
-    switch (mood) {
-      case AvatarMood.smile:
-        canvas.drawPath(
-          Path()
-            ..moveTo(43, 36)
-            ..quadraticBezierTo(50, 43, 57, 36),
-          ink,
-        );
-      case AvatarMood.happy:
-        canvas.drawPath(
-          Path()
-            ..moveTo(40, 35)
-            ..quadraticBezierTo(50, 48, 60, 35),
-          ink,
-        );
-      case AvatarMood.angry:
-        canvas.drawPath(
-          Path()
-            ..moveTo(43, 41)
-            ..quadraticBezierTo(50, 34, 57, 41),
-          ink,
-        );
-      case AvatarMood.neutral:
-        canvas.drawLine(const Offset(45, 38), const Offset(55, 38), ink);
-      case AvatarMood.stern:
-        canvas.drawLine(const Offset(44, 39), const Offset(56, 39), ink);
-    }
-  }
-
-  /// A scribbled-out eye: a zigzag inside a small box around [c].
-  Path _scribble(Offset c) {
-    final p = Path()..moveTo(c.dx - 4, c.dy - 3);
-    const steps = [
-      Offset(4, 3),
-      Offset(-4, 1),
-      Offset(4, -3),
-      Offset(-4, 3),
-      Offset(4, 1),
-    ];
-    var at = Offset(c.dx - 4, c.dy - 3);
-    for (final s in steps) {
-      at += s;
-      p.lineTo(at.dx, at.dy);
-    }
-    return p;
-  }
-
-  void _listening(Canvas canvas, Paint ink) {
-    final grey = Paint()
-      ..color = AppColors.textTertiary
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = ink.strokeWidth
-      ..strokeCap = StrokeCap.round;
-    final big = (t * 2).floor().isEven;
-    for (final r in big ? [26.0, 33.0] : [26.0]) {
-      canvas.drawArc(Rect.fromCircle(center: _head, radius: r), -0.5, 1.0, false, grey);
-    }
-  }
-
-  /// A long robe from the shoulders to the feet, with the feet peeking out.
-  void _robe(Canvas canvas, Paint ink) {
-    canvas
-      ..drawPath(
-        Path()
-          ..moveTo(44, 52)
-          ..quadraticBezierTo(38, 90, 30, 128)
-          ..quadraticBezierTo(50, 133, 70, 128)
-          ..quadraticBezierTo(62, 90, 56, 52),
-        ink,
-      )
-      ..drawLine(const Offset(42, 130), const Offset(36, 134), ink)
-      ..drawLine(const Offset(58, 130), const Offset(64, 134), ink);
-  }
-
-  /// A small four-point star centred on [c].
-  static Path star(Offset c, double r) => Path()
-    ..moveTo(c.dx, c.dy - r)
-    ..quadraticBezierTo(c.dx, c.dy, c.dx + r, c.dy)
-    ..quadraticBezierTo(c.dx, c.dy, c.dx, c.dy + r)
-    ..quadraticBezierTo(c.dx, c.dy, c.dx - r, c.dy)
-    ..quadraticBezierTo(c.dx, c.dy, c.dx, c.dy - r);
-
-  void _accessory(Canvas canvas, _Accessory accessory, Paint ink) {
-    switch (accessory) {
-      case _Accessory.none:
-        break;
-      case _Accessory.wizard:
-        // Long hair falling from under the hat.
-        canvas
-          ..drawPath(
-            Path()
-              ..moveTo(32, 20)
-              ..quadraticBezierTo(26, 36, 30, 50),
-            ink,
-          )
-          ..drawPath(
-            Path()
-              ..moveTo(68, 20)
-              ..quadraticBezierTo(74, 36, 70, 50),
-            ink,
-          );
-        // Pointed hat with a bent tip and a star.
-        canvas
-          ..drawPath(
-            Path()
-              ..moveTo(24, 15)
-              ..quadraticBezierTo(50, 9, 76, 15),
-            ink,
-          )
-          ..drawPath(
-            Path()
-              ..moveTo(33, 13)
-              ..quadraticBezierTo(44, -2, 52, -14)
-              ..quadraticBezierTo(58, -18, 64, -12)
-              ..moveTo(52, -14)
-              ..quadraticBezierTo(58, 0, 67, 13),
-            ink,
-          )
-          ..drawPath(star(const Offset(50, 4), 3.5), ink);
-      case _Accessory.hair:
-        canvas
-          ..drawLine(const Offset(50, 9), const Offset(50, 1), ink)
-          ..drawLine(const Offset(41, 12), const Offset(36, 5), ink)
-          ..drawLine(const Offset(59, 12), const Offset(64, 5), ink);
-      case _Accessory.glasses:
-        canvas
-          ..drawCircle(const Offset(42, 27), 6.5, ink)
-          ..drawCircle(const Offset(58, 27), 6.5, ink)
-          ..drawLine(const Offset(48.5, 27), const Offset(51.5, 27), ink);
-      case _Accessory.hat:
-        canvas
-          ..drawLine(const Offset(29, 17), const Offset(71, 17), ink)
-          ..drawPath(
-            Path()
-              ..moveTo(36, 17)
-              ..cubicTo(36, -3, 64, -3, 64, 17),
-            ink,
-          );
-      case _Accessory.bowTie:
-        canvas.drawPath(
-          Path()
-            ..moveTo(50, 55)
-            ..lineTo(40, 50)
-            ..lineTo(40, 60)
-            ..close()
-            ..moveTo(50, 55)
-            ..lineTo(60, 50)
-            ..lineTo(60, 60)
-            ..close(),
-          ink,
-        );
-    }
+    final sheet = frame.sheet;
+    final image = sheet.image;
+    if (image == null) return;
+    final s = size.height / sheet.height;
+    final dst = Rect.fromLTWH(
+      size.width / 2 - sheet.centerX * s,
+      -sheet.top * s,
+      sheet.cellWidth * s,
+      sheet.cellHeight * s,
+    );
+    canvas.drawImageRect(
+      image,
+      frame.source,
+      dst,
+      Paint()..filterQuality = FilterQuality.medium,
+    );
   }
 
   @override
-  bool shouldRepaint(_AvatarPainter old) =>
-      old.agent != agent ||
-      old.mood != mood ||
-      old.state != state ||
-      old.wave != wave ||
-      old.holdOrb != holdOrb ||
-      old.headOnly != headOnly ||
-      old.t != t ||
-      old.stroke != stroke;
+  bool shouldRepaint(_FigurePainter old) => old.frame != frame;
 }
 
-/// The head of [agent] in a round, light-grey badge — the portrait next to a
-/// message in the chat panel (`docs/DESIGN.md` Section 4). Always still.
-class AvatarHead extends StatelessWidget {
+/// Her head in a round, light-grey badge — the portrait next to a message in
+/// the chat panel (`docs/DESIGN.md` Section 4). Always still.
+class AvatarHead extends StatefulWidget {
   const AvatarHead({super.key, required this.agent, this.size = 28, this.mood});
 
   final String agent;
@@ -517,28 +416,64 @@ class AvatarHead extends StatelessWidget {
   final AvatarMood? mood;
 
   @override
+  State<AvatarHead> createState() => _AvatarHeadState();
+}
+
+class _AvatarHeadState extends State<AvatarHead> {
+  @override
+  void initState() {
+    super.initState();
+    if (!_Sheets.ready.value) unawaited(_Sheets.load());
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '$agent avatar',
+      label: '${widget.agent} avatar',
       child: SizedBox.square(
-        dimension: size,
+        dimension: widget.size,
         child: DecoratedBox(
           decoration: const BoxDecoration(color: AppColors.surfaceHigh, shape: BoxShape.circle),
           child: ClipOval(
             child: CustomPaint(
-              painter: _AvatarPainter(
-                agent: agent,
-                mood: mood ?? defaultMoodOf(agent),
-                state: AvatarState.idle,
-                wave: false,
-                headOnly: true,
-                t: 0,
-                stroke: size / 20,
-              ),
+              painter: _HeadPainter(_moodFrame(widget.mood ?? defaultMoodOf(widget.agent))),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// A close-up of the head of [frame].
+class _HeadPainter extends CustomPainter {
+  _HeadPainter(this.frame) : super(repaint: _Sheets.ready);
+
+  final _Frame frame;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sheet = frame.sheet;
+    final image = sheet.image;
+    if (image == null) return;
+    // The head in the expression sheet: 112 px around (128, 106); the same
+    // part of the figure in the other sheet.
+    final k = sheet.height / _Sheet.expressions.height;
+    final side = 112 * k;
+    final cell = frame.source;
+    final src = Rect.fromCenter(
+      center: cell.topLeft + Offset(sheet.centerX, sheet.top + (106 - _Sheet.expressions.top) * k),
+      width: side,
+      height: side,
+    );
+    canvas.drawImageRect(
+      image,
+      src,
+      Offset.zero & size,
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_HeadPainter old) => old.frame != frame;
 }

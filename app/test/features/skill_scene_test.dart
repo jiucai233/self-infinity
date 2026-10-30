@@ -1,6 +1,7 @@
-// Scene 4: the node overview — the node's name in the title bar with a status
-// chip, the contents card (one row per material), the avatar asking
-// Ready to try? →, “Attempts” as cards, questions to the chat.
+// Scene 4: the node overview — the node card (kicker, title, status chip,
+// Best / Attempts / Lessons, the audit history, the ink Take it on), the
+// contents card (one row per material), the avatar asking Ready to try?,
+// “Attempts” as cards on a wide screen, questions to the chat.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,6 +41,17 @@ Avatar avatar(WidgetTester tester) => tester.widget<Avatar>(find.byType(Avatar))
 String bubble(WidgetTester tester) =>
     textsIn(tester, find.byKey(const Key('skill-bubble'))).skip(1).join();
 
+/// Scrolls [finder] into view (the node card comes first) and taps it.
+Future<void> tapShown(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
+/// The right panel “Attempts” (wide screens).
+Finder get panel => find.byKey(const Key('history-panel'));
+
 void main() {
   late FakeApiClient api;
 
@@ -64,14 +76,17 @@ void main() {
   });
 
   group('the page', () {
-    testWidgets('the title bar shows the node name in the headline style, not node: …', (
+    testWidgets('the node card shows the name in the headline style, not node: …', (
       tester,
     ) async {
       await pumpSkill(tester, api, 5);
-      final title = tester.widget<Text>(find.byKey(const Key('stage-title')));
+      final title = tester.widget<Text>(find.byKey(const Key('skill-title')));
       expect(title.data, 'Quadratic Equations');
-      expect(title.style!.fontSize, 20);
+      expect(title.style!.fontSize, 24);
+      expect(title.maxLines, 2); // it may wrap on a phone
       expect(find.textContaining('node:'), findsNothing);
+      // Not in the title bar too.
+      expect(find.byKey(const Key('stage-title')), findsNothing);
     });
 
     testWidgets('a status chip next to it: Locked / Ready / Cleared / Failed', (tester) async {
@@ -85,18 +100,18 @@ void main() {
       await failAudit(api, 7); // the next node of the order
       await pumpSkill(tester, api, 7);
       final chip = find.descendant(
-        of: find.byKey(const Key('stage-panel')),
+        of: find.byKey(const Key('skill-chips')),
         matching: find.text('Failed'),
       );
       expect(chip, findsOneWidget);
-      // The chip sits right of the name.
+      // The chips have their own line under the name.
       expect(
-        tester.getTopLeft(chip).dx,
-        greaterThan(tester.getTopRight(find.byKey(const Key('stage-title'))).dx),
+        tester.getTopLeft(chip).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(find.byKey(const Key('skill-title'))).dy),
       );
     });
 
-    testWidgets('no badges, no day/night switch, no audit button outside the bubble', (
+    testWidgets('no badges, no day/night switch; one ink button, on the card, none in the bubble', (
       tester,
     ) async {
       await pumpSkill(tester, api, 6);
@@ -104,7 +119,19 @@ void main() {
       expect(find.byKey(const Key('mode-toggle')), findsNothing);
       expect(find.text('Day'), findsNothing);
       expect(find.text('Night'), findsNothing);
-      expect(find.byType(FilledButton), findsNothing);
+      expect(find.byType(FilledButton), findsOneWidget);
+      expect(
+        find.descendant(of: find.byKey(const Key('skill-node-card')), matching: find.byType(FilledButton)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byKey(const Key('skill-bubble')), matching: find.byType(ButtonStyleButton)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: find.byKey(const Key('skill-bubble')), matching: find.byType(IconButton)),
+        findsNothing,
+      );
       expect(find.text('Leaf'), findsNothing);
     });
 
@@ -247,19 +274,19 @@ void main() {
       final row = find.byKey(const ValueKey('link-https://example.org/1'));
       expect(find.descendant(of: row, matching: find.byType(InkWell)), findsOneWidget);
       // Tap on the domain line, not on the title: any part of the row works.
-      await tester.tap(
+      await tapShown(
+        tester,
         find.descendant(of: row, matching: find.byKey(const Key('material-domain'))),
       );
-      await tester.pumpAndSettle();
       expect(launched, ['https://example.org/1']);
       // Tapping the badge works as well.
-      await tester.tap(
+      await tapShown(
+        tester,
         find.descendant(
           of: find.byKey(const ValueKey('link-https://example.org/2')),
           matching: find.byKey(const Key('material-badge')),
         ),
       );
-      await tester.pumpAndSettle();
       expect(launched, ['https://example.org/1', 'https://example.org/2']);
     });
 
@@ -278,20 +305,17 @@ void main() {
       expect(find.byKey(const Key('links-prev')), findsNothing);
       expect(find.text('1/3'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('links-next')));
-      await tester.pump();
+      await tapShown(tester, find.byKey(const Key('links-next')));
       expect(find.byKey(const ValueKey('link-https://example.org/page/1')), findsNothing);
       expect(find.byKey(const ValueKey('link-https://example.org/page/5')), findsOneWidget);
       expect(find.byKey(const Key('links-prev')), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('links-next')));
-      await tester.pump();
+      await tapShown(tester, find.byKey(const Key('links-next')));
       expect(find.byKey(const ValueKey('link-https://example.org/page/9')), findsOneWidget);
       expect(find.byKey(const Key('links-next')), findsNothing);
       expect(find.text('3/3'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('links-prev')));
-      await tester.pump();
+      await tapShown(tester, find.byKey(const Key('links-prev')));
       expect(find.byKey(const ValueKey('link-https://example.org/page/5')), findsOneWidget);
     });
 
@@ -334,10 +358,10 @@ void main() {
         'example.org',
       );
       final launched = _recordLaunches(tester);
-      await tester.tap(
+      await tapShown(
+        tester,
         find.descendant(of: source, matching: find.byKey(const Key('material-title'))),
       );
-      await tester.pumpAndSettle();
       expect(launched, hasLength(1));
       expect(launched.single, startsWith('https://'));
     });
@@ -352,7 +376,7 @@ void main() {
   });
 
   group('the avatar', () {
-    testWidgets('an available node: waving, Ready to try? →', (tester) async {
+    testWidgets('an available node: waving, Ready to try? and Take it on on the card', (tester) async {
       await pumpSkill(tester, api, 6);
       expect(bubble(tester), 'Ready to try?');
       expect(find.byKey(const Key('start-audit')), findsOneWidget);
@@ -360,10 +384,22 @@ void main() {
       expect(avatar(tester).mood, AvatarMood.smile);
     });
 
-    testWidgets('→ opens the audit (scene 4-1) without a mode', (tester) async {
+    testWidgets('Take it on opens the audit (scene 4-1) without a mode', (tester) async {
       await pumpSkill(tester, api, 6);
-      await tester.tap(find.byKey(const Key('start-audit')));
-      await tester.pumpAndSettle();
+      final button = find.byKey(const Key('start-audit'));
+      expect(tester.widget<FilledButton>(button), isA<FilledButton>());
+      expect(find.descendant(of: button, matching: find.text('Take it on')), findsOneWidget);
+      await tapShown(tester, button);
+      expect(find.text('route:/skill/6/audit'), findsOneWidget);
+    });
+
+    testWidgets('on a phone Take it on spans the card and opens the audit', (tester) async {
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      final button = find.byKey(const Key('start-audit'));
+      final card = tester.getRect(find.byKey(const Key('skill-node-card')));
+      // Full width inside the card's padding.
+      expect(tester.getSize(button).width, greaterThan(card.width - 80));
+      await tapShown(tester, button);
       expect(find.text('route:/skill/6/audit'), findsOneWidget);
     });
 
@@ -419,7 +455,7 @@ void main() {
     testWidgets('empty', (tester) async {
       await pumpSkill(tester, api, 6);
       expect(find.text('No attempts yet.'), findsOneWidget);
-      expect(find.text('Attempts'), findsOneWidget);
+      expect(find.descendant(of: panel, matching: find.text('Attempts')), findsOneWidget);
     });
 
     testWidgets('a card per audit: date, a Passed/Failed chip and the score, newest first', (
@@ -461,7 +497,9 @@ void main() {
       final cards = find.byKey(const Key('audit-card'));
       bool labelled(int i) => textsIn(tester, cards.at(i)).contains('Not reflected on yet');
       expect([labelled(0), labelled(1), labelled(2)], [false, true, false]); // pass, fail, reflected fail
-      final label = tester.widget<Text>(find.text('Not reflected on yet'));
+      final label = tester.widget<Text>(
+        find.descendant(of: panel, matching: find.text('Not reflected on yet')),
+      );
       expect(label.style!.color, AppColors.textTertiary);
     });
 
@@ -469,12 +507,13 @@ void main() {
       await failAudit(api, 6);
       await passAudit(api, 6);
       await pumpSkill(tester, api, 6);
-      Color colorOf(String label) => tester.widget<Text>(find.text(label)).style!.color!;
+      Finder inPanel(String label) => find.descendant(of: panel, matching: find.text(label));
+      Color colorOf(String label) => tester.widget<Text>(inPanel(label)).style!.color!;
       Color fillOf(String label) =>
           (tester
                       .widget<DecoratedBox>(
                         find
-                            .ancestor(of: find.text(label), matching: find.byType(DecoratedBox))
+                            .ancestor(of: inPanel(label), matching: find.byType(DecoratedBox))
                             .first,
                       )
                       .decoration
@@ -608,11 +647,78 @@ void main() {
     });
   });
 
-  testWidgets('a phone: contents above the avatar, nothing overflows', (tester) async {
+  testWidgets('a phone: the node card, then the avatar, then the contents; nothing overflows', (
+    tester,
+  ) async {
     await api.createSearchPlan(5, gap: 'something');
     await pumpSkill(tester, api, 5, size: phoneScreen);
     expect(tester.takeException(), isNull);
-    expect(tester.getBottomLeft(contents).dy, lessThan(tester.getTopLeft(find.byType(Avatar)).dy));
+    final card = find.byKey(const Key('skill-node-card'));
+    expect(tester.getBottomLeft(card).dy, lessThan(tester.getTopLeft(find.byType(Avatar)).dy));
+    expect(tester.getBottomLeft(find.byType(Avatar)).dy, lessThan(tester.getTopLeft(contents).dy));
+  });
+
+  group('the node card', () {
+    String number(WidgetTester tester, String key) => textsIn(tester, find.byKey(Key(key))).last;
+
+    testWidgets('on a phone: Best / Attempts / Lessons and the audit history, no right drawer', (
+      tester,
+    ) async {
+      final failed = await failAudit(api, 6);
+      await passAudit(api, 6);
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      expect(find.byKey(const Key('open-right-drawer')), findsNothing);
+      expect(panel, findsNothing);
+      for (final key in ['skill-best', 'skill-attempts', 'skill-lessons']) {
+        expect(tester.getRect(find.byKey(Key(key))).bottom, lessThan(phoneScreen.height));
+      }
+      expect(number(tester, 'skill-attempts'), '2');
+      expect(number(tester, 'skill-best'), isNot('—'));
+      expect(textsIn(tester, find.byKey(const Key('skill-best'))).first, 'Best');
+      expect(find.byKey(Key('audit-row-${failed.sessionId}')), findsOneWidget);
+    });
+
+    testWidgets('no audits yet: a dash and zeros', (tester) async {
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      expect(number(tester, 'skill-best'), '—');
+      expect(number(tester, 'skill-attempts'), '0');
+      expect(find.byKey(const Key('skill-no-audits')), findsOneWidget);
+    });
+
+    testWidgets('an audit row opens its replay', (tester) async {
+      final failed = await failAudit(api, 6);
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      await tapShown(tester, find.byKey(Key('audit-row-${failed.sessionId}')));
+      expect(find.text('route:${AppRoutes.replay(failed.sessionId)}'), findsOneWidget);
+    });
+
+    testWidgets('a long title wraps to two lines on a phone; the chips have their own line', (
+      tester,
+    ) async {
+      await api.editSkill(6, title: 'The discriminant of a quadratic and what its sign says about the roots');
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      final title = find.byKey(const Key('skill-title'));
+      expect(tester.getSize(title).height, greaterThan(50)); // two lines of 24 px
+      expect(
+        tester.getTopLeft(find.byKey(const Key('skill-chips'))).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(title).dy),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a locked boss: no Take it on; the whole-branch challenge says what it does', (
+      tester,
+    ) async {
+      await pumpSkill(tester, api, 5, size: phoneScreen);
+      expect(find.byKey(const Key('start-audit')), findsNothing);
+      expect(
+        find.descendant(of: find.byKey(const Key('test-out')), matching: find.text('Take the whole branch at once')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('test-out-hint')), findsOneWidget);
+      await tapShown(tester, find.byKey(const Key('test-out')));
+      expect(find.text('route:${AppRoutes.challenge(5)}'), findsOneWidget);
+    });
   });
 }
 

@@ -10,6 +10,12 @@ class AppLocalizationsKo extends AppLocalizations {
   AppLocalizationsKo([String locale = 'ko']) : super(locale);
 
   @override
+  String get tabHome => '홈';
+
+  @override
+  String get tabMe => '나';
+
+  @override
   String get about => '소개';
 
   @override
@@ -283,6 +289,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get dotLocked => '잠김';
 
   @override
+  String get legend => '점의 뜻';
+
+  @override
   String get dotReady => '도전 가능';
 
   @override
@@ -423,6 +432,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get lessons => '교훈';
+
+  @override
+  String get challengeWholeHint => '몇 가지 부분을 설명해 통과하면 아래 노드가 모두 클리어돼요.';
 
   @override
   String levelBar(int level, int progress) {
@@ -620,8 +632,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get onbTopicBody =>
-      '이 답이 첫 나무의 모양을 정해요. 주제만 있어도 돼요: 실제 강의계획서를 찾아 그 항목을 첫 단계로 써요. 강의계획서가 있다면 파일을 쓰세요 (PDF, TXT, MD). 항목을 그대로 써요.';
+  String get onbTopicBody => '이 답으로 첫 나무를 만들어요. 주제만 써도 되고, 강의계획서 파일(PDF, TXT, MD)도 돼요.';
 
   @override
   String get onbTopicHint => '예: 미적분';
@@ -638,8 +649,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get onbWantToLearnThis => '이거 배우고 싶어요';
 
   @override
-  String get onbWelcomeBody =>
-      'Self-Infinity에서는 이해했다는 걸 증명해야 레벨이 올라요. 자기 말로 설명하면 심사관이 판단해요. 먼저 몇 가지만 물어볼게요. 각각 한두 문장이면 돼요(직접 쓰거나 마이크를 눌러 말해도 돼요). 나중에 전부 바꿀 수 있어요.';
+  String get onbWelcomeBody => '배운 걸 설명하면 레벨이 올라요. 먼저 짧은 질문 몇 개만 할게요.';
 
   @override
   String get onbWhoGuide => '누가 거기까지 갈까요?';
@@ -1096,7 +1106,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get unexpandedLine => '아직 나누지 않은 부분이에요. 나눠서 안을 보거나, 이미 안다면 통째로 도전하세요.';
 
   @override
-  String get challengeWhole => '통째로 도전';
+  String get challengeWhole => '이 가지 한 번에 도전';
 
   @override
   String get challengeInProgress => '통째로 도전';
@@ -1509,41 +1519,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get tourSkip => '둘러보기 건너뛰기';
 
   @override
+  String get tourVerdict => '그러면 점수, 놓친 부분, 교훈이 남아요.';
+
+  @override
   String get tourBegin => '내 캐릭터 설정하기';
 
   @override
-  String get tourWelcome => '안녕하세요, 가이드예요. 설정을 시작하기 전에 먼저 한 바퀴 보여 드릴게요. 지금 보이는 건 모두 예시예요.';
+  String get tourTalk => '배우고 싶은 걸 여기서 쓰거나 말해 주세요.';
 
   @override
-  String get tourCharacter => '이쪽은 당신이에요: 레벨, 클리어한 노드, 그리고 오늘의 컨디션.';
+  String get tourTree => '깬 노드마다 인생 나무에 불이 켜져요.';
 
   @override
-  String get tourQuests => '일일 퀘스트예요. 시간대와 컨디션에 맞춰 오늘 배울 것과 복습할 것을 골라요. 누르면 열려요.';
-
-  @override
-  String get tourTalk => '여기서 저와 이야기해요. 글이나 음성으로 배우고 싶은 것, 오늘 하루, 다음에 할 일을 말해 주세요.';
-
-  @override
-  String get tourAttempts => '이쪽에는 이 노드에 도전한 기록이 남아요: 언제, 몇 점, 통과했는지.';
-
-  @override
-  String get tourTree =>
-      '당신의 인생 나무예요. 강좌 하나가 가지 하나, 점 하나가 노드 하나예요. 클리어하면 불이 켜져요. 끌어서 돌리고, 스크롤로 확대하고, 노드를 눌러 열어요.';
-
-  @override
-  String get tourNode =>
-      '노드는 배울 것 하나예요. 무엇을 다루는지와 지식 포인트가 여기 있어요. 체크는 제대로 설명한 것, 엑스는 지난번에 놓친 것이에요.';
-
-  @override
-  String get tourProve => '노드를 클리어하려면 설명해야 해요. 여기를 누르면 심사관이 맡아요.';
-
-  @override
-  String get tourAudit =>
-      '당신이 가르치고, 심사관이 배워요. 이해하지 못한 부분은 되물어 보고, 틀린 곳은 다시 설명할 기회를 줘요. 맞게 설명한 건 다시 묻지 않아요.';
-
-  @override
-  String get tourSyllabus =>
-      '지금까지는 예시였어요. 이제 캐릭터를 설정하고 첫 나무를 만들어요. 무엇을 배우고 싶은지 물을게요. 주제만 있어도 되고, 강의계획서 파일이면 더 좋아요. 계획서의 항목이 그대로 나무의 첫 단계가 되니까요.';
+  String get tourAudit => '노드를 깨려면 심사관에게 가르쳐요.';
 
   @override
   String get tourLessonsTitle => '모든 실수는 교훈이 돼요.';

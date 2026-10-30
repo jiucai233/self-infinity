@@ -7,10 +7,10 @@ import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/app/app.dart';
 import 'package:self_infinity/app/app_state.dart';
 import 'package:self_infinity/features/audit/audit_scene.dart';
+import 'package:self_infinity/features/audit/replay_scene.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/features/map/map_scene.dart';
 import 'package:self_infinity/features/onboarding/guided_tour.dart';
-import 'package:self_infinity/features/skill/skill_scene.dart';
 import 'package:self_infinity/testing/fake_file_picker.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
 import 'package:self_infinity/widgets/widgets.dart';
@@ -67,9 +67,9 @@ void main() {
 
     expect(find.byType(GuidedTour), findsOneWidget);
     expect(key('onboarding'), findsNothing);
-    expect(said(tester), startsWith("Hi, I'm your Guide."));
-    expect(progress(tester), '1 / 10');
-    expect(lit(tester), isNull); // the welcome lights nothing
+    expect(said(tester), startsWith('Tell me here what you want to learn'));
+    expect(progress(tester), '1 / 4');
+    expect(find.byType(HomeScene), findsOneWidget);
     expect(key('tour-back'), findsNothing);
     // The example is its own world: the account has nothing yet.
     expect(find.text('Teach calculus to a stranger'), findsWidgets);
@@ -77,119 +77,113 @@ void main() {
     expect(await api.listGoals(), isEmpty);
   });
 
-  testWidgets('it goes from the left panel across the stage to the tree, a node and an audit', (tester) async {
+  testWidgets('four stops: talk to the Guide, explain to the Auditor, the verdict, the tree', (tester) async {
     await pumpNewAccount(tester);
-    final seen = <String>[];
-    final pages = <Type>[];
-    for (var i = 0; i < 9; i++) {
+    final seen = [said(tester)];
+    final pages = <Type>[HomeScene];
+    expect(lit(tester), isNotNull);
+    for (var i = 0; i < 3; i++) {
       await next(tester);
-      seen.add(said(tester).split(RegExp('[.:]')).first);
+      seen.add(said(tester));
       pages.add(
-        [HomeScene, MapScene, SkillScene, AuditScene].firstWhere((t) => find.byType(t).evaluate().isNotEmpty),
+        [HomeScene, AuditScene, ReplayScene, MapScene].firstWhere((t) => find.byType(t).evaluate().isNotEmpty),
       );
-      if (i < 8) expect(lit(tester), isNotNull, reason: 'stop ${i + 2} lights its part');
+      expect(lit(tester), isNotNull, reason: 'stop ${i + 2} lights its part');
     }
 
     expect(seen, [
-      'This side is you',
-      'Your daily quests',
-      'Talk to me here, typed or spoken',
-      'Your life tree',
-      'A node is one thing to learn',
-      'This side keeps your attempts at this node',
-      'To clear a node you explain it',
-      'You teach, the Auditor learns',
-      'That was an example',
+      'Tell me here what you want to learn, typed or spoken.',
+      'To clear a node, you teach it to the Auditor.',
+      'Then you get a score, what you missed, and a lesson.',
+      'Every node you clear lights up your life tree.',
     ]);
-    expect(pages, [
-      HomeScene, HomeScene, HomeScene, MapScene, SkillScene, SkillScene, SkillScene, AuditScene, MapScene,
-    ]);
-    expect(progress(tester), '10 / 10');
+    expect(pages, [HomeScene, AuditScene, ReplayScene, MapScene]);
+    expect(progress(tester), '4 / 4');
     expect(find.text('Set up my character'), findsOneWidget);
     expect(key('tour-skip'), findsNothing); // the last stop only goes on
   });
 
-  testWidgets('the lit part is the thing the Guide talks about', (tester) async {
-    await pumpNewAccount(tester);
-    await next(tester);
+  testWidgets('the lit part is the whole input bar, not just its field', (tester) async {
+    for (final size in [wideScreen, phoneScreen]) {
+      await pumpNewAccount(tester, size: size);
 
-    final panel = tester.getRect(key('left-panel'));
-    expect(lit(tester)!.contains(panel.center), isTrue);
-    expect(lit(tester)!.width, closeTo(panel.width + 12, 1)); // with its halo
-    // The card stands beside it, not over it.
-    expect(tester.getRect(key('tour-card')).overlaps(panel), isFalse);
+      final bar = tester.getRect(find.byType(Composer));
+      final field = tester.getRect(key('stage-input'));
+      expect(lit(tester), bar.inflate(4)); // with its 4 px outset
+      expect(lit(tester)!.width, greaterThan(field.width + 40));
+      // The card stands beside it, not over it.
+      expect(tester.getRect(key('tour-card')).overlaps(bar), isFalse);
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('the page under the tour cannot be tapped', (tester) async {
     await pumpNewAccount(tester);
-    await next(tester);
-    await next(tester);
 
     await tester.tapAt(tester.getCenter(find.textContaining('Linear Functions').first));
     await settle(tester);
 
     expect(find.byType(HomeScene), findsOneWidget); // the quest did not open
-    expect(progress(tester), '3 / 10');
+    expect(progress(tester), '1 / 4');
   });
 
   testWidgets('Back returns to the stop before, and to its page', (tester) async {
     await pumpNewAccount(tester);
-    for (var i = 0; i < 4; i++) {
-      await next(tester);
-    }
-    expect(find.byType(MapScene), findsOneWidget);
+    await next(tester);
+    expect(find.byType(AuditScene), findsOneWidget);
 
     await tester.tap(key('tour-back'));
     await settle(tester);
 
     expect(find.byType(HomeScene), findsOneWidget);
-    expect(progress(tester), '4 / 10');
+    expect(progress(tester), '1 / 4');
   });
 
-  testWidgets('on a phone the stops in the side panels are passed over', (tester) async {
+  testWidgets('on a phone every stop fits', (tester) async {
     await pumpNewAccount(tester, size: phoneScreen);
-    await tester.tap(key('tour-next'));
-    await tester.pump(); // at once: the left panel is in a drawer here
-
-    expect(said(tester), startsWith('Talk to me here'));
-    expect(progress(tester), '4 / 10');
-    await settle(tester);
-    expect(lit(tester), isNotNull);
-    expect(tester.takeException(), isNull);
-    final card = tester.getRect(key('tour-card'));
-    expect(card.left >= 0 && card.right <= phoneScreen.width, isTrue);
+    for (var i = 0; i < 4; i++) {
+      expect(lit(tester), isNotNull);
+      final card = tester.getRect(key('tour-card'));
+      expect(card.left >= 0 && card.right <= phoneScreen.width, isTrue);
+      expect(tester.takeException(), isNull);
+      if (i < 3) await next(tester);
+    }
+    expect(progress(tester), '4 / 4');
   });
 
-  testWidgets('Skip the tour goes straight to the setup', (tester) async {
+  testWidgets('Skip the tour goes straight to the first question of the setup', (tester) async {
     await pumpNewAccount(tester);
 
     await tester.tap(key('tour-skip'));
     await tester.pumpAndSettle();
 
     expect(find.byType(GuidedTour), findsNothing);
-    expect(key('onboarding'), findsOneWidget);
+    expect(key('onboarding-step-stakes'), findsOneWidget);
   });
 
   testWidgets('after the last stop: the setup, which says what a syllabus does, then the tree it built', (
     tester,
   ) async {
     final api = await pumpNewAccount(tester);
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 4; i++) {
       await next(tester);
     }
-    expect(key('onboarding'), findsOneWidget);
+    // The tour ended on "Set up my character": no welcome page again.
+    expect(key('onboarding-step-stakes'), findsOneWidget);
+    expect(key('onboarding-back'), findsNothing);
+    expect(key('onboarding-skip'), findsNothing); // one skip per page: Skip setup
+    expect(key('onboarding-skip-all'), findsOneWidget);
 
-    await tester.tap(key('onboarding-continue')); // Begin
-    await tester.pumpAndSettle();
     for (var i = 0; i < 4; i++) {
-      await tester.tap(key('onboarding-skip'));
+      await tester.tap(key('onboarding-continue')); // empty: passed over
       await tester.pumpAndSettle();
     }
     expect(find.textContaining('Your answer shapes your first tree.'), findsOneWidget);
-    expect(find.textContaining('its items are used as they are'), findsOneWidget);
+    expect(find.textContaining('syllabus file (PDF'), findsOneWidget);
     await tester.enterText(key('onboarding-input'), 'math');
     await tester.tap(key('onboarding-continue'));
     await tester.pumpAndSettle();
+    expect(key('onboarding-skip-all'), findsNothing); // built: Enter is the way out
     await tester.tap(key('onboarding-finish'));
     await tester.pumpAndSettle();
 

@@ -10,7 +10,7 @@ import '../../l10n/l10n.dart';
 
 /// How a dot of the skill graph is colored (`docs/DESIGN.md` Section 3).
 enum DotKind {
-  /// Cleared: green.
+  /// Cleared: gold ([AppColors.cleared], as on the Tree).
   mastered,
 
   /// The newest audit failed and the node is not cleared: red.
@@ -57,6 +57,12 @@ class SkillGraphView extends StatefulWidget {
   State<SkillGraphView> createState() => _SkillGraphViewState();
 }
 
+/// The smallest scale the outline is shrunk to so that it fits across.
+const double minWidthFit = 0.66;
+
+/// Narrower than this, the outline packs its columns closer.
+const double _narrowOutline = 480;
+
 class _SkillGraphViewState extends State<SkillGraphView> {
   final TransformationController _transform = TransformationController();
   GraphLayout? _layout;
@@ -64,6 +70,7 @@ class _SkillGraphViewState extends State<SkillGraphView> {
   CourseMap? _laidOut;
   TextStyle? _labelStyle;
   Size? _fittedFor;
+  bool? _narrow;
 
   @override
   void dispose() {
@@ -84,11 +91,13 @@ class _SkillGraphViewState extends State<SkillGraphView> {
   }
 
   /// Centers the drawing. A small graph is enlarged a little (at most 1.4x), a
-  /// large one shrunk, but never below 0.8 (the text stays readable; on a phone
-  /// the rest is reached by panning).
+  /// large one shrunk, but never below 0.8 (the text stays readable; the rest
+  /// is reached by panning). Its width comes first: down to [minWidthFit], it
+  /// is shrunk until no name is cut at the right edge.
   void _fit(Size viewport, Size content) {
     final fit = math.min(viewport.width / content.width, viewport.height / content.height);
-    final scale = fit.clamp(0.8, 1.4);
+    final widthFit = viewport.width / content.width;
+    final scale = math.min(fit.clamp(0.8, 1.4), math.max(widthFit, minWidthFit));
     final dx = math.max(0.0, (viewport.width - content.width * scale) / 2);
     final dy = math.max(0.0, (viewport.height - content.height * scale) / 2);
     _transform.value = Matrix4.identity()
@@ -101,25 +110,29 @@ class _SkillGraphViewState extends State<SkillGraphView> {
     final theme = Theme.of(context).textTheme;
     _labelStyle = theme.bodySmall?.copyWith(color: AppColors.textPrimary);
     final scaler = MediaQuery.textScalerOf(context);
-    if (_laidOut != widget.map) {
-      _laidOut = widget.map;
-      _layout = GraphLayout.compute(
-        nodes: widget.map.nodes,
-        edges: widget.map.edges,
-        measure: (t) => _measure(t, scaler),
-      );
-      _bosses = bossIds(widget.map.nodes, widget.map.edges);
-      _fittedFor = null;
-    }
-    final layout = _layout!;
     return LayoutBuilder(
       builder: (context, box) {
         final viewport = Size(box.maxWidth, box.maxHeight);
+        final narrow = viewport.width < _narrowOutline;
+        if (_laidOut != widget.map || _narrow != narrow) {
+          _laidOut = widget.map;
+          _narrow = narrow;
+          _layout = GraphLayout.compute(
+            nodes: widget.map.nodes,
+            edges: widget.map.edges,
+            measure: (t) => _measure(t, scaler),
+            gap: narrow ? 40 : GraphLayout.columnGap,
+            side: narrow ? 20 : GraphLayout.hMargin,
+          );
+          _bosses = bossIds(widget.map.nodes, widget.map.edges);
+          _fittedFor = null;
+        }
+        final layout = _layout!;
         if (_fittedFor != viewport) {
           _fittedFor = viewport;
           _fit(viewport, layout.size);
         }
-        return ClipRect(
+        final viewer = ClipRect(
           child: InteractiveViewer(
             key: const Key('graph-viewer'),
             transformationController: _transform,
@@ -157,7 +170,61 @@ class _SkillGraphViewState extends State<SkillGraphView> {
             ),
           ),
         );
+        // Wider than the panel (a phone, a deep course): a soft edge on the
+        // side where more of it is, to drag it into view.
+        return Stack(
+          children: [
+            Positioned.fill(child: viewer),
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _transform,
+                builder: (context, _) {
+                  final m = _transform.value;
+                  final scale = m.entry(0, 0); // getMaxScaleOnAxis counts z (1) too
+                  final left = m.getTranslation().x;
+                  final right = left + layout.size.width * scale;
+                  return Stack(
+                    children: [
+                      if (left < -1) const _EdgeFade(key: Key('outline-more-left'), left: true),
+                      if (right > viewport.width + 1)
+                        const _EdgeFade(key: Key('outline-more-right'), left: false),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        );
       },
+    );
+  }
+}
+
+/// A soft fade at one edge of the outline: there is more that way.
+class _EdgeFade extends StatelessWidget {
+  const _EdgeFade({super.key, required this.left});
+
+  final bool left;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 0,
+      bottom: 0,
+      left: left ? 0 : null,
+      right: left ? null : 0,
+      width: 40,
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: left ? Alignment.centerRight : Alignment.centerLeft,
+              end: left ? Alignment.centerLeft : Alignment.centerRight,
+              colors: [AppColors.surface.withValues(alpha: 0), AppColors.surface],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -386,7 +453,7 @@ class DotMark extends StatelessWidget {
 
   /// Fill and ring colors of a dot kind.
   static (Color, Color) colorsOf(DotKind kind) => switch (kind) {
-    DotKind.mastered => (AppColors.success, AppColors.success),
+    DotKind.mastered => (AppColors.cleared, AppColors.cleared),
     DotKind.failed => (AppColors.danger, AppColors.danger),
     DotKind.available => (AppColors.surface, AppColors.primary),
     DotKind.locked => (AppColors.locked, AppColors.locked),

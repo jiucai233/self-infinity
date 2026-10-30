@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../app/panel_layout.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
+import 'app_tabs.dart';
 import 'left_panel.dart';
 import '../../l10n/l10n.dart';
 
@@ -13,13 +14,15 @@ import '../../l10n/l10n.dart';
 /// given (scenes 4, 4-1 and 5), the chat panel on the right.
 ///
 /// Both side panels fold into a thin rail ([PanelLayout] remembers which).
-/// Below [AppLayout.wideBreakpoint] the side panels become drawers, opened from
-/// the ☰ (left) and history (right) buttons of the stage's title bar.
+/// Below [AppLayout.wideBreakpoint] the stage fills the screen: the left panel
+/// is the Me tab of the bottom bar ([TabShell]) and the right panel a drawer,
+/// opened from the history button at the right of the stage's title bar.
 /// Between the breakpoint and [threeColumnWidth] the left panel stays a rail
 /// when there is a chat panel, so that the stage keeps its room.
 ///
 /// * [title] (and [titleChip]) fill the stage's title bar — the node's name.
-/// * [topLeading] sits in front of it (a back arrow).
+/// * [topLeading] sits in front of it (a back arrow); a phone leaves it out
+///   on a tab's own page ([AppTab.isRoot]), which the bar already reaches.
 /// * [historyTitle] titles the right panel.
 class StageScaffold extends StatelessWidget {
   const StageScaffold({
@@ -30,6 +33,7 @@ class StageScaffold extends StatelessWidget {
     this.title,
     this.titleChip,
     this.topLeading,
+    this.showHistoryPanel = true,
   });
 
   /// The middle panel's content.
@@ -43,6 +47,11 @@ class StageScaffold extends StatelessWidget {
   final Widget? titleChip;
   final Widget? topLeading;
 
+  /// On wide screens, whether [history] is shown as the right panel. A phone
+  /// always has the history button when there is a [history], so that it
+  /// does not come and go.
+  final bool showHistoryPanel;
+
   /// With a chat panel the left panel only stays open from this width on.
   static const double threeColumnWidth = 1180;
 
@@ -50,7 +59,8 @@ class StageScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final wide = width >= AppLayout.wideBreakpoint;
-    final history = this.history;
+    final history = wide && !showHistoryPanel ? null : this.history;
+    final tabRoot = !wide && AppTab.isRoot(ModalRoute.settingsOf(context)?.name);
     final leftTitle = context.l10n.myCharacter;
     final historyTitle = this.historyTitle ?? context.l10n.chatTitle;
     final layout = context.watch<PanelLayout>();
@@ -62,7 +72,7 @@ class StageScaffold extends StatelessWidget {
     final stagePanel = _StagePanel(
       title: title,
       titleChip: titleChip,
-      topLeading: topLeading,
+      topLeading: tabRoot ? null : topLeading,
       wide: wide,
       hasHistory: history != null,
       historyTitle: historyTitle,
@@ -71,7 +81,7 @@ class StageScaffold extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
-      drawer: !wide || squeezed
+      drawer: squeezed
           ? Drawer(
               width: 320,
               child: SafeArea(
@@ -215,15 +225,6 @@ class _StagePanel extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                   child: Row(
                     children: [
-                      if (!wide)
-                        Builder(
-                          builder: (context) => IconButton(
-                            key: const Key('open-left-drawer'),
-                            tooltip: context.l10n.myCharacter,
-                            icon: const Icon(Icons.menu_rounded),
-                            onPressed: () => Scaffold.of(context).openDrawer(),
-                          ),
-                        ),
                       ?topLeading,
                       Expanded(
                         child: Row(
@@ -232,9 +233,7 @@ class _StagePanel extends StatelessWidget {
                               Flexible(
                                 child: Padding(
                                   padding: EdgeInsets.only(
-                                    left: wide && topLeading == null
-                                        ? AppSpacing.md
-                                        : AppSpacing.xs,
+                                    left: topLeading == null ? AppSpacing.md : AppSpacing.xs,
                                   ),
                                   child: Text(
                                     title!,

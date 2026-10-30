@@ -243,7 +243,10 @@ class _AccountShellState extends State<_AccountShell> {
         locale: look.locale,
         localizationsDelegates: _AppLook.delegates,
         supportedLocales: _AppLook.locales,
-        home: OnboardingScene(onCourseBuilt: () => _landOnTree = true),
+        home: OnboardingScene(
+          onCourseBuilt: () => _landOnTree = true,
+          afterTour: widget.tour,
+        ),
       );
     }
     // Replaying the tutorial later starts with the tour again.

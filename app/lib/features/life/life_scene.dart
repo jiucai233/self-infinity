@@ -109,7 +109,8 @@ class _LifeSceneState extends State<LifeScene> {
         key: const Key('back-home'),
         tooltip: context.l10n.back,
         icon: const Icon(Icons.arrow_back_rounded),
-        onPressed: () => context.go(AppRoutes.home),
+        // A phone opened it from the Me tab.
+        onPressed: () => context.go(AppLayout.isWide(context) ? AppRoutes.home : AppRoutes.me),
       ),
       stage: life == null
           ? (_error == null ? const LoadingView() : ErrorView(error: _error!, onRetry: _load))

@@ -77,7 +77,7 @@ void main() {
           ((tester.widget<Container>(ringOf(id)).decoration! as BoxDecoration).border! as Border)
               .top
               .color;
-      expect(ringColor(5), AppColors.success);
+      expect(ringColor(5), AppColors.cleared);
       expect(ringColor(3), AppColors.primary); // Functions: ready, blue
       expect(ringColor(1), AppColors.locked); // the root: a boss, still locked
       await failAudit(api, 3);
@@ -87,6 +87,7 @@ void main() {
 
     testWidgets('the legend ends with a double-ringed Boss entry', (tester) async {
       await pumpOutline(tester, api: api);
+      await openLegend(tester);
       final legend = key('graph-legend');
       expect(textsIn(tester, legend).last, 'Boss');
       final dot = tester.widget<DotMark>(key('legend-dot-boss'));
@@ -107,54 +108,54 @@ void main() {
     });
   });
 
-  group('scene 4: the Boss chip', () {
+  group('scene 4: Boss above the title', () {
     Future<void> pumpNode(WidgetTester tester, int id) =>
         pumpScene(tester, SkillScene(skillId: id), api: api);
+    String kicker(WidgetTester tester) => tester.widget<Text>(key('skill-kicker')).data!;
 
-    testWidgets('the root has one, in the title row before its status', (tester) async {
+    testWidgets('the root says BOSS above its title; the status chip is under the title', (
+      tester,
+    ) async {
       api.debugSetStatus(1, SkillStatus.available); // it opens last; open it by hand
       await pumpNode(tester, 1);
-      expect(key('boss-chip'), findsOneWidget);
-      expect(find.descendant(of: key('boss-chip'), matching: find.text('Boss')), findsOneWidget);
-      final title = tester.getRect(key('stage-title'));
-      final chip = tester.getRect(key('boss-chip'));
+      expect(kicker(tester), 'BOSS');
+      final title = tester.getRect(key('skill-title'));
       final status = tester.getRect(find.widgetWithText(StatusChip, 'Ready'));
-      expect((chip.center.dy - title.center.dy).abs(), lessThan(8));
-      expect(chip.left, greaterThanOrEqualTo(title.right));
-      expect(status.left, greaterThan(chip.right));
+      expect(tester.getRect(key('skill-kicker')).bottom, lessThanOrEqualTo(title.top));
+      expect(status.top, greaterThanOrEqualTo(title.bottom));
+      // No second Boss chip next to it.
+      expect(find.widgetWithText(StatusChip, 'Boss'), findsNothing);
     });
 
-    testWidgets('a branch has one', (tester) async {
+    testWidgets('a branch is a boss', (tester) async {
       await pumpNode(tester, 2); // Algebra
-      expect(key('boss-chip'), findsOneWidget);
+      expect(kicker(tester), 'BOSS');
     });
 
-    testWidgets('a locked boss has one too, next to Locked', (tester) async {
+    testWidgets('a locked boss too, with Locked', (tester) async {
       await pumpNode(tester, 5); // Quadratic Equations: a branch, locked
-      expect(key('boss-chip'), findsOneWidget);
+      expect(kicker(tester), 'BOSS');
       expect(find.widgetWithText(StatusChip, 'Locked'), findsOneWidget);
     });
 
-    testWidgets('a leaf has none', (tester) async {
+    testWidgets('a leaf is a node', (tester) async {
       await pumpNode(tester, 6); // Discriminant, the first node of the order
       expect(find.widgetWithText(StatusChip, 'Ready'), findsOneWidget);
-      expect(key('boss-chip'), findsNothing);
+      expect(kicker(tester), 'NODE');
     });
 
-    testWidgets('if the course map cannot be read the scene works without the chip', (
-      tester,
-    ) async {
+    testWidgets('if the course map cannot be read the scene works, as a node', (tester) async {
       api
         ..debugSetStatus(1, SkillStatus.available)
         ..failNext(method: 'getCourseMap');
       await pumpNode(tester, 1);
       expect(find.widgetWithText(StatusChip, 'Ready'), findsOneWidget);
-      expect(key('boss-chip'), findsNothing);
+      expect(kicker(tester), 'NODE');
     });
 
-    testWidgets('on a phone the title row still fits', (tester) async {
+    testWidgets('on a phone the card fits', (tester) async {
       await pumpScene(tester, SkillScene(skillId: 1), api: api, size: phoneScreen);
-      expect(key('boss-chip'), findsOneWidget);
+      expect(kicker(tester), 'BOSS');
       expect(tester.takeException(), isNull);
     });
   });

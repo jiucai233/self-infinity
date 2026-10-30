@@ -21,15 +21,17 @@ import '../stage/stage_controller.dart';
 import '../stage/stage_scaffold.dart';
 import '../../upload/file_picker_service.dart';
 import 'edit_node.dart';
+import 'node_card.dart';
 import '../../l10n/l10n.dart';
 
-/// Scene 4 of `docs/ux-chat.md`: the overview of one node — the node's name in
-/// the stage's title bar (with a status chip), a contents card (description,
-/// one row per material, the course source) and the waving avatar asking
-/// `Ready to try? →`. The right panel “Attempts” lists this node's audits as
-/// cards. Questions typed in the input bar go to the chat and her answer
-/// replaces the line in the bubble; the sent line shows above the input until
-/// she has answered.
+/// Scene 4 of `docs/ux-chat.md`: the overview of one node — the node card on
+/// top (kicker and `⋯`, the name, its chips, Best / Attempts / Lessons, the
+/// audit history and the full-width ink `Take it on`), a contents card
+/// (description, one row per material, the course source) and the waving
+/// avatar with one line. On a wide screen the right panel “Attempts” lists
+/// this node's audits as cards; a phone has only the card. Questions typed in
+/// the input bar go to the chat and her answer replaces the line in the
+/// bubble; the sent line shows above the input until she has answered.
 ///
 /// Route `/skill/:id`.
 class SkillScene extends StatefulWidget {
@@ -331,66 +333,134 @@ class _SkillSceneState extends State<SkillScene> {
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => context.go(AppRoutes.map),
       ),
-      title: overview?.skill.title ?? '',
-      titleChip: overview == null
-          ? null
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_boss) ...[
-                  StatusChip(
-                    key: const Key('boss-chip'),
-                    label: context.l10n.boss,
-                    color: AppColors.onAccent,
-                    fill: AppColors.textPrimary,
-                  ),
-                  const SizedBox(width: AppSpacing.xs + 2),
-                ],
-                _statusChip(overview),
-                if (_courseMap case final map?)
-                  PopupMenuButton<void>(
-                    key: const Key('skill-menu'),
-                    tooltip: context.l10n.more,
-                    icon: const Icon(Icons.more_horiz_rounded, size: 18),
-                    padding: EdgeInsets.zero,
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(28, 28),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    itemBuilder: (_) => [
-                      ..._editItems(overview.skill, map),
-                      PopupMenuItem(
-                        key: const Key('skill-delete-course'),
-                        onTap: () => unawaited(_deleteCourse(map)),
-                        child: Text(
-                          context.l10n.deleteCourse,
-                          style: const TextStyle(color: AppColors.danger),
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
+      // A phone has the node card's audit history instead (no drawer).
       historyTitle: context.l10n.attempts,
-      history: overview == null ? const SizedBox.shrink() : _AuditHistory(audits: overview.audits),
+      history: overview == null || !AppLayout.isWide(context)
+          ? null
+          : _AuditHistory(audits: overview.audits),
       stage: Column(
         children: [
           Expanded(child: _body(context, chat)),
           LastSaidBubble(said: _lastSaid),
-          // Typing by voice here; talking is for the Guide and the audits.
+          // Typing by voice here (no ∿, so the voice key dictates); talking is
+          // for the Guide and the audits.
           StageInputBar(
             controller: _input,
             focusNode: _focus,
             hint: context.l10n.askAboutNodeHint,
             enabled: overview != null && !chat.sending,
             onSubmit: () => _ask(_input.text),
-            dictation: true,
             error: _chatError,
           ),
         ],
       ),
     );
   }
+
+  /// The `⋯` menu in the card's kicker row: the edits, then Delete course.
+  Widget? _menu(SkillOverview overview) {
+    final map = _courseMap;
+    if (map == null) return null;
+    return PopupMenuButton<void>(
+      key: const Key('skill-menu'),
+      tooltip: context.l10n.more,
+      icon: const Icon(Icons.more_horiz_rounded, size: 18),
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(32, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      itemBuilder: (_) => [
+        ..._editItems(overview.skill, map),
+        PopupMenuItem(
+          key: const Key('skill-delete-course'),
+          onTap: () => unawaited(_deleteCourse(map)),
+          child: Text(
+            context.l10n.deleteCourse,
+            style: const TextStyle(color: AppColors.danger),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The card's chips: the status, Unexpanded, then the course's name (the
+  /// kicker above the title already says Boss).
+  List<Widget> _chips(SkillOverview overview) {
+    final node = overview.skill;
+    final map = _courseMap;
+    return [
+      _statusChip(overview),
+      if (node.unexpanded && !node.isMastered && !node.isLinked)
+        StatusChip.neutral(context.l10n.dotUnexpanded, key: const Key('skill-unexpanded')),
+      if (map != null)
+        Text(
+          courseNameOf(map),
+          key: const Key('skill-course-name'),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+        ),
+    ];
+  }
+
+  /// The card's buttons: the ink `Take it on` (full width) when the node can
+  /// be audited, else `Break it down` / `Open the course`; under them the
+  /// challenge on the whole branch, with a line saying what it does. None
+  /// while the course is being edited.
+  List<Widget> _actions(SkillOverview overview) {
+    if (_working != null) return const [];
+    final node = overview.skill;
+    final l = context.l10n;
+    final unexpanded = node.unexpanded && !node.isMastered && !node.isLinked;
+    final openCourse = node.isLinked ? _linkedRootId : null;
+    final canTestOut = !node.isMastered && !node.isLinked && (node.unexpanded || _boss);
+    final theme = Theme.of(context).textTheme;
+    final buttons = <Widget>[
+      if (!node.isLocked && !unexpanded && !node.isLinked)
+        FilledButton(
+          key: const Key('start-audit'),
+          onPressed: () => context.go(AppRoutes.audit(node.id)),
+          child: Text(l.takeItOn),
+        ),
+      if (openCourse != null)
+        FilledButton(
+          key: const Key('open-linked-course'),
+          onPressed: () => context.go(AppRoutes.skill(openCourse)),
+          child: Text(l.nodeOpenCourse),
+        ),
+      if (unexpanded)
+        FilledButton(
+          key: const Key('expand-node'),
+          onPressed: () => unawaited(_expand()),
+          child: Text(l.breakDown),
+        ),
+    ];
+    return [
+      for (final (i, b) in buttons.indexed) ...[
+        if (i > 0) const SizedBox(height: AppSpacing.sm),
+        b,
+      ],
+      if (canTestOut) ...[
+        if (buttons.isNotEmpty) const SizedBox(height: AppSpacing.sm),
+        OutlinedButton(
+          key: const Key('test-out'),
+          onPressed: () => context.go(AppRoutes.challenge(node.id)),
+          child: Text(l.challengeWhole),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          keepAll(l.challengeWholeHint),
+          key: const Key('test-out-hint'),
+          textAlign: TextAlign.center,
+          style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
+        ),
+      ],
+    ];
+  }
+
+  int? get _linkedRootId => switch (_linkedMap) {
+    final linked? => rootNodes(linked.nodes, linked.edges).firstOrNull?.id,
+    null => null,
+  };
 
   /// The `⋯` menu's edits of the course (contract #41–#45), above Delete
   /// course. Nothing while an edit runs.
@@ -434,10 +504,24 @@ class _SkillSceneState extends State<SkillScene> {
     if (overview == null) {
       return ErrorView(error: _error ?? 'error', onRetry: () => unawaited(_load()));
     }
+    final node = overview.skill;
+    final lessons = context.select<StageController, List<Principle>>(
+      (s) => [
+        for (final p in s.lessons)
+          if (p.skillId == node.id) p,
+      ],
+    );
     return LayoutBuilder(
       builder: (context, box) {
-        final node = overview.skill;
         final map = _courseMap;
+        final card = SkillNodeCard(
+          overview: overview,
+          boss: _boss,
+          chips: _chips(overview),
+          lessons: lessons,
+          menu: _menu(overview),
+          actions: _actions(overview),
+        );
         final contents = _ContentsCard(
           overview: overview,
           // Knowledge points belong to a leaf; a node that got parts no longer shows them.
@@ -455,51 +539,58 @@ class _SkillSceneState extends State<SkillScene> {
           thinking: chat.sending,
           working: _working,
           expandFailed: _expandFailed,
-          linkedCourse: switch (_linkedMap) {
-            final linked? when node.isLinked => (
-              name: courseNameOf(linked),
-              rootId: rootNodes(linked.nodes, linked.edges).firstOrNull?.id,
-            ),
+          linkedCourseName: switch (_linkedMap) {
+            final linked? when node.isLinked => courseNameOf(linked),
             _ => null,
           },
-          canTestOut: !node.isMastered && !node.isLinked && (node.unexpanded || _boss),
           size: (box.maxHeight * 0.3).clamp(120.0, 240.0),
-          onStart: () => context.go(AppRoutes.audit(node.id)),
-          onExpand: () => unawaited(_expand()),
-          onTestOut: () => context.go(AppRoutes.challenge(node.id)),
-          onOpenCourse: (rootId) => context.go(AppRoutes.skill(rootId)),
         );
         final sideBySide = box.maxWidth >= 680;
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xl,
+          padding: EdgeInsets.fromLTRB(
+            sideBySide ? AppSpacing.xl : AppSpacing.lg,
             AppSpacing.sm,
-            AppSpacing.xl,
+            sideBySide ? AppSpacing.xl : AppSpacing.lg,
             AppSpacing.xl,
           ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: box.maxHeight - AppSpacing.sm - AppSpacing.xl),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 960),
-                child: sideBySide
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(flex: 5, child: contents),
-                          const SizedBox(width: AppSpacing.xl),
-                          Expanded(flex: 4, child: Center(child: avatar)),
-                        ],
-                      )
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          contents,
-                          const SizedBox(height: AppSpacing.xl),
-                          avatar,
-                        ],
-                      ),
-              ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 960),
+              child: sideBySide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              card,
+                              const SizedBox(height: AppSpacing.xl),
+                              contents,
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xl),
+                        Expanded(
+                          flex: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.xl),
+                            child: avatar,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        card,
+                        const SizedBox(height: AppSpacing.xl),
+                        avatar,
+                        const SizedBox(height: AppSpacing.xl),
+                        contents,
+                      ],
+                    ),
             ),
           ),
         );
@@ -719,7 +810,7 @@ class _MaterialRow extends StatelessWidget {
   }
 }
 
-/// The waving avatar with her line; a → in the bubble starts the audit.
+/// The waving avatar with her one line (the buttons are on the node card).
 class _AvatarColumn extends StatelessWidget {
   const _AvatarColumn({
     required this.overview,
@@ -729,13 +820,8 @@ class _AvatarColumn extends StatelessWidget {
     required this.thinking,
     required this.working,
     required this.expandFailed,
-    required this.linkedCourse,
-    required this.canTestOut,
+    required this.linkedCourseName,
     required this.size,
-    required this.onStart,
-    required this.onExpand,
-    required this.onTestOut,
-    required this.onOpenCourse,
   });
 
   final SkillOverview overview;
@@ -752,29 +838,19 @@ class _AvatarColumn extends StatelessWidget {
   final String? working;
   final bool expandFailed;
 
-  /// The course this node is, once read: its name and root.
-  final ({String name, int? rootId})? linkedCourse;
-
-  /// A branch, root or unexpanded node not cleared yet: it can be challenged
-  /// whole, locked or not.
-  final bool canTestOut;
+  /// The name of the course this node is, once read.
+  final String? linkedCourseName;
   final double size;
-  final VoidCallback onStart;
-  final VoidCallback onExpand;
-  final VoidCallback onTestOut;
-  final void Function(int rootId) onOpenCourse;
 
   bool get _unexpanded =>
       overview.skill.unexpanded && !overview.skill.isMastered && !overview.skill.isLinked;
-  bool get _expanding => working != null;
-  bool get _linked => overview.skill.isLinked;
 
   String _line(AppLocalizations l) {
     final node = overview.skill;
     if (working case final line?) return line;
     if (expandFailed) return l.breakDownFailed;
     if (reply != null) return reply!;
-    if (linkedCourse case (:final name, rootId: _)?) return l.nodeLinkedLine(name);
+    if (linkedCourseName case final name?) return l.nodeLinkedLine(name);
     if (_unexpanded) return l.unexpandedLine;
     if (node.isLocked) {
       final open = openNode;
@@ -788,9 +864,7 @@ class _AvatarColumn extends StatelessWidget {
     final node = overview.skill;
     final theme = Theme.of(context).textTheme;
     final agent = reply == null ? 'front_desk' : replyAgent;
-    final state = thinking || _expanding ? AvatarState.thinking : AvatarState.idle;
-    final busy = thinking || _expanding;
-    final openCourse = linkedCourse?.rootId;
+    final busy = thinking || working != null;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -804,65 +878,14 @@ class _AvatarColumn extends StatelessWidget {
           ),
           child: thinking
               ? const ThinkingShimmer(width: 220)
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(child: Text(_line(context.l10n), style: theme.bodyLarge)),
-                    if (!node.isLocked && !_unexpanded && !_linked && !_expanding) ...[
-                      const SizedBox(width: AppSpacing.md),
-                      IconButton(
-                        key: const Key('start-audit'),
-                        tooltip: context.l10n.startAudit,
-                        visualDensity: VisualDensity.compact,
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: AppColors.onAccent,
-                          fixedSize: const Size(36, 36),
-                          minimumSize: const Size(36, 36),
-                          padding: EdgeInsets.zero,
-                          shape: const CircleBorder(),
-                        ),
-                        icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                        onPressed: onStart,
-                      ),
-                    ],
-                  ],
-                ),
+              : Text(keepAll(_line(context.l10n)), style: theme.bodyLarge),
         ),
-        if (!busy && (_unexpanded || canTestOut || openCourse != null)) ...[
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            alignment: WrapAlignment.center,
-            children: [
-              if (openCourse != null)
-                FilledButton(
-                  key: const Key('open-linked-course'),
-                  onPressed: () => onOpenCourse(openCourse),
-                  child: Text(context.l10n.nodeOpenCourse),
-                ),
-              if (_unexpanded)
-                FilledButton(
-                  key: const Key('expand-node'),
-                  onPressed: onExpand,
-                  child: Text(context.l10n.breakDown),
-                ),
-              if (canTestOut)
-                OutlinedButton(
-                  key: const Key('test-out'),
-                  onPressed: onTestOut,
-                  child: Text(context.l10n.challengeWhole),
-                ),
-            ],
-          ),
-        ],
         const SizedBox(height: AppSpacing.sm),
         Avatar(
           agent: agent,
           mood: AvatarMood.smile,
-          state: state,
-          wave: !node.isLocked && !_unexpanded && !_linked && reply == null,
+          state: busy ? AvatarState.thinking : AvatarState.idle,
+          wave: !node.isLocked && !_unexpanded && !node.isLinked && reply == null,
           size: size,
         ),
       ],
@@ -870,9 +893,10 @@ class _AvatarColumn extends StatelessWidget {
   }
 }
 
-/// The body of the right panel “Attempts” on scene 4: one card per audit of
-/// this node, newest first — the date, a Passed/Failed chip and the score.
-/// A card opens the audit's replay; a fail not reflected on yet says so.
+/// The body of the right panel “Attempts” on a wide screen: one card per
+/// audit of this node, newest first — the date, a Passed/Failed chip and the
+/// score. A card opens the audit's replay; a fail not reflected on yet says
+/// so. (On a phone the node card's audit history stands in for it.)
 class _AuditHistory extends StatelessWidget {
   const _AuditHistory({required this.audits});
 

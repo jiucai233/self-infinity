@@ -94,6 +94,18 @@ abstract class AppLocalizations {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[Locale('en'), Locale('ko'), Locale('zh')];
 
+  /// Phone bottom navigation: the home tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get tabHome;
+
+  /// Phone bottom navigation: the tab with the character sheet, stats and settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Me'**
+  String get tabMe;
+
   /// No description provided for @about.
   ///
   /// In en, this message translates to:
@@ -610,6 +622,12 @@ abstract class AppLocalizations {
   /// **'Locked'**
   String get dotLocked;
 
+  /// No description provided for @legend.
+  ///
+  /// In en, this message translates to:
+  /// **'What the dots mean'**
+  String get legend;
+
   /// No description provided for @dotReady.
   ///
   /// In en, this message translates to:
@@ -885,6 +903,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Lessons'**
   String get lessons;
+
+  /// No description provided for @challengeWholeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain a few of its parts; pass and every node under it is cleared.'**
+  String get challengeWholeHint;
 
   /// No description provided for @levelBar.
   ///
@@ -1255,7 +1279,7 @@ abstract class AppLocalizations {
   /// No description provided for @onbTopicBody.
   ///
   /// In en, this message translates to:
-  /// **'Your answer shapes your first tree. A topic is enough: I look for a real syllabus, and its items become the first level. Got your own syllabus? Use the file (PDF, TXT or MD) and its items are used as they are.'**
+  /// **'Your answer shapes your first tree. A topic is enough, or use your syllabus file (PDF, TXT, MD).'**
   String get onbTopicBody;
 
   /// No description provided for @onbTopicHint.
@@ -1285,7 +1309,7 @@ abstract class AppLocalizations {
   /// No description provided for @onbWelcomeBody.
   ///
   /// In en, this message translates to:
-  /// **'In Self-Infinity you level up by proving you understand things: you explain them in your own words, and the Auditor decides. A few questions first. One or two sentences each (type them, or tap the mic and say them); you can change everything later.'**
+  /// **'You level up by explaining what you learn. A few short questions first; you can change them later.'**
   String get onbWelcomeBody;
 
   /// No description provided for @onbWhoGuide.
@@ -2161,7 +2185,7 @@ abstract class AppLocalizations {
   /// No description provided for @challengeWhole.
   ///
   /// In en, this message translates to:
-  /// **'Challenge it whole'**
+  /// **'Take the whole branch at once'**
   String get challengeWhole;
 
   /// No description provided for @challengeInProgress.
@@ -2884,71 +2908,35 @@ abstract class AppLocalizations {
   /// **'Skip the tour'**
   String get tourSkip;
 
+  /// No description provided for @tourVerdict.
+  ///
+  /// In en, this message translates to:
+  /// **'Then you get a score, what you missed, and a lesson.'**
+  String get tourVerdict;
+
   /// No description provided for @tourBegin.
   ///
   /// In en, this message translates to:
   /// **'Set up my character'**
   String get tourBegin;
 
-  /// No description provided for @tourWelcome.
-  ///
-  /// In en, this message translates to:
-  /// **'Hi, I\'m your Guide. Before we set anything up, let me show you around. Everything you see for now is an example.'**
-  String get tourWelcome;
-
-  /// No description provided for @tourCharacter.
-  ///
-  /// In en, this message translates to:
-  /// **'This side is you: your level, the nodes you have cleared, and how you are doing today.'**
-  String get tourCharacter;
-
-  /// No description provided for @tourQuests.
-  ///
-  /// In en, this message translates to:
-  /// **'Your daily quests. I pick what to learn or review today, by the time of day and your condition. Tap one to open it.'**
-  String get tourQuests;
-
   /// No description provided for @tourTalk.
   ///
   /// In en, this message translates to:
-  /// **'Talk to me here, typed or spoken: say what you want to learn, tell me about your day, or ask what to do next.'**
+  /// **'Tell me here what you want to learn, typed or spoken.'**
   String get tourTalk;
-
-  /// No description provided for @tourAttempts.
-  ///
-  /// In en, this message translates to:
-  /// **'This side keeps your attempts at this node: when, the score, and whether it passed.'**
-  String get tourAttempts;
 
   /// No description provided for @tourTree.
   ///
   /// In en, this message translates to:
-  /// **'Your life tree. Every course is a branch and every dot a node; a node lights up when you clear it. Drag to turn it, scroll to zoom, tap a node to open it.'**
+  /// **'Every node you clear lights up your life tree.'**
   String get tourTree;
-
-  /// No description provided for @tourNode.
-  ///
-  /// In en, this message translates to:
-  /// **'A node is one thing to learn. Here is what it covers and its knowledge points: a check for what you explained right, a cross for what you missed.'**
-  String get tourNode;
-
-  /// No description provided for @tourProve.
-  ///
-  /// In en, this message translates to:
-  /// **'To clear a node you explain it. Press here and the Auditor takes over.'**
-  String get tourProve;
 
   /// No description provided for @tourAudit.
   ///
   /// In en, this message translates to:
-  /// **'You teach, the Auditor learns. She asks about whatever she could not follow, and where you slip you get to explain it again. What you get right is not asked again.'**
+  /// **'To clear a node, you teach it to the Auditor.'**
   String get tourAudit;
-
-  /// No description provided for @tourSyllabus.
-  ///
-  /// In en, this message translates to:
-  /// **'That was an example. Next we set up your character and build your first tree. I will ask what you want to learn: a topic is enough, and a syllabus file is better, because its items become the first level of your tree as they are.'**
-  String get tourSyllabus;
 
   /// No description provided for @tourLessonsTitle.
   ///

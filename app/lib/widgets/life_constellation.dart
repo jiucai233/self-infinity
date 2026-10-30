@@ -55,6 +55,11 @@ class LifeConstellation extends StatefulWidget {
   final Set<String> highlighted;
   final ValueChanged<LifeNode>? onSelect;
 
+  /// How far from a node a tap still picks it: an invisible 48 px target
+  /// around every node (at least the 44 px of a touch target); the nearest
+  /// node wins.
+  static const double hitRadius = 24;
+
   @override
   State<LifeConstellation> createState() => LifeConstellationState();
 }
@@ -73,6 +78,14 @@ class LifeConstellationState extends State<LifeConstellation> with SingleTickerP
 
   /// Where node [key] was drawn last frame (local coordinates), or null.
   Offset? positionOf(String key) => _projected.at[key];
+
+  /// Where each label was drawn last frame (local coordinates), by node key.
+  @visibleForTesting
+  Map<String, Rect> get labelRects => Map.unmodifiable(_projected.labels);
+
+  /// The node a tap at [p] (local coordinates) picks, or null.
+  @visibleForTesting
+  String? nodeAt(Offset p) => _hit(p);
 
   @override
   void didUpdateWidget(LifeConstellation oldWidget) {
@@ -108,7 +121,7 @@ class LifeConstellationState extends State<LifeConstellation> with SingleTickerP
 
   String? _hit(Offset p) {
     String? best;
-    var bestD = 22.0;
+    var bestD = LifeConstellation.hitRadius;
     for (final e in _projected.at.entries) {
       final d = (e.value - p).distance;
       if (d < bestD) {
@@ -288,6 +301,7 @@ class _Clock extends ChangeNotifier {
 /// Screen positions of the last frame, for hit testing.
 class _Projection {
   final Map<String, Offset> at = {};
+  final Map<String, Rect> labels = {};
 }
 
 class _P3 {
@@ -453,10 +467,12 @@ class _NightPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     projection.at.clear();
+    projection.labels.clear();
     final center = size.center(Offset.zero) + (compact ? Offset.zero : clock.offset);
     final zoom = compact ? 1.0 : clock.zoom;
     final radius = (compact ? size.shortestSide * 0.40 : size.shortestSide * 0.42) * zoom;
-    final u = (compact ? size.shortestSide / 64 : size.shortestSide * 0.42 / 64) * math.sqrt(zoom);
+    // On a phone the panel is small: the dots keep a size you can see.
+    final u = (compact ? size.shortestSide / 64 : math.max(3.2, size.shortestSide * 0.42 / 64)) * math.sqrt(zoom);
     const camera = 3.2;
     final m = clock.rotation;
 
@@ -473,7 +489,8 @@ class _NightPainter extends CustomPainter {
     double fade(double depth) => (0.78 - 0.5 * depth).clamp(0.2, 1.0);
 
     // -- the wire shell ------------------------------------------------------
-    final dustIn = Curves.easeOut.transform(((clock.t - 0.1) / 1.4).clamp(0.0, 1.0));
+    // The shell only holds the tree: faint, so the nodes stand out.
+    final dustIn = Curves.easeOut.transform(((clock.t - 0.1) / 1.4).clamp(0.0, 1.0)) * (compact ? 1.0 : 0.5);
     if (dustIn > 0) {
       final pts = [for (final d in layout.dust) project(d)];
       final face = Paint()..style = PaintingStyle.fill;
@@ -592,29 +609,59 @@ class _NightPainter extends CustomPainter {
 
     if (compact) return;
 
-    // Labels on top: you, courses; skills when hovered, selected or found,
-    // and, zoomed in, the ones in front (nearest first, none over another).
-    // Courses come before the skills in front; one that would cover another
-    // label is left out, unless it was asked for.
+    // Labels on top, none over another, and none past the panel's edge. In
+    // order: the selected (or hovered) node, the search hits, you, the
+    // selected node's parent and children, the courses, and, zoomed in, the
+    // skills in front (nearest first). Each tries the right of its dot, then
+    // the left, above and below; one with no free place is left out. A small
+    // panel (a phone) names only what was asked for and the courses.
     final taken = <Rect>[];
-    final front = zoom >= 1.6;
+    final bounds = Offset.zero & size;
+    final front = zoom >= 1.6 && size.shortestSide >= 480;
+    final byDistance = order.reversed.toList();
+    final picked = <String>{};
+    final queue = <LifeNode>[];
+    void want(LifeNode? n) {
+      if (n == null || !picked.add(n.key)) return;
+      queue.add(n);
+    }
+
+    want(selected == null ? null : tree.byKey(selected!));
+    want(hovered == null ? null : tree.byKey(hovered!));
+    for (final n in byDistance) {
+      if (highlighted.contains(n.key)) want(n);
+    }
+    want(tree.nodes.first);
+    if (selected != null) {
+      final s = tree.byKey(selected!);
+      if (s?.parent != null) want(tree.byKey(s!.parent!));
+      for (final n in byDistance) {
+        if (n.parent == selected) want(n);
+      }
+    }
+    final focused = selected != null || highlighted.isNotEmpty;
+    for (final n in byDistance) {
+      // While something is selected or searched for on a phone, the
+      // course names would crowd it: they wait.
+      if (n.kind == LifeKind.course && !(focused && size.width < 480)) want(n);
+    }
     var named = 0;
-    final labelled = [
-      ...order.reversed.where((n) => n.kind != LifeKind.skill),
-      ...order.reversed.where((n) => n.kind == LifeKind.skill),
-    ];
-    for (final n in labelled) {
+    if (front) {
+      for (final n in byDistance) {
+        if (n.kind != LifeKind.skill || named >= 60) continue;
+        final at = projection.at[n.key];
+        if (at == null || !size.contains(at) || proj[n.key]!.$2 >= 0.35) continue;
+        want(n);
+        named++;
+      }
+    }
+    final maxLabel = math.min(200.0, size.width * 0.45);
+    for (final n in queue) {
       final hit = projection.at[n.key];
       if (hit == null) continue;
       final (_, depth, k) = proj[n.key]!;
-      final asked = n.kind == LifeKind.self ||
-          n.key == hovered ||
-          n.key == selected ||
-          highlighted.contains(n.key);
-      final course = n.kind == LifeKind.course;
-      final near = front && depth < 0.35 && named < 60 && size.contains(hit);
-      if (!asked && !course && !near) continue;
-      final f = n.key == hovered || n.key == selected ? 1.0 : fade(depth);
+      final lit = n.key == hovered || n.key == selected;
+      final f = lit || highlighted.contains(n.key) ? 1.0 : fade(depth);
       final style = switch (n.kind) {
         LifeKind.self => titleStyle,
         _ => labelStyle,
@@ -625,13 +672,41 @@ class _NightPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
         maxLines: 1,
         ellipsis: '…',
-      )..layout(maxWidth: 200);
-      final at = hit + Offset(u * 2.4 * k, -tp.height / 2);
-      final box = (at & tp.size).inflate(2);
-      if (!asked && taken.any(box.overlaps)) continue;
+      )..layout(maxWidth: maxLabel);
+      final gap = u * 2.4 * k;
+      final w = tp.width, h = tp.height;
+      // Beside the dot first, then above and below it, then a line up or
+      // down on either side.
+      final places = [
+        hit + Offset(gap, -h / 2),
+        hit + Offset(-gap - w, -h / 2),
+        hit + Offset(-w / 2, -gap - h),
+        hit + Offset(-w / 2, gap),
+        for (final dy in [-h, h, -1.6 * h, 1.6 * h]) ...[
+          hit + Offset(gap, -h / 2 + dy),
+          hit + Offset(-gap - w, -h / 2 + dy),
+        ],
+      ];
+      Rect? box;
+      for (final at in places) {
+        final b = (at & tp.size).inflate(2);
+        if (!bounds.contains(b.topLeft) || !bounds.contains(b.bottomRight - const Offset(0.01, 0.01))) continue;
+        if (taken.any(b.overlaps)) continue;
+        box = b;
+        break;
+      }
+      if (box == null) {
+        // Only the selected node is never left out: inside the panel, over
+        // whatever is there (it was placed first, so nothing is).
+        if (n.key != selected) continue;
+        final at = places.first;
+        box = (Offset(at.dx.clamp(0, math.max(0, size.width - w)), at.dy.clamp(0, math.max(0, size.height - h))) &
+                tp.size)
+            .inflate(2);
+      }
       taken.add(box);
-      if (!asked && !course) named++;
-      tp.paint(canvas, at);
+      projection.labels[n.key] = box;
+      tp.paint(canvas, box.topLeft + const Offset(2, 2));
     }
   }
 

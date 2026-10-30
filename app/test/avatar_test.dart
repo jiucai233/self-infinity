@@ -1,4 +1,4 @@
-// Avatar (line stick figure) and its head, SpeechBubble, ThinkingShimmer, StatBar,
+// Avatar (大肥鱼, drawn from her sheets) and its head, SpeechBubble, ThinkingShimmer, StatBar,
 // VoiceWave and LifeConstellation.
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -111,45 +111,22 @@ void main() {
       expect(find.bySemanticsLabel('auditor avatar'), findsOneWidget);
     });
 
-    testWidgets('is a thin line drawing: few pixels are inked, nothing is filled', (tester) async {
+    testWidgets('she is drawn from the sheets: she fills the box, in blue', (tester) async {
       final image = await pixelsOf(tester, mood: AvatarMood.smile);
       final share = inked(image) / (image.length / 4);
-      expect(share, greaterThan(0.01));
-      expect(share, lessThan(0.12));
-    });
-
-    testWidgets('is drawn in the text color and the grey only', (tester) async {
-      final image = await pixelsOf(tester, mood: AvatarMood.smile, state: AvatarState.listening);
-      final allowed = [
-        (AppColors.textPrimary.r * 255).round(),
-        (AppColors.textTertiary.r * 255).round(),
-      ];
+      expect(share, greaterThan(0.3));
+      var blue = 0;
       for (var i = 0; i < image.length; i += 4) {
-        if (image[i + 3] < 250) continue; // anti-aliased edge
-        expect(allowed.any((r) => (r - image[i]).abs() <= 2), isTrue, reason: 'pixel ${i ~/ 4}');
+        if (image[i + 3] > 200 && image[i + 2] > image[i] + 60) blue++;
       }
+      expect(blue / (image.length / 4), greaterThan(0.1), reason: 'her hair');
     });
 
-    testWidgets('each distinct accessory looks different', (tester) async {
-      final looks = <String, Uint8List>{
-        'hair': await pixelsOf(tester, agent: 'front_desk'),
-        'bow tie': await pixelsOf(tester, agent: 'narrator'),
-        'hat': await pixelsOf(tester, agent: 'recommender'),
-        'glasses': await pixelsOf(tester, agent: 'planner'),
-        'none': await pixelsOf(tester, agent: 'someone_else'),
-      };
-      final names = looks.keys.toList();
-      for (var i = 0; i < names.length; i++) {
-        for (var j = i + 1; j < names.length; j++) {
-          expect(
-            same(looks[names[i]]!, looks[names[j]]!),
-            isFalse,
-            reason: '${names[i]} vs ${names[j]}',
-          );
-        }
+    testWidgets('every agent is the same character', (tester) async {
+      final front = await pixelsOf(tester, agent: 'front_desk');
+      for (final agent in ['auditor', 'narrator', 'someone_else']) {
+        expect(same(front, await pixelsOf(tester, agent: agent)), isTrue, reason: agent);
       }
-      // The same accessory is the same picture.
-      expect(same(looks['hat']!, await pixelsOf(tester, agent: 'recorder')), isTrue);
     });
 
     testWidgets('each mood has its own face', (tester) async {
@@ -164,10 +141,34 @@ void main() {
       }
     });
 
-    testWidgets('waving raises the arm; speaking opens the mouth', (tester) async {
+    testWidgets('waving, listening, thinking and speaking each change the picture', (
+      tester,
+    ) async {
       final idle = await pixelsOf(tester);
-      expect(same(idle, await pixelsOf(tester, wave: true)), isFalse);
-      expect(same(idle, await pixelsOf(tester, state: AvatarState.listening)), isFalse);
+      final others = [
+        await pixelsOf(tester, wave: true),
+        for (final state in [AvatarState.listening, AvatarState.thinking, AvatarState.speaking])
+          await pixelsOf(tester, state: state),
+      ];
+      for (var i = 0; i < others.length; i++) {
+        expect(same(idle, others[i]), isFalse, reason: 'picture $i');
+        for (var j = i + 1; j < others.length; j++) {
+          expect(same(others[i], others[j]), isFalse, reason: '$i vs $j');
+        }
+      }
+    });
+
+    testWidgets('holding the orb: her hands are in front of her chest', (tester) async {
+      await pumpWidgetUnderTest(
+        tester,
+        const Avatar(agent: 'front_desk', holdOrb: true, size: 140, animate: false),
+      );
+      final held = await pixels(tester);
+      expect(same(held, await pixelsOf(tester, mood: AvatarMood.smile)), isFalse);
+      final hand = Avatar.orbHandAt('front_desk', 140);
+      expect(hand.dx, inInclusiveRange(30, 70));
+      expect(hand.dy, inInclusiveRange(60, 110));
+      expect(Avatar.unit('front_desk', 140), 1);
     });
 
     testWidgets('the same input always gives the same picture', (tester) async {
@@ -205,8 +206,10 @@ void main() {
         await tester.pump(const Duration(milliseconds: 700));
         expect(tester.hasRunningAnimations, isTrue, reason: '$state');
       }
+      // Idle she blinks; with the movement off she is still.
       await pumpWidgetUnderTest(tester, const Avatar(agent: 'front_desk', animate: true));
-      await tester.pumpAndSettle();
+      expect(tester.hasRunningAnimations, isTrue);
+      await pumpWidgetUnderTest(tester, const Avatar(agent: 'front_desk', animate: false));
       expect(tester.hasRunningAnimations, isFalse);
     });
 
@@ -371,23 +374,16 @@ void main() {
       expect(inked(await pixels(tester)), greaterThan(0));
     });
 
-    testWidgets('each agent has a different head; unknown agents get a plain one', (tester) async {
-      final seen = <String, Uint8List>{};
-      for (final agent in [
-        'front_desk',
-        'narrator',
-        'recommender',
-        'planner',
-        'checkin_converter',
-      ]) {
-        await pumpWidgetUnderTest(tester, AvatarHead(agent: agent, size: 56));
-        seen[agent] = await pixels(tester);
+    testWidgets('the head follows the mood, not the agent', (tester) async {
+      Future<Uint8List> head(String agent, [AvatarMood? mood]) async {
+        await pumpWidgetUnderTest(tester, AvatarHead(agent: agent, size: 56, mood: mood));
+        return pixels(tester);
       }
-      for (final a in seen.keys) {
-        for (final b in seen.keys) {
-          if (a.compareTo(b) < 0) expect(same(seen[a]!, seen[b]!), isFalse, reason: '$a vs $b');
-        }
-      }
+
+      final smiling = await head('front_desk');
+      expect(same(smiling, await head('recommender')), isTrue);
+      expect(same(smiling, await head('auditor')), isFalse, reason: 'the auditor is stern');
+      expect(same(await head('auditor'), await head('nobody', AvatarMood.stern)), isTrue);
       await pumpWidgetUnderTest(tester, const AvatarHead(agent: 'nobody'));
       expect(tester.takeException(), isNull);
     });

@@ -20,7 +20,7 @@ import '../../widgets/widgets.dart';
 /// stays lit, and what the Guide says about it.
 @immutable
 class TourStop {
-  const TourStop({this.route, this.anchor, required this.text, this.optional = false});
+  const TourStop({this.route, this.anchor, this.frame, required this.text, this.optional = false});
 
   /// The page to be on; null keeps the page of the stop before.
   final String? route;
@@ -28,6 +28,11 @@ class TourStop {
   /// The widget that stays lit (found by its key); null darkens everything
   /// and puts the Guide in the middle.
   final Key? anchor;
+
+  /// Lights the nearest widget of this type around the [anchor] instead of the
+  /// anchor alone (the whole input bar, not just its text field); the anchor
+  /// itself when there is none.
+  final Type? frame;
   final String Function(AppLocalizations l) text;
 
   /// A stop whose [anchor] is not on this screen (a side panel on a phone)
@@ -37,10 +42,9 @@ class TourStop {
 
 /// The guided tour a new account sees before the setup (`docs/ux-chat.md`
 /// §7): the real scenes over an example world, everything dark but the part
-/// the Guide is talking about. It goes from the left panel to the stage, then
-/// to the life tree, a node (its contents, the attempts on its right, the way
-/// into an audit) and an audit, and ends on what the setup is about to ask:
-/// the topic or syllabus that shapes the first tree.
+/// the Guide is talking about. Four stops, the loop of the app: talk to the
+/// Guide on the home page, explain a node to the Auditor, what a verdict
+/// gives back, and the life tree it all grows; then the setup.
 ///
 /// The world is a [FakeApiClient] of its own (a character with a main quest,
 /// a course built from a syllabus, one node cleared and one failed, today's
@@ -60,26 +64,27 @@ class GuidedTour extends StatefulWidget {
   /// The tour was finished or skipped.
   final VoidCallback onDone;
 
-  /// The stops, given the example node (a leaf with knowledge points).
-  static List<TourStop> stops(int nodeId) => [
-    TourStop(route: AppRoutes.home, text: (l) => l.tourWelcome),
-    TourStop(anchor: const Key('left-panel'), text: (l) => l.tourCharacter, optional: true),
-    TourStop(anchor: const Key('daily-quests'), text: (l) => l.tourQuests, optional: true),
-    TourStop(anchor: const Key('stage-input'), text: (l) => l.tourTalk),
-    TourStop(route: AppRoutes.map, anchor: const Key('night-panel'), text: (l) => l.tourTree),
+  /// The stops, given the example node (a leaf with knowledge points) and the
+  /// failed audit of it whose verdict is shown.
+  static List<TourStop> stops(int nodeId, int? auditId) => [
     TourStop(
-      route: AppRoutes.skill(nodeId),
-      anchor: const Key('skill-contents'),
-      text: (l) => l.tourNode,
+      route: AppRoutes.home,
+      anchor: const Key('stage-input'),
+      frame: Composer,
+      text: (l) => l.tourTalk,
     ),
-    TourStop(anchor: const Key('history-panel'), text: (l) => l.tourAttempts, optional: true),
-    TourStop(anchor: const Key('start-audit'), text: (l) => l.tourProve),
     TourStop(
       route: AppRoutes.audit(nodeId),
       anchor: const Key('audit-bubble'),
       text: (l) => l.tourAudit,
     ),
-    TourStop(route: AppRoutes.map, text: (l) => l.tourSyllabus),
+    if (auditId != null)
+      TourStop(
+        route: AppRoutes.replay(auditId),
+        anchor: const Key('replay-scene'),
+        text: (l) => l.tourVerdict,
+      ),
+    TourStop(route: AppRoutes.map, anchor: const Key('night-panel'), text: (l) => l.tourTree),
   ];
 
   @override
@@ -136,12 +141,13 @@ class _GuidedTourState extends State<GuidedTour> {
   }
 
   /// Plays an audit of [nodeId] in the example world with the same [answer]
-  /// until its verdict.
-  Future<void> _audit(int nodeId, String answer) async {
+  /// until its verdict; its id.
+  Future<int> _audit(int nodeId, String answer) async {
     final audit = await _world.startAudit(nodeId);
     for (var i = 0; i < 12; i++) {
-      if (await _world.submitTurn(audit.session.id, answer) is VerdictResult) return;
+      if (await _world.submitTurn(audit.session.id, answer) is VerdictResult) break;
     }
+    return audit.session.id;
   }
 
   /// The example world: a character with a main quest, a course from a
@@ -150,13 +156,14 @@ class _GuidedTourState extends State<GuidedTour> {
   /// today's quests asked for.
   Future<void> _buildWorld() async {
     var nodeId = 1;
+    int? failed;
     try {
       final course = await _world.generateCourse(const GenerateRequest(topic: 'math'));
       int? open(CourseMap map) => map.nodes.where((n) => n.isAvailable).firstOrNull?.id;
       final first = open(await _world.getCourseMap(course.course.id));
       if (first != null) await _audit(first, _exampleAnswer);
       nodeId = open(await _world.getCourseMap(course.course.id)) ?? first ?? nodeId;
-      await _audit(nodeId, "I'm not sure");
+      failed = await _audit(nodeId, "I'm not sure");
       final quest = await _world.createGoal(_exampleQuest);
       await _world.updateGoal(quest.id, courseIds: [course.course.id]);
       await _world.updateProfile(identity: _exampleIdentity);
@@ -166,7 +173,7 @@ class _GuidedTourState extends State<GuidedTour> {
     }
     if (!mounted) return;
     setState(() {
-      _stops = GuidedTour.stops(nodeId);
+      _stops = GuidedTour.stops(nodeId, failed);
       _router = createRouter(initialLocation: _stops.first.route);
     });
     _watch = Timer.periodic(_watchEvery, (_) => _look());
@@ -210,7 +217,7 @@ class _GuidedTourState extends State<GuidedTour> {
     if (anchor == null) return;
     final found = _find(anchor);
     final overlay = _overlay.currentContext?.findRenderObject();
-    final box = found?.findRenderObject();
+    final box = (_frame(found) ?? found)?.findRenderObject();
     if (found == null || box is! RenderBox || !box.hasSize || overlay is! RenderBox) {
       if (++_misses == _patience && _stop.optional) _go(_index + _direction);
       return;
@@ -225,6 +232,19 @@ class _GuidedTourState extends State<GuidedTour> {
     if (_lit == null || (lit.topLeft - _lit!.topLeft).distance > 0.5 || lit.size != _lit!.size) {
       setState(() => _lit = lit);
     }
+  }
+
+  /// The nearest widget of the stop's frame type around [found], if any.
+  Element? _frame(Element? found) {
+    final type = _stop.frame;
+    if (found == null || type == null) return null;
+    Element? frame;
+    found.visitAncestorElements((element) {
+      if (element.widget.runtimeType != type) return true;
+      frame = element;
+      return false;
+    });
+    return frame;
   }
 
   Element? _find(Key key) {
@@ -321,7 +341,7 @@ class _TourOverlay extends StatelessWidget {
   final VoidCallback onSkip;
 
   /// Air between the lit part and its edge, and between it and the card.
-  static const double _halo = 6;
+  static const double _halo = 4;
   static const double _gap = 16;
 
   @override

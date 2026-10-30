@@ -69,6 +69,7 @@ void main() {
     test('path helpers', () {
       expect(AppRoutes.home, '/');
       expect(AppRoutes.map, '/map');
+      expect(AppRoutes.me, '/me');
       expect(AppRoutes.skill(5), '/skill/5');
       expect(AppRoutes.audit(5), '/skill/5/audit');
       expect(AppRoutes.replay(31), '/audit/31');
@@ -201,8 +202,8 @@ void main() {
       await tester.tap(find.byKey(const Key('node-6')));
       await tester.pumpAndSettle();
       expect(find.byType(SkillScene), findsOneWidget);
-      expect(tester.widget<Text>(find.byKey(const Key('stage-title'))).data, 'Discriminant');
-      // Scene 4: →
+      expect(tester.widget<Text>(find.byKey(const Key('skill-title'))).data, 'Discriminant');
+      // Scene 4: Take it on
       await tester.tap(find.byKey(const Key('start-audit')));
       await tester.pumpAndSettle();
       expect(find.byType(AuditScene), findsOneWidget);
@@ -227,7 +228,7 @@ void main() {
       await go(tester, AppRoutes.map);
       await say(tester, 'Calculus');
       expect(find.byType(SkillScene), findsOneWidget);
-      expect(tester.widget<Text>(find.byKey(const Key('stage-title'))).data, 'Calculus');
+      expect(tester.widget<Text>(find.byKey(const Key('skill-title'))).data, 'Calculus');
     });
 
     testWidgets('a course made in the chat shows up on the map', (tester) async {
@@ -265,7 +266,7 @@ void main() {
             find.descendant(of: find.byKey(const Key('dot-6')), matching: find.byType(Container)),
           )
           .last;
-      expect((dot.decoration! as BoxDecoration).color, AppColors.success);
+      expect((dot.decoration! as BoxDecoration).color, AppColors.cleared);
     });
   });
 
@@ -277,10 +278,19 @@ void main() {
     expect(app.title, 'Self-Infinity');
   });
 
-  testWidgets('createRouter has exactly the six scene routes', (tester) async {
+  testWidgets('createRouter has exactly the seven scene routes, all in the tab shell', (tester) async {
     final router = createRouter();
     addTearDown(router.dispose);
-    final paths = router.configuration.routes.whereType<GoRoute>().map((r) => r.path).toList();
-    expect(paths, ['/', '/map', '/life', '/skill/:skillId', '/skill/:skillId/audit', '/audit/:auditId']);
+    final shell = router.configuration.routes.single as ShellRoute;
+    final paths = shell.routes.whereType<GoRoute>().map((r) => r.path).toList();
+    expect(paths, [
+      '/',
+      '/map',
+      '/me',
+      '/life',
+      '/skill/:skillId',
+      '/skill/:skillId/audit',
+      '/audit/:auditId',
+    ]);
   });
 }

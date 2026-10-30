@@ -228,8 +228,8 @@ void main() {
         await passAudit(api, 7); // Roots and Coefficients mastered; Quadratic Equations (5) opens
         await pumpOutline(tester, api: api);
 
-        expect(dotColor(tester, 6), AppColors.success);
-        expect(dotColor(tester, 7), AppColors.success);
+        expect(dotColor(tester, 6), AppColors.cleared);
+        expect(dotColor(tester, 7), AppColors.cleared);
         expect(dotColor(tester, 5), AppColors.surface); // available: white
         expect(dotRing(tester, 5), AppColors.primary); // ... with a blue ring
         expect(dotColor(tester, 1), AppColors.locked);
@@ -245,7 +245,7 @@ void main() {
       await failAudit(api, 7);
       await passAudit(api, 7);
       await pumpOutline(tester, api: api);
-      expect(dotColor(tester, 7), AppColors.success);
+      expect(dotColor(tester, 7), AppColors.cleared);
     });
 
     testWidgets('only the latest finished audit of a node counts', (tester) async {
@@ -319,10 +319,15 @@ void main() {
     });
 
     group('the legend', () {
-      testWidgets('bottom-left: Ready / Cleared / Failed / Locked, then the Boss ring', (
+      testWidgets('behind a ? at the bottom left: Ready / Cleared / Failed / Locked, then the Boss ring', (
         tester,
       ) async {
         await pumpOutline(tester, api: api);
+        // Closed at first: it does not lie over the tree.
+        expect(find.byKey(const Key('graph-legend')), findsNothing);
+        final toggle = tester.getRect(find.byKey(const Key('graph-legend-toggle')));
+        expect(toggle.width, greaterThanOrEqualTo(40));
+        await openLegend(tester);
         final legend = find.byKey(const Key('graph-legend'));
         expect(legend, findsOneWidget);
         expect(
@@ -332,7 +337,8 @@ void main() {
         final rect = tester.getRect(legend);
         final stage = tester.getRect(find.byKey(const Key('stage-panel')));
         expect(rect.left - stage.left, lessThan(40));
-        expect(stage.bottom - rect.bottom, lessThan(120)); // above the search bar
+        expect(stage.bottom - toggle.bottom, lessThan(120)); // above the search bar
+        expect(rect.bottom, lessThanOrEqualTo(toggle.top)); // opens above its ?
         expect(rect.top, greaterThan(stage.center.dy));
         // The dots use the colors of the graph.
         Color fill(DotKind kind) =>
@@ -348,7 +354,7 @@ void main() {
                 .color;
         expect(fill(DotKind.available), AppColors.surface);
         expect(ring(DotKind.available), AppColors.primary);
-        expect(fill(DotKind.mastered), AppColors.success);
+        expect(fill(DotKind.mastered), AppColors.cleared);
         expect(fill(DotKind.failed), AppColors.danger);
         expect(fill(DotKind.locked), AppColors.locked);
       });
@@ -358,6 +364,7 @@ void main() {
       ) async {
         for (final size in [wideScreen, phoneScreen]) {
           await pumpOutline(tester, api: api, size: size);
+          if (find.byKey(const Key('graph-legend')).evaluate().isEmpty) await openLegend(tester);
           final legend = tester.getRect(find.byKey(const Key('graph-legend')));
           // On a phone she is not shown on this scene.
           if (size == wideScreen) {
@@ -373,7 +380,10 @@ void main() {
 
       testWidgets('also with no course yet', (tester) async {
         await pumpOutline(tester, api: FakeApiClient(latency: Duration.zero));
+        await openLegend(tester);
         expect(find.byKey(const Key('graph-legend')), findsOneWidget);
+        await openLegend(tester); // the ? closes it again
+        expect(find.byKey(const Key('graph-legend')), findsNothing);
       });
     });
 
@@ -494,7 +504,7 @@ void main() {
       await passAudit(api, 6);
       state.markDataChanged();
       await tester.pumpAndSettle();
-      expect(dotColor(tester, 6), AppColors.success);
+      expect(dotColor(tester, 6), AppColors.cleared);
     });
 
     testWidgets('the graph can be panned and zoomed', (tester) async {

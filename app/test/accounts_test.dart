@@ -424,7 +424,7 @@ void main() {
       await pumpApp(tester, api: api, picker: picker);
       await tapKey(tester, 'onboarding-continue');
       for (var i = 0; i < 4; i++) {
-        await tapKey(tester, 'onboarding-skip');
+        await tapKey(tester, 'onboarding-continue'); // empty: passed over
       }
       await tapKey(tester, 'onboarding-upload');
       expect(find.text('Linear Algebra.txt'), findsOneWidget);
@@ -438,7 +438,7 @@ void main() {
       await pumpApp(tester, api: FakeApiClient(latency: Duration.zero, onboarded: false));
       await tapKey(tester, 'onboarding-continue');
       for (var i = 0; i < 4; i++) {
-        await tapKey(tester, 'onboarding-skip');
+        await tapKey(tester, 'onboarding-continue'); // empty: passed over
       }
       await tapKey(tester, 'onboarding-continue');
       expect(find.text('Tell me a topic, or pick a syllabus file.'), findsOneWidget);
@@ -449,7 +449,7 @@ void main() {
       await pumpApp(tester, api: api);
       await tapKey(tester, 'onboarding-continue');
       for (var i = 0; i < 4; i++) {
-        await tapKey(tester, 'onboarding-skip');
+        await tapKey(tester, 'onboarding-continue'); // empty: passed over
       }
       api.failNext(method: 'sendChat');
       await answer(tester, 'math');
@@ -465,7 +465,7 @@ void main() {
       await pumpApp(tester, api: api);
       await tapKey(tester, 'onboarding-continue');
       for (var i = 0; i < 4; i++) {
-        await tapKey(tester, 'onboarding-skip');
+        await tapKey(tester, 'onboarding-continue'); // empty: passed over
       }
       // "I want to learn Sleep science" reads as a check-in to the front desk
       // (check-in words win); with courseTopic it is not asked.
@@ -479,7 +479,7 @@ void main() {
       await pumpApp(tester, api: api);
       await tapKey(tester, 'onboarding-continue');
       for (var i = 0; i < 3; i++) {
-        await tapKey(tester, 'onboarding-skip');
+        await tapKey(tester, 'onboarding-continue'); // empty: passed over
       }
       await answer(tester, 'Complete SO-ARM101 project');
       await answer(tester, 'idk, a lot of things');
@@ -499,7 +499,7 @@ void main() {
       await pumpApp(tester, api: api);
       await tapKey(tester, 'onboarding-continue');
       for (var i = 0; i < 4; i++) {
-        await tapKey(tester, 'onboarding-skip');
+        await tapKey(tester, 'onboarding-continue'); // empty: passed over
       }
       api.failNext(method: 'scoutCourse');
       await answer(tester, 'idk');
@@ -615,7 +615,7 @@ void main() {
       await pumpApp(tester, api: api);
       await tapKey(tester, 'onboarding-continue');
       for (var i = 0; i < 3; i++) {
-        await tapKey(tester, 'onboarding-skip');
+        await tapKey(tester, 'onboarding-continue'); // empty: passed over
       }
       expect(find.text('Old quest'), findsOneWidget);
       await answer(tester, 'New quest');

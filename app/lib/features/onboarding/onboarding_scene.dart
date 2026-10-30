@@ -20,14 +20,18 @@ import '../../l10n/l10n.dart';
 /// Welcome → Stakes → Win condition → Identity → Main quest → First course
 /// (a topic or a syllabus file — it shapes the first tree, and the step says
 /// so; the course is built and put under the quest). Every answer is saved as
-/// soon as you continue; every step can be skipped, and `Skip setup` ends it.
-/// Finishing (or skipping) sets `onboarded` on the profile, and the app opens
-/// on the life tree.
+/// soon as you continue, and an empty one is passed over; `Skip setup` (the
+/// one skip on every page) ends it. Finishing (or skipping) sets `onboarded`
+/// on the profile, and the app opens on the life tree.
 class OnboardingScene extends StatefulWidget {
-  const OnboardingScene({super.key, this.onCourseBuilt});
+  const OnboardingScene({super.key, this.onCourseBuilt, this.afterTour = false});
 
   /// The first course was built: the app opens on the tree that holds it.
   final VoidCallback? onCourseBuilt;
+
+  /// The guided tour came just before and ended on "Set up my character": the
+  /// welcome would say it again, so the setup opens on its first question.
+  final bool afterTour;
 
   @override
   State<OnboardingScene> createState() => _OnboardingSceneState();
@@ -42,7 +46,7 @@ enum _Build { idle, reading, building, done }
 class _OnboardingSceneState extends State<OnboardingScene> {
   static String get identityStem => l10nNow.identityStem;
 
-  _Step _step = _Step.welcome;
+  late _Step _step = widget.afterTour ? _Step.stakes : _Step.welcome;
   final _text = {
     _Step.stakes: TextEditingController(),
     _Step.win: TextEditingController(),
@@ -378,12 +382,16 @@ class _OnboardingSceneState extends State<OnboardingScene> {
               ],
             ),
           ),
-          TextButton(
-            key: const Key('onboarding-skip-all'),
-            onPressed: _busy || _build == _Build.building ? null : _finish,
-            style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
-            child: Text(context.l10n.onbSkipSetup),
-          ),
+          // Built: "Enter" is the way out, so no skip next to it.
+          if (_build != _Build.done)
+            TextButton(
+              key: const Key('onboarding-skip-all'),
+              onPressed: _busy || _build == _Build.building ? null : _finish,
+              style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
+              child: Text(context.l10n.onbSkipSetup),
+            )
+          else
+            const SizedBox(height: kMinInteractiveDimension),
         ],
       ),
     );
@@ -398,11 +406,7 @@ class _OnboardingSceneState extends State<OnboardingScene> {
           title: context.l10n.onbSetUpCharacter,
           body: context.l10n.onbWelcomeBody,
           wide: wide,
-          actions: _actions(
-            primary: context.l10n.onbBegin,
-            onPrimary: () => _next(),
-            showSkip: false,
-          ),
+          actions: _actions(primary: context.l10n.onbBegin, onPrimary: () => _next()),
         );
       case _Step.stakes:
         return _question(
@@ -466,35 +470,17 @@ class _OnboardingSceneState extends State<OnboardingScene> {
       title: title,
       body: helper,
       wide: wide,
-      field: TextField(
-        key: const Key('onboarding-input'),
-        controller: _text[_step],
+      field: Composer(
+        fieldKey: const Key('onboarding-input'),
+        controller: _text[_step]!,
+        hint: hint,
         autofocus: true,
-        minLines: lines == 2 ? 1 : 3,
-        maxLines: lines,
+        // A short title is one line (Enter continues); the rest grow.
+        multiline: lines > 2,
+        onSend: lines > 2 ? null : _continue,
+        showSend: false,
         maxLength: maxLength,
         enabled: !_busy,
-        style: Theme.of(context).textTheme.bodyLarge,
-        decoration: InputDecoration(
-          hintText: hint,
-          suffixIcon: DictationButton(
-            controller: _text[_step]!,
-            maxLength: maxLength,
-            enabled: !_busy,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: AppRadius.cardBorder,
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: AppRadius.cardBorder,
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: AppRadius.cardBorder,
-            borderSide: const BorderSide(color: AppColors.primary),
-          ),
-        ),
       ),
       error: _error,
       actions: _actions(primary: context.l10n.continueLabel, onPrimary: _continue),
@@ -502,7 +488,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
   }
 
   Widget _courseStep(BuildContext context, bool wide) {
-    final theme = Theme.of(context).textTheme;
     final quest = _goal?.title;
     if (_build == _Build.building || _build == _Build.reading) {
       final reading = _build == _Build.reading;
@@ -571,29 +556,14 @@ class _OnboardingSceneState extends State<OnboardingScene> {
               ),
             const SizedBox(height: AppSpacing.md),
           ],
-          TextField(
-            key: const Key('onboarding-input'),
-            controller: _text[_Step.course],
+          Composer(
+            fieldKey: const Key('onboarding-input'),
+            controller: _text[_Step.course]!,
+            hint: context.l10n.onbTopicHint,
             autofocus: true,
             maxLength: 120,
-            style: theme.bodyLarge,
-            onSubmitted: (_) => _continue(),
-            decoration: InputDecoration(
-              hintText: context.l10n.onbTopicHint,
-              suffixIcon: DictationButton(controller: _text[_Step.course]!, maxLength: 120),
-              border: OutlineInputBorder(
-                borderRadius: AppRadius.cardBorder,
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: AppRadius.cardBorder,
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: AppRadius.cardBorder,
-                borderSide: const BorderSide(color: AppColors.primary),
-              ),
-            ),
+            onSend: _continue,
+            showSend: false,
           ),
           const SizedBox(height: AppSpacing.xs),
           if (file == null)
@@ -617,29 +587,20 @@ class _OnboardingSceneState extends State<OnboardingScene> {
     );
   }
 
-  Widget _actions({
-    required String primary,
-    required VoidCallback onPrimary,
-    bool showSkip = true,
-  }) {
+  /// Back and the step's button. No skip here: an empty answer continues
+  /// past its question, and `Skip setup` above is the one way out.
+  Widget _actions({required String primary, required VoidCallback onPrimary}) {
     final previous = _previous;
+    final firstPage = _step == _Step.welcome || widget.afterTour && _step == _Step.stakes;
     return Row(
       children: [
-        if (previous != null && previous != _Step.welcome || _step == _Step.stakes)
+        if (previous != null && !firstPage)
           TextButton(
             key: const Key('onboarding-back'),
-            onPressed: _busy ? null : () => _go(previous!),
+            onPressed: _busy ? null : () => _go(previous),
             child: Text(context.l10n.back),
           ),
         const Spacer(),
-        if (showSkip)
-          TextButton(
-            key: const Key('onboarding-skip'),
-            onPressed: _busy ? null : _next,
-            style: TextButton.styleFrom(foregroundColor: AppColors.textTertiary),
-            child: Text(context.l10n.skip),
-          ),
-        const SizedBox(width: AppSpacing.sm),
         FilledButton(
           key: const Key('onboarding-continue'),
           onPressed: _busy ? null : onPrimary,

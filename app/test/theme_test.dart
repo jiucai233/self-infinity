@@ -42,6 +42,9 @@ void main() {
     expect(AppColors.xp, AppColors.success);
     expect(AppColors.loot, AppColors.success);
     expect(AppColors.warning, AppColors.danger);
+    // One gold for a cleared node, in the Tree and the Outline.
+    expect(AppColors.cleared, AppColors.ember);
+    expect(AppColors.nightHint, const Color(0xB3EEEEE9)); // nightText at 70%
     expect(
       [AppSpacing.xs, AppSpacing.sm, AppSpacing.md, AppSpacing.lg, AppSpacing.xl, AppSpacing.xxl],
       [4, 8, 12, 16, 24, 32],

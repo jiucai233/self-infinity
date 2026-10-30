@@ -10,6 +10,12 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get tabHome => 'Home';
+
+  @override
+  String get tabMe => 'Me';
+
+  @override
   String get about => 'About';
 
   @override
@@ -286,6 +292,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dotLocked => 'Locked';
 
   @override
+  String get legend => 'What the dots mean';
+
+  @override
   String get dotReady => 'Ready';
 
   @override
@@ -427,6 +436,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lessons => 'Lessons';
+
+  @override
+  String get challengeWholeHint =>
+      'Explain a few of its parts; pass and every node under it is cleared.';
 
   @override
   String levelBar(int level, int progress) {
@@ -627,7 +640,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onbTopicBody =>
-      'Your answer shapes your first tree. A topic is enough: I look for a real syllabus, and its items become the first level. Got your own syllabus? Use the file (PDF, TXT or MD) and its items are used as they are.';
+      'Your answer shapes your first tree. A topic is enough, or use your syllabus file (PDF, TXT, MD).';
 
   @override
   String get onbTopicHint => 'e.g. Calculus';
@@ -645,7 +658,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onbWelcomeBody =>
-      'In Self-Infinity you level up by proving you understand things: you explain them in your own words, and the Auditor decides. A few questions first. One or two sentences each (type them, or tap the mic and say them); you can change everything later.';
+      'You level up by explaining what you learn. A few short questions first; you can change them later.';
 
   @override
   String get onbWhoGuide => 'Who gets there?';
@@ -1103,7 +1116,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Not broken down yet. Break it down to see what\'s inside, or challenge it whole if you already know it.';
 
   @override
-  String get challengeWhole => 'Challenge it whole';
+  String get challengeWhole => 'Take the whole branch at once';
 
   @override
   String get challengeInProgress => 'Challenge';
@@ -1523,46 +1536,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tourSkip => 'Skip the tour';
 
   @override
+  String get tourVerdict => 'Then you get a score, what you missed, and a lesson.';
+
+  @override
   String get tourBegin => 'Set up my character';
 
   @override
-  String get tourWelcome =>
-      'Hi, I\'m your Guide. Before we set anything up, let me show you around. Everything you see for now is an example.';
+  String get tourTalk => 'Tell me here what you want to learn, typed or spoken.';
 
   @override
-  String get tourCharacter =>
-      'This side is you: your level, the nodes you have cleared, and how you are doing today.';
+  String get tourTree => 'Every node you clear lights up your life tree.';
 
   @override
-  String get tourQuests =>
-      'Your daily quests. I pick what to learn or review today, by the time of day and your condition. Tap one to open it.';
-
-  @override
-  String get tourTalk =>
-      'Talk to me here, typed or spoken: say what you want to learn, tell me about your day, or ask what to do next.';
-
-  @override
-  String get tourAttempts =>
-      'This side keeps your attempts at this node: when, the score, and whether it passed.';
-
-  @override
-  String get tourTree =>
-      'Your life tree. Every course is a branch and every dot a node; a node lights up when you clear it. Drag to turn it, scroll to zoom, tap a node to open it.';
-
-  @override
-  String get tourNode =>
-      'A node is one thing to learn. Here is what it covers and its knowledge points: a check for what you explained right, a cross for what you missed.';
-
-  @override
-  String get tourProve => 'To clear a node you explain it. Press here and the Auditor takes over.';
-
-  @override
-  String get tourAudit =>
-      'You teach, the Auditor learns. She asks about whatever she could not follow, and where you slip you get to explain it again. What you get right is not asked again.';
-
-  @override
-  String get tourSyllabus =>
-      'That was an example. Next we set up your character and build your first tree. I will ask what you want to learn: a topic is enough, and a syllabus file is better, because its items become the first level of your tree as they are.';
+  String get tourAudit => 'To clear a node, you teach it to the Auditor.';
 
   @override
   String get tourLessonsTitle => 'Every miss becomes a lesson.';

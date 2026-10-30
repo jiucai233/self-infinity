@@ -46,6 +46,10 @@ class _MapSceneState extends State<MapScene> {
   final GlobalKey<LifeConstellationState> _sky = GlobalKey();
   String? _selected;
   int? _outlineCourse;
+  bool _legendOpen = false;
+
+  /// Narrower than this, the node card is a bottom sheet.
+  static const double phoneWidth = 600;
 
   @override
   void dispose() {
@@ -76,6 +80,8 @@ class _MapSceneState extends State<MapScene> {
     final stage = context.watch<StageController>();
     final tree = stage.lifeTree;
     final maps = stage.courseMaps;
+    final phone = MediaQuery.sizeOf(context).width < phoneWidth;
+    final selected = _selected == null ? null : tree.byKey(_selected!);
     return StageScaffold(
       title: context.l10n.lifeTree,
       topLeading: IconButton(
@@ -84,7 +90,40 @@ class _MapSceneState extends State<MapScene> {
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => context.go(AppRoutes.home),
       ),
-      stage: Column(
+      stage: Stack(
+        children: [
+          Positioned.fill(child: _content(context, stage, tree, maps)),
+          if (phone && selected != null && _view == _View.constellation)
+            Positioned.fill(
+              child: _PhoneSheet(
+                key: ValueKey('phone-sheet-${selected.key}'),
+                onClose: _closeSheet,
+                builder: (controller) => NodeSheet(
+                  node: selected,
+                  tree: tree,
+                  scrollController: controller,
+                  onClose: _closeSheet,
+                  onOpenSkill: (id) => context.go(AppRoutes.skill(id)),
+                  onOutline: _showOutline,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _closeSheet() {
+    if (mounted && _selected != null) setState(() => _selected = null);
+  }
+
+  void _showOutline(int courseId) => setState(() {
+    _outlineCourse = courseId;
+    _view = _View.outline;
+  });
+
+  Widget _content(BuildContext context, StageController stage, LifeTree tree, List<CourseMap> maps) {
+    return Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -127,8 +166,7 @@ class _MapSceneState extends State<MapScene> {
             error: _searchError,
           ),
         ],
-      ),
-    );
+      );
   }
 
   // -- constellation ----------------------------------------------------------
@@ -211,7 +249,8 @@ class _MapSceneState extends State<MapScene> {
                         const SizedBox(height: AppSpacing.sm),
                         Text(
                           context.l10n.dragToTurn,
-                          style: theme.bodySmall?.copyWith(color: AppColors.nightMuted),
+                          key: const Key('night-hint'),
+                          style: theme.bodySmall?.copyWith(color: AppColors.nightHint),
                         ),
                       ],
                     ],
@@ -229,7 +268,8 @@ class _MapSceneState extends State<MapScene> {
                       style: theme.bodyLarge?.copyWith(color: AppColors.nightLine),
                     ),
                   ),
-                if (selected != null)
+                // A phone: the card is a bottom sheet over the whole stage.
+                if (selected != null && MediaQuery.sizeOf(context).width >= phoneWidth)
                   Positioned(
                     top: narrow ? null : AppSpacing.lg,
                     right: AppSpacing.lg,
@@ -259,10 +299,7 @@ class _MapSceneState extends State<MapScene> {
                           tree: tree,
                           onClose: () => setState(() => _selected = null),
                           onOpenSkill: (id) => context.go(AppRoutes.skill(id)),
-                          onOutline: (courseId) => setState(() {
-                            _outlineCourse = courseId;
-                            _view = _View.outline;
-                          }),
+                          onOutline: _showOutline,
                         ),
                       ),
                     ),
@@ -362,8 +399,12 @@ class _MapSceneState extends State<MapScene> {
           Positioned(
             left: AppSpacing.lg,
             bottom: AppSpacing.lg,
-            child: GraphLegend(
-              unexpanded: map?.nodes.any((n) => n.unexpanded && !n.isMastered) ?? false,
+            child: _LegendButton(
+              open: _legendOpen,
+              onToggle: () => setState(() => _legendOpen = !_legendOpen),
+              legend: GraphLegend(
+                unexpanded: map?.nodes.any((n) => n.unexpanded && !n.isMastered) ?? false,
+              ),
             ),
           ),
         ],
@@ -461,7 +502,7 @@ class _NightLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.nightLine);
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.nightHint);
     Widget dot({Color? fill, Color? ring, bool doubled = false}) => SizedBox.square(
       dimension: 12,
       child: Center(
@@ -479,9 +520,10 @@ class _NightLegend extends StatelessWidget {
     final entries = <(Widget, String)>[
       (dot(fill: AppColors.nightText), context.l10n.you),
       (dot(ring: AppColors.nightText, fill: AppColors.night), context.l10n.dotReady),
-      (dot(fill: AppColors.ember), context.l10n.dotCleared),
+      (dot(fill: AppColors.cleared), context.l10n.dotCleared),
       (dot(fill: AppColors.emberRed), context.l10n.auditFailed),
-      (dot(fill: AppColors.nightMuted), context.l10n.dotLocked),
+      // As the tree draws it: a dark disc in a grey ring.
+      (dot(fill: AppColors.nightHigh, ring: AppColors.nightLine), context.l10n.dotLocked),
     ];
     return Wrap(
       key: const Key('night-legend'),
@@ -525,6 +567,79 @@ class _Guide extends StatelessWidget {
           child: Text(line, style: Theme.of(context).textTheme.bodySmall),
         ),
         Avatar(agent: 'front_desk', mood: AvatarMood.smile, size: narrow ? 56 : 72),
+      ],
+    );
+  }
+}
+
+/// The node card on a phone: a Material bottom sheet over the stage. It opens
+/// at about two thirds, drags up to the full stage (the whole card and its
+/// button), and down to close.
+class _PhoneSheet extends StatefulWidget {
+  const _PhoneSheet({super.key, required this.builder, required this.onClose});
+
+  final Widget Function(ScrollController controller) builder;
+  final VoidCallback onClose;
+
+  /// How much of the stage the sheet covers when it opens.
+  static const double start = 0.66;
+
+  @override
+  State<_PhoneSheet> createState() => _PhoneSheetState();
+}
+
+class _PhoneSheetState extends State<_PhoneSheet> {
+  bool _closing = false;
+
+  bool _onExtent(DraggableScrollableNotification n) {
+    if (!_closing && n.extent <= 0.12) {
+      _closing = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => widget.onClose());
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<DraggableScrollableNotification>(
+      onNotification: _onExtent,
+      child: DraggableScrollableSheet(
+        key: const Key('node-bottom-sheet'),
+        initialChildSize: _PhoneSheet.start,
+        minChildSize: 0,
+        maxChildSize: 1,
+        snap: true,
+        snapSizes: const [_PhoneSheet.start],
+        builder: (context, controller) => widget.builder(controller),
+      ),
+    );
+  }
+}
+
+/// A small `?` at the bottom left of the outline; it opens the legend above it.
+class _LegendButton extends StatelessWidget {
+  const _LegendButton({required this.open, required this.onToggle, required this.legend});
+
+  final bool open;
+  final VoidCallback onToggle;
+  final Widget legend;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (open) ...[legend, const SizedBox(height: AppSpacing.sm)],
+        IconButton.outlined(
+          key: const Key('graph-legend-toggle'),
+          tooltip: context.l10n.legend,
+          isSelected: open,
+          onPressed: onToggle,
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.question_mark_rounded, size: 18),
+          selectedIcon: const Icon(Icons.close_rounded, size: 18),
+        ),
       ],
     );
   }

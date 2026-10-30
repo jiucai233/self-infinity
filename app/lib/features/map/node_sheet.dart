@@ -33,6 +33,7 @@ class NodeSheet extends StatelessWidget {
     required this.onClose,
     required this.onOpenSkill,
     required this.onOutline,
+    this.scrollController,
   });
 
   final LifeNode node;
@@ -42,6 +43,10 @@ class NodeSheet extends StatelessWidget {
 
   /// Show this course in the outline view.
   final ValueChanged<int> onOutline;
+
+  /// Set: the card is the body of a bottom sheet (a phone) and scrolls with
+  /// this controller, so that a drag anywhere on it moves the sheet.
+  final ScrollController? scrollController;
 
   static const double width = 360;
 
@@ -57,24 +62,67 @@ class NodeSheet extends StatelessWidget {
         onOutline: onOutline,
       ),
     };
+    final header = Row(
+      children: [
+        Expanded(child: _Kicker(node: node)),
+        IconButton(
+          key: const Key('node-sheet-close'),
+          tooltip: context.l10n.close,
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.close_rounded, size: 18),
+          onPressed: onClose,
+        ),
+      ],
+    );
+    final controller = scrollController;
+    if (controller != null) {
+      return Material(
+        key: Key('node-sheet-${node.key}'),
+        color: AppColors.surface,
+        elevation: 8,
+        shadowColor: AppColors.primary.withValues(alpha: 0.3),
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          side: BorderSide(color: AppColors.glow.withValues(alpha: 0.7)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: SingleChildScrollView(
+          controller: controller,
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            0,
+            AppSpacing.md,
+            AppSpacing.xl + MediaQuery.paddingOf(context).bottom,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  key: const Key('node-sheet-handle'),
+                  margin: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.outlineStrong,
+                    borderRadius: AppRadius.pillBorder,
+                  ),
+                ),
+              ),
+              header,
+              Padding(padding: const EdgeInsets.only(top: AppSpacing.xs), child: body),
+            ],
+          ),
+        ),
+      );
+    }
     return _PaperStack(
       key: Key('node-sheet-${node.key}'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Expanded(child: _Kicker(node: node)),
-              IconButton(
-                key: const Key('node-sheet-close'),
-                tooltip: context.l10n.close,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.close_rounded, size: 18),
-                onPressed: onClose,
-              ),
-            ],
-          ),
+          header,
           Flexible(
             child: SingleChildScrollView(
               padding: const EdgeInsets.only(top: AppSpacing.xs),

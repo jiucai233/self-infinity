@@ -306,7 +306,7 @@ void main() {
       expect(texts.where((t) => t == shortAnswer), hasLength(4)); // two gaps, two answers
     });
 
-    testWidgets('the reflection field asks what you believed, and has the mic in it', (
+    testWidgets('the reflection field asks what you believed, with the mic key beside it', (
       tester,
     ) async {
       final failed = await failAudit(api, 6);
@@ -314,7 +314,10 @@ void main() {
       await pumpReplay(tester, api, failed.sessionId, voice: voice);
       final field = tester.widget<TextField>(key('replay-reflection'));
       expect(field.decoration!.hintText, 'What did you believe at the time?…');
-      expect(field.decoration!.suffixIcon, isA<DictationButton>());
+      expect(
+        find.descendant(of: find.byType(Composer), matching: key('dictation-button')),
+        findsOneWidget,
+      );
       expect(field.maxLines, greaterThan(1));
       // Nothing is suggested: the field starts empty, and so nothing can be sent.
       expect(reflectionText(tester), '');

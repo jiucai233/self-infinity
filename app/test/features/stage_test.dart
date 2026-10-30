@@ -1,6 +1,6 @@
 // The NotebookLM frame every scene shares: three white panels on a canvas, the
 // left panel “My character” with numbers, the chat panel only on scenes 4, 4-1 and
-// 5, folding side panels, drawers on narrow screens, the ◎ button.
+// 5, folding side panels, the phone's Me page and history drawer, the ◎ button.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/testing/fake_auth.dart';
@@ -11,6 +11,7 @@ import 'package:self_infinity/features/audit/audit_scene.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/features/map/map_scene.dart';
 import 'package:self_infinity/features/skill/skill_scene.dart';
+import 'package:self_infinity/features/stage/me_scene.dart';
 import 'package:self_infinity/testing/test_app.dart';
 import 'package:self_infinity/theme/tokens.dart';
 import 'package:self_infinity/widgets/widgets.dart';
@@ -350,7 +351,7 @@ void main() {
     testWidgets('scene 4: Attempts', (tester) async {
       await pumpScene(tester, const SkillScene(skillId: 1), api: api);
       expect(historyPanel, findsOneWidget);
-      expect(find.text('Attempts'), findsOneWidget);
+      expect(find.descendant(of: historyPanel, matching: find.text('Attempts')), findsOneWidget);
       expect(find.text('history'), findsNothing);
     });
 
@@ -378,7 +379,12 @@ void main() {
       ]) {
         await pumpScene(tester, scene, api: api);
         for (final english in ['history', "today's summary", 'node:', 'contents']) {
-          expect(find.textContaining(english), findsNothing, reason: '$english in $scene');
+          // The node card's “Audit history” is a section of the card, not a panel.
+          expect(
+            find.textContaining(RegExp('(?<!Audit )${RegExp.escape(english)}')),
+            findsNothing,
+            reason: '$english in $scene',
+          );
         }
       }
     });
@@ -412,7 +418,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(historyPanel, findsNothing);
       expect(rail('right'), findsOneWidget);
-      expect(find.text('Attempts'), findsOneWidget); // the rail title
+      expect(tester.widget<Text>(find.byKey(const Key('rail-title'))).data, 'Attempts');
       await tester.tap(rail('right'));
       await tester.pumpAndSettle();
       expect(historyPanel, findsOneWidget);
@@ -449,40 +455,41 @@ void main() {
     });
   });
 
-  group('narrow screens (< 900 px): the columns become drawers', () {
-    testWidgets('scene 1 and 2: only the left drawer', (tester) async {
+  group('narrow screens (< 900 px): no side columns, no ☰', () {
+    testWidgets('scene 1 and 2: no left panel and no ☰; the Me tab has it', (tester) async {
       for (final scene in [const HomeScene(), const MapScene()]) {
         await pumpScene(tester, scene, api: api, size: phoneScreen);
         expect(leftPanel, findsNothing);
-        expect(find.byKey(const Key('open-left-drawer')), findsOneWidget);
-        expect(find.byKey(const Key('open-right-drawer')), findsNothing);
+        expect(find.byIcon(Icons.menu_rounded), findsNothing);
       }
+      // Only Home has the chat history button, before the first message too.
+      await pumpScene(tester, const HomeScene(), api: api, size: phoneScreen);
+      expect(find.byKey(const Key('open-right-drawer')), findsOneWidget);
+      await pumpScene(tester, const MapScene(), api: api, size: phoneScreen);
+      expect(find.byKey(const Key('open-right-drawer')), findsNothing);
     });
 
-    testWidgets('the left drawer holds the same panel', (tester) async {
-      await pumpScene(tester, const HomeScene(), api: api, size: phoneScreen);
-      await tester.tap(find.byKey(const Key('open-left-drawer')));
-      await tester.pumpAndSettle();
+    testWidgets('the Me page holds the same panel', (tester) async {
+      await pumpScene(tester, const MeScene(), api: api, size: phoneScreen);
       expect(leftPanel, findsOneWidget);
       expect(find.text('My character'), findsOneWidget);
       expect(find.text('Today'), findsOneWidget);
       expect(find.byType(StatBar), findsNWidgets(3));
+      expect(find.byKey(const Key('settings-button')), findsOneWidget);
     });
 
-    testWidgets('scene 4: a right drawer with the history (4-1 has none)', (tester) async {
-      await pumpScene(tester, const AuditScene(skillId: 6), api: api, size: phoneScreen);
-      expect(find.byKey(const Key('open-right-drawer')), findsNothing);
-      for (final scene in [const SkillScene(skillId: 1)]) {
+    testWidgets('scene 4 and 4-1: no right drawer (the node card shows the attempts)', (
+      tester,
+    ) async {
+      for (final scene in [const AuditScene(skillId: 6), const SkillScene(skillId: 1)]) {
         await pumpScene(tester, scene, api: api, size: phoneScreen);
+        expect(find.byKey(const Key('open-right-drawer')), findsNothing);
         expect(historyPanel, findsNothing);
-        await tester.tap(find.byKey(const Key('open-right-drawer')));
-        await tester.pumpAndSettle();
-        expect(historyPanel, findsOneWidget);
-        expect(find.text('history'), findsNothing);
       }
+      expect(find.byKey(const Key('skill-attempts')), findsOneWidget);
     });
 
-    testWidgets('scene 5: the right drawer appears once chatting', (tester) async {
+    testWidgets('scene 5: the right drawer lists the chat', (tester) async {
       await pumpScene(tester, const HomeScene(), api: api, size: phoneScreen);
       await say(tester, 'Hello there');
       await tester.tap(find.byKey(const Key('open-right-drawer')));

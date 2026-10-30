@@ -58,6 +58,12 @@ Future<void> pumpOutline(
   await tester.pumpAndSettle();
 }
 
+/// Opens the outline's legend (behind its `?`).
+Future<void> openLegend(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('graph-legend-toggle')));
+  await tester.pumpAndSettle();
+}
+
 /// Types [text] into the stage input (without sending).
 Future<void> type(WidgetTester tester, String text) async {
   await tester.enterText(find.byKey(const Key('stage-input')), text);

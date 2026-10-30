@@ -3,6 +3,7 @@ library;
 
 export 'avatar.dart';
 export 'collapsible_section.dart';
+export 'composer.dart';
 export 'orb_avatar.dart';
 export 'empty_view.dart';
 export 'error_view.dart';

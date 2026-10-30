@@ -332,7 +332,7 @@ void main() {
       );
     });
     // The guided tour before the setup: one shot per stop.
-    for (var stop = 0; stop < 10; stop++) {
+    for (var stop = 0; stop < 4; stop++) {
       testWidgets(skip: dir == null, 'guided tour stop $stop ($tag)', (tester) async {
         await scene(
           tester,

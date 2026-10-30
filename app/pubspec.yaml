@@ -42,6 +42,7 @@ flutter:
     - assets/fonts/cjk/
     - assets/landing/
     - assets/landing/frames/
+    - assets/dafeiyu/
 
   # Infinity Sans (Pretendard, Latin subset) for all text, Instrument Serif for headlines, big numbers and the
   # identity quote (docs/DESIGN.md 2.2). SIL Open Font License; see assets/fonts/README.md.
