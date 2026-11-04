@@ -406,6 +406,30 @@ abstract class AppLocalizations {
   /// **'Save and continue'**
   String get saveNewPassword;
 
+  /// No description provided for @setPasswordMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Set a password'**
+  String get setPasswordMenu;
+
+  /// No description provided for @setPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set a sign-in password'**
+  String get setPasswordTitle;
+
+  /// No description provided for @setPasswordBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'With it you can also sign in with your email and this password.'**
+  String get setPasswordBlurb;
+
+  /// No description provided for @passwordSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Password saved.'**
+  String get passwordSaved;
+
   /// No description provided for @authConfirmEmailFirst.
   ///
   /// In en, this message translates to:
@@ -445,7 +469,7 @@ abstract class AppLocalizations {
   /// No description provided for @authWrongCredentials.
   ///
   /// In en, this message translates to:
-  /// **'Wrong email or password.'**
+  /// **'Wrong email or password. Signed up with Google? Use Continue with Google, or Forgot password to give the account a password.'**
   String get authWrongCredentials;
 
   /// No description provided for @back.

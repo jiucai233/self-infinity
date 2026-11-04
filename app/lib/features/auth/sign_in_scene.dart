@@ -110,6 +110,11 @@ class _SignInSceneState extends State<SignInScene> {
       _error = result.error;
       if (result.needsConfirmation) _mode = _Mode.checkInbox;
     });
+    // Wrong password: straight back into it, selected, to type again.
+    if (result.error != null) {
+      _password.selection = TextSelection(baseOffset: 0, extentOffset: _password.text.length);
+      _passwordFocus.requestFocus();
+    }
   }
 
   /// Off to Google; the session arrives with the redirect back (the auth
@@ -324,7 +329,9 @@ class _SignInSceneState extends State<SignInScene> {
                 keyboardType: TextInputType.emailAddress,
                 autofillHints: const [AutofillHints.email],
                 textInputAction: TextInputAction.next,
-                enabled: !_busy,
+                // Read-only, not disabled: a disabled field drops its focus, and the
+                // front page takes the keys from it.
+                readOnly: _busy,
                 onSubmitted: (_) => _passwordFocus.requestFocus(),
                 decoration: InputDecoration(hintText: context.l10n.email),
               ),
@@ -336,7 +343,9 @@ class _SignInSceneState extends State<SignInScene> {
                 obscureText: !_showPassword,
                 autofillHints: [signUp ? AutofillHints.newPassword : AutofillHints.password],
                 textInputAction: TextInputAction.done,
-                enabled: !_busy,
+                // Read-only, not disabled: a disabled field drops its focus, and the
+                // front page takes the keys from it.
+                readOnly: _busy,
                 onSubmitted: (_) => _submit(),
                 decoration: InputDecoration(
                   hintText: signUp

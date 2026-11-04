@@ -177,6 +177,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saveNewPassword => 'Save and continue';
 
   @override
+  String get setPasswordMenu => 'Set a password';
+
+  @override
+  String get setPasswordTitle => 'Set a sign-in password';
+
+  @override
+  String get setPasswordBlurb => 'With it you can also sign in with your email and this password.';
+
+  @override
+  String get passwordSaved => 'Password saved.';
+
+  @override
   String get authConfirmEmailFirst => 'Confirm your email first — check your inbox.';
 
   @override
@@ -197,7 +209,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authRateLimited => 'Too many tries. Wait a minute and try again.';
 
   @override
-  String get authWrongCredentials => 'Wrong email or password.';
+  String get authWrongCredentials =>
+      'Wrong email or password. Signed up with Google? Use Continue with Google, or Forgot password to give the account a password.';
 
   @override
   String get back => 'Back';

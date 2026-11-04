@@ -174,6 +174,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get saveNewPassword => '저장하고 계속';
 
   @override
+  String get setPasswordMenu => '로그인 비밀번호 설정';
+
+  @override
+  String get setPasswordTitle => '로그인 비밀번호 설정';
+
+  @override
+  String get setPasswordBlurb => '설정하면 이메일과 이 비밀번호로도 로그인할 수 있어요.';
+
+  @override
+  String get passwordSaved => '비밀번호를 저장했어요.';
+
+  @override
   String get authConfirmEmailFirst => '먼저 이메일 인증을 해 주세요. 받은편지함을 확인해 보세요.';
 
   @override
@@ -194,7 +206,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get authRateLimited => '시도 횟수가 너무 많아요. 1분 뒤에 다시 해 보세요.';
 
   @override
-  String get authWrongCredentials => '이메일 또는 비밀번호가 맞지 않아요.';
+  String get authWrongCredentials =>
+      '이메일 또는 비밀번호가 맞지 않아요. Google로 가입했다면 아직 비밀번호가 없어요. 「Google로 계속」을 누르거나 「비밀번호를 잊으셨나요?」로 만들어 주세요.';
 
   @override
   String get back => '뒤로';

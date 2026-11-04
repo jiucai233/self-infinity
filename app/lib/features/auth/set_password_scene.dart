@@ -7,8 +7,13 @@ import '../../theme/tokens.dart';
 
 /// Back from a password-reset link (`AuthService.recovering`): the account is
 /// signed in, and a new password is set before the app opens.
+///
+/// [fromSettings]: opened from the account menu, for an account that has none
+/// yet (one made with Google) or wants another; it closes once saved.
 class SetPasswordScene extends StatefulWidget {
-  const SetPasswordScene({super.key});
+  const SetPasswordScene({super.key, this.fromSettings = false});
+
+  final bool fromSettings;
 
   @override
   State<SetPasswordScene> createState() => _SetPasswordSceneState();
@@ -39,6 +44,11 @@ class _SetPasswordSceneState extends State<SetPasswordScene> {
     });
     final result = await auth.updatePassword(_password.text);
     if (!mounted) return;
+    if (result.isOk && widget.fromSettings) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(context.l10n.passwordSaved)));
+      Navigator.of(context).pop();
+      return;
+    }
     setState(() {
       _busy = false;
       _error = result.error;
@@ -49,9 +59,11 @@ class _SetPasswordSceneState extends State<SetPasswordScene> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
     final auth = context.watch<AuthService>();
+    final fromSettings = widget.fromSettings;
     return Scaffold(
       key: const Key('set-password'),
       backgroundColor: AppColors.surface,
+      appBar: fromSettings ? AppBar(backgroundColor: AppColors.surface) : null,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -62,10 +74,10 @@ class _SetPasswordSceneState extends State<SetPasswordScene> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(context.l10n.setNewPassword, style: theme.headlineMedium),
+                  Text(fromSettings ? context.l10n.setPasswordTitle : context.l10n.setNewPassword, style: theme.headlineMedium),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    context.l10n.setNewPasswordBlurb,
+                    fromSettings ? context.l10n.setPasswordBlurb : context.l10n.setNewPasswordBlurb,
                     style: theme.bodyMedium?.copyWith(color: AppColors.textSecondary),
                   ),
                   if (auth.email case final email?) ...[

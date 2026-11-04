@@ -174,6 +174,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get saveNewPassword => '保存并进入';
 
   @override
+  String get setPasswordMenu => '设置登录密码';
+
+  @override
+  String get setPasswordTitle => '设置登录密码';
+
+  @override
+  String get setPasswordBlurb => '设好以后，也可以用邮箱加这个密码登录。';
+
+  @override
+  String get passwordSaved => '密码已保存。';
+
+  @override
   String get authConfirmEmailFirst => '请先确认邮箱——去收件箱看看。';
 
   @override
@@ -194,7 +206,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authRateLimited => '尝试次数太多，请等一分钟再试。';
 
   @override
-  String get authWrongCredentials => '邮箱或密码不对。';
+  String get authWrongCredentials =>
+      '邮箱或密码不对。之前用 Google 登录的话，这个账号还没有密码：点「使用 Google 继续」，或者点「忘记密码？」设一个。';
 
   @override
   String get back => '返回';

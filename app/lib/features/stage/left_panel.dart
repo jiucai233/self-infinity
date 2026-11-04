@@ -8,6 +8,7 @@ import '../../api/api.dart';
 import '../../api/api_exception.dart';
 import '../../api/models.dart';
 import '../../auth/auth_service.dart';
+import '../auth/set_password_scene.dart';
 import '../../app/app_state.dart';
 import '../../app/panel_layout.dart';
 import '../../app/router.dart';
@@ -467,6 +468,10 @@ class _SettingsButtonState extends State<_SettingsButton> {
               showLicensePage(context: context, applicationName: 'Self-Infinity');
             case 'dev':
               await showDevPanel(context);
+            case 'password':
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const SetPasswordScene(fromSettings: true)),
+              );
             case 'sign-out':
               await auth.signOut();
           }
@@ -550,6 +555,12 @@ class _SettingsButtonState extends State<_SettingsButton> {
               key: const Key('settings-dev'),
               value: 'dev',
               child: Text(context.l10n.devPanel),
+            ),
+          if (auth.enabled)
+            PopupMenuItem<String>(
+              key: const Key('settings-password'),
+              value: 'password',
+              child: Text(context.l10n.setPasswordMenu),
             ),
           if (auth.enabled)
             PopupMenuItem<String>(

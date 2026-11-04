@@ -268,6 +268,13 @@ void main() {
       await tapKey(tester, 'auth-submit');
       expect(find.text('Wrong email or password.'), findsOneWidget);
       expect(auth.signedIn, isFalse);
+      // The password field has the focus back, its text selected, and takes a new one.
+      final field = tester.widget<TextField>(key('auth-password'));
+      expect(field.focusNode!.hasFocus, isTrue);
+      expect(field.controller!.selection, const TextSelection(baseOffset: 0, extentOffset: 9));
+      await enter(tester, 'auth-password', 'right-one');
+      await tapKey(tester, 'auth-submit');
+      expect(auth.signedIn, isTrue);
     });
 
     testWidgets('the confirmation link can be sent again from the inbox screen, once', (tester) async {
@@ -351,6 +358,24 @@ void main() {
       expect(key('set-password'), findsNothing);
       await auth.signOut();
       expect(await auth.signIn('me@x.io', 'brand-new'), AuthResult.ok);
+    });
+
+    testWidgets('a Google account can give itself a password from the account menu', (tester) async {
+      final auth = FakeAuthService();
+      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: auth);
+      await tapKey(tester, 'hero-sign-in');
+      await tapKey(tester, 'auth-google');
+      await tapKey(tester, 'settings-button');
+      await tapKey(tester, 'settings-password');
+      expect(key('set-password'), findsOneWidget);
+
+      await enter(tester, 'new-password', 'pass-word');
+      await tapKey(tester, 'save-password');
+
+      expect(key('set-password'), findsNothing);
+      expect(find.text('Password saved.'), findsOneWidget);
+      await auth.signOut();
+      expect(await auth.signIn(FakeAuthService.googleEmail, 'pass-word'), AuthResult.ok);
     });
 
     testWidgets('forgot password sends the reset email', (tester) async {
