@@ -135,9 +135,11 @@ def test_it07_leaf_opening_question(client, client_engine, math):
 
     body = client.post(f"/api/skills/{math['discriminant']}/audits").json()
 
-    # A leaf opens with the student asking to be taught, with its knowledge points or without:
-    # the points are what she listens for, not questions to walk through.
-    assert body["opening_question"] == "I have never learned “Discriminant”. Teach it to me from the start."
+    # A leaf with knowledge points opens small: one question on the first point.
+    first = body["session"]["points"][0]["title"]
+    assert body["opening_question"] == (
+        f"I have never learned “Discriminant”. Let's start small, with “{first}”: what is it, and what is it for?"
+    )
     assert body["session"]["points"] == held(None, None, None)
     assert body["session"]["node_position"] == "leaf"
     assert stored_audit(client_engine, body["session"]["id"]).node_position == NodePosition.leaf

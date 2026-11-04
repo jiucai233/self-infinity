@@ -381,6 +381,32 @@ class HttpApi implements SelfInfinityApi {
   @override
   Future<void> deleteGoal(int goalId) => _send('DELETE', '/goals/$goalId', parse: (_) {});
 
+  // -- 52: study notes -----------------------------------------------------------
+
+  @override
+  Future<List<NodeNote>> listNodeNotes(int skillId) => _get(
+    '/skills/$skillId/notes',
+    parse: (j) => _array(j).map((e) => NodeNote.fromJson(_object(e))).toList(),
+  );
+
+  @override
+  Future<NodeNote> createNodeNote(int skillId, String content) => _post(
+    '/skills/$skillId/notes',
+    body: {'content': content},
+    parse: (j) => NodeNote.fromJson(_object(j)),
+  );
+
+  @override
+  Future<NodeNote> updateNodeNote(int noteId, String content) => _send(
+    'PUT',
+    '/notes/$noteId',
+    body: {'content': content},
+    parse: (j) => NodeNote.fromJson(_object(j)),
+  );
+
+  @override
+  Future<void> deleteNodeNote(int noteId) => _send('DELETE', '/notes/$noteId', parse: (_) {});
+
   @override
   Future<void> deleteCourse(int courseId, {bool deleteNodes = false}) => _send(
     'DELETE',

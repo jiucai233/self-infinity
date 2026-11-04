@@ -108,7 +108,7 @@ class SkillNodeCard extends StatelessWidget {
               ],
             ),
           ),
-          SkillNodeHistory(audits: audits, lessons: lessons),
+          SkillNodeHistory(audits: audits),
           if (actions.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xl),
             Padding(
@@ -133,13 +133,13 @@ List<AuditSummary> finishedAudits(SkillOverview overview) =>
 int? bestScore(List<AuditSummary> audits) =>
     audits.map((a) => a.score).whereType<int>().fold<int?>(null, (m, s) => m == null || s > m ? s : m);
 
-/// The audit history (each row opens its replay) and the lesson cards: the
-/// lower half of the node card, and on a phone what “Details” opens.
+/// The audit history (each row opens its replay): the lower half of the node
+/// card, and on a phone what “Details” opens. The lesson cards are in the
+/// Learn first area (`learn_panel.dart`).
 class SkillNodeHistory extends StatelessWidget {
-  const SkillNodeHistory({super.key, required this.audits, required this.lessons});
+  const SkillNodeHistory({super.key, required this.audits});
 
   final List<AuditSummary> audits;
-  final List<Principle> lessons;
 
   @override
   Widget build(BuildContext context) {
@@ -157,10 +157,6 @@ class SkillNodeHistory extends StatelessWidget {
           )
         else
           for (final a in audits.take(8)) _AuditRow(audit: a),
-        if (lessons.isNotEmpty) ...[
-          _SectionLabel(l.lessonCards),
-          for (final p in lessons.take(3)) _LessonRow(lesson: p),
-        ],
       ],
     );
   }
@@ -169,15 +165,14 @@ class SkillNodeHistory extends StatelessWidget {
 /// The node on a phone, as a quiet block under her line: the title (two
 /// lines at most) with the `⋯` [menu], one muted [line] (status · course ·
 /// main quest), one number line (`Best 95 · 2 attempts` or `No attempts
-/// yet`) and a “Details” that opens the audit history, the lesson cards and
-/// [details] (the contents) in place.
+/// yet`) with a “Details” that opens the audit history in place, and one
+/// `Learn first` row ([onLearn]: the materials and the notes, in a sheet).
 class SkillNodeBlock extends StatefulWidget {
   const SkillNodeBlock({
     super.key,
     required this.overview,
     required this.line,
-    required this.lessons,
-    required this.details,
+    required this.onLearn,
     this.menu,
   });
 
@@ -185,10 +180,9 @@ class SkillNodeBlock extends StatefulWidget {
 
   /// Status · course · main quest, already joined.
   final String line;
-  final List<Principle> lessons;
 
-  /// Shown under the history once “Details” is open.
-  final Widget details;
+  /// Opens the Learn first sheet.
+  final VoidCallback onLearn;
   final Widget? menu;
 
   @override
@@ -273,14 +267,12 @@ class _SkillNodeBlockState extends State<SkillNodeBlock> {
               ? Column(
                   key: const Key('skill-details-body'),
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SkillNodeHistory(audits: audits, lessons: widget.lessons),
-                    const SizedBox(height: AppSpacing.xl),
-                    widget.details,
-                  ],
+                  children: [SkillNodeHistory(audits: audits)],
                 )
               : const SizedBox(width: double.infinity),
         ),
+        const SizedBox(height: AppSpacing.md),
+        _LearnRow(onTap: widget.onLearn),
       ],
     );
   }
@@ -456,23 +448,37 @@ class _AuditRow extends StatelessWidget {
   }
 }
 
-class _LessonRow extends StatelessWidget {
-  const _LessonRow({required this.lesson});
+/// A phone's way into Learn first: one quiet outlined row (a book, the words,
+/// a chevron) that opens the sheet.
+class _LearnRow extends StatelessWidget {
+  const _LearnRow({required this.onTap});
 
-  final Principle lesson;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm, right: AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(lesson.title, style: theme.labelLarge),
-          if (lesson.misconception case final m? when m.isNotEmpty)
-            Text(m, style: theme.bodySmall?.copyWith(color: AppColors.danger)),
-        ],
+    return Material(
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.cardBorder,
+        side: const BorderSide(color: AppColors.outline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const Key('skill-learn'),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          child: Row(
+            children: [
+              const Icon(Icons.menu_book_outlined, size: 20, color: AppColors.primary),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(child: Text(context.l10n.learnFirst, style: theme.bodyLarge)),
+              const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textTertiary),
+            ],
+          ),
+        ),
       ),
     );
   }

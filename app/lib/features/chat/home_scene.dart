@@ -247,13 +247,22 @@ class _HomeSceneState extends State<HomeScene> {
       history: const ChatHistoryPanel(),
       showHistoryPanel: _chatting,
       stage: CallbackShortcuts(
-        bindings: {const SingleActivator(LogicalKeyboardKey.escape): () => _voiceMode.stop()},
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            if (_voiceMode.active) {
+              _voiceMode.stop();
+            } else {
+              _endChat();
+            }
+          },
+        },
         child: Focus(
           autofocus: true,
           child: ListenableBuilder(
             listenable: Listenable.merge([_voiceMode, _uploads, _input]),
             builder: (context, _) => Column(
               children: [
+                if (_chatting) _chatBar(context, phone),
                 Expanded(
                   child: phone && (_chatting || _voiceMode.active)
                       ? _phoneThread(context, chat)
@@ -311,6 +320,44 @@ class _HomeSceneState extends State<HomeScene> {
       VoiceModeState.speaking => AvatarState.speaking,
       VoiceModeState.off => AvatarState.idle,
     };
+  }
+
+  /// Back to her with the crystal ball (the conversation stays in the
+  /// history drawer).
+  void _endChat() {
+    if (!_chatting) return;
+    _voiceMode.stop();
+    setState(() {
+      _chatting = false;
+      _reply = null;
+    });
+  }
+
+  /// Over the conversation: the way back to her, and on a wide screen (no
+  /// bottom tabs) the way to the life tree.
+  Widget _chatBar(BuildContext context, bool phone) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, 0),
+      child: Row(
+        children: [
+          IconButton(
+            key: const Key('end-chat'),
+            tooltip: context.l10n.back,
+            onPressed: _endChat,
+            icon: const Icon(Icons.arrow_back_rounded, size: 20, color: AppColors.textSecondary),
+          ),
+          const Spacer(),
+          if (!phone)
+            TextButton.icon(
+              key: const Key('chat-open-map'),
+              onPressed: () => context.go(AppRoutes.map),
+              style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+              icon: const Icon(Icons.blur_on_rounded, size: 18),
+              label: Text(context.l10n.lifeTree),
+            ),
+        ],
+      ),
+    );
   }
 
   /// The avatar is about 30 % of the stage height.

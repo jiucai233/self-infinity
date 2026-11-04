@@ -283,20 +283,26 @@ _TEXTS: dict[str, dict[str, str]] = {
     "suggest_learn": {"en": "Tell me what you want to learn", "zh": "告诉我你想学什么", "ko": "배우고 싶은 걸 알려 주세요"},
     # audit opening questions, by tree position (section 5)
     "opening_leaf": {
-        "en": "I have never learned {title}. Teach it to me from the start.",
-        "zh": "我没学过{title}，你从头给我讲讲吧。",
-        "ko": "{title}, 저는 아직 배운 적이 없어요. 처음부터 가르쳐 주세요.",
+        "en": "I have never learned {title}. Start small: in a sentence or two, what is it, and what problem does it solve?",
+        "zh": "我没学过{title}。先简单说说：它是什么，用来解决什么问题？一两句就行。",
+        "ko": "{title}, 저는 아직 배운 적이 없어요. 짧게 시작해요: 그게 뭐고, 어떤 문제를 푸는 건가요? 한두 문장이면 돼요.",
     },
     # a leaf audited again: the points that held before are left out of the teaching
     "opening_points_again": {
-        "en": "What you taught me last time, I still have. This time teach me {points}, as if I had never heard of them.",
-        "zh": "上次你讲明白的我都记住了。这次给我讲讲{points}吧，就当我完全没学过。",
-        "ko": "지난번에 가르쳐 준 건 잘 기억하고 있어요. 이번엔 {points}만, 제가 처음 듣는다고 생각하고 가르쳐 주세요.",
+        "en": "What you taught me last time, I still have. This time only {points} are left. First {point}: what is it, and what is it for?",
+        "zh": "上次你讲明白的我都记住了，这次只剩{points}。先说{point}：它是什么，用来干什么？",
+        "ko": "지난번에 가르쳐 준 건 잘 기억하고 있어요. 이번엔 {points}만 남았어요. 먼저 {point}: 그게 뭐고, 뭘 하려고 있는 건가요?",
     },
     "opening_point_again": {
-        "en": "What you taught me last time, I still have. This time teach me only {point}, as if I had never heard of it.",
-        "zh": "上次你讲明白的我都记住了。这次只给我讲讲{point}吧，就当我完全没学过。",
-        "ko": "지난번에 가르쳐 준 건 잘 기억하고 있어요. 이번엔 {point}만, 제가 처음 듣는다고 생각하고 가르쳐 주세요.",
+        "en": "What you taught me last time, I still have. Only {point} is left: what is it, and what is it for?",
+        "zh": "上次你讲明白的我都记住了，只剩{point}了：它是什么，用来干什么？",
+        "ko": "지난번에 가르쳐 준 건 잘 기억하고 있어요. {point}만 남았어요: 그게 뭐고, 뭘 하려고 있는 건가요?",
+    },
+    # a leaf with knowledge points, first audit: one small question on the first point
+    "opening_point_first": {
+        "en": "I have never learned {title}. Let's start small, with {point}: what is it, and what is it for?",
+        "zh": "我没学过{title}。先从小的开始，{point}：它是什么，用来干什么？",
+        "ko": "{title}, 저는 아직 배운 적이 없어요. 작은 것부터 해요. {point}: 그게 뭐고, 뭘 하려고 있는 건가요?",
     },
     "opening_branch": {
         "en": "{title} covers {children}. Why do these belong together, and when do you use which?",
@@ -325,9 +331,9 @@ _TEXTS: dict[str, dict[str, str]] = {
         "ko": "저는 열 살이에요. 열 살이 모르는 말은 쓰지 말아 주세요.",
     },
     "audience_expert": {
-        "en": "I work in a neighbouring field, so the basic terms need no explaining. Get straight to how it works.",
-        "zh": "我是做相关方向的，基础术语不用解释，直接讲它是怎么起作用的就行。",
-        "ko": "저는 가까운 분야에서 일해요. 기본 용어는 설명 안 해도 되니, 바로 어떻게 작동하는지 얘기해 주세요.",
+        "en": "I work in a neighbouring field, so the basic terms need no explaining.",
+        "zh": "我是做相关方向的，基础术语不用跟我解释。",
+        "ko": "저는 가까운 분야에서 일해요. 기본 용어는 설명 안 해도 돼요.",
     },
     "opening_task": {
         "en": "How exactly will you do {title}?",

@@ -570,5 +570,15 @@
   "feedbackMisheard": "我没这么说",
   "feedbackTooHardNoted": "已记下：太难了",
   "feedbackMisheardNoted": "已记下：你没这么说",
-  "notReflectedYet": "还没反思"
+  "notReflectedYet": "还没反思",
+  "learnFirst": "先学",
+  "myNotes": "我的笔记",
+  "notesPrivate": "只有你看得到，挑战时不会用到。",
+  "noteHint": "写下你想记住的",
+  "noteAdd": "保存笔记",
+  "noteSave": "保存",
+  "noteEdited": "已编辑",
+  "noteDeleteTitle": "删除这条笔记？",
+  "noteSaveFailed": "笔记没保存上，再试一次。",
+  "notesLoadFailed": "笔记没加载出来。"
 }

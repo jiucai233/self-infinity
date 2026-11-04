@@ -36,6 +36,7 @@ def post_message(body: ChatRequest, background: BackgroundTasks, session: Sessio
             attached,
             course_topic=body.course_topic,
             remember=facts.remember_later(background.add_task, session.get_bind()),
+            log_said=checkin.said_later(background.add_task, session.get_bind()),
         )
     except FrontDeskUnavailable:
         raise HTTPException(502, "The assistant is temporarily unavailable. Please try again.")

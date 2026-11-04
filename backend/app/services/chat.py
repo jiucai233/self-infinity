@@ -7,6 +7,12 @@ REST endpoints use. Audits never start from chat.
 What the user says in a check-in or a plain chat also goes to the Fact Keeper (`remember`, run
 after the response by the router; contract #40).
 
+A message routed to `none` is answered by the Guide (app/agents/guide.py) with the chat so far,
+older related lines, today's check-in, the condition, today's quests, the last audits, lessons and
+the lasting facts (`guide_context`, no LLM); if it fails, the front desk's own reply stands. A
+logged check-in gets one Guide line on what it changes today. Both are agent `front_desk`: to the
+client the Guide is the front desk.
+
 A pipeline failure is not an error: the second assistant message explains it in English and the
 endpoint still answers 200. Only a front desk failure fails the request (FrontDeskUnavailable),
 and by then the user's message is already saved.
@@ -14,6 +20,7 @@ and by then the user's message is already saved.
 
 import json
 import logging
+import re
 from collections.abc import Callable
 from pathlib import PurePath
 
@@ -21,21 +28,37 @@ from sqlmodel import Session, col, select
 
 from app.i18n import join_list, language_of, quote, t, use_language
 from app.agents.front_desk import FrontDesk, FrontDeskResult
+from app.agents.guide import Guide, Turn
 from app.llm import decisions
 from app.llm.base import LLMProvider
 from app.agents.planner import SyllabusText
-from app.models import AuditSession, AuditStatus, ChatMessage, Course, EdgeKind, SkillNode, SkillStatus, Upload
+from app.models import (
+    AuditSession,
+    AuditStatus,
+    ChatMessage,
+    Course,
+    DailyCheckIn,
+    EdgeKind,
+    Principle,
+    SkillNode,
+    SkillStatus,
+    Upload,
+)
 from app.schemas import (
     ChatMessageOut,
     ChatSuggestionOut,
     CheckInRequest,
+    CHECKIN_FIELDS,
+    CheckInResponse,
     CourseOut,
 )
 from app.search.base import SearchProvider
 from app.services.courses import live_courses, live_nodes
 from app.services import briefing as briefing_service
 from app.services import checkin as checkin_service
-from app.services import course_generation, journal, planning
+from app.agents.memory_retriever import retrieve_lessons
+from app.services import course_generation, day_plan, facts as facts_service, journal, planning
+from app.services.condition import current_condition
 from app.services.briefing import BriefingFailed
 from app.services.course_generation import CourseGenerationError
 from app.services.planning import NoAvailableNode, PlanFailed
@@ -43,6 +66,8 @@ from app.services.planning import NoAvailableNode, PlanFailed
 logger = logging.getLogger(__name__)
 
 ProviderFor = Callable[[str], LLMProvider]
+# The text Guide's lines are the front desk's too: the client knows the Guide by that name.
+GUIDE_AGENT = "front_desk"
 Remember = Callable[[str], None]
 
 DEFAULT_DIFFICULTY = "standard"
@@ -198,15 +223,20 @@ def _checkin_summary(result) -> str:
     return t("checkin_logged", parts=" · ".join(parts))
 
 
-def _run_checkin(session: Session, message: str, provider_for: ProviderFor) -> ChatMessage:
+def _record_checkin(session: Session, message: str, provider_for: ProviderFor) -> tuple[ChatMessage, CheckInResponse]:
     result = checkin_service.record_checkin(session, CheckInRequest(transcript=message), provider_for)
-    return _save(
+    saved = _save(
         session,
         "assistant",
         _checkin_summary(result),
         "checkin_converter",
         {"type": "checkin", "result": result.model_dump(mode="json")},
     )
+    return saved, result
+
+
+def _run_checkin(session: Session, message: str, provider_for: ProviderFor) -> ChatMessage:
+    return _record_checkin(session, message, provider_for)[0]
 
 
 def _run_plan(session: Session, provider_for: ProviderFor) -> ChatMessage:
@@ -283,6 +313,195 @@ def audit_review(session: Session) -> tuple[str, dict | None]:
     return "\n".join(lines), action
 
 
+# ---------------------------------------------------------------- the Guide's memory (no LLM)
+
+ROUTER_TURNS = 6  # chat lines before the message the front desk sees
+GUIDE_TURNS = 12  # ... and the Guide
+OLDER_SCAN = 300  # older lines searched for ones related to the message
+OLDER_TURNS = 3
+OLDER_MIN_SHARED = 2
+GUIDE_AUDITS = 3
+GUIDE_LESSONS = 3
+GUIDE_TITLES = 40
+SAID_CHARS = 600
+# Who said a line, as the agents read the chat.
+_SPEAKERS = {
+    "front_desk": "Guide",
+    "checkin_converter": "Check-in",
+    "recommender": "Quests",
+    "narrator": "Status",
+    "planner": "World builder",
+}
+_WORD_RE = re.compile(r"[a-z0-9]{3,}")
+_CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7a3]+")
+_STOP = {"the", "and", "you", "what", "how", "that", "this", "for", "with", "are", "was", "have", "today", "can", "did"}
+
+
+def _turn(m: ChatMessage) -> Turn:
+    return ("User", m.content) if m.role == "user" else (_SPEAKERS.get(m.agent or "front_desk", m.agent or "Guide"), m.content)
+
+
+def _before(session: Session, before_id: int, limit: int, offset: int = 0) -> list[ChatMessage]:
+    """Up to `limit` messages before `before_id` (skipping the `offset` nearest), oldest first."""
+    rows = session.exec(
+        select(ChatMessage)
+        .where(col(ChatMessage.id) < before_id)
+        .order_by(col(ChatMessage.id).desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    return list(reversed(rows))
+
+
+def recent_turns(session: Session, before_id: int, limit: int) -> list[Turn]:
+    return [_turn(m) for m in _before(session, before_id, limit)]
+
+
+def _keys(text: str) -> set[str]:
+    """Words of three letters or more, and every pair of neighbouring CJK / Hangul characters."""
+    lowered = text.casefold()
+    keys = {w for w in _WORD_RE.findall(lowered) if w not in _STOP}
+    for run in _CJK_RE.findall(lowered):
+        keys.update(run[i : i + 2] for i in range(len(run) - 1))
+    return keys
+
+
+def older_related(session: Session, before_id: int, message: str) -> list[Turn]:
+    """Lines older than the Guide's window that share the most words with the message (at least
+    OLDER_MIN_SHARED), oldest first: the chat beyond the last GUIDE_TURNS is searched, not lost."""
+    wanted = _keys(message)
+    if not wanted:
+        return []
+    scored = []
+    for m in _before(session, before_id, OLDER_SCAN, offset=GUIDE_TURNS):
+        shared = len(wanted & _keys(m.content))
+        if shared >= OLDER_MIN_SHARED:
+            scored.append((shared, m.id, m))
+    best = sorted(scored, key=lambda x: (x[0], x[1]), reverse=True)[:OLDER_TURNS]
+    return [_turn(m) for _, _, m in sorted(best, key=lambda x: x[1])]
+
+
+def _checkin_facts(row: DailyCheckIn | None) -> dict | None:
+    if row is None:
+        return None
+    return {
+        "date": row.date.isoformat(),
+        "sleep_hours": row.sleep_hours,
+        "sleep_quality_1_5": row.sleep_quality,
+        "exercised": row.exercised,
+        "exercise_minutes": row.exercise_minutes,
+        "meals": row.diet_note,
+        "focus_1_5": row.focus,
+        "stress_1_5": row.stress,
+        "weight_kg": row.weight_kg,
+        "said": (row.transcript or "")[-SAID_CHARS:] or None,
+    }
+
+
+def _condition_facts(session: Session) -> dict:
+    c = current_condition(session)
+    return {
+        "flag": c.flag,
+        "checkins_used": c.days,
+        "avg_sleep_hours": round(c.avg_sleep_hours, 1) if c.avg_sleep_hours is not None else None,
+        "avg_stress_1_5": round(c.avg_stress, 1) if c.avg_stress is not None else None,
+        "audit_pacing": "light" if c.flag == "low" else "normal",
+    }
+
+
+def _todays_quests(session: Session) -> list[dict] | None:
+    """The quests of today's latest plan, None when today has none (no LLM: the stored plan)."""
+    plan = planning.current_plan(session)
+    if plan is None or json.loads(plan.context_json).get("date") != day_plan.now().date().isoformat():
+        return None
+    return [
+        {"node": s.get("skill_title"), "kind": s.get("kind", "learn"), "minutes": s.get("minutes")}
+        for s in json.loads(plan.steps_json)
+    ]
+
+
+def _recent_audits(session: Session) -> list[dict]:
+    rows = session.exec(
+        select(AuditSession, SkillNode)
+        .join(SkillNode, SkillNode.id == AuditSession.skill_id)
+        .join(Course, Course.id == SkillNode.course_id)
+        .where(col(Course.archived_at).is_(None), AuditSession.status != AuditStatus.active)
+        .order_by(col(AuditSession.created_at).desc(), col(AuditSession.id).desc())
+        .limit(GUIDE_AUDITS)
+    ).all()
+    return [
+        {
+            "node": node.title,
+            "result": audit.status.value,
+            "date": audit.created_at.date().isoformat(),
+            "gaps": [e["gap"] for e in audit.evidence[:REVIEW_GAPS]],
+        }
+        for audit, node in rows
+    ]
+
+
+def _lessons(session: Session, nodes: list[SkillNode], message: str) -> list[dict]:
+    """The lessons of a node the message names (memory_retriever), else the latest ones."""
+    lowered = message.casefold()
+    named = next((n for n in nodes if len(n.title.strip()) >= 2 and n.title.strip().casefold() in lowered), None)
+    if named is not None:
+        rows = retrieve_lessons(session, named, GUIDE_LESSONS)
+    else:
+        rows = session.exec(
+            select(Principle).order_by(col(Principle.created_at).desc(), col(Principle.id).desc()).limit(GUIDE_LESSONS)
+        ).all()
+    return [{"title": p.title, "lesson": p.body, "misconception": p.misconception} for p in rows]
+
+
+def guide_context(session: Session, nodes: list[SkillNode], message: str = "") -> dict:
+    """What the Guide is told about the player, all from the database."""
+    return {
+        "today": day_plan.now().date().isoformat(),
+        "todays_checkin": _checkin_facts(checkin_service.todays_checkin(session)),
+        "condition": _condition_facts(session),
+        "todays_quests": _todays_quests(session),
+        "recent_audits": _recent_audits(session),
+        "lessons": _lessons(session, nodes, message),
+        "lasting_facts": facts_service.for_coach(session),
+        "nodes": list(dict.fromkeys(n.title for n in nodes))[:GUIDE_TITLES],
+    }
+
+
+def _guide_reply(
+    session: Session, message: str, before_id: int, nodes: list[SkillNode], draft: str, provider_for: ProviderFor
+) -> str | None:
+    """The Guide's answer, or None when it fails (the front desk's reply `draft` stands)."""
+    try:
+        return Guide(provider_for("guide")).reply(
+            message,
+            recent_turns(session, before_id, GUIDE_TURNS),
+            older_related(session, before_id, message),
+            guide_context(session, nodes, message),
+            draft,
+        )
+    except Exception:
+        logger.warning("guide failed, keeping the front desk's reply", exc_info=True)
+        session.rollback()
+        return None
+
+
+def _checkin_feedback(session: Session, message: str, provider_for: ProviderFor) -> ChatMessage | None:
+    """One Guide line on what the check-in just logged changes today; None when it fails."""
+    context = {
+        "checkin": _checkin_facts(checkin_service.todays_checkin(session)),
+        "condition": _condition_facts(session),
+        "todays_quests": _todays_quests(session),
+        "lasting_facts": facts_service.for_coach(session),
+    }
+    try:
+        line = Guide(provider_for("guide")).checkin_feedback(message, context)
+    except Exception:
+        logger.warning("guide check-in feedback failed, leaving it out", exc_info=True)
+        session.rollback()
+        return None
+    return _save(session, "assistant", line, GUIDE_AGENT)
+
+
 # ---------------------------------------------------------------- the endpoint
 
 def handle_message(
@@ -293,9 +512,15 @@ def handle_message(
     uploads: list[Upload] | None = None,
     course_topic: str | None = None,
     remember: Remember | None = None,
+    log_said: Remember | None = None,
 ) -> list[ChatMessageOut]:
     """`course_topic` (the tutorial) builds a course straight away: no front desk call, so the
-    result does not hang on how the message would be classified."""
+    result does not hang on how the message would be classified.
+
+    `log_said` (checkin.said_later): a plain chat message that mentions the day in passing ("I had
+    ramen, how many calories is that?") is offered to the day's check-in after the response, behind
+    the Decisions gate; only when the gate is available, so it never adds a converter call to
+    every message."""
     user = _save(session, "user", message)  # kept even if the front desk fails
 
     if course_topic is not None:
@@ -312,7 +537,9 @@ def handle_message(
     try:
         desk = FrontDesk(provider_for("front_desk"), decide=decisions.decide if decisions.available() else None)
         with use_language(spoken):
-            routed: FrontDeskResult = desk.route(message, [n.title for n in nodes])
+            routed: FrontDeskResult = desk.route(
+                message, [n.title for n in nodes], recent_turns(session, user.id, ROUTER_TURNS)
+            )
     except Exception as exc:
         logger.warning("front desk failed", exc_info=True)
         session.rollback()
@@ -322,6 +549,8 @@ def handle_message(
     intent = routed.intent
     if remember is not None and (intent == "checkin" or (intent == "none" and not uploads)):
         remember(message)
+    if log_said is not None and intent == "none" and not uploads and decisions.available():
+        log_said(message)
     topic = str(routed.args.get("topic") or "").strip()
 
     if intent == "open_skill":
@@ -335,6 +564,9 @@ def handle_message(
     elif intent == "audit_review":
         with use_language(spoken):
             content, action = audit_review(session)
+    elif intent == "none" and not uploads:
+        with use_language(spoken):
+            content = _guide_reply(session, message, user.id, nodes, content, provider_for) or content
 
     # Saved before the pipeline runs, so ids stay in reading order: user, front desk, result.
     first = _save(session, "assistant", content, "front_desk", action)
@@ -347,7 +579,13 @@ def handle_message(
     elif intent == "generate_course" and topic:
         result.append(_run_generate_course(session, topic, provider_for, search_provider_for))
     elif intent == "checkin":
-        result.append(_run_checkin(session, message, provider_for))
+        logged, checked = _record_checkin(session, message, provider_for)
+        result.append(logged)
+        if checked.missing_fields != list(CHECKIN_FIELDS):  # it logged something
+            with use_language(spoken):
+                feedback = _checkin_feedback(session, message, provider_for)
+            if feedback is not None:
+                result.append(feedback)
     elif intent == "plan":
         result.append(_run_plan(session, provider_for))
     elif intent == "briefing":

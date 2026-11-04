@@ -202,7 +202,7 @@ void main() {
       expect(leaf.session.nodePosition, NodePosition.leaf);
       expect(
         leaf.openingQuestion,
-        'I have never learned “Discriminant”. Teach it to me from the start.',
+        'I have never learned “Discriminant”. Start small: in a sentence or two, what is it, and what problem does it solve?',
       );
       expect(leaf.session.points.map((p) => p.title), FakeApiClient.fakePointTitles('Discriminant'));
 
@@ -1125,7 +1125,7 @@ void main() {
       for (final name in FakeApiClient.methodNames) {
         api.failNext(method: name); // asserts on unknown names
       }
-      expect(FakeApiClient.methodNames, hasLength(65));
+      expect(FakeApiClient.methodNames, hasLength(69));
       expect(() => api.failNext(method: 'nope'), throwsA(isA<AssertionError>()));
     });
   });

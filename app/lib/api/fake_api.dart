@@ -160,6 +160,10 @@ class FakeApiClient implements SelfInfinityApi {
     'createGoal',
     'updateGoal',
     'deleteGoal',
+    'listNodeNotes',
+    'createNodeNote',
+    'updateNodeNote',
+    'deleteNodeNote',
     'deleteCourse',
     'getMe',
     'getDevAudits',
@@ -201,6 +205,7 @@ class FakeApiClient implements SelfInfinityApi {
   Profile _profile;
   final List<JournalEntry> _journal = []; // creation order
   final List<Goal> _goals = []; // creation order
+  final List<NodeNote> _notes = []; // creation order
   String? _narrative;
   DateTime? _narrativeAt;
 
@@ -214,6 +219,7 @@ class FakeApiClient implements SelfInfinityApi {
   int _nextUploadId = 1;
   int _nextJournalId = 1;
   int _nextGoalId = 1;
+  int _nextNoteId = 1;
 
   // -- failure injection ------------------------------------------------------
 
@@ -515,6 +521,7 @@ class FakeApiClient implements SelfInfinityApi {
       }
     }
     gone.forEach(_nodes.remove);
+    _notes.removeWhere((n) => gone.contains(n.skillId));
     final audits = {
       for (final a in _audits.values)
         if (gone.contains(a.skillId)) a.id,
@@ -2467,6 +2474,66 @@ class FakeApiClient implements SelfInfinityApi {
     if (_goals.length == before) throw const ApiException(404, 'goal not found');
   }
 
+  // -- study notes (contract #52) ---------------------------------------------------
+
+  String _noteContent(String content) {
+    final c = content.trim();
+    if (c.isEmpty) throw const ApiException(400, 'note must not be empty');
+    if (c.length > NodeNote.maxLength) {
+      throw const ApiException(400, 'note must be at most ${NodeNote.maxLength} characters');
+    }
+    return c;
+  }
+
+  @override
+  Future<List<NodeNote>> listNodeNotes(int skillId) async {
+    await _begin('listNodeNotes');
+    if (!_nodes.containsKey(skillId)) throw const ApiException(404, 'skill not found');
+    return [
+      for (final n in _notes.reversed)
+        if (n.skillId == skillId) n,
+    ];
+  }
+
+  @override
+  Future<NodeNote> createNodeNote(int skillId, String content) async {
+    await _begin('createNodeNote');
+    if (!_nodes.containsKey(skillId)) throw const ApiException(404, 'skill not found');
+    final now = _clock();
+    final note = NodeNote(
+      id: _nextNoteId++,
+      skillId: skillId,
+      content: _noteContent(content),
+      createdAt: now,
+      updatedAt: now,
+    );
+    _notes.add(note);
+    return note;
+  }
+
+  @override
+  Future<NodeNote> updateNodeNote(int noteId, String content) async {
+    await _begin('updateNodeNote');
+    final index = _notes.indexWhere((n) => n.id == noteId);
+    if (index < 0) throw const ApiException(404, 'note not found');
+    final old = _notes[index];
+    return _notes[index] = NodeNote(
+      id: old.id,
+      skillId: old.skillId,
+      content: _noteContent(content),
+      createdAt: old.createdAt,
+      updatedAt: _clock(),
+    );
+  }
+
+  @override
+  Future<void> deleteNodeNote(int noteId) async {
+    await _begin('deleteNodeNote');
+    final before = _notes.length;
+    _notes.removeWhere((n) => n.id == noteId);
+    if (_notes.length == before) throw const ApiException(404, 'note not found');
+  }
+
   /// Keeping the nodes moves them out of sight with the course (the lessons
   /// stay); deleting them takes their audits and lessons too.
   @override
@@ -2508,6 +2575,7 @@ class FakeApiClient implements SelfInfinityApi {
       };
       _audits.removeWhere((id, _) => audits.contains(id));
       _principles.removeWhere((p) => audits.contains(p.sourceSessionId));
+      _notes.removeWhere((n) => nodes.contains(n.skillId));
     }
   }
 
@@ -2588,7 +2656,7 @@ class FakeApiClient implements SelfInfinityApi {
     if (node.nodeType == NodeType.task) return 'How exactly will you do “$title”?';
     switch (position) {
       case NodePosition.leaf:
-        return 'I have never learned “$title”. Teach it to me from the start.';
+        return 'I have never learned “$title”. Start small: in a sentence or two, what is it, and what problem does it solve?';
       case NodePosition.branch:
         final children = containsChildren(
           node.id,

@@ -1888,4 +1888,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notReflectedYet => 'Not reflected on yet';
+
+  @override
+  String get learnFirst => 'Learn first';
+
+  @override
+  String get myNotes => 'My notes';
+
+  @override
+  String get notesPrivate => 'Only you see these. They aren\'t used in the challenge.';
+
+  @override
+  String get noteHint => 'Write down what you want to remember';
+
+  @override
+  String get noteAdd => 'Save note';
+
+  @override
+  String get noteSave => 'Save';
+
+  @override
+  String get noteEdited => 'edited';
+
+  @override
+  String get noteDeleteTitle => 'Delete this note?';
+
+  @override
+  String get noteSaveFailed => 'Couldn\'t save the note. Try again.';
+
+  @override
+  String get notesLoadFailed => 'Couldn\'t load your notes.';
 }

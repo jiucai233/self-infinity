@@ -519,6 +519,16 @@ class Goal(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 
+class NodeNote(SQLModel, table=True):
+    """The user's own study note on one node (contract section 52). Never given to an agent."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    skill_id: int = Field(foreign_key="skillnode.id", index=True)
+    content: str
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    updated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+
+
 class VoiceSession(SQLModel, table=True):
     """One live voice session's usage (contract #37), reported by the browser as it goes: the
     home page's realtime Guide (`guide`) or an audit's live transcription (`transcribe`).

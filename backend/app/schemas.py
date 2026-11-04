@@ -985,6 +985,26 @@ class AuditReviewIn(BaseModel):
     leaked: bool = False
 
 
+# ---------------------------------------------------------------- study notes (section 52)
+
+NODE_NOTE_MAX = 4000
+
+
+class NodeNoteIn(BaseModel):
+    """POST /api/skills/{id}/notes and PUT /api/notes/{id}. Blank or longer than
+    NODE_NOTE_MAX is a 400 (checked in the router)."""
+
+    content: str
+
+
+class NodeNoteOut(_Out):
+    id: int
+    skill_id: int
+    content: str
+    created_at: datetime
+    updated_at: datetime
+
+
 class GoalOut(BaseModel):
     id: int
     title: str

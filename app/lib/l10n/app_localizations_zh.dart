@@ -1853,4 +1853,34 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get notReflectedYet => '还没反思';
+
+  @override
+  String get learnFirst => '先学';
+
+  @override
+  String get myNotes => '我的笔记';
+
+  @override
+  String get notesPrivate => '只有你看得到，挑战时不会用到。';
+
+  @override
+  String get noteHint => '写下你想记住的';
+
+  @override
+  String get noteAdd => '保存笔记';
+
+  @override
+  String get noteSave => '保存';
+
+  @override
+  String get noteEdited => '已编辑';
+
+  @override
+  String get noteDeleteTitle => '删除这条笔记？';
+
+  @override
+  String get noteSaveFailed => '笔记没保存上，再试一次。';
+
+  @override
+  String get notesLoadFailed => '笔记没加载出来。';
 }

@@ -1856,4 +1856,34 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get notReflectedYet => '아직 돌아보지 않았어요';
+
+  @override
+  String get learnFirst => '먼저 배우기';
+
+  @override
+  String get myNotes => '내 노트';
+
+  @override
+  String get notesPrivate => '나만 볼 수 있어요. 도전할 때는 쓰이지 않아요.';
+
+  @override
+  String get noteHint => '기억하고 싶은 것을 적어 보세요';
+
+  @override
+  String get noteAdd => '노트 저장';
+
+  @override
+  String get noteSave => '저장';
+
+  @override
+  String get noteEdited => '수정됨';
+
+  @override
+  String get noteDeleteTitle => '이 노트를 삭제할까요?';
+
+  @override
+  String get noteSaveFailed => '노트를 저장하지 못했어요. 다시 해 보세요.';
+
+  @override
+  String get notesLoadFailed => '노트를 불러오지 못했어요.';
 }

@@ -155,10 +155,11 @@ def opening_question(
     again: bool = False,
     audience: str | None = None,
 ) -> str:
-    """An audit opens with the student asking to be taught, never with a question about one
-    point: the user teaches, and what she asks afterwards comes out of what they said. `examined`: the
-    knowledge points this audit is on (a leaf that has them); `again`: some of the node's
-    points held before, so only the ones still open are to be explained. `audience`: who she is
+    """An audit opens small: on a leaf with knowledge points, one question on the first of them
+    (what it is, what it is for); without points, a sentence or two on what the node is. What
+    she asks afterwards comes out of what they said. `examined`: the knowledge points this audit
+    is on (a leaf that has them); `again`: some of the node's points held before, so only the
+    ones still open are asked. `audience`: who she is
     this time; a child or a colleague says so before asking (the default student says nothing)."""
     question = _opening(skill, position, children, test_out, examined, again)
     intro = t(f"audience_{audience}") if audience in ("child", "expert") else ""
@@ -173,10 +174,14 @@ def _opening(
     examined: list[str] | None,
     again: bool,
 ) -> str:
-    if examined and again and not test_out:
+    if examined and not test_out:
+        # One small question on the first point, not "teach me all of it": starting costs a
+        # sentence, and what comes next grows out of the answer.
+        if not again:
+            return t("opening_point_first", title=quote(skill.title), point=quote(examined[0]))
         if len(examined) == 1:
             return t("opening_point_again", point=quote(examined[0]))
-        return t("opening_points_again", points=join_list(examined))
+        return t("opening_points_again", points=join_list(examined), point=quote(examined[0]))
     if test_out:
         if children:
             return t("opening_test_out", title=quote(skill.title), part=quote(children[0]))
@@ -278,7 +283,9 @@ def start_audit(
         again=len(examined) < len(skill.points),
         audience=audit.audience,
     )
-    session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=question))
+    # An opening on the first point is one of that point's questions.
+    opened_on = examined[0]["title"] if examined and not test_out else None
+    session.add(AuditTurn(session_id=audit.id, role=TurnRole.auditor, content=question, point=opened_on))
     session.commit()
     session.refresh(audit)
     return audit, question, False

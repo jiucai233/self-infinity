@@ -1029,5 +1029,15 @@
   "feedbackMisheard": "I didn't say that",
   "feedbackTooHardNoted": "Noted: too hard for now",
   "feedbackMisheardNoted": "Noted: you didn't say that",
-  "notReflectedYet": "Not reflected on yet"
+  "notReflectedYet": "Not reflected on yet",
+  "learnFirst": "Learn first",
+  "myNotes": "My notes",
+  "notesPrivate": "Only you see these. They aren't used in the challenge.",
+  "noteHint": "Write down what you want to remember",
+  "noteAdd": "Save note",
+  "noteSave": "Save",
+  "noteEdited": "edited",
+  "noteDeleteTitle": "Delete this note?",
+  "noteSaveFailed": "Couldn't save the note. Try again.",
+  "notesLoadFailed": "Couldn't load your notes."
 }

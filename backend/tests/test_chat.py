@@ -339,7 +339,8 @@ def test_open_skill_not_found_asks_which_node(client, monkeypatch):
 def test_checkin_runs_the_converter_on_the_message(client):
     messages = say(client, VOICE)
 
-    assert [m["role"] for m in messages] == ["user", "assistant", "assistant"]
+    # user, front desk, the check-in, the Guide's line on what it changes today
+    assert [m["role"] for m in messages] == ["user", "assistant", "assistant", "assistant"]
     second = messages[2]
     assert second["agent"] == "checkin_converter"
     assert second["content"] == "Logged: sleep 6 h · exercise no · meals lunch: ramen"
@@ -543,7 +544,7 @@ def test_history_keeps_actions_and_agents(client):
 
     history = client.get("/api/chat/history").json()
 
-    assert [m["agent"] for m in history] == [None, "front_desk", "checkin_converter"]
+    assert [m["agent"] for m in history] == [None, "front_desk", "checkin_converter", "front_desk"]
     assert history[2]["action"]["type"] == "checkin"
 
 

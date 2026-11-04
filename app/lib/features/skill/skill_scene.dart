@@ -21,7 +21,10 @@ import '../stage/stage_controller.dart';
 import '../stage/stage_scaffold.dart';
 import '../../upload/file_picker_service.dart';
 import 'edit_node.dart';
+import 'learn_panel.dart';
 import 'node_card.dart';
+
+export 'learn_panel.dart' show firstLetterOf;
 import '../../l10n/l10n.dart';
 
 /// Scene 4 of `docs/ux-chat.md`: the overview of one node — the node card on
@@ -625,9 +628,10 @@ class _SkillSceneState extends State<SkillScene> {
                 SkillNodeBlock(
                   overview: overview,
                   line: _statusLine(overview, quest),
-                  lessons: lessons,
                   menu: _menu(overview),
-                  details: _ContentsCard(overview: overview, points: points, framed: false),
+                  onLearn: () => unawaited(
+                    showLearnSheet(context, overview: overview, points: points, lessons: lessons),
+                  ),
                 ),
               ],
             ),
@@ -642,7 +646,7 @@ class _SkillSceneState extends State<SkillScene> {
           menu: _menu(overview),
           actions: _actions(overview),
         );
-        final contents = _ContentsCard(overview: overview, points: points);
+        final contents = LearnPanel(overview: overview, points: points, lessons: lessons);
         final avatar = avatarOf(size: (box.maxHeight * 0.3).clamp(120.0, 240.0));
         final sideBySide = box.maxWidth >= 680;
         return SingleChildScrollView(
@@ -695,225 +699,6 @@ class _SkillSceneState extends State<SkillScene> {
         );
       },
     );
-  }
-}
-
-/// The contents card: the description, the knowledge points of a leaf (what
-/// held, what was missed and why), one row per material (a letter badge, the
-/// title and the site), the course source. More than [pageSize] rows are
-/// paged with `>`.
-class _ContentsCard extends StatefulWidget {
-  const _ContentsCard({required this.overview, this.points = const [], this.framed = true});
-
-  final SkillOverview overview;
-
-  /// False on a phone's “Details”: the same contents without the card.
-  final bool framed;
-
-  /// The node's knowledge points, when it is a leaf that has them.
-  final List<SkillPoint> points;
-
-  @override
-  State<_ContentsCard> createState() => _ContentsCardState();
-}
-
-class _ContentsCardState extends State<_ContentsCard> {
-  static const int pageSize = 4;
-  int _page = 0;
-
-  List<SearchItem> get _links {
-    final seen = <String>{};
-    return [
-      for (final plan in widget.overview.materials)
-        for (final item in plan.items)
-          if (seen.add(item.url)) item,
-    ];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    final node = widget.overview.skill;
-    final course = widget.overview.course;
-    final links = _links;
-    final pages = (links.length / pageSize).ceil();
-    final page = _page.clamp(0, pages == 0 ? 0 : pages - 1);
-    final shown = links.skip(page * pageSize).take(pageSize).toList();
-    return DecoratedBox(
-      key: const Key('skill-contents'),
-      decoration: !widget.framed
-          ? const BoxDecoration()
-          : BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: AppRadius.cardBorder,
-              border: Border.all(color: AppColors.outline),
-            ),
-      child: Padding(
-        padding: EdgeInsets.all(widget.framed ? AppSpacing.xl : 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              context.l10n.about,
-              style: widget.framed ? theme.labelMedium : theme.labelMedium?.copyWith(color: AppColors.textTertiary),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              node.description.isEmpty ? context.l10n.noDescriptionYet : node.description,
-              key: const Key('skill-description'),
-              style: theme.bodyLarge,
-            ),
-            if (widget.points.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.lg),
-              const Divider(),
-              const SizedBox(height: AppSpacing.md),
-              Text(context.l10n.knowledgePoints, style: theme.labelMedium),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                context.l10n.knowledgePointsHint,
-                style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              for (final (i, point) in widget.points.indexed)
-                PointRow(key: Key('skill-point-$i'), point: point),
-            ],
-            if (shown.isNotEmpty || course.hasSource) ...[
-              const SizedBox(height: AppSpacing.lg),
-              const Divider(),
-              const SizedBox(height: AppSpacing.md),
-              Text(context.l10n.resources, style: theme.labelMedium),
-              const SizedBox(height: AppSpacing.xs),
-            ],
-            for (final item in shown)
-              _MaterialRow(
-                key: ValueKey('link-${item.url}'),
-                title: item.title.isEmpty ? displayDomain(item.url) : item.title,
-                subtitle: displayDomain(item.url),
-                onTap: () => openExternalUrl(context, item.url),
-              ),
-            if (course.hasSource)
-              _MaterialRow(
-                key: const Key('course-source'),
-                title: context.l10n.sourceLabel(course.sourceCourse!),
-                subtitle: course.hasSourceLink
-                    ? displayDomain(course.sourceUrl!)
-                    : context.l10n.uploadedCourseMaterial,
-                icon: Icons.menu_book_outlined,
-                onTap: course.hasSourceLink
-                    ? () => openExternalUrl(context, course.sourceUrl!)
-                    : null,
-              ),
-            if (pages > 1)
-              Align(
-                alignment: Alignment.centerRight,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (page > 0)
-                      IconButton(
-                        key: const Key('links-prev'),
-                        tooltip: context.l10n.previous,
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.chevron_left_rounded),
-                        onPressed: () => setState(() => _page = page - 1),
-                      ),
-                    Text('${page + 1}/$pages', style: theme.bodySmall),
-                    if (page < pages - 1)
-                      IconButton(
-                        key: const Key('links-next'),
-                        tooltip: context.l10n.next,
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.chevron_right_rounded),
-                        onPressed: () => setState(() => _page = page + 1),
-                      ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// The first letter or digit of [title] in capitals (`“Functions” …` -> `F`); the
-/// favicon placeholder of a material row.
-String firstLetterOf(String title) {
-  final match = RegExp(r'[\p{L}\p{N}]', unicode: true).firstMatch(title);
-  return match == null ? '·' : match.group(0)!.toUpperCase();
-}
-
-/// One material: a round badge with the first letter of the title (the place
-/// of the site's favicon), the title and the site; the whole row opens the
-/// link. Without [onTap] (a course made from an uploaded file) it is plain.
-class _MaterialRow extends StatelessWidget {
-  const _MaterialRow({
-    super.key,
-    required this.title,
-    required this.subtitle,
-    this.icon,
-    this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-
-  /// Shown in the badge instead of the first letter.
-  final IconData? icon;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    final letter = firstLetterOf(title);
-    final row = Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.xs),
-      child: Row(
-        children: [
-          DecoratedBox(
-            key: const Key('material-badge'),
-            decoration: const BoxDecoration(color: AppColors.primarySoft, shape: BoxShape.circle),
-            child: SizedBox.square(
-              dimension: 32,
-              child: Center(
-                child: icon != null
-                    ? Icon(icon, size: 18, color: AppColors.primary)
-                    : Text(
-                        letter,
-                        style: theme.labelLarge?.copyWith(color: AppColors.primary),
-                      ),
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  key: const Key('material-title'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                ),
-                Text(
-                  subtitle,
-                  key: const Key('material-domain'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          if (onTap != null)
-            const Icon(Icons.open_in_new_rounded, size: 16, color: AppColors.textTertiary),
-        ],
-      ),
-    );
-    if (onTap == null) return row;
-    return InkWell(onTap: onTap, borderRadius: AppRadius.chipBorder, child: row);
   }
 }
 

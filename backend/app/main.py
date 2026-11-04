@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app.db import init_db
 from app.i18n import parse_accept_language, reset_language, set_language
 from app.llm import get_provider, usage
-from app.routers import audits, chat, checkins, courses, dev, goals, graph, journal, life, llm, narrator, plan, principles, profile, skills, uploads, voice
+from app.routers import audits, chat, checkins, courses, dev, goals, graph, journal, life, llm, narrator, notes, plan, principles, profile, skills, uploads, voice
 
 logging.basicConfig(level=logging.INFO)
 
@@ -59,6 +59,7 @@ app.add_middleware(
 )
 
 app.include_router(skills.router)
+app.include_router(notes.router)
 app.include_router(courses.router)
 app.include_router(audits.router)
 app.include_router(principles.router)

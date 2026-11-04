@@ -793,6 +793,44 @@ def _front_desk(messages: list[Message]) -> str:
     return out("none", _FRONT_REPLIES["none"])
 
 
+# ---------------------------------------------------------------- the Guide (chat and check-in feedback)
+
+_CONTEXT_RE = re.compile(r"<context>\n(.*?)\n</context>", re.S)
+_DRAFT_RE = re.compile(r"<draft>\n(.*?)\n</draft>", re.S)
+_CALORIE_RE = re.compile(r"calori|kcal|卡路里|热量|多少卡|칼로리", re.I)
+_GUIDE_CHAT = _FRONT_REPLIES["none"]  # the demo script's line, as the front desk said it before the Guide
+_GUIDE_CALORIES = "A rough guess for {meals}: about 800–1,400 kcal. It is only a rough range, not a measurement."
+_GUIDE_ASK_MEALS = "Tell me what you ate and roughly how much, and I'll give you a rough range."
+_FEEDBACK_LOW = "With {sleep} of sleep your condition is low, so audits will keep their questions short today. Pick one review or a small node rather than something new."
+_FEEDBACK_LOW_NO_SLEEP = "Your condition is low, so audits will keep their questions short today. Pick one review or a small node rather than something new."
+_FEEDBACK_NORMAL = "Your condition looks normal, so today's audits run as usual. Take on your next node while you are sharp."
+
+
+def _guide(messages: list[Message]) -> str:
+    """Chat: a rough calorie range when asked and meals are logged, otherwise the front desk's
+    draft (so the demo script reads as before), or a plain line.
+    Check-in feedback: by the condition flag and the hours slept."""
+    system = _system(messages)
+    match = _CONTEXT_RE.search(system)
+    context = json.loads(match.group(1)) if match else {}
+    if "Mode: checkin_feedback" in system:
+        checkin = context.get("checkin") or {}
+        sleep = checkin.get("sleep_hours")
+        if (context.get("condition") or {}).get("flag") == "low":
+            reply = _FEEDBACK_LOW.format(sleep=f"{sleep} h") if sleep is not None else _FEEDBACK_LOW_NO_SLEEP
+        else:
+            reply = _FEEDBACK_NORMAL
+        return _dump({"reply": reply})
+    message = _user_turns(messages)[-1] if _user_turns(messages) else ""
+    if _CALORIE_RE.search(message):
+        meals = (context.get("todays_checkin") or {}).get("meals")
+        return _dump({"reply": _GUIDE_CALORIES.format(meals=meals) if meals else _GUIDE_ASK_MEALS})
+    draft = _DRAFT_RE.search(system)
+    if draft and draft.group(1).strip() not in ("", "(none)"):
+        return _dump({"reply": draft.group(1).strip()})
+    return _dump({"reply": _GUIDE_CHAT})
+
+
 def _translate(messages: list[Message]) -> str:
     """The Mock has no second language: it answers the course back as it was given."""
     return _first_user(messages) or "{}"
@@ -813,6 +851,7 @@ _SCRIPTS = {
     "recommender": _recommend,
     "material_finder": _find_material,
     "front_desk": _front_desk,
+    "guide": _guide,
     "life_coach": _life_coach,
     "fact_keeper": _fact_keeper,
     "translator": _translate,

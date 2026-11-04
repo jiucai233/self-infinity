@@ -406,6 +406,26 @@ void main() {
     testWidgets(skip: dir == null, 'scene 4 node ($tag)', (tester) async {
       await scene(tester, size: size, name: '4-node-$tag', location: '/skill/5');
     });
+    testWidgets(skip: dir == null, 'scene 4 learn first ($tag)', (tester) async {
+      final api = await _seed();
+      await api.createNodeNote(5, 'b² − 4ac decides how many real roots there are.');
+      await scene(
+        tester,
+        size: size,
+        name: '4-learn-$tag',
+        location: '/skill/5',
+        api: api,
+        act: (t) async {
+          final row = find.byKey(const Key('skill-learn'));
+          if (row.evaluate().isEmpty) {
+            await t.scrollUntilVisible(find.byKey(const Key('node-notes')), 200, scrollable: find.byType(Scrollable).first);
+          } else {
+            await t.tap(row);
+          }
+          await t.pumpAndSettle();
+        },
+      );
+    });
     testWidgets(skip: dir == null, 'scene 4 locked ($tag)', (tester) async {
       await scene(tester, size: size, name: '4-locked-$tag', location: '/skill/12');
     });

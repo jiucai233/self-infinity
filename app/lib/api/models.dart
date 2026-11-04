@@ -2255,6 +2255,40 @@ class Goal {
   final DateTime createdAt;
 }
 
+/// One of the player's own study notes on a node (contract #52). Plain text;
+/// never given to an agent.
+@immutable
+class NodeNote {
+  const NodeNote({
+    required this.id,
+    required this.skillId,
+    required this.content,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory NodeNote.fromJson(Json json) => NodeNote(
+    id: _int(json, 'id'),
+    skillId: _int(json, 'skill_id'),
+    content: _str(json, 'content'),
+    createdAt: _time(json, 'created_at'),
+    updatedAt: _time(json, 'updated_at'),
+  );
+
+  /// A note is at most this many characters (trimmed); a blank one is a 400.
+  static const int maxLength = 4000;
+
+  final int id;
+  final int skillId;
+  final String content;
+
+  /// UTC.
+  final DateTime createdAt;
+
+  /// UTC; equal to [createdAt] until the note is edited.
+  final DateTime updatedAt;
+}
+
 // ---------------------------------------------------------------------------
 // Developer panel (contract #34)
 // ---------------------------------------------------------------------------

@@ -251,6 +251,37 @@ void main() {
   });
 
   group('scene 5 · text', () {
+    testWidgets('the conversation has a way back to her and, on a wide screen, to the life tree', (
+      tester,
+    ) async {
+      await pumpHome(tester, await seededFakeApi());
+      expect(find.byKey(const Key('end-chat')), findsNothing);
+      await say(tester, 'Hello there');
+      expect(find.byKey(const Key('mini-tree')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('end-chat')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('mini-tree')), findsOneWidget);
+      expect(find.byKey(const Key('end-chat')), findsNothing);
+
+      await say(tester, 'Hello again');
+      await tester.tap(find.byKey(const Key('chat-open-map')));
+      await tester.pumpAndSettle();
+      expect(find.text('route:/map'), findsOneWidget);
+    });
+
+    testWidgets('on a phone the thread has the way back; the tabs reach the tree', (tester) async {
+      await pumpHome(tester, await seededFakeApi(), size: phoneScreen);
+      await say(tester, 'Hello there');
+      expect(find.byKey(const Key('phone-thread')), findsOneWidget);
+      expect(find.byKey(const Key('chat-open-map')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('end-chat')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('phone-thread')), findsNothing);
+      expect(find.byKey(const Key('greeting-bubble')), findsOneWidget);
+    });
+
     testWidgets('her latest line in a big bubble; the user’s words in the chat panel', (
       tester,
     ) async {

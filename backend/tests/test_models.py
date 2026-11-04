@@ -51,6 +51,7 @@ def test_the_tables_are_exactly_the_planned_ones():
         "dailycheckin", "rewardevent", "narratorbriefing", "studyplan", "searchplan", "banditarm", "chatmessage", "upload",
         "profile", "journalentry", "goal", "voicesession", "lifeadvice",
         "lifefact", "llmcall", "principlecheck", "learner", "learnerpoint", "learnerstep", "stylearm",
+        "nodenote",
     }
 
 

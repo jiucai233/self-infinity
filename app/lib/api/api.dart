@@ -279,6 +279,22 @@ abstract class SelfInfinityApi {
   /// found`.
   Future<void> deleteGoal(int goalId);
 
+  // -- study notes (contract #52, no LLM) --------------------------------------
+
+  /// `GET /skills/{skillId}/notes` — the player's notes on a node, newest
+  /// first. 404 `skill not found`.
+  Future<List<NodeNote>> listNodeNotes(int skillId);
+
+  /// `POST /skills/{skillId}/notes` — a new note. The content is trimmed;
+  /// blank or over [NodeNote.maxLength] characters is a 400.
+  Future<NodeNote> createNodeNote(int skillId, String content);
+
+  /// `PUT /notes/{noteId}` — rewrites a note. Same 400s; 404 `note not found`.
+  Future<NodeNote> updateNodeNote(int noteId, String content);
+
+  /// `DELETE /notes/{noteId}`. 404 `note not found`.
+  Future<void> deleteNodeNote(int noteId);
+
   /// `DELETE /courses/{id}?delete_nodes=` (no LLM). Deletes a course; it
   /// leaves its main quest and the study plan either way. Without
   /// [deleteNodes] its nodes, audits and lesson cards are kept (hidden with

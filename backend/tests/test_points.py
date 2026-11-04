@@ -143,7 +143,9 @@ def test_a_failing_point_lister_leaves_the_audit_as_it_was(client, monkeypatch, 
     body = begin(client, math["discriminant"])
 
     assert body["session"]["points"] == []
-    assert body["opening_question"] == "I have never learned “Discriminant”. Teach it to me from the start."
+    assert body["opening_question"] == (
+        "I have never learned “Discriminant”. Start small: in a sentence or two, what is it, and what problem does it solve?"
+    )
 
 
 # ---------------------------------------------------------------- what an audit does with them
@@ -170,8 +172,8 @@ def test_the_next_audit_asks_only_about_what_was_missed(client, client_engine, m
     answer_turns(client, body["session"]["id"], FIRST)
 
     assert body["opening_question"] == (
-        "What you taught me last time, I still have. This time teach me only “What Discriminant is”, "
-        "as if I had never heard of it."
+        "What you taught me last time, I still have. Only “What Discriminant is” is left: "
+        "what is it, and what is it for?"
     )
     assert body["session"]["points"] == [{"title": POINTS[0], "ok": None, "note": NOTE}]
     with Session(client_engine) as session:
@@ -198,7 +200,9 @@ def test_a_review_of_a_mastered_node_asks_every_point_again(client, math):
     body = begin(client, math["discriminant"])
 
     assert [p["title"] for p in body["session"]["points"]] == POINTS
-    assert body["opening_question"] == "I have never learned “Discriminant”. Teach it to me from the start."
+    assert body["opening_question"] == (
+        f"I have never learned “Discriminant”. Let's start small, with “{POINTS[0]}”: what is it, and what is it for?"
+    )
 
 
 def test_several_points_still_open_are_all_named_in_the_opening(client, client_engine, math):
@@ -209,10 +213,10 @@ def test_several_points_still_open_are_all_named_in_the_opening(client, client_e
         first = audit_flow.opening_question(skill, position, [], examined=POINTS, again=False)
 
     assert again == (
-        f"What you taught me last time, I still have. This time teach me {POINTS[1]}, {POINTS[2]}, "
-        "as if I had never heard of them."
+        f"What you taught me last time, I still have. This time only {POINTS[1]}, {POINTS[2]} are left. "
+        f"First “{POINTS[1]}”: what is it, and what is it for?"
     )
-    assert first == "I have never learned “Discriminant”. Teach it to me from the start."
+    assert first == f"I have never learned “Discriminant”. Let's start small, with “{POINTS[0]}”: what is it, and what is it for?"
 
 
 def test_a_point_the_audit_did_not_settle_keeps_what_it_had():
@@ -258,8 +262,9 @@ def test_a_point_asked_about_twice_is_closed_and_she_is_told_to_leave_it(client,
     answer_turns(client, audit_id, FIRST, "more", "still more")
 
     prompts = spy.system_prompts("auditor")
-    assert "You have asked about these twice" not in prompts[1]  # one question so far
-    assert f"judge them on what was said: {POINTS[0]}\n" in prompts[2]
+    # The opening was on the first point: it and one more question are its two.
+    assert "You have asked about these twice" not in prompts[0]  # the opening only so far
+    assert f"judge them on what was said: {POINTS[0]}\n" in prompts[1]
 
 
 def test_when_every_point_has_had_its_questions_the_turn_is_the_verdict(client, monkeypatch, math):

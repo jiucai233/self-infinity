@@ -168,7 +168,7 @@ void main() {
       expect(decoration.borderRadius, BorderRadius.circular(16));
       expect((decoration.border! as Border).top.color, AppColors.outline);
       expect(find.text('contents'), findsNothing);
-      expect(find.text('About'), findsOneWidget);
+      expect(find.text('Learn first'), findsOneWidget);
       expect(find.byKey(const Key('skill-description')), findsOneWidget);
       expect(
         tester.widget<Text>(find.byKey(const Key('skill-description'))).data,
@@ -629,7 +629,7 @@ void main() {
       }
     });
 
-    testWidgets('the history, lessons and contents wait behind Details', (tester) async {
+    testWidgets('the history waits behind Details; the contents are in Learn first', (tester) async {
       final failed = await failAudit(api, 6);
       await pumpSkill(tester, api, 6, size: phoneScreen);
       final row = find.byKey(Key('audit-row-${failed.sessionId}'));
@@ -639,7 +639,7 @@ void main() {
       await tester.tap(find.byKey(const Key('skill-details')));
       await tester.pumpAndSettle();
       expect(row, findsOneWidget);
-      expect(contents, findsOneWidget);
+      expect(contents, findsNothing); // not twice: they are in Learn first
       expect(find.text('Hide details'), findsOneWidget);
       await tapShown(tester, row);
       expect(find.text('route:${AppRoutes.replay(failed.sessionId)}'), findsOneWidget);

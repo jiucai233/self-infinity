@@ -570,5 +570,15 @@
   "feedbackMisheard": "저는 그렇게 말하지 않았어요",
   "feedbackTooHardNoted": "기록했어요: 지금은 너무 어려움",
   "feedbackMisheardNoted": "기록했어요: 그렇게 말하지 않음",
-  "notReflectedYet": "아직 돌아보지 않았어요"
+  "notReflectedYet": "아직 돌아보지 않았어요",
+  "learnFirst": "먼저 배우기",
+  "myNotes": "내 노트",
+  "notesPrivate": "나만 볼 수 있어요. 도전할 때는 쓰이지 않아요.",
+  "noteHint": "기억하고 싶은 것을 적어 보세요",
+  "noteAdd": "노트 저장",
+  "noteSave": "저장",
+  "noteEdited": "수정됨",
+  "noteDeleteTitle": "이 노트를 삭제할까요?",
+  "noteSaveFailed": "노트를 저장하지 못했어요. 다시 해 보세요.",
+  "notesLoadFailed": "노트를 불러오지 못했어요."
 }

@@ -3519,6 +3519,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not reflected on yet'**
   String get notReflectedYet;
+
+  /// No description provided for @learnFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn first'**
+  String get learnFirst;
+
+  /// No description provided for @myNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'My notes'**
+  String get myNotes;
+
+  /// No description provided for @notesPrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Only you see these. They aren\'t used in the challenge.'**
+  String get notesPrivate;
+
+  /// No description provided for @noteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write down what you want to remember'**
+  String get noteHint;
+
+  /// No description provided for @noteAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Save note'**
+  String get noteAdd;
+
+  /// No description provided for @noteSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get noteSave;
+
+  /// No description provided for @noteEdited.
+  ///
+  /// In en, this message translates to:
+  /// **'edited'**
+  String get noteEdited;
+
+  /// No description provided for @noteDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this note?'**
+  String get noteDeleteTitle;
+
+  /// No description provided for @noteSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the note. Try again.'**
+  String get noteSaveFailed;
+
+  /// No description provided for @notesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your notes.'**
+  String get notesLoadFailed;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
