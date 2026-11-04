@@ -132,6 +132,7 @@ void main() {
         size: phoneScreen,
       );
       expect(key('hero-brand'), findsOneWidget);
+      expect(key('landing-shot-learn'), findsOneWidget); // a phone shows its screens too
       expect(tester.takeException(), isNull);
       await tapKey(tester, 'hero-get-started');
       expect(key('auth-card'), findsOneWidget);
@@ -162,6 +163,8 @@ void main() {
       final big = sphere();
       expect(big, greaterThan(small * 2));
       expect(key('landing-chapter-2'), findsOneWidget);
+      // Beside the robot, a real screen of the app for the chapter.
+      expect(key('landing-shot-prove'), findsOneWidget);
 
       await swipeUp(2);
       expect(key('landing-chapter-4'), findsOneWidget);

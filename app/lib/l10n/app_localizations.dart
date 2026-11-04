@@ -526,6 +526,12 @@ abstract class AppLocalizations {
   /// **'04 · Grow'**
   String get chapterGrowKicker;
 
+  /// No description provided for @chapterGrowPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Every course hangs under one of this year\'s main quests\nEach idea you prove lights a star in your life tree\nTap a star to see which course and node it came from'**
+  String get chapterGrowPoints;
+
   /// No description provided for @chapterGrowTitle.
   ///
   /// In en, this message translates to:
@@ -543,6 +549,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'01 · Learn'**
   String get chapterLearnKicker;
+
+  /// No description provided for @chapterLearnPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Say what you want to learn; the Guide asks a few questions to pin it down\nIt finds a real university syllabus and lays it out as a map of ideas\nA node opens once the ones it requires are proven'**
+  String get chapterLearnPoints;
 
   /// No description provided for @chapterLearnTitle.
   ///
@@ -562,6 +574,12 @@ abstract class AppLocalizations {
   /// **'02 · Prove'**
   String get chapterProveKicker;
 
+  /// No description provided for @chapterProvePoints.
+  ///
+  /// In en, this message translates to:
+  /// **'The Auditor keeps asking “why?” the way a beginner would\nIt slips in a deliberate mistake to see if you catch it\nEven a pass gets a second look from the Challenger'**
+  String get chapterProvePoints;
+
   /// No description provided for @chapterRememberBody.
   ///
   /// In en, this message translates to:
@@ -573,6 +591,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'03 · Remember'**
   String get chapterRememberKicker;
+
+  /// No description provided for @chapterRememberPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed it? You write down what you misunderstood\nThat becomes a lesson card you keep\nThe next audit brings the related lessons back up'**
+  String get chapterRememberPoints;
 
   /// No description provided for @characterSheet.
   ///
@@ -993,6 +1017,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Journal'**
   String get journal;
+
+  /// No description provided for @landingRealScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'From the app'**
+  String get landingRealScreen;
 
   /// No description provided for @language.
   ///

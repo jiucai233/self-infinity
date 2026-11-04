@@ -15,8 +15,8 @@ import 'landing_robot.dart';
 
 /// The front page: a robot holding your life tree in its palm. Scrolling, the
 /// tree grows — a little sphere above the hand, then big beside four short
-/// chapters about the system, then the whole screen — and the page ends on
-/// one button.
+/// chapters about the system, each with a real screen of the app and what it
+/// shows, then the whole screen — and the page ends on one button.
 ///
 /// The robot and the sphere stay put (the "stage"); the words scroll over
 /// them. Below [_wide] the robot stands in the bottom half and the words sit
@@ -359,15 +359,45 @@ class _LandingPageState extends State<LandingPage> {
   }
 }
 
-/// One chapter: a kicker, a title, a paragraph.
-typedef _Chapter = ({String kicker, String title, String body});
+/// One chapter: a kicker, a title, a paragraph, what you see in its screen
+/// (one point per line) and which real screen of the app it shows
+/// ([_UsageShot]).
+typedef _Chapter = ({String kicker, String title, String body, String points, String shot});
 
 List<_Chapter> _chapters(AppLocalizations l) => [
-  (kicker: l.chapterLearnKicker, title: l.chapterLearnTitle, body: l.chapterLearnBody),
-  (kicker: l.chapterProveKicker, title: l.tourProveTitle, body: l.chapterProveBody),
-  (kicker: l.chapterRememberKicker, title: l.tourLessonsTitle, body: l.chapterRememberBody),
-  (kicker: l.chapterGrowKicker, title: l.chapterGrowTitle, body: l.chapterGrowBody),
+  (
+    kicker: l.chapterLearnKicker,
+    title: l.chapterLearnTitle,
+    body: l.chapterLearnBody,
+    points: l.chapterLearnPoints,
+    shot: 'learn',
+  ),
+  (
+    kicker: l.chapterProveKicker,
+    title: l.tourProveTitle,
+    body: l.chapterProveBody,
+    points: l.chapterProvePoints,
+    shot: 'prove',
+  ),
+  (
+    kicker: l.chapterRememberKicker,
+    title: l.tourLessonsTitle,
+    body: l.chapterRememberBody,
+    points: l.chapterRememberPoints,
+    shot: 'remember',
+  ),
+  (
+    kicker: l.chapterGrowKicker,
+    title: l.chapterGrowTitle,
+    body: l.chapterGrowBody,
+    points: l.chapterGrowPoints,
+    shot: 'grow',
+  ),
 ];
+
+/// How wide the words (and a chapter's screen) are on a desktop: they stay
+/// left of the robot, which stands right of centre.
+double _wordsWidth(double width) => math.min(540, width * 0.40);
 
 /// How far the sphere has grown, 0–1: through the chapters to its big size
 /// (0–0.75), then over the last screen to the whole window (0.75–1).
@@ -491,7 +521,7 @@ class _FilmStage extends StatelessWidget {
     // words (kept to the film's right otherwise), on a phone it stays centred.
     // A desktop film may leave a strip of paper on the left, under the scrim.
     final orbX = (orb?.x ?? 0.5) * filmW;
-    final wordsRight = 64 + math.min(460, w * 0.34);
+    final wordsRight = 64 + _wordsWidth(w);
     final want = wide ? math.max(w - filmW + orbX, wordsRight + r0 + 48) : w / 2;
     final left = (want - orbX).clamp(w - filmW, wide ? w * 0.2 : 0.0);
 
@@ -887,7 +917,9 @@ class _HeroScreen extends StatelessWidget {
   }
 }
 
-/// Screens 1–4: one chapter, beside the sphere (above it on a phone).
+/// Screens 1–4: one chapter beside the robot — the words, what you see in
+/// the app, and a real screen of it. On a phone (the robot below) the words
+/// sit above it with a small phone screen beside the paragraph.
 class _ChapterScreen extends StatelessWidget {
   const _ChapterScreen({
     required this.index,
@@ -906,31 +938,103 @@ class _ChapterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
-    final text = Column(
-      key: Key('landing-chapter-$index'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          keepAll(chapter.kicker),
-          style: theme.labelLarge?.copyWith(color: AppColors.textTertiary, letterSpacing: 0.4),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Text(
-          keepAll(chapter.title),
-          style: (wide ? theme.displaySmall : theme.headlineLarge)?.copyWith(height: 1.1),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          keepAll(chapter.body),
-          style: (wide ? theme.titleMedium : theme.bodyLarge)?.copyWith(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w400,
-            height: 1.6,
+    final l = context.l10n;
+    final kicker = Text(
+      keepAll(chapter.kicker),
+      style: theme.labelLarge?.copyWith(color: AppColors.textTertiary, letterSpacing: 0.4),
+    );
+    final shot = _UsageShot(
+      key: Key('landing-shot-${chapter.shot}'),
+      shot: chapter.shot,
+      wide: wide,
+      label: l.landingRealScreen,
+      alt: chapter.title,
+    );
+    final Widget content;
+    if (wide) {
+      final width = _wordsWidth(size.width);
+      content = Padding(
+        // Clear of the header above and the page's edge below.
+        padding: const EdgeInsets.fromLTRB(64, 88, 0, AppSpacing.xxl),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          // A short window shrinks the whole chapter rather than cutting it.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: width,
+              child: Column(
+                key: Key('landing-chapter-$index'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  kicker,
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    keepAll(chapter.title),
+                    style: theme.displaySmall?.copyWith(height: 1.1),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    keepAll(chapter.body),
+                    style: theme.titleMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w400,
+                      height: 1.6,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _Points(points: chapter.points),
+                  const SizedBox(height: AppSpacing.xl),
+                  shot,
+                ],
+              ),
+            ),
           ),
         ),
-      ],
-    );
+      );
+    } else {
+      content = Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 96, AppSpacing.xl, 0),
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              key: Key('landing-chapter-$index'),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                kicker,
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  keepAll(chapter.title),
+                  style: theme.headlineLarge?.copyWith(fontSize: 30, height: 1.1),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(width: 84, child: shot),
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(
+                      child: Text(
+                        keepAll(chapter.body),
+                        style: theme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.55,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return AnimatedBuilder(
       animation: scroll,
       builder: (context, child) {
@@ -941,19 +1045,147 @@ class _ChapterScreen extends StatelessWidget {
           child: Transform.translate(offset: Offset(0, 24 * (1 - p)), child: child),
         );
       },
-      child: SizedBox(
-        height: size.height,
-        width: size.width,
-        child: Padding(
-          padding: wide
-              ? const EdgeInsets.only(left: 64)
-              : const EdgeInsets.fromLTRB(AppSpacing.xl, 104, AppSpacing.xl, 0),
-          child: Align(
-            alignment: wide ? Alignment.centerLeft : Alignment.topLeft,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: wide ? math.min(460, size.width * 0.34) : 560),
-              child: text,
+      child: SizedBox(height: size.height, width: size.width, child: content),
+    );
+  }
+}
+
+/// What you see in a chapter's screen: one short line each, with a gold dot.
+class _Points extends StatelessWidget {
+  const _Points({required this.points});
+
+  /// One point per line.
+  final String points;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: AppColors.textPrimary,
+      height: 1.5,
+    );
+    final lines = points.split('\n').where((p) => p.trim().isNotEmpty);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final point in lines)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  // On the first line's middle.
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: AppColors.ember,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(child: Text(keepAll(point.trim()), style: style)),
+              ],
             ),
+          ),
+      ],
+    );
+  }
+}
+
+/// A real screen of the app for one chapter, in a window frame (a phone
+/// frame on a phone): `assets/landing/usage_<shot>_<wide|narrow>_<lang>.webp`,
+/// rendered from the app itself by `tool/landing_usage.py`. Without one in
+/// this language it shows the English one; without either, an empty frame.
+class _UsageShot extends StatelessWidget {
+  const _UsageShot({
+    super.key,
+    required this.shot,
+    required this.wide,
+    required this.label,
+    required this.alt,
+  });
+
+  /// learn, prove, remember or grow.
+  final String shot;
+  final bool wide;
+
+  /// The frame's caption ("From the app").
+  final String label;
+
+  /// What the picture is, for screen readers.
+  final String alt;
+
+  static String asset(String shot, {required bool wide, required String lang}) =>
+      'assets/landing/usage_${shot}_${wide ? 'wide' : 'narrow'}_$lang.webp';
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
+    const empty = ColoredBox(
+      key: Key('landing-shot-empty'),
+      color: AppColors.background,
+      child: Center(child: Icon(Icons.image_outlined, color: AppColors.outlineStrong)),
+    );
+    Widget picture(String language, Widget Function() otherwise) => Image.asset(
+      asset(shot, wide: wide, lang: language),
+      fit: BoxFit.cover,
+      alignment: Alignment.topCenter,
+      filterQuality: FilterQuality.medium,
+      gaplessPlayback: true,
+      errorBuilder: (context, error, stack) => otherwise(),
+    );
+    final image = picture(lang, () => lang == 'en' ? empty : picture('en', () => empty));
+    // A hairline window edge on a desktop; a phone's dark bezel on a phone.
+    final edge = wide ? 1.0 : 3.0;
+    final corner = wide ? AppRadius.card : 14.0;
+    return Semantics(
+      label: alt,
+      image: true,
+      child: Container(
+        padding: EdgeInsets.all(edge),
+        decoration: BoxDecoration(
+          color: wide ? AppColors.outline : AppColors.textPrimary,
+          borderRadius: BorderRadius.circular(corner),
+          boxShadow: AppShadows.float,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(corner - edge),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (wide)
+                Container(
+                  height: 30,
+                  color: AppColors.sidebar,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Container(
+                          width: 9,
+                          height: 9,
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: const BoxDecoration(
+                            color: AppColors.outlineStrong,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      const Spacer(),
+                      Text(
+                        label,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              AspectRatio(aspectRatio: wide ? 1440 / 900 : 390 / 844, child: image),
+            ],
           ),
         ),
       ),

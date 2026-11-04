@@ -237,6 +237,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chapterGrowKicker => '04 · 成长';
 
   @override
+  String get chapterGrowPoints =>
+      '每门课程都挂在今年的某个主线任务下面\n每证明一个知识点，人生树上就亮起一颗星\n点一颗星，就能看到它来自哪门课、哪个节点';
+
+  @override
   String get chapterGrowTitle => '你的整个人生，一棵树。';
 
   @override
@@ -244,6 +248,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chapterLearnKicker => '01 · 学';
+
+  @override
+  String get chapterLearnPoints =>
+      '说出想学什么，向导会问几个问题帮你缩小范围\n它会找来真实的大学课程大纲，铺成一张知识地图\n前置节点都证明了，下一个节点才会解锁';
 
   @override
   String get chapterLearnTitle => '想学什么都行，拿到真实的课程大纲。';
@@ -255,10 +263,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chapterProveKicker => '02 · 证明';
 
   @override
+  String get chapterProvePoints =>
+      '审核官像新手一样不停追问“为什么”\n它会故意埋一个错误，看你能不能识破\n就算通过了，质疑者还会再复核一次';
+
+  @override
   String get chapterRememberBody => '答错了就写下原因。它会变成一张教训卡，审核官下次会专门提起，同一个误解没法溜过去两次。';
 
   @override
   String get chapterRememberKicker => '03 · 记住';
+
+  @override
+  String get chapterRememberPoints =>
+      '答错了，就写下自己误解了什么\n这段反思会变成一张教训卡\n下次审核会把相关的教训翻出来再问';
 
   @override
   String get characterSheet => '角色卡';
@@ -481,6 +497,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get journal => '日记';
+
+  @override
+  String get landingRealScreen => '真实界面';
 
   @override
   String get language => '语言';

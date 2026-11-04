@@ -238,6 +238,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get chapterGrowKicker => '04 · 성장하기';
 
   @override
+  String get chapterGrowPoints =>
+      '모든 강좌는 올해의 메인 퀘스트 아래에 모여요\n증명한 개념마다 인생 나무에 별이 하나씩 켜져요\n별을 누르면 어느 강좌의 어떤 노드인지 보여요';
+
+  @override
   String get chapterGrowTitle => '당신의 삶 전체가, 나무 한 그루.';
 
   @override
@@ -245,6 +249,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get chapterLearnKicker => '01 · 배우기';
+
+  @override
+  String get chapterLearnPoints =>
+      '배우고 싶은 걸 말하면 가이드가 몇 가지 질문으로 범위를 좁혀요\n실제 대학 강의계획서를 찾아 개념 지도로 펼쳐 줘요\n선수 개념을 증명해야 다음 노드가 열려요';
 
   @override
   String get chapterLearnTitle => '무엇이든 고르면, 진짜 강의계획서가 와요.';
@@ -257,11 +265,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get chapterProveKicker => '02 · 증명하기';
 
   @override
+  String get chapterProvePoints =>
+      '심사관이 초보자처럼 계속 “왜?”라고 물어요\n일부러 틀린 말을 섞어 알아채는지 확인해요\n통과해도 반론자가 한 번 더 검증해요';
+
+  @override
   String get chapterRememberBody =>
       '틀리면 왜 틀렸는지 적어요. 그게 교훈 카드가 되고, 심사관이 다음에 꼭 꺼내 와요. 같은 오개념이 두 번 빠져나갈 순 없어요.';
 
   @override
   String get chapterRememberKicker => '03 · 기억하기';
+
+  @override
+  String get chapterRememberPoints =>
+      '틀리면 무엇을 오해했는지 직접 적어요\n그 반성이 교훈 카드로 남아요\n다음 심사에서 관련 교훈을 다시 꺼내 물어요';
 
   @override
   String get characterSheet => '캐릭터 시트';
@@ -484,6 +500,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get journal => '일기';
+
+  @override
+  String get landingRealScreen => '실제 앱 화면';
 
   @override
   String get language => '언어';

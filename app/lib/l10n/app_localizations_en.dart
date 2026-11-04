@@ -241,6 +241,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chapterGrowKicker => '04 · Grow';
 
   @override
+  String get chapterGrowPoints =>
+      'Every course hangs under one of this year\'s main quests\nEach idea you prove lights a star in your life tree\nTap a star to see which course and node it came from';
+
+  @override
   String get chapterGrowTitle => 'Your whole life, one tree.';
 
   @override
@@ -249,6 +253,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chapterLearnKicker => '01 · Learn';
+
+  @override
+  String get chapterLearnPoints =>
+      'Say what you want to learn; the Guide asks a few questions to pin it down\nIt finds a real university syllabus and lays it out as a map of ideas\nA node opens once the ones it requires are proven';
 
   @override
   String get chapterLearnTitle => 'Pick anything. Get a real syllabus.';
@@ -261,11 +269,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chapterProveKicker => '02 · Prove';
 
   @override
+  String get chapterProvePoints =>
+      'The Auditor keeps asking “why?” the way a beginner would\nIt slips in a deliberate mistake to see if you catch it\nEven a pass gets a second look from the Challenger';
+
+  @override
   String get chapterRememberBody =>
       'Get it wrong and you write down why. It becomes a lesson card, and the Auditor brings it up next time, so the same misconception can\'t sneak past twice.';
 
   @override
   String get chapterRememberKicker => '03 · Remember';
+
+  @override
+  String get chapterRememberPoints =>
+      'Missed it? You write down what you misunderstood\nThat becomes a lesson card you keep\nThe next audit brings the related lessons back up';
 
   @override
   String get characterSheet => 'Character sheet';
@@ -490,6 +506,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get journal => 'Journal';
+
+  @override
+  String get landingRealScreen => 'From the app';
 
   @override
   String get language => 'Language';
