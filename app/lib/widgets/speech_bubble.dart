@@ -6,7 +6,7 @@ import 'vocabulary.dart';
 import '../l10n/l10n.dart';
 
 /// Where the small tail of a [SpeechBubble] points (toward the avatar).
-enum BubbleTail { none, bottomLeft, bottomCenter, bottomRight, left, right }
+enum BubbleTail { none, top, bottomLeft, bottomCenter, bottomRight, left, right }
 
 /// Her speech bubble (`docs/DESIGN.md` Section 3): `surfaceHigh` fill, no
 /// border, radius 20, a small tail toward the avatar. With [speaker] the
@@ -61,6 +61,17 @@ class SpeechBubble extends StatelessWidget {
     switch (tail) {
       case BubbleTail.none:
         laidOut = body;
+      case BubbleTail.top:
+        laidOut = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CustomPaint(
+              size: Size(_tail * 1.6, _tail),
+              painter: _TailPainter(_Dir.up),
+            ),
+            body,
+          ],
+        );
       case BubbleTail.bottomLeft:
       case BubbleTail.bottomCenter:
       case BubbleTail.bottomRight:
@@ -144,7 +155,7 @@ class SpeechBubble extends StatelessWidget {
   }
 }
 
-enum _Dir { down, left, right }
+enum _Dir { up, down, left, right }
 
 class _TailPainter extends CustomPainter {
   const _TailPainter(this.dir);
@@ -155,6 +166,11 @@ class _TailPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final path = Path();
     switch (dir) {
+      case _Dir.up:
+        path
+          ..moveTo(0, size.height + 1)
+          ..lineTo(size.width, size.height + 1)
+          ..lineTo(size.width / 2, 0);
       case _Dir.down:
         path
           ..moveTo(0, -1)
@@ -283,4 +299,41 @@ class _Slide extends GradientTransform {
   @override
   Matrix4? transform(Rect bounds, {TextDirection? textDirection}) =>
       Matrix4.translationValues(dx, 0, 0);
+}
+
+/// One line of a phone conversation (`docs/DESIGN.md` §3.y): hers on the left
+/// in `surfaceHigh`, sharp at the top left toward her figure above the thread
+/// ([AppRadius.herBubbleBorder]); the user's on the right in `userBubble`
+/// ([AppRadius.userBubbleBorder]). Each leaves a gutter on the far side.
+class ThreadBubble extends StatelessWidget {
+  const ThreadBubble({
+    super.key,
+    required this.child,
+    this.fromUser = false,
+    this.padding = const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+  });
+
+  final Widget child;
+  final bool fromUser;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: fromUser ? AppSpacing.xxl : 0,
+        right: fromUser ? 0 : AppSpacing.xxl,
+      ),
+      child: Align(
+        alignment: fromUser ? Alignment.centerRight : Alignment.centerLeft,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: fromUser ? AppColors.userBubble : AppColors.surfaceHigh,
+            borderRadius: fromUser ? AppRadius.userBubbleBorder : AppRadius.herBubbleBorder,
+          ),
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
+    );
+  }
 }

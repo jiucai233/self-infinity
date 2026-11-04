@@ -42,9 +42,14 @@ class VerdictCard extends StatelessWidget {
     required this.onBack,
     this.attempt,
     this.delta,
+    this.asBubble = false,
   });
 
   final VerdictResult verdict;
+
+  /// A phone: the card is her message in the thread — her bubble's fill and
+  /// shape ([AppRadius.herBubbleBorder]), no edge, no shadow, same size.
+  final bool asBubble;
 
   /// Which audit of this node this was (1 = the first); null shows the plain
   /// `VERDICT` label.
@@ -178,12 +183,14 @@ class VerdictCard extends StatelessWidget {
       key: const Key('audit-verdict'),
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.md, AppSpacing.md, AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppRadius.cardBorder,
-        border: Border.all(color: passed ? AppColors.ember : AppColors.outline),
-        boxShadow: AppShadows.paper,
-      ),
+      decoration: asBubble
+          ? BoxDecoration(color: AppColors.surfaceHigh, borderRadius: AppRadius.herBubbleBorder)
+          : BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: AppRadius.cardBorder,
+              border: Border.all(color: passed ? AppColors.ember : AppColors.outline),
+              boxShadow: AppShadows.paper,
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

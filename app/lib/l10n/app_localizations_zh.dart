@@ -470,6 +470,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get lessons => '教训';
 
   @override
+  String nodeBestScore(int score) {
+    return '最高 $score';
+  }
+
+  @override
+  String nodeTries(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '试过 $count 次',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nodeNoTriesYet => '还没试过';
+
+  @override
+  String get nodeDetails => '详情';
+
+  @override
+  String get nodeHideDetails => '收起';
+
+  @override
   String get challengeWholeHint => '讲清其中几个部分，通过后它下面的节点全部算通关。';
 
   @override
@@ -541,9 +565,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get next => '下一页';
-
-  @override
-  String get noAttemptsYet => '还没有尝试记录。';
 
   @override
   String get noAuditsYet => '还没有审核记录。';

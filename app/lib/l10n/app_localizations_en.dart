@@ -477,6 +477,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lessons => 'Lessons';
 
   @override
+  String nodeBestScore(int score) {
+    return 'Best $score';
+  }
+
+  @override
+  String nodeTries(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count attempts',
+      one: '1 attempt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nodeNoTriesYet => 'No attempts yet';
+
+  @override
+  String get nodeDetails => 'Details';
+
+  @override
+  String get nodeHideDetails => 'Hide details';
+
+  @override
   String get challengeWholeHint =>
       'Explain a few of its parts; pass and every node under it is cleared.';
 
@@ -549,9 +574,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get next => 'Next';
-
-  @override
-  String get noAttemptsYet => 'No attempts yet.';
 
   @override
   String get noAuditsYet => 'No audits yet.';

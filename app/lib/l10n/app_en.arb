@@ -231,6 +231,25 @@
   "lessonCardCreated": "Lesson card created.",
   "lessonCards": "Lesson cards",
   "lessons": "Lessons",
+  "nodeBestScore": "Best {score}",
+  "@nodeBestScore": {
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "nodeTries": "{count, plural, =1{1 attempt} other{{count} attempts}}",
+  "@nodeTries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "nodeNoTriesYet": "No attempts yet",
+  "nodeDetails": "Details",
+  "nodeHideDetails": "Hide details",
   "challengeWholeHint": "Explain a few of its parts; pass and every node under it is cleared.",
   "levelBar": "Lv {level} · {progress}/5",
   "@levelBar": {
@@ -271,7 +290,6 @@
   "newHere": "New here?",
   "newNodesUnlocked": "New nodes unlocked",
   "next": "Next",
-  "noAttemptsYet": "No attempts yet.",
   "noAuditsYet": "No audits yet.",
   "noConversationYet": "No conversation yet.",
   "noDescriptionYet": "No description yet.",

@@ -234,6 +234,15 @@ abstract final class AppRadius {
     topRight: Radius.circular(bubbleCorner),
   );
 
+  /// Her chat bubble on a phone: the mirror of [userBubbleBorder], sharp at
+  /// the top left, toward her figure above the thread.
+  static BorderRadius get herBubbleBorder => const BorderRadius.only(
+    topLeft: Radius.circular(bubbleCorner),
+    topRight: Radius.circular(bubble),
+    bottomLeft: Radius.circular(bubble),
+    bottomRight: Radius.circular(bubble),
+  );
+
   static BorderRadius get cardBorder => BorderRadius.circular(card);
   static BorderRadius get panelBorder => BorderRadius.circular(panel);
   static BorderRadius get chipBorder => BorderRadius.circular(chip);

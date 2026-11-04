@@ -42,11 +42,8 @@ class SkillNodeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final theme = Theme.of(context).textTheme;
-    final audits = overview.audits.where((a) => a.status != AuditStatus.active).toList();
-    final best = audits
-        .map((a) => a.score)
-        .whereType<int>()
-        .fold<int?>(null, (m, s) => m == null || s > m ? s : m);
+    final audits = finishedAudits(overview);
+    final best = bestScore(audits);
     return _PaperStack(
       key: const Key('skill-node-card'),
       child: Column(
@@ -111,19 +108,7 @@ class SkillNodeCard extends StatelessWidget {
               ],
             ),
           ),
-          _SectionLabel(l.auditHistory),
-          if (audits.isEmpty)
-            Text(
-              l.noAuditsYet,
-              key: const Key('skill-no-audits'),
-              style: theme.bodyMedium?.copyWith(color: AppColors.textTertiary),
-            )
-          else
-            for (final a in audits.take(8)) _AuditRow(audit: a),
-          if (lessons.isNotEmpty) ...[
-            _SectionLabel(l.lessonCards),
-            for (final p in lessons.take(3)) _LessonRow(lesson: p),
-          ],
+          SkillNodeHistory(audits: audits, lessons: lessons),
           if (actions.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xl),
             Padding(
@@ -136,6 +121,167 @@ class SkillNodeCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// The node's finished audits, newest first (one in progress is left out).
+List<AuditSummary> finishedAudits(SkillOverview overview) =>
+    overview.audits.where((a) => a.status != AuditStatus.active).toList();
+
+/// The best score of [audits]; null when none has one.
+int? bestScore(List<AuditSummary> audits) =>
+    audits.map((a) => a.score).whereType<int>().fold<int?>(null, (m, s) => m == null || s > m ? s : m);
+
+/// The audit history (each row opens its replay) and the lesson cards: the
+/// lower half of the node card, and on a phone what “Details” opens.
+class SkillNodeHistory extends StatelessWidget {
+  const SkillNodeHistory({super.key, required this.audits, required this.lessons});
+
+  final List<AuditSummary> audits;
+  final List<Principle> lessons;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionLabel(l.auditHistory),
+        if (audits.isEmpty)
+          Text(
+            l.noAuditsYet,
+            key: const Key('skill-no-audits'),
+            style: theme.bodyMedium?.copyWith(color: AppColors.textTertiary),
+          )
+        else
+          for (final a in audits.take(8)) _AuditRow(audit: a),
+        if (lessons.isNotEmpty) ...[
+          _SectionLabel(l.lessonCards),
+          for (final p in lessons.take(3)) _LessonRow(lesson: p),
+        ],
+      ],
+    );
+  }
+}
+
+/// The node on a phone, as a quiet block under her line: the title (two
+/// lines at most) with the `⋯` [menu], one muted [line] (status · course ·
+/// main quest), one number line (`Best 95 · 2 attempts` or `No attempts
+/// yet`) and a “Details” that opens the audit history, the lesson cards and
+/// [details] (the contents) in place.
+class SkillNodeBlock extends StatefulWidget {
+  const SkillNodeBlock({
+    super.key,
+    required this.overview,
+    required this.line,
+    required this.lessons,
+    required this.details,
+    this.menu,
+  });
+
+  final SkillOverview overview;
+
+  /// Status · course · main quest, already joined.
+  final String line;
+  final List<Principle> lessons;
+
+  /// Shown under the history once “Details” is open.
+  final Widget details;
+  final Widget? menu;
+
+  @override
+  State<SkillNodeBlock> createState() => _SkillNodeBlockState();
+}
+
+class _SkillNodeBlockState extends State<SkillNodeBlock> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context).textTheme;
+    final audits = finishedAudits(widget.overview);
+    final best = bestScore(audits);
+    final numbers = audits.isEmpty
+        ? l.nodeNoTriesYet
+        : [if (best != null) l.nodeBestScore(best), l.nodeTries(audits.length)].join(' · ');
+    final muted = theme.bodySmall?.copyWith(color: AppColors.textTertiary);
+    return Column(
+      key: const Key('skill-node-block'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                keepAll(widget.overview.skill.title),
+                key: const Key('skill-title'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.headlineMedium,
+              ),
+            ),
+            ?widget.menu,
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          keepAll(widget.line),
+          key: const Key('skill-status-line'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: muted,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                keepAll(numbers),
+                key: const Key('skill-numbers'),
+                style: theme.bodyLarge,
+              ),
+            ),
+            TextButton(
+              key: const Key('skill-details'),
+              onPressed: () => setState(() => _open = !_open),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_open ? l.nodeHideDetails : l.nodeDetails),
+                  Icon(
+                    _open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: _open
+              ? Column(
+                  key: const Key('skill-details-body'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SkillNodeHistory(audits: audits, lessons: widget.lessons),
+                    const SizedBox(height: AppSpacing.xl),
+                    widget.details,
+                  ],
+                )
+              : const SizedBox(width: double.infinity),
+        ),
+      ],
     );
   }
 }

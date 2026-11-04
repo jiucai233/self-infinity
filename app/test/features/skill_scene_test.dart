@@ -1,7 +1,8 @@
-// Scene 4: the node overview — the node card (kicker, title, status chip,
-// Best / Attempts / Lessons, the audit history, the ink Take it on), the
-// contents card (one row per material), the avatar asking Ready to try?,
-// “Attempts” as cards on a wide screen, questions to the chat.
+// Scene 4: the node overview — on a wide screen the node card (kicker, title,
+// status chip, Best / Attempts / Lessons, the audit history, the ink Take it
+// on), the contents card (one row per material) and the avatar asking Ready
+// to try?; on a phone her line first, the node as a quiet block with Details,
+// Take it on pinned above the input; questions to the chat.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,7 +50,7 @@ Future<void> tapShown(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
-/// The right panel “Attempts” (wide screens).
+/// The right panel; the node page has none.
 Finder get panel => find.byKey(const Key('history-panel'));
 
 void main() {
@@ -393,13 +394,13 @@ void main() {
       expect(find.text('route:/skill/6/audit'), findsOneWidget);
     });
 
-    testWidgets('on a phone Take it on spans the card and opens the audit', (tester) async {
+    testWidgets('on a phone Take it on spans the page and opens the audit', (tester) async {
       await pumpSkill(tester, api, 6, size: phoneScreen);
       final button = find.byKey(const Key('start-audit'));
-      final card = tester.getRect(find.byKey(const Key('skill-node-card')));
-      // Full width inside the card's padding.
-      expect(tester.getSize(button).width, greaterThan(card.width - 80));
-      await tapShown(tester, button);
+      final block = tester.getRect(find.byKey(const Key('skill-node-block')));
+      expect(tester.getSize(button).width, greaterThan(block.width - 8));
+      await tester.tap(button);
+      await tester.pumpAndSettle();
       expect(find.text('route:/skill/6/audit'), findsOneWidget);
     });
 
@@ -451,84 +452,22 @@ void main() {
     });
   });
 
-  group('Attempts: the audits of this node as cards', () {
-    testWidgets('empty', (tester) async {
-      await pumpSkill(tester, api, 6);
-      expect(find.text('No attempts yet.'), findsOneWidget);
-      expect(find.descendant(of: panel, matching: find.text('Attempts')), findsOneWidget);
-    });
-
-    testWidgets('a card per audit: date, a Passed/Failed chip and the score, newest first', (
-      tester,
-    ) async {
+  group('the audit history lives only in the node card (wide screens)', () {
+    testWidgets('no right panel; the card lists this node\u2019s audits', (tester) async {
       await failAudit(api, 6);
       await passAudit(api, 6);
       await pumpSkill(tester, api, 6);
-      final cards = find.byKey(const Key('audit-card'));
-      expect(cards, findsNWidgets(2));
-      final newest = textsIn(tester, cards.at(0)).toList();
-      final oldest = textsIn(tester, cards.at(1)).toList();
-      expect(newest[0], matches(r'^[A-Z][a-z]{2} \d{1,2}, \d{4} \d{2}:\d{2}$'));
-      expect(newest[1], endsWith(' pts'));
-      expect(newest, contains('Passed'));
-      expect(oldest, containsAll(['45 pts', 'Failed']));
-      // A card is a white card with a hairline.
-      final decoration = tester.widget<DecoratedBox>(cards.first).decoration as BoxDecoration;
-      expect(decoration.color, AppColors.surface);
-      expect(decoration.borderRadius, BorderRadius.circular(16));
+      expect(panel, findsNothing);
+      expect(find.byKey(const Key('collapse-right')), findsNothing);
+      expect(find.byKey(const Key('audit-card')), findsNothing);
+      expect(find.byKey(const Key('audit-score')), findsNWidgets(2));
     });
 
-    testWidgets('a card opens the replay of its audit', (tester) async {
-      final failed = await failAudit(api, 6);
-      await pumpSkill(tester, api, 6);
-      await tester.tap(find.byKey(const Key('audit-card')));
-      await tester.pumpAndSettle();
-      expect(find.text('route:${AppRoutes.replay(failed.sessionId)}'), findsOneWidget);
-    });
-
-    testWidgets('a fail not reflected on yet says so; a reflected one and a pass do not', (
-      tester,
-    ) async {
-      final reflected = await failAudit(api, 6);
-      await api.submitReflection(reflected.sessionId, 'I memorized the formula');
-      await failAudit(api, 6);
-      await passAudit(api, 6);
-      await pumpSkill(tester, api, 6);
-      final cards = find.byKey(const Key('audit-card'));
-      bool labelled(int i) => textsIn(tester, cards.at(i)).contains('Not reflected on yet');
-      expect([labelled(0), labelled(1), labelled(2)], [false, true, false]); // pass, fail, reflected fail
-      final label = tester.widget<Text>(
-        find.descendant(of: panel, matching: find.text('Not reflected on yet')),
-      );
-      expect(label.style!.color, AppColors.textTertiary);
-    });
-
-    testWidgets('the chips are colored: green for a pass, red for a fail', (tester) async {
-      await failAudit(api, 6);
-      await passAudit(api, 6);
-      await pumpSkill(tester, api, 6);
-      Finder inPanel(String label) => find.descendant(of: panel, matching: find.text(label));
-      Color colorOf(String label) => tester.widget<Text>(inPanel(label)).style!.color!;
-      Color fillOf(String label) =>
-          (tester
-                      .widget<DecoratedBox>(
-                        find
-                            .ancestor(of: inPanel(label), matching: find.byType(DecoratedBox))
-                            .first,
-                      )
-                      .decoration
-                  as BoxDecoration)
-              .color!;
-      expect(colorOf('Passed'), AppColors.success);
-      expect(fillOf('Passed'), AppColors.successSoft);
-      expect(colorOf('Failed'), AppColors.danger);
-      expect(fillOf('Failed'), AppColors.dangerSoft);
-    });
-
-    testWidgets('only this node’s audits', (tester) async {
+    testWidgets('a node with no audits shows none, and no panel either', (tester) async {
       await passAudit(api, 6);
       await pumpSkill(tester, api, 7);
-      expect(find.text('No attempts yet.'), findsOneWidget);
+      expect(panel, findsNothing);
+      expect(find.byKey(const Key('audit-score')), findsNothing);
     });
   });
 
@@ -647,31 +586,151 @@ void main() {
     });
   });
 
-  testWidgets('a phone: the node card, then the avatar, then the contents; nothing overflows', (
-    tester,
-  ) async {
-    await api.createSearchPlan(5, gap: 'something');
-    await pumpSkill(tester, api, 5, size: phoneScreen);
-    expect(tester.takeException(), isNull);
-    final card = find.byKey(const Key('skill-node-card'));
-    expect(tester.getBottomLeft(card).dy, lessThan(tester.getTopLeft(find.byType(Avatar)).dy));
-    expect(tester.getBottomLeft(find.byType(Avatar)).dy, lessThan(tester.getTopLeft(contents).dy));
-  });
+  group('a phone: she talks about the node', () {
+    final block = find.byKey(const Key('skill-node-block'));
+    String phoneBubble(WidgetTester tester) => textsIn(tester, find.byKey(const Key('skill-bubble'))).join();
 
-  group('the node card', () {
-    String number(WidgetTester tester, String key) => textsIn(tester, find.byKey(Key(key))).last;
-
-    testWidgets('on a phone: Best / Attempts / Lessons and the audit history, no right drawer', (
+    testWidgets('her line comes first, without her name; then the node; no card, no contents', (
       tester,
     ) async {
-      final failed = await failAudit(api, 6);
-      await passAudit(api, 6);
-      await pumpSkill(tester, api, 6, size: phoneScreen);
+      await api.createSearchPlan(5, gap: 'something');
+      await pumpSkill(tester, api, 5, size: phoneScreen);
+      expect(tester.takeException(), isNull);
+      final said = find.byKey(const Key('skill-bubble'));
+      expect(tester.getTopLeft(said).dy, lessThan(tester.getTopLeft(block).dy));
+      expect(tester.getBottomLeft(find.byType(Avatar)).dy, lessThan(tester.getTopLeft(block).dy));
+      expect(phoneBubble(tester), 'Still locked. Clear “Discriminant” first.');
+      expect(find.byKey(const Key('speaker-name')), findsNothing);
+      expect(find.text('Guide'), findsNothing);
+      expect(find.byKey(const Key('skill-node-card')), findsNothing);
+      expect(find.byKey(const Key('skill-kicker')), findsNothing);
+      expect(find.byKey(const Key('skill-chips')), findsNothing);
+      expect(contents, findsNothing);
       expect(find.byKey(const Key('open-right-drawer')), findsNothing);
       expect(panel, findsNothing);
+    });
+
+    testWidgets('one muted line: status · course · main quest', (tester) async {
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      final line = tester.widget<Text>(find.byKey(const Key('skill-status-line')));
+      expect(line.data, startsWith('Ready · High School Math'));
+      expect(line.maxLines, 1);
+    });
+
+    testWidgets('one number line: Best and attempts, or none yet', (tester) async {
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      expect(tester.widget<Text>(find.byKey(const Key('skill-numbers'))).data, 'No attempts yet');
+      await failAudit(api, 6);
+      await passAudit(api, 6);
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      expect(tester.widget<Text>(find.byKey(const Key('skill-numbers'))).data, matches(RegExp(r'^Best \d+ · 2 attempts$')));
       for (final key in ['skill-best', 'skill-attempts', 'skill-lessons']) {
-        expect(tester.getRect(find.byKey(Key(key))).bottom, lessThan(phoneScreen.height));
+        expect(find.byKey(Key(key)), findsNothing);
       }
+    });
+
+    testWidgets('the history, lessons and contents wait behind Details', (tester) async {
+      final failed = await failAudit(api, 6);
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      final row = find.byKey(Key('audit-row-${failed.sessionId}'));
+      expect(row, findsNothing);
+      expect(find.text('Audit history'), findsNothing);
+      expect(contents, findsNothing);
+      await tester.tap(find.byKey(const Key('skill-details')));
+      await tester.pumpAndSettle();
+      expect(row, findsOneWidget);
+      expect(contents, findsOneWidget);
+      expect(find.text('Hide details'), findsOneWidget);
+      await tapShown(tester, row);
+      expect(find.text('route:${AppRoutes.replay(failed.sessionId)}'), findsOneWidget);
+    });
+
+    testWidgets('Details closes again', (tester) async {
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      await tester.tap(find.byKey(const Key('skill-details')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('skill-no-audits')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('skill-details')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('skill-no-audits')), findsNothing);
+    });
+
+    testWidgets('Take it on is pinned above the input: visible on 390×844 without scrolling', (
+      tester,
+    ) async {
+      await failAudit(api, 6);
+      await passAudit(api, 6);
+      await pumpSkill(tester, api, 6, size: const Size(390, 844));
+      await tester.tap(find.byKey(const Key('skill-details')));
+      await tester.pumpAndSettle();
+      final button = tester.getRect(find.byKey(const Key('start-audit')));
+      expect(button.bottom, lessThanOrEqualTo(844));
+      expect(button.bottom, lessThanOrEqualTo(tester.getTopLeft(find.byKey(const Key('stage-input'))).dy));
+      expect(
+        find.ancestor(of: find.byKey(const Key('start-audit')), matching: find.byType(Scrollable)),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the ⋯ menu sits beside the title', (tester) async {
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      final menu = find.byKey(const Key('skill-menu'));
+      expect(menu, findsOneWidget);
+      expect(find.descendant(of: block, matching: menu), findsOneWidget);
+    });
+
+    testWidgets('a long title wraps to two lines; the muted line under it', (tester) async {
+      await api.editSkill(6, title: 'The discriminant of a quadratic and what its sign says about the roots');
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      final title = find.byKey(const Key('skill-title'));
+      expect(tester.widget<Text>(title).maxLines, 2);
+      expect(tester.getSize(title).height, greaterThan(50)); // two lines of 24 px
+      expect(
+        tester.getTopLeft(find.byKey(const Key('skill-status-line'))).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(title).dy),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a locked boss: no Take it on; the whole-branch challenge is a quiet text button', (
+      tester,
+    ) async {
+      await pumpSkill(tester, api, 5, size: phoneScreen);
+      expect(find.byKey(const Key('start-audit')), findsNothing);
+      final testOut = find.byKey(const Key('test-out'));
+      expect(tester.widget(testOut), isA<TextButton>());
+      expect(find.descendant(of: testOut, matching: find.text('Take the whole branch at once')), findsOneWidget);
+      expect(find.byType(FilledButton), findsNothing);
+      await tester.tap(testOut);
+      await tester.pumpAndSettle();
+      expect(find.text('route:${AppRoutes.challenge(5)}'), findsOneWidget);
+    });
+
+    testWidgets('an open leaf has no whole-branch challenge', (tester) async {
+      await pumpSkill(tester, api, 6, size: phoneScreen);
+      expect(find.byKey(const Key('test-out')), findsNothing);
+    });
+  });
+
+  group('the node card (wide screens, unchanged)', () {
+    String number(WidgetTester tester, String key) => textsIn(tester, find.byKey(Key(key))).last;
+
+    testWidgets('the card, the contents and her on the right; no phone block', (tester) async {
+      await pumpSkill(tester, api, 6);
+      final card = find.byKey(const Key('skill-node-card'));
+      expect(card, findsOneWidget);
+      expect(find.byKey(const Key('skill-node-block')), findsNothing);
+      expect(find.byKey(const Key('skill-phone-actions')), findsNothing);
+      expect(tester.getTopLeft(find.byType(Avatar)).dx, greaterThan(tester.getTopRight(card).dx));
+      expect(tester.getTopLeft(contents).dy, greaterThan(tester.getBottomLeft(card).dy));
+      expect(find.descendant(of: card, matching: find.byKey(const Key('start-audit'))), findsOneWidget);
+    });
+
+    testWidgets('Best / Attempts / Lessons and the audit history', (tester) async {
+      final failed = await failAudit(api, 6);
+      await passAudit(api, 6);
+      await pumpSkill(tester, api, 6);
       expect(number(tester, 'skill-attempts'), '2');
       expect(number(tester, 'skill-best'), isNot('—'));
       expect(textsIn(tester, find.byKey(const Key('skill-best'))).first, 'Best');
@@ -679,7 +738,7 @@ void main() {
     });
 
     testWidgets('no audits yet: a dash and zeros', (tester) async {
-      await pumpSkill(tester, api, 6, size: phoneScreen);
+      await pumpSkill(tester, api, 6);
       expect(number(tester, 'skill-best'), '—');
       expect(number(tester, 'skill-attempts'), '0');
       expect(find.byKey(const Key('skill-no-audits')), findsOneWidget);
@@ -687,34 +746,25 @@ void main() {
 
     testWidgets('an audit row opens its replay', (tester) async {
       final failed = await failAudit(api, 6);
-      await pumpSkill(tester, api, 6, size: phoneScreen);
+      await pumpSkill(tester, api, 6);
       await tapShown(tester, find.byKey(Key('audit-row-${failed.sessionId}')));
       expect(find.text('route:${AppRoutes.replay(failed.sessionId)}'), findsOneWidget);
     });
 
-    testWidgets('a long title wraps to two lines on a phone; the chips have their own line', (
-      tester,
-    ) async {
-      await api.editSkill(6, title: 'The discriminant of a quadratic and what its sign says about the roots');
-      await pumpSkill(tester, api, 6, size: phoneScreen);
-      final title = find.byKey(const Key('skill-title'));
-      expect(tester.getSize(title).height, greaterThan(50)); // two lines of 24 px
+    testWidgets('the chips have their own line under the name', (tester) async {
+      await pumpSkill(tester, api, 6);
       expect(
         tester.getTopLeft(find.byKey(const Key('skill-chips'))).dy,
-        greaterThanOrEqualTo(tester.getBottomLeft(title).dy),
+        greaterThanOrEqualTo(tester.getBottomLeft(find.byKey(const Key('skill-title'))).dy),
       );
-      expect(tester.takeException(), isNull);
     });
 
     testWidgets('a locked boss: no Take it on; the whole-branch challenge says what it does', (
       tester,
     ) async {
-      await pumpSkill(tester, api, 5, size: phoneScreen);
+      await pumpSkill(tester, api, 5);
       expect(find.byKey(const Key('start-audit')), findsNothing);
-      expect(
-        find.descendant(of: find.byKey(const Key('test-out')), matching: find.text('Take the whole branch at once')),
-        findsOneWidget,
-      );
+      expect(tester.widget(find.byKey(const Key('test-out'))), isA<OutlinedButton>());
       expect(find.byKey(const Key('test-out-hint')), findsOneWidget);
       await tapShown(tester, find.byKey(const Key('test-out')));
       expect(find.text('route:${AppRoutes.challenge(5)}'), findsOneWidget);

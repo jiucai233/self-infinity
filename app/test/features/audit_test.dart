@@ -150,6 +150,13 @@ void main() {
         tester.widget<Text>(find.byKey(const Key('audit-style'))).data,
         'A ten-year-old · One level deeper',
       );
+      // A phone keeps it as a tiny line under her, with no name beside her.
+      await pumpAudit(tester, styled, 1, size: phoneScreen);
+      expect(
+        tester.getTopLeft(find.byKey(const Key('audit-style'))).dy,
+        greaterThan(tester.getBottomLeft(find.byType(Avatar).first).dy - 1),
+      );
+      expect(find.text('Auditor'), findsNothing);
 
       await pumpAudit(tester, api, 1);
       expect(find.byKey(const Key('audit-style')), findsNothing);

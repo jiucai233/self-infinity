@@ -44,9 +44,14 @@ class OrbAvatar extends StatefulWidget {
     this.mood = AvatarMood.smile,
     this.state = AvatarState.idle,
     this.size = 220,
+    this.hint,
   });
 
   final String agent;
+
+  /// What tapping the ball does, as its tooltip and semantic hint (a phone
+  /// shows no hint line; the glow invites the tap).
+  final String? hint;
 
   /// Built with the hover state, so the content can react too.
   final Widget orb;
@@ -218,9 +223,10 @@ class _OrbAvatarState extends State<OrbAvatar> with SingleTickerProviderStateMix
 
   Widget _ball(BuildContext context, double d, double scale) {
     final k = Avatar.unit(widget.agent, widget.size);
-    return Semantics(
+    final ball = Semantics(
       button: widget.onOrbTap != null,
       label: context.l10n.crystalBall,
+      hint: widget.hint,
       child: MouseRegion(
         cursor: widget.onOrbTap == null ? MouseCursor.defer : SystemMouseCursors.click,
         onEnter: (_) => _setHover(true),
@@ -253,6 +259,10 @@ class _OrbAvatarState extends State<OrbAvatar> with SingleTickerProviderStateMix
         ),
       ),
     );
+    final hint = widget.hint;
+    return hint == null
+        ? ball
+        : Tooltip(key: const Key('crystal-ball-hint'), message: hint, excludeFromSemantics: true, child: ball);
   }
 }
 

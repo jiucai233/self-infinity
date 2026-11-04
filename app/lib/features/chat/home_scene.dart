@@ -9,6 +9,7 @@ import '../../api/api.dart';
 import '../../api/life_tree.dart';
 import '../../api/models.dart';
 import '../../app/router.dart';
+import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../upload/file_picker_service.dart';
 import '../../voice/live_voice.dart';
@@ -34,6 +35,11 @@ import '../../l10n/l10n.dart';
 /// (with her name above it), the user's sent line stays above the input until
 /// she has answered, and the whole conversation is in the chat panel, which
 /// scene 1 does not have.
+///
+/// On a phone (below [AppLayout.wideBreakpoint]) it is only a talk with her:
+/// scene 1 is her figure with the ball, the greeting as her speech bubble and
+/// the suggestions as quick-reply chips under it; scene 5 is the thread of
+/// this visit, her small figure pinned on top.
 class HomeScene extends StatefulWidget {
   const HomeScene({super.key});
 
@@ -52,7 +58,12 @@ class _HomeSceneState extends State<HomeScene> {
   late final VoiceMode _voiceMode;
 
   final LastSaid _lastSaid = LastSaid();
+  final ScrollController _thread = ScrollController();
   bool _chatting = false;
+
+  /// The messages there were when the chat began: the phone's thread shows
+  /// only what came after (the rest is in the history drawer).
+  Set<int> _earlier = const {};
   ChatMessage? _reply;
 
   /// Everything she said in answer to the last message (a reply and, say, the
@@ -89,10 +100,18 @@ class _HomeSceneState extends State<HomeScene> {
     _chat.removeListener(_sendQueued);
     _voiceMode.dispose();
     _lastSaid.dispose();
+    _thread.dispose();
     _uploads.dispose();
     _input.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  /// The chat begins (scene 1 turns into scene 5): what was said before
+  /// stays out of the phone's thread.
+  void _beginChat() {
+    if (_chatting) return;
+    _earlier = {for (final m in _chat.messages) m.id};
   }
 
   // -- sending ---------------------------------------------------------------
@@ -111,6 +130,7 @@ class _HomeSceneState extends State<HomeScene> {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _chat.sending) return;
     final asked = _asked;
+    _beginChat();
     setState(() {
       _chatting = true;
       _error = null;
@@ -154,6 +174,7 @@ class _HomeSceneState extends State<HomeScene> {
       agent: 'front_desk',
       createdAt: DateTime.now().toUtc(),
     );
+    _beginChat();
     setState(() {
       _chatting = true;
       _asked = question;
@@ -194,6 +215,7 @@ class _HomeSceneState extends State<HomeScene> {
   /// and her last line into the bubble; a navigation is followed.
   void _onGuideSaved(List<ChatMessage> saved) {
     if (!mounted) return;
+    _beginChat();
     _chat.addSaved(saved);
     final assistants = saved.where((m) => !m.isUser).toList();
     if (assistants.isEmpty) return;
@@ -211,6 +233,7 @@ class _HomeSceneState extends State<HomeScene> {
   Future<void> _startVoice() async {
     final ok = await _voiceMode.start();
     if (!mounted || !ok) return;
+    _beginChat();
     setState(() => _chatting = true);
   }
 
@@ -219,6 +242,7 @@ class _HomeSceneState extends State<HomeScene> {
   @override
   Widget build(BuildContext context) {
     final chat = context.watch<ChatController>();
+    final phone = !AppLayout.isWide(context);
     return StageScaffold(
       history: const ChatHistoryPanel(),
       showHistoryPanel: _chatting,
@@ -231,7 +255,9 @@ class _HomeSceneState extends State<HomeScene> {
             builder: (context, _) => Column(
               children: [
                 Expanded(
-                  child: LayoutBuilder(
+                  child: phone && (_chatting || _voiceMode.active)
+                      ? _phoneThread(context, chat)
+                      : LayoutBuilder(
                     builder: (context, box) => Center(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.all(AppSpacing.lg),
@@ -245,7 +271,8 @@ class _HomeSceneState extends State<HomeScene> {
                     ),
                   ),
                 ),
-                LastSaidBubble(said: _lastSaid),
+                // A phone's thread shows the sent line itself.
+                if (!phone || !_chatting) LastSaidBubble(said: _lastSaid),
                 StageInputBar(
                   controller: _input,
                   focusNode: _focus,
@@ -303,6 +330,50 @@ class _HomeSceneState extends State<HomeScene> {
     final hint = map == null
         ? context.l10n.hintNew
         : context.l10n.hintContinue;
+    if (!AppLayout.isWide(context)) {
+      // A phone: she, her line, the quick replies. The ball's glow invites the
+      // tap; the hint is only its tooltip.
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          OrbAvatar(
+            agent: 'front_desk',
+            size: (box.maxHeight * 0.36).clamp(140.0, 260.0),
+            hint: hint,
+            onOrbTap: () => context.go(AppRoutes.map),
+            orb: KeyedSubtree(
+              key: const Key('mini-tree'),
+              child: LifeConstellation(
+                tree: tree,
+                compact: true,
+                boost: OrbAvatar.hoveredOf(context),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SpeechBubble(
+            key: const Key('greeting-bubble'),
+            tail: BubbleTail.top,
+            maxWidth: 340,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
+            child: Text(
+              keepAll(greeting),
+              key: const Key('greeting'),
+              textAlign: TextAlign.center,
+              style: AppTheme.serif(theme.headlineSmall)?.copyWith(height: 1.3),
+            ),
+          ),
+          if (!typing && chat.suggestions.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            _QuickReplies(
+              key: const Key('suggestions'),
+              suggestions: chat.suggestions.take(3).toList(),
+              onTap: _onSuggestion,
+            ),
+          ],
+        ],
+      );
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -340,6 +411,80 @@ class _HomeSceneState extends State<HomeScene> {
             suggestions: chat.suggestions.take(2).toList(),
             onTap: _onSuggestion,
           ),
+      ],
+    );
+  }
+
+  /// How many lines the phone's thread showed when it last scrolled down.
+  int _threadShown = 0;
+
+  /// Scene 5 on a phone: her small figure pinned on top (tap: interrupt her),
+  /// then this visit's conversation as bubbles. Her latest line (or her
+  /// thinking) is the `reply-bubble`, with its action.
+  Widget _phoneThread(BuildContext context, ChatController chat) {
+    final theme = Theme.of(context).textTheme;
+    final reply = chat.sending ? null : _reply;
+    final lines = chat.messages.where((m) => !_earlier.contains(m.id)).toList();
+    var replyShown = false;
+    final items = <Widget>[];
+    for (final m in lines) {
+      final Widget line;
+      if (m.isUser) {
+        line = ThreadBubble(
+          fromUser: true,
+          child: Text(keepAll(m.content), style: theme.bodyLarge),
+        );
+      } else if (reply != null && m.id == reply.id) {
+        replyShown = true;
+        line = _HerLine(key: const Key('reply-bubble'), message: m, current: true);
+      } else {
+        line = _HerLine(message: m);
+      }
+      items.add(Padding(padding: const EdgeInsets.only(bottom: AppSpacing.md), child: line));
+    }
+    if (chat.sending) {
+      items.add(
+        const ThreadBubble(
+          key: Key('reply-bubble'),
+          child: ThinkingShimmer(width: 200),
+        ),
+      );
+    } else if (reply != null && !replyShown) {
+      // A reflection prompt she asks here: not sent, so not in the chat yet.
+      items.add(_HerLine(key: const Key('reply-bubble'), message: reply, current: true));
+    }
+    if (items.length != _threadShown) {
+      _threadShown = items.length;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_thread.hasClients) return;
+        _thread.jumpTo(_thread.position.maxScrollExtent);
+      });
+    }
+    return Column(
+      children: [
+        GestureDetector(
+          key: const Key('avatar-tap'),
+          onTap: _voiceMode.interrupt,
+          child: Avatar(
+            agent: _reply?.agent ?? 'front_desk',
+            mood: AvatarMood.neutral,
+            state: _avatarState(chat),
+            size: 96,
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            key: const Key('phone-thread'),
+            controller: _thread,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.md,
+            ),
+            children: items,
+          ),
+        ),
       ],
     );
   }
@@ -383,11 +528,103 @@ class _HomeSceneState extends State<HomeScene> {
   }
 }
 
-/// Her line plus the button of its action (`Open life tree →` after a course).
-class _ReplyBubbleContent extends StatelessWidget {
-  const _ReplyBubbleContent({required this.message});
+/// The suggestions on a phone: small quick-reply chips under her bubble,
+/// with the keys of the cards.
+class _QuickReplies extends StatelessWidget {
+  const _QuickReplies({super.key, required this.suggestions, required this.onTap});
+
+  final List<ChatSuggestion> suggestions;
+  final ValueChanged<ChatSuggestion> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelLarge;
+    // Two lines round off less than a pill would.
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.bubble),
+      side: const BorderSide(color: AppColors.outlineStrong),
+    );
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: [
+        for (var i = 0; i < suggestions.length; i++)
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Material(
+              key: Key('suggestion-$i'),
+              type: MaterialType.transparency,
+              shape: shape,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                customBorder: shape,
+                onTap: () => onTap(suggestions[i]),
+                hoverColor: AppColors.surfaceHigh,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.sm,
+                  ),
+                  child: Text(
+                    keepAll(suggestions[i].label),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: style,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// One of her lines in the phone's thread, in the serif; another agent's
+/// name stands small above it. The [current] one has the `bubble-text` key
+/// and its action.
+class _HerLine extends StatelessWidget {
+  const _HerLine({super.key, required this.message, this.current = false});
 
   final ChatMessage message;
+  final bool current;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+    final agent = message.agent ?? 'front_desk';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (agent != 'front_desk')
+          Padding(
+            padding: const EdgeInsets.only(left: AppSpacing.sm, bottom: AppSpacing.xs),
+            child: Text(
+              agentLabel(context.l10n, agent),
+              key: const Key('speaker-name'),
+              style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
+            ),
+          ),
+        ThreadBubble(
+          child: current
+              ? _ReplyBubbleContent(message: message, serif: true)
+              : Text(keepAll(message.content), style: AppTheme.serif(theme.titleLarge)),
+        ),
+      ],
+    );
+  }
+}
+
+/// Her line plus the button of its action (`Open life tree →` after a course).
+class _ReplyBubbleContent extends StatelessWidget {
+  const _ReplyBubbleContent({required this.message, this.serif = false});
+
+  final ChatMessage message;
+
+  /// Her line in the serif (the phone's thread).
+  final bool serif;
 
   @override
   Widget build(BuildContext context) {
@@ -397,7 +634,11 @@ class _ReplyBubbleContent extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(keepAll(message.content), key: const Key('bubble-text'), style: theme.bodyLarge),
+        Text(
+          keepAll(message.content),
+          key: const Key('bubble-text'),
+          style: serif ? AppTheme.serif(theme.titleLarge) : theme.bodyLarge,
+        ),
         if (action is CourseAction) ...[
           const SizedBox(height: AppSpacing.sm),
           TextButton.icon(

@@ -28,10 +28,16 @@ import '../../l10n/l10n.dart';
 /// top (kicker and `⋯`, the name, its chips, Best / Attempts / Lessons, the
 /// audit history and the full-width ink `Take it on`), a contents card
 /// (description, one row per material, the course source) and the waving
-/// avatar with one line. On a wide screen the right panel “Attempts” lists
-/// this node's audits as cards; a phone has only the card. Questions typed in
-/// the input bar go to the chat and her answer replaces the line in the
-/// bubble; the sent line shows above the input until she has answered.
+/// avatar with one line; there is no right panel, the card is the only place
+/// the audits are listed. Questions typed in the input bar go to the chat and
+/// her answer replaces the line in the bubble; the sent line shows above the
+/// input until she has answered.
+///
+/// A phone (below [AppLayout.wideBreakpoint]) is her talking about the node:
+/// her small figure with the line first, then the node as a quiet block
+/// (title, one muted line, one number line, “Details” for the rest) and the
+/// ink `Take it on` pinned above the input, the whole-branch challenge a
+/// text button under it.
 ///
 /// Route `/skill/:id`.
 class SkillScene extends StatefulWidget {
@@ -333,14 +339,10 @@ class _SkillSceneState extends State<SkillScene> {
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => context.go(AppRoutes.map),
       ),
-      // A phone has the node card's audit history instead (no drawer).
-      historyTitle: context.l10n.attempts,
-      history: overview == null || !AppLayout.isWide(context)
-          ? null
-          : _AuditHistory(audits: overview.audits),
       stage: Column(
         children: [
           Expanded(child: _body(context, chat)),
+          if (overview != null && !AppLayout.isWide(context)) _phoneActions(overview),
           LastSaidBubble(said: _lastSaid),
           // Typing by voice here (no ∿, so the voice key dictates); talking is
           // for the Guide and the audits.
@@ -457,6 +459,59 @@ class _SkillSceneState extends State<SkillScene> {
     ];
   }
 
+  /// A phone's buttons, pinned above the input so they never scroll away:
+  /// the ink button(s) of [_actions] full width, the whole-branch challenge
+  /// as a quiet text button under them.
+  Widget _phoneActions(SkillOverview overview) {
+    if (_working != null) return const SizedBox.shrink();
+    final node = overview.skill;
+    final l = context.l10n;
+    final unexpanded = node.unexpanded && !node.isMastered && !node.isLinked;
+    final openCourse = node.isLinked ? _linkedRootId : null;
+    final canTestOut = !node.isMastered && !node.isLinked && (node.unexpanded || _boss);
+    final children = <Widget>[
+      if (!node.isLocked && !unexpanded && !node.isLinked)
+        FilledButton(
+          key: const Key('start-audit'),
+          onPressed: () => context.go(AppRoutes.audit(node.id)),
+          child: Text(l.takeItOn),
+        ),
+      if (openCourse != null)
+        FilledButton(
+          key: const Key('open-linked-course'),
+          onPressed: () => context.go(AppRoutes.skill(openCourse)),
+          child: Text(l.nodeOpenCourse),
+        ),
+      if (unexpanded)
+        FilledButton(
+          key: const Key('expand-node'),
+          onPressed: () => unawaited(_expand()),
+          child: Text(l.breakDown),
+        ),
+      if (canTestOut)
+        TextButton(
+          key: const Key('test-out'),
+          onPressed: () => context.go(AppRoutes.challenge(node.id)),
+          style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+          child: Text(l.challengeWhole),
+        ),
+    ];
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      key: const Key('skill-phone-actions'),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, b) in children.indexed) ...[
+            if (i > 0) SizedBox(height: b is TextButton ? 0 : AppSpacing.sm),
+            b,
+          ],
+        ],
+      ),
+    );
+  }
+
   int? get _linkedRootId => switch (_linkedMap) {
     final linked? => rootNodes(linked.nodes, linked.edges).firstOrNull?.id,
     null => null,
@@ -485,6 +540,26 @@ class _SkillSceneState extends State<SkillScene> {
       if (!root) item('skill-delete-node', l.nodeDelete, () => unawaited(_deleteNode(node)), danger: true),
       const PopupMenuDivider(),
     ];
+  }
+
+  /// A phone's one muted line under the title: the status (or Unexpanded),
+  /// the course's name and the main quest it serves.
+  String _statusLine(SkillOverview overview, String? quest) {
+    final node = overview.skill;
+    final l = context.l10n;
+    final last = overview.audits.firstOrNull;
+    final status = switch (node) {
+      _ when node.isMastered => node.testedOut ? l.testedOut : l.dotCleared,
+      _ when node.isLocked => l.dotLocked,
+      _ when node.unexpanded && !node.isLinked => l.dotUnexpanded,
+      _ when last != null && last.status == AuditStatus.failed => l.auditFailed,
+      _ => l.dotReady,
+    };
+    return [
+      status,
+      if (_courseMap case final map?) courseNameOf(map),
+      if (quest case final q? when q.trim().isNotEmpty) l.nodeServesQuest(q.trim()),
+    ].join(' · ');
   }
 
   /// Where the node stands: cleared, locked, failed last time or open.
@@ -518,22 +593,8 @@ class _SkillSceneState extends State<SkillScene> {
     return LayoutBuilder(
       builder: (context, box) {
         final map = _courseMap;
-        final card = SkillNodeCard(
-          overview: overview,
-          quest: quest,
-          boss: _boss,
-          chips: _chips(overview),
-          lessons: lessons,
-          menu: _menu(overview),
-          actions: _actions(overview),
-        );
-        final contents = _ContentsCard(
-          overview: overview,
-          // Knowledge points belong to a leaf; a node that got parts no longer shows them.
-          points: map != null && hasParts(node, map) ? const [] : node.points,
-        );
         final chapter = map == null ? null : chapterOf(node.id, map.edges);
-        final avatar = _AvatarColumn(
+        _AvatarColumn avatarOf({required double size, bool compact = false}) => _AvatarColumn(
           overview: overview,
           // The open node of this node's chapter (the root waits for them all).
           openNode: map?.nodes
@@ -548,8 +609,41 @@ class _SkillSceneState extends State<SkillScene> {
             final linked? when node.isLinked => courseNameOf(linked),
             _ => null,
           },
-          size: (box.maxHeight * 0.3).clamp(120.0, 240.0),
+          size: size,
+          compact: compact,
         );
+        // Knowledge points belong to a leaf; a node that got parts no longer shows them.
+        final points = map != null && hasParts(node, map) ? const <SkillPoint>[] : node.points;
+        if (!AppLayout.isWide(context)) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                avatarOf(size: 96, compact: true),
+                const SizedBox(height: AppSpacing.xl),
+                SkillNodeBlock(
+                  overview: overview,
+                  line: _statusLine(overview, quest),
+                  lessons: lessons,
+                  menu: _menu(overview),
+                  details: _ContentsCard(overview: overview, points: points, framed: false),
+                ),
+              ],
+            ),
+          );
+        }
+        final card = SkillNodeCard(
+          overview: overview,
+          quest: quest,
+          boss: _boss,
+          chips: _chips(overview),
+          lessons: lessons,
+          menu: _menu(overview),
+          actions: _actions(overview),
+        );
+        final contents = _ContentsCard(overview: overview, points: points);
+        final avatar = avatarOf(size: (box.maxHeight * 0.3).clamp(120.0, 240.0));
         final sideBySide = box.maxWidth >= 680;
         return SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
@@ -609,9 +703,12 @@ class _SkillSceneState extends State<SkillScene> {
 /// title and the site), the course source. More than [pageSize] rows are
 /// paged with `>`.
 class _ContentsCard extends StatefulWidget {
-  const _ContentsCard({required this.overview, this.points = const []});
+  const _ContentsCard({required this.overview, this.points = const [], this.framed = true});
 
   final SkillOverview overview;
+
+  /// False on a phone's “Details”: the same contents without the card.
+  final bool framed;
 
   /// The node's knowledge points, when it is a leaf that has them.
   final List<SkillPoint> points;
@@ -644,17 +741,22 @@ class _ContentsCardState extends State<_ContentsCard> {
     final shown = links.skip(page * pageSize).take(pageSize).toList();
     return DecoratedBox(
       key: const Key('skill-contents'),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppRadius.cardBorder,
-        border: Border.all(color: AppColors.outline),
-      ),
+      decoration: !widget.framed
+          ? const BoxDecoration()
+          : BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: AppRadius.cardBorder,
+              border: Border.all(color: AppColors.outline),
+            ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        padding: EdgeInsets.all(widget.framed ? AppSpacing.xl : 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(context.l10n.about, style: theme.labelMedium),
+            Text(
+              context.l10n.about,
+              style: widget.framed ? theme.labelMedium : theme.labelMedium?.copyWith(color: AppColors.textTertiary),
+            ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               node.description.isEmpty ? context.l10n.noDescriptionYet : node.description,
@@ -827,9 +929,13 @@ class _AvatarColumn extends StatelessWidget {
     required this.expandFailed,
     required this.linkedCourseName,
     required this.size,
+    this.compact = false,
   });
 
   final SkillOverview overview;
+
+  /// A phone: the small figure on the left, her line beside it, no name.
+  final bool compact;
 
   /// The open node of this node's chapter (one per chapter, in the learning
   /// order); null until the course map is read.
@@ -870,6 +976,39 @@ class _AvatarColumn extends StatelessWidget {
     final theme = Theme.of(context).textTheme;
     final agent = reply == null ? 'front_desk' : replyAgent;
     final busy = thinking || working != null;
+    final wave = !node.isLocked && !_unexpanded && !node.isLinked && reply == null;
+    final state = busy ? AvatarState.thinking : AvatarState.idle;
+    if (compact) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox.square(
+            dimension: size,
+            child: Live2DFigure(
+              mood: AvatarMood.smile,
+              state: state,
+              wave: wave,
+              size: size,
+              framing: 'upper',
+              fallback: Avatar(agent: agent, mood: AvatarMood.smile, state: state, wave: wave, size: size),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SpeechBubble(
+                key: const Key('skill-bubble'),
+                tail: BubbleTail.left,
+                child: thinking
+                    ? const ThinkingShimmer(width: 140)
+                    : Text(keepAll(_line(context.l10n)), style: theme.bodyLarge),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -900,90 +1039,6 @@ class _AvatarColumn extends StatelessWidget {
             size: size,
           ),
         ),
-      ],
-    );
-  }
-}
-
-/// The body of the right panel “Attempts” on a wide screen: one card per
-/// audit of this node, newest first — the date, a Passed/Failed chip and the
-/// score. A card opens the audit's replay; a fail not reflected on yet says
-/// so. (On a phone the node card's audit history stands in for it.)
-class _AuditHistory extends StatelessWidget {
-  const _AuditHistory({required this.audits});
-
-  final List<AuditSummary> audits;
-
-  @override
-  Widget build(BuildContext context) {
-    if (audits.isEmpty) return EmptyView(message: context.l10n.noAttemptsYet);
-    final theme = Theme.of(context).textTheme;
-    return ListView(
-      key: const Key('skill-audits'),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.sm,
-        AppSpacing.lg,
-        AppSpacing.lg,
-      ),
-      children: [
-        for (final a in audits)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: DecoratedBox(
-              key: const Key('audit-card'),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: AppRadius.cardBorder,
-                border: Border.all(color: AppColors.outline),
-              ),
-              child: Material(
-                type: MaterialType.transparency,
-                child: InkWell(
-                  key: Key('audit-open-${a.id}'),
-                  borderRadius: AppRadius.cardBorder,
-                  onTap: () => context.go(AppRoutes.replay(a.id)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                formatLocal(a.createdAt, style: DateStyle.dateTime),
-                                style: theme.bodySmall,
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                a.score == null ? '—' : context.l10n.points(a.score!),
-                                key: const Key('audit-score'),
-                                style: theme.titleLarge,
-                              ),
-                              if (a.status == AuditStatus.failed && !a.reflected) ...[
-                                const SizedBox(height: AppSpacing.xs),
-                                Text(
-                                  context.l10n.notReflectedYet,
-                                  key: const Key('audit-unreflected'),
-                                  style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        StatusChip(
-                          label: a.status.label(context.l10n),
-                          color: a.status.color,
-                          fill: a.status.fill,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }

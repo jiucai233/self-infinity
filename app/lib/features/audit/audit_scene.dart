@@ -43,6 +43,10 @@ import '../../l10n/l10n.dart';
 /// one, their identity line read back, the nodes it opened). To try again, go
 /// back to scene 4.
 ///
+/// On a phone it is only a talk with her: she sits small at the top (the
+/// audit's style, if any, a tiny line under her), her lines are her bubbles,
+/// the answers yours, and the verdict is her message in the thread.
+///
 /// Route `/skill/:id/audit`. Starts a session when opened, or goes on with the
 /// node's unfinished one (`Start over` begins a new one).
 class AuditScene extends StatefulWidget {
@@ -494,9 +498,11 @@ class _AuditSceneState extends State<AuditScene> {
 
   @override
   Widget build(BuildContext context) {
+    final phone = !AppLayout.isWide(context);
     return StageScaffold(
       title: _title.isEmpty ? null : _title,
-      titleChip: _session == null ? null : _statusChip(),
+      // A phone leaves the chip out: the thread says where the audit is.
+      titleChip: _session == null || phone ? null : _statusChip(),
       topLeading: IconButton(
         key: const Key('audit-back'),
         tooltip: context.l10n.back,
@@ -595,6 +601,8 @@ class _AuditSceneState extends State<AuditScene> {
   Widget _dialogue(BuildContext context) {
     _followBottom();
     final current = _currentIndex;
+    final phone = !AppLayout.isWide(context);
+    final side = phone ? AppSpacing.lg : AppSpacing.xl;
     return ListenableBuilder(
       listenable: _voiceMode,
       builder: (context, _) {
@@ -615,12 +623,14 @@ class _AuditSceneState extends State<AuditScene> {
               children: [
                 // Pinned: her face (and mood) stays in view while the dialogue scrolls.
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.xl,
-                    AppSpacing.md,
-                    AppSpacing.xl,
-                    AppSpacing.md,
-                  ),
+                  padding: phone
+                      ? const EdgeInsets.only(top: AppSpacing.xs)
+                      : const EdgeInsets.fromLTRB(
+                          AppSpacing.xl,
+                          AppSpacing.md,
+                          AppSpacing.xl,
+                          AppSpacing.md,
+                        ),
                   child: _SpeakerHeader(
                     figureKey: _figure,
                     agent: speaker.agent,
@@ -628,32 +638,40 @@ class _AuditSceneState extends State<AuditScene> {
                     state: state,
                     style: speaker.agent == 'auditor' ? _styleLabel(context) : null,
                     onTap: _voiceMode.interrupt,
+                    compact: phone,
                   ),
                 ),
-                const Divider(height: 1, indent: AppSpacing.xl, endIndent: AppSpacing.xl),
+                if (!phone) const Divider(height: 1, indent: AppSpacing.xl, endIndent: AppSpacing.xl),
                 Expanded(
                   // Everything said here can be selected and copied.
                   child: SelectionArea(
                     child: ListView(
                       key: const Key('audit-qa'),
                       controller: _scroll,
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.xl,
-                        AppSpacing.xl,
-                        AppSpacing.xl,
+                      padding: EdgeInsets.fromLTRB(
+                        side,
+                        phone ? AppSpacing.md : AppSpacing.xl,
+                        side,
                         AppSpacing.xl,
                       ),
                       children: [
                         if (_resumed && _verdict == null)
                           _ResumedNote(onStartOver: () => unawaited(_start(restart: true))),
                         for (final (i, line) in _lines.indexed) ...[
-                          _lineView(context, line, current: i == current && _problem == null),
+                          _lineView(
+                            context,
+                            line,
+                            current: i == current && _problem == null,
+                            phone: phone,
+                          ),
                           const SizedBox(height: AppSpacing.lg),
                         ],
                         if (_sending)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: AppSpacing.lg),
-                            child: Align(alignment: Alignment.centerLeft, child: ThinkingShimmer()),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                            child: phone
+                                ? const ThreadBubble(child: ThinkingShimmer(width: 200))
+                                : const Align(alignment: Alignment.centerLeft, child: ThinkingShimmer()),
                           ),
                         if (_problem != null)
                           Text(
@@ -704,7 +722,12 @@ class _AuditSceneState extends State<AuditScene> {
     }
   }
 
-  Widget _lineView(BuildContext context, _Line line, {required bool current}) {
+  Widget _lineView(
+    BuildContext context,
+    _Line line, {
+    required bool current,
+    required bool phone,
+  }) {
     if (line.fromUser) return _Answer(text: line.text);
     switch (line.kind) {
       case _Kind.verdict:
@@ -714,10 +737,14 @@ class _AuditSceneState extends State<AuditScene> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (line.feedback case final feedback? when feedback.isNotEmpty) ...[
-              _Feedback(text: feedback, current: true),
-              const SizedBox(height: AppSpacing.lg),
+              if (phone)
+                ThreadBubble(child: _Feedback(text: feedback, current: true))
+              else
+                _Feedback(text: feedback, current: true),
+              SizedBox(height: phone ? AppSpacing.sm : AppSpacing.lg),
             ],
             VerdictCard(
+              asBubble: phone,
               verdict: verdict,
               attempt: _attempt,
               delta: _delta,
@@ -738,7 +765,7 @@ class _AuditSceneState extends State<AuditScene> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Question(agent: line.agent, text: line.text, current: current),
+            _Question(agent: line.agent, text: line.text, current: current, phone: phone),
             if (_principle != null) ...[
               const SizedBox(height: AppSpacing.lg),
               Center(
@@ -756,6 +783,7 @@ class _AuditSceneState extends State<AuditScene> {
           text: line.text,
           feedback: line.feedback,
           current: current,
+          phone: phone,
         );
     }
   }
@@ -824,9 +852,14 @@ class _SpeakerHeader extends StatelessWidget {
     required this.state,
     required this.onTap,
     this.style,
+    this.compact = false,
   });
 
   final GlobalKey<Live2DFigureState> figureKey;
+
+  /// A phone: only her, centred, and the style as a tiny line under her —
+  /// no name, no tagline.
+  final bool compact;
 
   /// "Listener · depth"; null for a challenge.
   final String? style;
@@ -838,6 +871,33 @@ class _SpeakerHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
+    final figure = GestureDetector(
+      onTap: onTap,
+      // On the web she is the Live2D student at her desk; the sprite stands in until it loads.
+      child: Live2DFigure(
+        key: figureKey,
+        mood: mood,
+        state: state,
+        size: 76,
+        framing: 'upper',
+        fallback: Avatar(agent: agent, mood: mood, state: state, size: 76),
+      ),
+    );
+    if (compact) {
+      return Column(
+        key: const Key('audit-speaker'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          figure,
+          if (style != null)
+            Text(
+              style!,
+              key: const Key('audit-style'),
+              style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
+            ),
+        ],
+      );
+    }
     final doing = switch (state) {
       AvatarState.thinking => context.l10n.voiceThinking,
       AvatarState.listening => context.l10n.voiceListening,
@@ -848,18 +908,7 @@ class _SpeakerHeader extends StatelessWidget {
     return Row(
       key: const Key('audit-speaker'),
       children: [
-        GestureDetector(
-          onTap: onTap,
-          // On the web she is the Live2D student at her desk; the sprite stands in until it loads.
-          child: Live2DFigure(
-            key: figureKey,
-            mood: mood,
-            state: state,
-            size: 76,
-            framing: 'upper',
-            fallback: Avatar(agent: agent, mood: mood, state: state, size: 76),
-          ),
-        ),
+        figure,
         const SizedBox(width: AppSpacing.lg),
         Expanded(
           child: Column(
@@ -890,10 +939,14 @@ class _Question extends StatelessWidget {
     required this.text,
     required this.current,
     this.feedback,
+    this.phone = false,
   });
 
   final String agent;
   final String text;
+
+  /// A phone: her bubble, no name above it (but the Recorder's).
+  final bool phone;
 
   /// What she said about the answer before, shown ahead of [text].
   final String? feedback;
@@ -902,6 +955,40 @@ class _Question extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
+    if (phone) {
+      return Column(
+        key: current ? const Key('audit-bubble') : const Key('audit-line'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (agent != 'auditor')
+            Padding(
+              padding: const EdgeInsets.only(left: AppSpacing.sm, bottom: AppSpacing.xs),
+              child: Text(
+                agentLabel(context.l10n, agent),
+                style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
+              ),
+            ),
+          ThreadBubble(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (feedback case final feedback? when feedback.isNotEmpty) ...[
+                  _Feedback(text: feedback, current: current),
+                  SizedBox(height: current ? AppSpacing.sm : AppSpacing.xs),
+                ],
+                Text(
+                  keepAll(text),
+                  key: current ? const Key('audit-bubble-text') : null,
+                  style: current
+                      ? AppTheme.serif(theme.headlineSmall)?.copyWith(height: 1.3)
+                      : theme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     return Column(
       key: current ? const Key('audit-bubble') : const Key('audit-line'),
       crossAxisAlignment: CrossAxisAlignment.start,

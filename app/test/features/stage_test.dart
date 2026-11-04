@@ -59,7 +59,8 @@ void main() {
     });
 
     testWidgets('three white radius-20 panels with 12 px gaps on the canvas', (tester) async {
-      await pumpScene(tester, const SkillScene(skillId: 1), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
+      await say(tester, 'Hello there');
       expect(
         tester.widget<Scaffold>(find.byType(Scaffold).first).backgroundColor,
         AppColors.canvas,
@@ -348,10 +349,10 @@ void main() {
       expect(historyPanel, findsNothing);
     });
 
-    testWidgets('scene 4: Attempts', (tester) async {
+    testWidgets('scene 4: none, the node card lists the attempts', (tester) async {
       await pumpScene(tester, const SkillScene(skillId: 1), api: api);
-      expect(historyPanel, findsOneWidget);
-      expect(find.descendant(of: historyPanel, matching: find.text('Attempts')), findsOneWidget);
+      expect(historyPanel, findsNothing);
+      expect(find.byKey(const Key('collapse-right')), findsNothing);
       expect(find.text('history'), findsNothing);
     });
 
@@ -413,12 +414,13 @@ void main() {
     });
 
     testWidgets('right: fold and unfold the chat panel', (tester) async {
-      await pumpScene(tester, const SkillScene(skillId: 1), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
+      await say(tester, 'Hello there');
       await tester.tap(find.byKey(const Key('collapse-right')));
       await tester.pumpAndSettle();
       expect(historyPanel, findsNothing);
       expect(rail('right'), findsOneWidget);
-      expect(tester.widget<Text>(find.byKey(const Key('rail-title'))).data, 'Attempts');
+      expect(tester.widget<Text>(find.byKey(const Key('rail-title'))).data, 'Chat');
       await tester.tap(rail('right'));
       await tester.pumpAndSettle();
       expect(historyPanel, findsOneWidget);
@@ -444,7 +446,8 @@ void main() {
     testWidgets('a 1000 px window with a chat panel keeps the stage roomy: left is a rail', (
       tester,
     ) async {
-      await pumpScene(tester, const SkillScene(skillId: 1), api: api, size: const Size(1000, 800));
+      await pumpScene(tester, const HomeScene(), api: api, size: const Size(1000, 800));
+      await say(tester, 'Hello there');
       expect(rail('left'), findsOneWidget);
       expect(historyPanel, findsOneWidget);
       expect(tester.getSize(find.byKey(const Key('stage-panel'))).width, greaterThan(400));
@@ -478,7 +481,7 @@ void main() {
       expect(find.byKey(const Key('settings-button')), findsOneWidget);
     });
 
-    testWidgets('scene 4 and 4-1: no right drawer (the node card shows the attempts)', (
+    testWidgets('scene 4 and 4-1: no right drawer (the node block shows the attempts)', (
       tester,
     ) async {
       for (final scene in [const AuditScene(skillId: 6), const SkillScene(skillId: 1)]) {
@@ -486,7 +489,7 @@ void main() {
         expect(find.byKey(const Key('open-right-drawer')), findsNothing);
         expect(historyPanel, findsNothing);
       }
-      expect(find.byKey(const Key('skill-attempts')), findsOneWidget);
+      expect(find.byKey(const Key('skill-numbers')), findsOneWidget);
     });
 
     testWidgets('scene 5: the right drawer lists the chat', (tester) async {

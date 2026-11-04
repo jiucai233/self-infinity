@@ -473,6 +473,30 @@ class AppLocalizationsKo extends AppLocalizations {
   String get lessons => '교훈';
 
   @override
+  String nodeBestScore(int score) {
+    return '최고 $score';
+  }
+
+  @override
+  String nodeTries(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count번 시도',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nodeNoTriesYet => '아직 시도 없음';
+
+  @override
+  String get nodeDetails => '자세히';
+
+  @override
+  String get nodeHideDetails => '접기';
+
+  @override
   String get challengeWholeHint => '몇 가지 부분을 설명해 통과하면 아래 노드가 모두 클리어돼요.';
 
   @override
@@ -544,9 +568,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get next => '다음';
-
-  @override
-  String get noAttemptsYet => '아직 시도 기록이 없어요.';
 
   @override
   String get noAuditsYet => '아직 심사 기록이 없어요.';

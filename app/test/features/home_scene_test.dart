@@ -167,14 +167,18 @@ void main() {
       );
     });
 
-    testWidgets('on a phone the cards are stacked and the greeting is smaller', (tester) async {
+    testWidgets('on a phone the cards are quick replies under her bubble', (tester) async {
       await pumpHome(tester, await seededFakeApi(), size: phoneScreen);
+      final bubble = tester.getRect(find.byKey(const Key('greeting-bubble')));
       final first = tester.getRect(find.byKey(const Key('suggestion-0')));
       final second = tester.getRect(find.byKey(const Key('suggestion-1')));
-      expect(second.top, greaterThanOrEqualTo(first.bottom));
-      expect(first.left, second.left);
+      expect(first.top, greaterThan(bubble.bottom));
+      expect(second.top, greaterThanOrEqualTo(first.top));
+      expect(first.height, lessThan(64), reason: 'a chip, not a card');
       expect(tester.takeException(), isNull);
-      expect(tester.widget<Text>(find.byKey(const Key('greeting'))).style!.fontSize, 24);
+      // Her line, in the serif.
+      final greeting = tester.widget<Text>(find.byKey(const Key('greeting')));
+      expect(greeting.style!.fontFamily, AppFonts.display);
     });
 
     testWidgets('the cards hide while typing', (tester) async {

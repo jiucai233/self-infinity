@@ -970,6 +970,36 @@ abstract class AppLocalizations {
   /// **'Lessons'**
   String get lessons;
 
+  /// No description provided for @nodeBestScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Best {score}'**
+  String nodeBestScore(int score);
+
+  /// No description provided for @nodeTries.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 attempt} other{{count} attempts}}'**
+  String nodeTries(int count);
+
+  /// No description provided for @nodeNoTriesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No attempts yet'**
+  String get nodeNoTriesYet;
+
+  /// No description provided for @nodeDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get nodeDetails;
+
+  /// No description provided for @nodeHideDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide details'**
+  String get nodeHideDetails;
+
   /// No description provided for @challengeWholeHint.
   ///
   /// In en, this message translates to:
@@ -1107,12 +1137,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Next'**
   String get next;
-
-  /// No description provided for @noAttemptsYet.
-  ///
-  /// In en, this message translates to:
-  /// **'No attempts yet.'**
-  String get noAttemptsYet;
 
   /// No description provided for @noAuditsYet.
   ///

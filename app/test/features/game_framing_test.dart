@@ -153,9 +153,10 @@ void main() {
       expect(kicker(tester), 'NODE');
     });
 
-    testWidgets('on a phone the card fits', (tester) async {
+    testWidgets('on a phone the quiet node block fits, without the kicker', (tester) async {
       await pumpScene(tester, SkillScene(skillId: 1), api: api, size: phoneScreen);
-      expect(kicker(tester), 'BOSS');
+      expect(key('skill-node-block'), findsOneWidget);
+      expect(key('skill-kicker'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   });

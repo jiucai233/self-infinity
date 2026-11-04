@@ -76,11 +76,11 @@
 |---|---|
 | **面板** | 白底、圆角 20、无边框；顶部 56 高的标题栏（`titleMedium` + 右侧折叠图标）。 |
 | **输入栏** | `surfaceHigh` 填充的胶囊，无边框、聚焦时 1px 墨色边；左 ⊕，右侧发送键是墨色圆形（空输入时灰色）。语音键在框外，40px 圆形 `surfaceHigh`：有语音模式时是 ∿，否则是听写麦克风。全 App 只有这一个输入栏（`widgets/composer.dart` 的 `Composer`：首页、节点页、审计、人生树搜索、复盘反思、教程），各页只换左侧（⊕ / 🔍 / 无）、是否多行、有没有发送键。 |
-| **问候语**（scene 1） | `displayMedium`（手机 `headlineMedium`），墨色，居中；下面一行 `bodyLarge` 三级灰。 |
-| **推荐卡片**（scene 1） | `surfaceHigh` 底、圆角 16、内边距 16，左上一个小图标，文字 `labelLarge`；最多两张并排（窄屏竖排）；hover 时底色加深。 |
+| **问候语**（scene 1） | `displayMedium`（手机 `headlineMedium`），墨色，居中；下面一行 `bodyLarge` 三级灰。手机见 3.y。 |
+| **推荐卡片**（scene 1） | `surfaceHigh` 底、圆角 16、内边距 16，左上一个小图标，文字 `labelLarge`；最多两张并排（窄屏竖排）；hover 时底色加深。手机上是快捷回复（3.y）。 |
 | **她的气泡**（舞台） | `surfaceHigh` 底、圆角 20、尾巴指向 avatar；气泡上方一行小字是说话的 agent 名（`labelMedium`）。思考时气泡里是一条流动的古铜到金微光（三行骨架）。 |
 | **你的最后一句**（舞台） | 发送后、她回答前，在输入栏上方右对齐显示一个 `userBubble` 小气泡；回答到达后淡出（它已经在聊天面板里）。审计页不用它：回答直接进对话列。 |
-| **审计对话列**（scene 4-1） | 一列，最宽 720。顶部钉住说话人：形象 76 + 名字（`titleMedium`）+ 在做什么（`bodySmall` 三级灰），下面一条分隔线。之前的问题：agent 名（`labelSmall` 三级灰）+ `bodyMedium` 次要色；**当前的问题**：`AppTheme.serif(headlineMedium)`，行高 1.25；你的回答：右侧 `userBubble` 气泡。 |
+| **审计对话列**（scene 4-1） | 一列，最宽 720。顶部钉住说话人：形象 76 + 名字（`titleMedium`）+ 在做什么（`bodySmall` 三级灰），下面一条分隔线。之前的问题：agent 名（`labelSmall` 三级灰）+ `bodyMedium` 次要色；**当前的问题**：`AppTheme.serif(headlineMedium)`，行高 1.25；你的回答：右侧 `userBubble` 气泡。手机见 3.y。 |
 | **裁决卡**（scene 4-1） | `surface` 底、圆角 16、`paper` 阴影，1px 边：通过 `ember`、失败 `outline`。`VERDICT`（`labelSmall`，字距 1.6）→ 结论（`displaySmall` 衬线，通过时琥珀）与分数（`headlineLarge` 衬线 + `pts`）同一基线 → `+N XP` → 评语 `bodyLarge` → 分隔线 + `What was missing` 与圆点列表（失败砖红点、通过灰点）→ 墨色主按钮 `Make a lesson card` + 文字按钮 `Back to node`。 |
 | **聊天面板** | 你的话右对齐 `userBubble` 气泡（圆角 20，右上角 4）；她的话左对齐无气泡，左侧 28px 圆形 agent 小头像 + 名字 + 时间，正文 `bodyLarge`。日期分隔是居中的小字。新消息自动滚到底。 |
 | **左栏** | 标题栏 `My character`：身份宣言、Win condition、Stakes、Main quests、Rules；三条属性条（`Lv 2 · 3/5`、`Cleared 4/12`、`Condition: …`），条高 8、圆角 4，填充墨色（Cleared 为琥珀，状态差为砖红）；Daily quests；Today。 |
@@ -93,6 +93,13 @@
 | **教训卡**（反思之后） | 卡片从背面翻到正面（300ms）：标题、正文、误解（红色小标签）。 |
 | **形变图标**（`MorphIcon`，参考 Morphicons） | 线条图标放在 24 网格上，用折线描述；每笔重采样到同样多的点，在弹簧上移动（stiffness 420、damping 30，略过冲后很快停下）。笔画数不同时，多出来的那笔从另一形状最后一点长出或缩回。用在：发送键 → 等她回答时变成转圈（`ring`，转动），回来后变回箭头；∿ 悬停时竖条换一个节拍；听写麦克风 ↔ 停止方块；落地页 `Sign in` 悬停时箭头穿过一扇门（`signIn`）。动画关闭时直接到终态。 |
 | **语音模式** | 输入栏变成 `surfaceHigh` 胶囊里的实时声波条（随音量跳动，古铜到金），上方一行状态字 `Listening… / Thinking… / Speaking…`，再上方是实时字幕（你说的话，灰色）。 |
+
+### 3.y 手机（宽 < 900）：首页和审计只是和她说话
+
+底部三个 tab 不变；桌面布局不变。这两页上只有她、对话、快捷回复和输入栏，别的都拿掉。
+- **首页 scene 1**：她托着水晶球居中（悬停/点击照旧）；问候语是她的话，放进她的气泡（`SpeechBubble` 尾巴朝上指向她，`AppTheme.serif(headlineSmall)`）；提示行去掉，只留作水晶球的 tooltip / 语义提示；推荐卡片变成气泡下 1–3 个小快捷回复（`outlineStrong` 细边、圆角 20、`labelLarge`，最多两行），打字时隐藏。右上的聊天记录图标保留，20px、三级灰。
+- **首页 scene 5**：开始对话后是这次的对话串（之前的在抽屉里），她的小形象（96）钉在顶部，点她可打断。她的话左侧 `surfaceHigh` 气泡，左上角尖（`AppRadius.herBubbleBorder`，和你的 `userBubble` 右上角尖对称），衬线；你的话右侧 `userBubble`。别的 agent 在气泡上方一行小字署名。
+- **审计 scene 4-1**：顶部只有她（76，Web 上 Live2D），没有名字、tagline、分隔线、状态 chip；有审计风格时在她下面一行 `labelSmall` 三级灰（听众 · 深度）。她的问题、反馈都是她的气泡，你的回答是你的气泡；裁决卡用她气泡的底色和形状、无边框无阴影，尺寸不变，读起来是她在对话里说的一条。
 
 ---
 

@@ -256,7 +256,8 @@ class _StagePanel extends StatelessWidget {
                           builder: (context) => IconButton(
                             key: const Key('open-right-drawer'),
                             tooltip: historyTitle,
-                            icon: const Icon(Icons.forum_outlined),
+                            // Quiet: on a phone the page is the talk with her.
+                            icon: const Icon(Icons.forum_outlined, size: 20, color: AppColors.textTertiary),
                             onPressed: () => Scaffold.of(context).openEndDrawer(),
                           ),
                         ),
