@@ -4,7 +4,7 @@ import 'package:self_infinity/api/api.dart';
 import 'package:self_infinity/app/app_state.dart';
 import 'package:self_infinity/auth/auth_service.dart';
 import 'package:self_infinity/app/panel_layout.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
+import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/testing/fake_file_picker.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
 import 'package:self_infinity/testing/test_app.dart';
@@ -53,7 +53,7 @@ Future<void> pumpOutline(
   Size size = wideScreen,
   AppState? state,
 }) async {
-  await pumpScene(tester, const MapScene(), api: api, size: size, state: state);
+  await pumpScene(tester, const HomeScene(), api: api, size: size, state: state);
   await tester.tap(find.byKey(const Key('view-outline')));
   await tester.pumpAndSettle();
 }

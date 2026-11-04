@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/app_state.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
+import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/features/stage/stage_controller.dart';
 import 'package:self_infinity/testing/test_app.dart';
 
@@ -102,7 +102,7 @@ void main() {
       final clock = Clock('2026-10-05 09:00');
       final api = await math(clock);
       await api.generatePlan();
-      await pumpScene(tester, const MapScene(), api: api, clock: () => clock.now);
+      await pumpScene(tester, const HomeScene(), api: api, clock: () => clock.now);
 
       expect(textOf(tester, key('quests-summary')), startsWith('Morning: judgement first'));
       expect(textOf(tester, key('quest-kind-6')), 'Learn · 25 min');
@@ -114,7 +114,7 @@ void main() {
       await passAudit(api, 6);
       clock.set('2026-10-05 20:00');
       await api.generatePlan();
-      await pumpScene(tester, const MapScene(), api: api, clock: () => clock.now);
+      await pumpScene(tester, const HomeScene(), api: api, clock: () => clock.now);
       // Mastered three days ago, but not explained again yet.
       await tester.ensureVisible(key('quest-6'));
       expect(find.descendant(of: key('quest-6'), matching: key('quest-open')), findsOneWidget);
@@ -122,7 +122,7 @@ void main() {
 
       clock.set('2026-10-05 20:30');
       await passAudit(api, 6);
-      tester.element(find.byType(MapScene)).read<AppState>().markDataChanged();
+      tester.element(find.byType(HomeScene)).read<AppState>().markDataChanged();
       await tester.pumpAndSettle();
       expect(find.descendant(of: key('quest-6'), matching: key('quest-done')), findsOneWidget);
     });

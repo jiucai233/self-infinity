@@ -2,13 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/api.dart';
-import '../../api/life_tree.dart';
 import '../../api/models.dart';
-import '../../app/router.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/tokens.dart';
 import '../../upload/file_picker_service.dart';
@@ -24,21 +21,20 @@ import '../stage/uploads_controller.dart';
 import 'chat_controller.dart';
 import 'chat_history_panel.dart';
 import 'chat_navigation.dart';
+import 'orb_picks.dart';
+import '../map/life_board.dart';
 import '../../l10n/l10n.dart';
 
 /// Scene 1 (entering) and scene 5 (text / voice chat) of `docs/ux-chat.md`.
 ///
 /// Route `/`. Until the user sends a message or starts the voice mode it is
-/// scene 1: a gradient greeting, the wizard holding the crystal ball (the mini
-/// skill tree opens scene 2) and two Gemini suggestion cards (typing hides
-/// them). After that it is scene 5: the bubble shows only her latest line
-/// (with her name above it), the user's sent line stays above the input until
-/// she has answered, and the whole conversation is in the chat panel, which
-/// scene 1 does not have.
+/// the life tree ([LifeBoard]) with her and the nodes to do next on the
+/// night sky ([HomeSky]); the input asks what to learn. After that it is
+/// scene 5: the bubble shows only her latest line (with her name above it),
+/// the user's sent line stays above the input until she has answered, and
+/// the whole conversation is in the chat panel.
 ///
-/// On a phone (below [AppLayout.wideBreakpoint]) it is only a talk with her:
-/// scene 1 is her figure with the ball, the greeting as her speech bubble and
-/// the suggestions as quick-reply chips under it; scene 5 is the thread of
+/// On a phone (below [AppLayout.wideBreakpoint]) scene 5 is the thread of
 /// this visit, her small figure pinned on top.
 class HomeScene extends StatefulWidget {
   const HomeScene({super.key});
@@ -71,11 +67,6 @@ class _HomeSceneState extends State<HomeScene> {
   String? _spokenReply;
   String? _error;
 
-  /// The reflection prompt the Guide has asked and the user has not answered
-  /// yet (`docs/ux-chat.md` §6.3). It exists only here: nothing is sent until
-  /// the answer is, and then it goes along as `reflection_prompt`.
-  ChatMessage? _asked;
-
   @override
   void initState() {
     super.initState();
@@ -85,12 +76,12 @@ class _HomeSceneState extends State<HomeScene> {
       onUnavailable: _voiceUnavailable,
     );
     // The Guide talks as one realtime model where it can; turns over the app's voice elsewhere.
-    _voiceMode = context.read<LiveVoice?>()?.guide(fallback: turns, onMessages: _onGuideSaved) ?? turns;
+    _voiceMode =
+        context.read<LiveVoice?>()?.guide(fallback: turns, onMessages: _onGuideSaved) ?? turns;
     _chat.addListener(_sendQueued);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_chat.loadHistory());
-      unawaited(_chat.loadSuggestions());
       _sendQueued();
     });
   }
@@ -122,14 +113,12 @@ class _HomeSceneState extends State<HomeScene> {
     if (!mounted || _chat.sending) return;
     final text = _chat.takeQueued();
     if (text == null) return;
-    setState(() => _asked = null);
     unawaited(_send(text));
   }
 
   Future<void> _send(String text, {bool fromVoice = false}) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _chat.sending) return;
-    final asked = _asked;
     _beginChat();
     setState(() {
       _chatting = true;
@@ -140,61 +129,21 @@ class _HomeSceneState extends State<HomeScene> {
     _lastSaid.say(trimmed);
     final saved = await _chat.send(
       trimmed,
-      uploadIds: asked == null ? _uploads.ids : const [],
-      reflectionPrompt: asked?.content,
+      uploadIds: _uploads.ids,
     );
     if (!mounted) return;
     if (saved == null) {
       _lastSaid.clear();
-      setState(() {
-        _error = _chat.error;
-        _reply = asked; // still waiting for the answer: keep her question up
-      });
+      setState(() => _error = _chat.error);
       if (!fromVoice) _input.text = trimmed;
       return;
     }
-    if (asked == null) _uploads.clear();
+    _uploads.clear();
     _lastSaid.fade();
     final assistants = saved.where((m) => !m.isUser).toList();
     _spokenReply = assistants.isEmpty ? null : assistants.map((m) => m.content.trim()).join(' ');
-    setState(() {
-      _asked = null;
-      _reply = assistants.isEmpty ? null : assistants.last;
-    });
-    followNavigation(context, assistants);
-  }
-
-  /// A reflection suggestion: the Guide asks the prompt in her bubble and the
-  /// cursor goes to the input. Nothing is sent yet.
-  void _askReflection(String prompt) {
-    final question = ChatMessage(
-      id: -1,
-      role: ChatRole.assistant,
-      content: prompt,
-      agent: 'front_desk',
-      createdAt: DateTime.now().toUtc(),
-    );
-    _beginChat();
-    setState(() {
-      _chatting = true;
-      _asked = question;
-      _reply = question;
-      _error = null;
-    });
-    _focus.requestFocus();
-  }
-
-  void _onSuggestion(ChatSuggestion s) {
-    final skillId = s.skillId;
-    if (s.reflection) {
-      _askReflection(s.label);
-    } else if (skillId != null) {
-      context.go(AppRoutes.skill(skillId));
-    } else if (s.message.trim().isEmpty) {
-      _focus.requestFocus(); // "tell me what you want to learn": just the cursor
-    } else {
-      unawaited(_send(s.message));
-    }
+    setState(() => _reply = assistants.isEmpty ? null : assistants.last);
+    _follow(assistants);
   }
 
   Future<void> _pickUpload() async {
@@ -223,7 +172,7 @@ class _HomeSceneState extends State<HomeScene> {
       _chatting = true;
       _reply = assistants.last;
     });
-    followNavigation(context, assistants);
+    _follow(assistants);
   }
 
   void _voiceUnavailable() {
@@ -264,28 +213,32 @@ class _HomeSceneState extends State<HomeScene> {
               children: [
                 if (_chatting) _chatBar(context, phone),
                 Expanded(
-                  child: phone && (_chatting || _voiceMode.active)
+                  child: !_chatting && !_voiceMode.active
+                      ? _board(context, chat)
+                      : phone
                       ? _phoneThread(context, chat)
                       : LayoutBuilder(
-                    builder: (context, box) => Center(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: AppLayout.chatWidth),
-                          child: _chatting || _voiceMode.active
-                              ? _chatStage(context, chat, box)
-                              : _enterStage(context, chat, box),
+                          builder: (context, box) => Center(
+                            child: SingleChildScrollView(
+                              // A phone's entering stage gives her the width.
+                              padding: EdgeInsets.symmetric(
+                                horizontal: phone && !_chatting ? AppSpacing.sm : AppSpacing.lg,
+                                vertical: AppSpacing.lg,
+                              ),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: AppLayout.chatWidth),
+                                child: _chatStage(context, chat, box),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
                 ),
                 // A phone's thread shows the sent line itself.
                 if (!phone || !_chatting) LastSaidBubble(said: _lastSaid),
                 StageInputBar(
                   controller: _input,
                   focusNode: _focus,
-                  hint: _asked == null ? context.l10n.messageHint : context.l10n.answerHint,
+                  hint: _chatting ? context.l10n.messageHint : context.l10n.homeInputHint,
                   enabled: !chat.sending,
                   onSubmit: () => _send(_input.text),
                   onUpload: _pickUpload,
@@ -322,7 +275,18 @@ class _HomeSceneState extends State<HomeScene> {
     };
   }
 
-  /// Back to her with the crystal ball (the conversation stays in the
+  /// Carries out a navigate action of her answer; the life tree is this
+  /// page's own stage, so going there ends the chat.
+  void _follow(List<ChatMessage> assistants) {
+    final first = assistants.map((m) => m.action).whereType<NavigateAction>().firstOrNull;
+    if (first?.scene == NavScene.map) {
+      _endChat();
+      return;
+    }
+    followNavigation(context, assistants);
+  }
+
+  /// Back to the life tree (the conversation stays in the
   /// history drawer).
   void _endChat() {
     if (!_chatting) return;
@@ -350,7 +314,7 @@ class _HomeSceneState extends State<HomeScene> {
           if (!phone)
             TextButton.icon(
               key: const Key('chat-open-map'),
-              onPressed: () => context.go(AppRoutes.map),
+              onPressed: _endChat,
               style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
               icon: const Icon(Icons.blur_on_rounded, size: 18),
               label: Text(context.l10n.lifeTree),
@@ -363,102 +327,24 @@ class _HomeSceneState extends State<HomeScene> {
   /// The avatar is about 30 % of the stage height.
   static double _avatarSize(BoxConstraints box) => (box.maxHeight * 0.3).clamp(120.0, 300.0);
 
-  /// Scene 1: the headline, the wizard with your life tree in her crystal
-  /// ball and the suggestion cards (hidden while typing).
-  Widget _enterStage(BuildContext context, ChatController chat, BoxConstraints box) {
+  /// Before a chat: the life tree (stats, the night sky, Tree / Outline)
+  /// with her at the bottom left and the nodes to do next tied to their
+  /// points (2026-11-04 review: home and the life tree are one page).
+  Widget _board(BuildContext context, ChatController chat) {
     final map = context.select<StageController, CourseMap?>((s) => s.courseMap);
-    final tree = context.select<StageController, LifeTree>((s) => s.lifeTree);
-    final theme = Theme.of(context).textTheme;
-    final avatar = _avatarSize(box);
-    final typing = _input.text.isNotEmpty;
     final greeting = map == null
         ? context.l10n.greetingNew
         : context.l10n.greetingContinue(courseNameOf(map));
-    final hint = map == null
-        ? context.l10n.hintNew
-        : context.l10n.hintContinue;
-    if (!AppLayout.isWide(context)) {
-      // A phone: she, her line, the quick replies. The ball's glow invites the
-      // tap; the hint is only its tooltip.
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          OrbAvatar(
-            agent: 'front_desk',
-            size: (box.maxHeight * 0.36).clamp(140.0, 260.0),
-            hint: hint,
-            onOrbTap: () => context.go(AppRoutes.map),
-            orb: KeyedSubtree(
-              key: const Key('mini-tree'),
-              child: LifeConstellation(
-                tree: tree,
-                compact: true,
-                boost: OrbAvatar.hoveredOf(context),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          SpeechBubble(
-            key: const Key('greeting-bubble'),
-            tail: BubbleTail.top,
-            maxWidth: 340,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
-            child: Text(
-              keepAll(greeting),
-              key: const Key('greeting'),
-              textAlign: TextAlign.center,
-              style: AppTheme.serif(theme.headlineSmall)?.copyWith(height: 1.3),
-            ),
-          ),
-          if (!typing && chat.suggestions.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
-            _QuickReplies(
-              key: const Key('suggestions'),
-              suggestions: chat.suggestions.take(3).toList(),
-              onTap: _onSuggestion,
-            ),
-          ],
-        ],
-      );
-    }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          keepAll(greeting),
-          key: const Key('greeting'),
-          textAlign: TextAlign.center,
-          style: AppLayout.isWide(context) ? theme.displayMedium : theme.headlineMedium,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Text(
-          keepAll(hint),
-          key: const Key('greeting-hint'),
-          textAlign: TextAlign.center,
-          style: theme.bodyLarge?.copyWith(color: AppColors.textTertiary),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        OrbAvatar(
-          agent: 'front_desk',
-          size: avatar,
-          onOrbTap: () => context.go(AppRoutes.map),
-          orb: KeyedSubtree(
-            key: const Key('mini-tree'),
-            child: LifeConstellation(
-              tree: tree,
-              compact: true,
-              boost: OrbAvatar.hoveredOf(context),
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        if (!typing && chat.suggestions.isNotEmpty)
-          _SuggestionCards(
-            key: const Key('suggestions'),
-            suggestions: chat.suggestions.take(2).toList(),
-            onTap: _onSuggestion,
-          ),
-      ],
+    final phone = !AppLayout.isWide(context);
+    return LifeBoard(
+      legendLeft: (box) => HomeSky.avatarRoom(box, phone: phone),
+      overlay: (context, sky, box) => HomeSky(
+        sky: sky,
+        box: box,
+        picks: orbPicksOf(context, context.watch<StageController>()),
+        greeting: greeting,
+        avatarState: _avatarState(chat),
+      ),
     );
   }
 
@@ -483,11 +369,21 @@ class _HomeSceneState extends State<HomeScene> {
         );
       } else if (reply != null && m.id == reply.id) {
         replyShown = true;
-        line = _HerLine(key: const Key('reply-bubble'), message: m, current: true);
+        line = _HerLine(
+          key: const Key('reply-bubble'),
+          message: m,
+          onOpenTree: _endChat,
+          current: true,
+        );
       } else {
-        line = _HerLine(message: m);
+        line = _HerLine(message: m, onOpenTree: _endChat);
       }
-      items.add(Padding(padding: const EdgeInsets.only(bottom: AppSpacing.md), child: line));
+      items.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: line,
+        ),
+      );
     }
     if (chat.sending) {
       items.add(
@@ -498,7 +394,14 @@ class _HomeSceneState extends State<HomeScene> {
       );
     } else if (reply != null && !replyShown) {
       // A reflection prompt she asks here: not sent, so not in the chat yet.
-      items.add(_HerLine(key: const Key('reply-bubble'), message: reply, current: true));
+      items.add(
+        _HerLine(
+          key: const Key('reply-bubble'),
+          message: reply,
+          onOpenTree: _endChat,
+          current: true,
+        ),
+      );
     }
     if (items.length != _threadShown) {
       _threadShown = items.length;
@@ -544,7 +447,7 @@ class _HomeSceneState extends State<HomeScene> {
     if (chat.sending) {
       bubble = const ThinkingShimmer();
     } else if (reply != null) {
-      bubble = _ReplyBubbleContent(message: reply);
+      bubble = _ReplyBubbleContent(message: reply, onOpenTree: _endChat);
     } else {
       bubble = null;
     }
@@ -575,68 +478,20 @@ class _HomeSceneState extends State<HomeScene> {
   }
 }
 
-/// The suggestions on a phone: small quick-reply chips under her bubble,
-/// with the keys of the cards.
-class _QuickReplies extends StatelessWidget {
-  const _QuickReplies({super.key, required this.suggestions, required this.onTap});
-
-  final List<ChatSuggestion> suggestions;
-  final ValueChanged<ChatSuggestion> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelLarge;
-    // Two lines round off less than a pill would.
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(AppRadius.bubble),
-      side: const BorderSide(color: AppColors.outlineStrong),
-    );
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        for (var i = 0; i < suggestions.length; i++)
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 320),
-            child: Material(
-              key: Key('suggestion-$i'),
-              type: MaterialType.transparency,
-              shape: shape,
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                customBorder: shape,
-                onTap: () => onTap(suggestions[i]),
-                hoverColor: AppColors.surfaceHigh,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: AppSpacing.sm,
-                  ),
-                  child: Text(
-                    keepAll(suggestions[i].label),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: style,
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 /// One of her lines in the phone's thread, in the serif; another agent's
 /// name stands small above it. The [current] one has the `bubble-text` key
 /// and its action.
 class _HerLine extends StatelessWidget {
-  const _HerLine({super.key, required this.message, this.current = false});
+  const _HerLine({
+    super.key,
+    required this.message,
+    required this.onOpenTree,
+    this.current = false,
+  });
 
   final ChatMessage message;
   final bool current;
+  final VoidCallback onOpenTree;
 
   @override
   Widget build(BuildContext context) {
@@ -656,7 +511,7 @@ class _HerLine extends StatelessWidget {
           ),
         ThreadBubble(
           child: current
-              ? _ReplyBubbleContent(message: message, serif: true)
+              ? _ReplyBubbleContent(message: message, onOpenTree: onOpenTree, serif: true)
               : Text(keepAll(message.content), style: AppTheme.serif(theme.titleLarge)),
         ),
       ],
@@ -666,9 +521,12 @@ class _HerLine extends StatelessWidget {
 
 /// Her line plus the button of its action (`Open life tree →` after a course).
 class _ReplyBubbleContent extends StatelessWidget {
-  const _ReplyBubbleContent({required this.message, this.serif = false});
+  const _ReplyBubbleContent({required this.message, required this.onOpenTree, this.serif = false});
 
   final ChatMessage message;
+
+  /// `Open life tree →`: the life tree is the home stage, so the chat ends.
+  final VoidCallback onOpenTree;
 
   /// Her line in the serif (the phone's thread).
   final bool serif;
@@ -690,7 +548,7 @@ class _ReplyBubbleContent extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           TextButton.icon(
             key: const Key('action-map'),
-            onPressed: () => context.go(AppRoutes.map),
+            onPressed: onOpenTree,
             iconAlignment: IconAlignment.end,
             icon: const Icon(Icons.arrow_forward_rounded, size: 18),
             label: Text(context.l10n.openLifeTree),
@@ -698,130 +556,6 @@ class _ReplyBubbleContent extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-/// The suggestions as Gemini cards (`docs/DESIGN.md` Section 3): side by side
-/// on a wide stage, stacked on a narrow one.
-class _SuggestionCards extends StatelessWidget {
-  const _SuggestionCards({super.key, required this.suggestions, required this.onTap});
-
-  final List<ChatSuggestion> suggestions;
-  final ValueChanged<ChatSuggestion> onTap;
-
-  static IconData _iconOf(ChatSuggestion s) {
-    if (s.reflection) return Icons.psychology_alt_outlined;
-    if (s.skillId != null) return Icons.auto_stories_outlined;
-    if (s.message.trim().isEmpty) return Icons.lightbulb_outline_rounded;
-    return Icons.wb_sunny_outlined;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, box) {
-        final stacked = box.maxWidth < 500 || suggestions.length == 1 && box.maxWidth < 300;
-        final cards = [
-          for (var i = 0; i < suggestions.length; i++)
-            _SuggestionCard(
-              key: Key('suggestion-$i'),
-              label: suggestions[i].label,
-              icon: _iconOf(suggestions[i]),
-              compact: stacked,
-              onTap: () => onTap(suggestions[i]),
-            ),
-        ];
-        if (stacked) {
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < cards.length; i++) ...[
-                if (i > 0) const SizedBox(height: AppSpacing.sm),
-                cards[i],
-              ],
-            ],
-          );
-        }
-        return Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: cards.length == 1 ? 280 : 560),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < cards.length; i++) ...[
-                    if (i > 0) const SizedBox(width: AppSpacing.md),
-                    Expanded(child: cards[i]),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// One suggestion: a `surfaceHigh` card, a small icon, the text.
-class _SuggestionCard extends StatelessWidget {
-  const _SuggestionCard({
-    super.key,
-    required this.label,
-    required this.icon,
-    required this.compact,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-
-  /// Icon and text in one row (the stacked cards of a narrow stage).
-  final bool compact;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
-    final text = Text(
-      keepAll(label),
-      maxLines: 3,
-      overflow: TextOverflow.ellipsis,
-      style: theme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-    );
-    final iconWidget = Icon(icon, size: 20, color: AppColors.primary);
-    return Material(
-      color: AppColors.surfaceHigh,
-      shape: RoundedRectangleBorder(borderRadius: AppRadius.cardBorder),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        hoverColor: AppColors.userBubble,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: compact
-              ? Row(
-                  children: [
-                    iconWidget,
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(child: text),
-                  ],
-                )
-              : ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 72),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      iconWidget,
-                      const SizedBox(height: AppSpacing.md),
-                      text,
-                    ],
-                  ),
-                ),
-        ),
-      ),
     );
   }
 }

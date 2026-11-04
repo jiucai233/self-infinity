@@ -8,7 +8,6 @@ import 'package:self_infinity/app/app.dart';
 import 'package:self_infinity/app/app_state.dart';
 import 'package:self_infinity/auth/auth_service.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
 import 'package:self_infinity/testing/fake_auth.dart';
 import 'package:self_infinity/testing/fake_file_picker.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
@@ -466,7 +465,7 @@ void main() {
       expect(find.text('Your world “High School Math” is ready.'), findsOneWidget);
       // The setup ends here, and the app opens on the tree it built.
       await tapKey(tester, 'onboarding-finish');
-      expect(find.byType(MapScene), findsOneWidget);
+      expect(find.byType(HomeScene), findsOneWidget);
 
       final profile = await api.getProfile();
       expect(profile.onboarded, isTrue);

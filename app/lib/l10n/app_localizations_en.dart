@@ -604,6 +604,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get menu => 'Menu';
 
   @override
+  String get homeInputHint => 'I want to learn…';
+
+  @override
   String get messageHint => 'Message…';
 
   @override
@@ -1592,6 +1595,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resetView => 'Back to the start';
+
+  @override
+  String get upNext => 'Up next';
 
   @override
   String get questLearn => 'Learn';

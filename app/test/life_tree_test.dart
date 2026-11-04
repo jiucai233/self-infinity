@@ -9,7 +9,7 @@ import 'package:self_infinity/api/api_exception.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/life_tree.dart';
 import 'package:self_infinity/api/models.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
+import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/testing/test_app.dart';
 import 'package:self_infinity/widgets/life_constellation.dart';
 
@@ -152,7 +152,7 @@ void main() {
 
     testWidgets('it turns any way, zooms by scroll and buttons, and goes back', (tester) async {
       final (api, _, _) = await twoCourses();
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       final state = tester.state<LifeConstellationState>(find.byType(LifeConstellation));
       final centre = tester.getCenter(find.byType(LifeConstellation));
       final before = state.positionOf('s6')!;
@@ -182,7 +182,7 @@ void main() {
       final (api, _, _) = await twoCourses();
       await passAudit(api, 6); // opens Roots and Coefficients (7)
       await failAudit(api, 7);
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(find.byKey(const Key('night-panel')), findsOneWidget);
       expect(find.byKey(const Key('stat-strip')), findsOneWidget);
       final state = tester.state<LifeConstellationState>(find.byType(LifeConstellation));
@@ -204,7 +204,7 @@ void main() {
     testWidgets('a course card moves the course under a main quest', (tester) async {
       final (api, math, _) = await twoCourses();
       await api.createGoal('Teach calculus');
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       final state = tester.state<LifeConstellationState>(find.byType(LifeConstellation));
       final box = tester.renderObject<RenderBox>(find.byType(LifeConstellation));
       await tester.tapAt(box.localToGlobal(state.positionOf('s${math.nodes.first.id}')!));
@@ -228,7 +228,7 @@ void main() {
     testWidgets('deleting a course asks first; unchecked, its history is kept', (tester) async {
       final (api, math, writing) = await twoCourses();
       await failAudit(api, 6);
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await openCourse(tester, math);
 
       await tester.tap(find.byKey(const Key('course-delete')));
@@ -254,7 +254,7 @@ void main() {
     testWidgets('checked, the nodes and their history go too', (tester) async {
       final (api, math, _) = await twoCourses();
       await failAudit(api, 6);
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await openCourse(tester, math);
 
       await tester.tap(find.byKey(const Key('course-delete')));

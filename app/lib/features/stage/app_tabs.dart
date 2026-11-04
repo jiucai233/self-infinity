@@ -6,10 +6,10 @@ import '../../l10n/l10n.dart';
 import '../../theme/tokens.dart';
 import '../onboarding/guided_tour.dart';
 
-/// The three places a phone can always reach from the bottom bar.
+/// The places a phone can always reach from the bottom bar. The life tree is
+/// the home stage (2026-11-04), so it has no tab of its own.
 enum AppTab {
   home(AppRoutes.home),
-  tree(AppRoutes.map),
   me(AppRoutes.me);
 
   const AppTab(this.root);
@@ -18,11 +18,10 @@ enum AppTab {
   final String root;
 
   /// The tab a [path] belongs to: the node, its audits and replays are under
-  /// the life tree; the life overview is under Me.
+  /// home (the life tree); the life overview is under Me.
   static AppTab of(String path) {
     final first = Uri.parse(path).pathSegments.firstOrNull;
     return switch (first) {
-      'map' || 'skill' || 'audit' => AppTab.tree,
       'me' || 'life' => AppTab.me,
       _ => AppTab.home,
     };
@@ -73,8 +72,8 @@ class TabShell extends StatelessWidget {
   }
 }
 
-/// The phone's bottom navigation (`docs/DESIGN.md`, clean): Home, Life tree,
-/// Me. Ink on paper: a hairline on top, no pill and no ripple; the current tab
+/// The phone's bottom navigation (`docs/DESIGN.md`, clean): Home (the life
+/// tree) and Me. Ink on paper: a hairline on top, no pill and no ripple; the current tab
 /// in ink, the others in secondary text. Each tab is at least 56 px tall.
 class AppTabBar extends StatelessWidget {
   const AppTabBar({super.key, required this.location});
@@ -115,7 +114,6 @@ class AppTabBar extends StatelessWidget {
           child: Row(
             children: [
               tab(AppTab.home, Icons.home_outlined, l.tabHome),
-              tab(AppTab.tree, Icons.park_outlined, l.lifeTree),
               // `open-left-drawer`: what used to open My character still does.
               tab(
                 AppTab.me,

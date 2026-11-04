@@ -150,7 +150,7 @@ void main() {
       expect(find.text('Delete “Calculus”?'), findsOneWidget);
       await tester.tap(find.byKey(const Key('node-delete-confirm')));
       await tester.pumpAndSettle();
-      expect(find.text('route:/map'), findsOneWidget);
+      expect(find.text('route:/'), findsOneWidget);
       expect((await api.getCourseMap(1)).nodes.any((n) => n.id == 4), isFalse);
     });
 

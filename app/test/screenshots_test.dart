@@ -14,6 +14,7 @@ import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/app.dart';
 import 'package:self_infinity/app/app_state.dart';
+import 'package:self_infinity/app/panel_layout.dart';
 import 'package:self_infinity/auth/auth_service.dart';
 import 'package:self_infinity/testing/fake_auth.dart';
 import 'package:self_infinity/testing/fake_file_picker.dart';
@@ -159,11 +160,13 @@ void main() {
     debugDisableShadows = true; // the test binding checks that it is back
   }
 
-  const sizes = {'wide': Size(1440, 900), 'narrow': Size(390, 844)};
+  const sizes = {'wide': Size(1440, 900), 'tablet': Size(1180, 820), 'narrow': Size(390, 844)};
 
   setUpAll(() async {
     if (dir != null) await _loadFonts();
+    PanelLayout.leftStartsFolded = true; // as the app starts
   });
+  tearDownAll(() => PanelLayout.leftStartsFolded = false);
 
   for (final entry in sizes.entries) {
     final tag = entry.key;

@@ -29,12 +29,6 @@ void main() {
   });
 
   group('scene 2', () {
-    testWidgets('the title is “Life tree”, with or without a course', (tester) async {
-      await pumpOutline(tester, api: api);
-      expect(tester.widget<Text>(key('stage-title')).data, 'Life tree');
-      await pumpOutline(tester, api: FakeApiClient(latency: Duration.zero));
-      expect(tester.widget<Text>(key('stage-title')).data, 'Life tree');
-    });
 
     testWidgets('root and branches have a double ring, leaves a single one', (tester) async {
       await pumpOutline(tester, api: api);

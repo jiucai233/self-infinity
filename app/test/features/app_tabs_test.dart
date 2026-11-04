@@ -1,4 +1,4 @@
-// The phone's bottom bar: Home, Life tree, Me. Not on wide screens, not in an
+// The phone's bottom bar: Home and Me. Not on wide screens, not in an
 // audit.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,7 +10,6 @@ import 'package:self_infinity/app/router.dart';
 import 'package:self_infinity/features/audit/audit_scene.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/features/life/life_scene.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
 import 'package:self_infinity/features/skill/skill_scene.dart';
 import 'package:self_infinity/features/stage/app_tabs.dart';
 import 'package:self_infinity/features/stage/me_scene.dart';
@@ -60,25 +59,20 @@ String selectedTab(WidgetTester tester) => AppTab.values
 
 void main() {
   group('on a phone', () {
-    testWidgets('three tabs; Home is selected on /', (tester) async {
+    testWidgets('two tabs; Home is selected on /', (tester) async {
       await pumpApp(tester);
       expect(bar, findsOneWidget);
       expect(find.descendant(of: bar, matching: find.text('Home')), findsOneWidget);
-      expect(find.descendant(of: bar, matching: find.text('Life tree')), findsOneWidget);
+      expect(tab('tree'), findsNothing);
       expect(find.descendant(of: bar, matching: find.text('Me')), findsOneWidget);
       expect(selectedTab(tester), 'home');
-      for (final name in ['home', 'tree', 'me']) {
+      for (final name in ['home', 'me']) {
         expect(tester.getSize(tab(name)).height, greaterThanOrEqualTo(44));
       }
     });
 
     testWidgets('the tabs switch scenes', (tester) async {
       await pumpApp(tester);
-      await tester.tap(tab('tree'));
-      await tester.pumpAndSettle();
-      expect(find.byType(MapScene), findsOneWidget);
-      expect(selectedTab(tester), 'tree');
-
       await tester.tap(tab('me'));
       await tester.pumpAndSettle();
       expect(find.byType(MeScene), findsOneWidget);
@@ -92,28 +86,19 @@ void main() {
       expect(selectedTab(tester), 'home');
     });
 
-    testWidgets('the crystal ball still opens the life tree', (tester) async {
-      await pumpApp(tester);
-      final orb = find.byKey(const Key('crystal-ball'));
-      expect(orb, findsOneWidget);
-      await tester.tap(orb);
-      await tester.pumpAndSettle();
-      expect(find.byType(MapScene), findsOneWidget);
-    });
-
     testWidgets('tab pages have no back arrow and no ☰; a node has its back arrow', (
       tester,
     ) async {
       await pumpApp(tester, initialLocation: AppRoutes.map);
       expect(find.byIcon(Icons.menu_rounded), findsNothing);
       expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
-      expect(find.byKey(const Key('stage-title')), findsOneWidget);
+      expect(find.byType(HomeScene), findsOneWidget); // /map is home now
 
       await pumpApp(tester, initialLocation: AppRoutes.skill(1));
       expect(find.byType(SkillScene), findsOneWidget);
       expect(find.byKey(const Key('back-map')), findsOneWidget);
       expect(find.byIcon(Icons.menu_rounded), findsNothing);
-      expect(selectedTab(tester), 'tree'); // a node belongs to the life tree
+      expect(selectedTab(tester), 'home'); // a node belongs to the home page
     });
 
     testWidgets('Home has the chat history button at the top right', (tester) async {
@@ -160,7 +145,7 @@ void main() {
       expect(leftPanel, findsOneWidget);
       await pumpApp(tester, size: wideScreen, initialLocation: AppRoutes.map);
       expect(bar, findsNothing);
-      expect(find.byKey(const Key('back-home')), findsOneWidget); // the map keeps its back arrow
+      expect(find.byType(HomeScene), findsOneWidget); // /map is home now
     });
 
     testWidgets('/me goes home: the panel is already on screen', (tester) async {

@@ -1180,6 +1180,12 @@ abstract class AppLocalizations {
   /// **'Menu'**
   String get menu;
 
+  /// Home stage: the input's placeholder before a chat, an invitation to name what to learn.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to learn…'**
+  String get homeInputHint;
+
   /// No description provided for @messageHint.
   ///
   /// In en, this message translates to:
@@ -2985,6 +2991,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to the start'**
   String get resetView;
+
+  /// Home stage: header over the nodes the crystal ball points to.
+  ///
+  /// In en, this message translates to:
+  /// **'Up next'**
+  String get upNext;
 
   /// No description provided for @questLearn.
   ///

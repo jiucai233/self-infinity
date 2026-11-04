@@ -596,6 +596,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get menu => '메뉴';
 
   @override
+  String get homeInputHint => '배우고 싶은 건…';
+
+  @override
   String get messageHint => '메시지…';
 
   @override
@@ -1574,6 +1577,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get resetView => '처음 시점으로';
+
+  @override
+  String get upNext => '다음 할 일';
 
   @override
   String get questLearn => '배우기';

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
+import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/testing/test_app.dart';
 
 import '../support/scene_helpers.dart';
@@ -151,7 +151,7 @@ String metric(WidgetTester tester, String key) =>
 
 void main() {
   Future<void> openPanel(WidgetTester tester, FakeApiClient api) async {
-    await pumpScene(tester, const MapScene(), api: api);
+    await pumpScene(tester, const HomeScene(), api: api);
     await tester.tap(find.byKey(const Key('settings-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('settings-dev')));
@@ -161,7 +161,7 @@ void main() {
   testWidgets('only a developer has it in the account menu', (tester) async {
     final api = _NotADeveloper();
     await api.generateCourse(const GenerateRequest(topic: 'math'));
-    await pumpScene(tester, const MapScene(), api: api);
+    await pumpScene(tester, const HomeScene(), api: api);
     await tester.tap(find.byKey(const Key('settings-button')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('settings-tutorial')), findsOneWidget);

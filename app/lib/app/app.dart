@@ -216,11 +216,11 @@ class _AccountShellState extends State<_AccountShell> {
     final router = _router;
     if (router == null) {
       return _router = createRouter(
-        initialLocation: widget.initialLocation ?? (land ? AppRoutes.map : null),
+        initialLocation: widget.initialLocation ?? (land ? AppRoutes.home : null),
       );
     }
     // A replayed setup: the scenes are still where they were left.
-    if (land) WidgetsBinding.instance.addPostFrameCallback((_) => router.go(AppRoutes.map));
+    if (land) WidgetsBinding.instance.addPostFrameCallback((_) => router.go(AppRoutes.home));
     return router;
   }
 

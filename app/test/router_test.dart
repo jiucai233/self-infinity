@@ -9,7 +9,6 @@ import 'package:self_infinity/app/router.dart';
 import 'package:self_infinity/features/audit/audit_scene.dart';
 import 'package:self_infinity/features/audit/replay_scene.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
 import 'package:self_infinity/features/skill/skill_scene.dart';
 import 'package:self_infinity/testing/fake_file_picker.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
@@ -54,7 +53,7 @@ void main() {
     testWidgets('each route shows its scene', (tester) async {
       await pumpApp(tester);
       await go(tester, AppRoutes.map);
-      expect(find.byType(MapScene), findsOneWidget);
+      expect(find.byType(HomeScene), findsOneWidget);
       await go(tester, AppRoutes.skill(1));
       expect(find.byType(SkillScene), findsOneWidget);
       await go(tester, AppRoutes.audit(1));
@@ -91,7 +90,7 @@ void main() {
       await go(tester, '/skill/1/audit?mode=night');
       expect(find.byType(AuditScene), findsOneWidget);
       await go(tester, '/map?course=1&focus=3');
-      expect(find.byType(MapScene), findsOneWidget);
+      expect(find.byType(HomeScene), findsOneWidget);
     });
 
     testWidgets('a bad node id is "not found"; the button goes home', (tester) async {
@@ -107,14 +106,14 @@ void main() {
 
     testWidgets('initialLocation starts anywhere', (tester) async {
       await pumpApp(tester, initialLocation: '/map');
-      expect(find.byType(MapScene), findsOneWidget);
+      expect(find.byType(HomeScene), findsOneWidget);
     });
 
     testWidgets('with animations off (tests) scenes switch at once', (tester) async {
       await pumpApp(tester);
-      routerContext(tester).go(AppRoutes.map);
+      routerContext(tester).go(AppRoutes.skill(1));
       await tester.pump();
-      expect(find.byType(MapScene), findsOneWidget);
+      expect(find.byType(SkillScene), findsOneWidget);
       expect(find.byType(HomeScene), findsNothing);
     });
 
@@ -142,29 +141,29 @@ void main() {
 
       testWidgets('the new scene fades in while it slides up into place', (tester) async {
         await pumpAnimated(tester);
-        routerContext(tester).go(AppRoutes.map);
+        routerContext(tester).go(AppRoutes.skill(1));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 60));
         // Both scenes are there while it runs.
-        expect(find.byType(MapScene), findsOneWidget);
         expect(find.byType(HomeScene), findsOneWidget);
-        final opacity = opacityOf(tester, MapScene);
+        expect(find.byType(SkillScene), findsOneWidget);
+        final opacity = opacityOf(tester, SkillScene);
         expect(opacity, inExclusiveRange(0, 1));
-        expect(slideOf(tester, MapScene).dy, greaterThan(0));
-        expect(slideOf(tester, MapScene).dy, lessThanOrEqualTo(0.02));
+        expect(slideOf(tester, SkillScene).dy, greaterThan(0));
+        expect(slideOf(tester, SkillScene).dy, lessThanOrEqualTo(0.02));
         await tester.pump(const Duration(milliseconds: 100));
-        expect(opacityOf(tester, MapScene), greaterThan(opacity));
+        expect(opacityOf(tester, SkillScene), greaterThan(opacity));
         await tester.pump(const Duration(milliseconds: 100));
         await tester.pump(const Duration(milliseconds: 300)); // the life tree never settles
         expect(find.byType(HomeScene), findsNothing);
-        expect(opacityOf(tester, MapScene), 1);
-        expect(slideOf(tester, MapScene), Offset.zero);
+        expect(opacityOf(tester, SkillScene), 1);
+        expect(slideOf(tester, SkillScene), Offset.zero);
       });
 
       testWidgets('it takes about 220 ms', (tester) async {
         await pumpAnimated(tester);
         expect(kSceneTransition, const Duration(milliseconds: 220));
-        routerContext(tester).go(AppRoutes.map);
+        routerContext(tester).go(AppRoutes.skill(1));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 200));
         expect(find.byType(HomeScene), findsOneWidget); // not yet
@@ -175,10 +174,10 @@ void main() {
 
       testWidgets('going back slides the other way', (tester) async {
         await pumpAnimated(tester, initialLocation: AppRoutes.skill(1));
-        routerContext(tester).go(AppRoutes.map);
+        routerContext(tester).go(AppRoutes.home);
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 40));
-        expect(slideOf(tester, MapScene).dy, lessThan(0));
+        expect(slideOf(tester, HomeScene).dy, lessThan(0));
         await tester.pump(const Duration(milliseconds: 300)); // the life tree never settles
         routerContext(tester).go(AppRoutes.audit(1));
         await tester.pump();
@@ -192,11 +191,7 @@ void main() {
   group('walking through the scenes (real router)', () {
     testWidgets('1 → 2 → 4 → 4-1 and back with ←', (tester) async {
       await pumpApp(tester);
-      // Scene 1: the mini tree.
-      await tester.tap(find.byKey(const Key('mini-tree')));
-      await tester.pumpAndSettle();
-      expect(find.byType(MapScene), findsOneWidget);
-      // Scene 2: a node (in the outline).
+      // Home: the life tree is the page. A node (in the outline).
       await tester.tap(find.byKey(const Key('view-outline')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('node-6')));
@@ -213,30 +208,26 @@ void main() {
       expect(find.byType(SkillScene), findsOneWidget);
       await tester.tap(find.byKey(const Key('back-map')));
       await tester.pumpAndSettle();
-      expect(find.byType(MapScene), findsOneWidget);
-      await tester.tap(find.byKey(const Key('back-home')));
-      await tester.pumpAndSettle();
       expect(find.byType(HomeScene), findsOneWidget);
     });
 
-    testWidgets('the "continue" suggestion goes to scene 4; a search to the node', (tester) async {
+    testWidgets('an "Up next" pick on home goes to its node', (tester) async {
       await pumpApp(tester);
-      await tester.tap(find.text('Start with “Discriminant”'));
+      final pick = find.byWidgetPredicate(
+        (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('orb-pick-'),
+      );
+      await tester.tap(pick.first);
       await tester.pumpAndSettle();
       expect(find.byType(SkillScene), findsOneWidget);
-
-      await go(tester, AppRoutes.map);
-      await say(tester, 'Calculus');
-      expect(find.byType(SkillScene), findsOneWidget);
-      expect(tester.widget<Text>(find.byKey(const Key('skill-title'))).data, 'Calculus');
     });
 
     testWidgets('a course made in the chat shows up on the map', (tester) async {
       await pumpApp(tester, api: FakeApiClient(latency: Duration.zero));
       await say(tester, 'I want to learn math');
-      await tester.tap(find.byKey(const Key('action-map')));
+      // (action-map goes to /map, which is home: the chat stays; ← shows the tree.)
+      await tester.tap(find.byKey(const Key('end-chat')));
       await tester.pumpAndSettle();
-      expect(find.byType(MapScene), findsOneWidget);
+      expect(find.byType(HomeScene), findsOneWidget);
       await tester.tap(find.byKey(const Key('view-outline')));
       await tester.pumpAndSettle();
       expect(

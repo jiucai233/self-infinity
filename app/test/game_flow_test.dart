@@ -8,7 +8,6 @@ import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/app.dart';
 import 'package:self_infinity/app/app_state.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
 import 'package:self_infinity/testing/fake_file_picker.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
 import 'package:self_infinity/widgets/widgets.dart';
@@ -43,7 +42,7 @@ void main() {
       final api = SpyApi();
       await api.generateCourse(const GenerateRequest(topic: 'math'));
       await pumpApp(tester, api, initialLocation: '/map');
-      expect(find.byType(MapScene), findsOneWidget);
+      expect(find.byType(HomeScene), findsOneWidget);
       await tester.tap(key('get-quests'));
       await tester.pumpAndSettle();
       expect(find.byType(HomeScene), findsOneWidget);

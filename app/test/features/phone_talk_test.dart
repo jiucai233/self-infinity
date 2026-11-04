@@ -18,42 +18,24 @@ Finder inStage(Finder f) => find.descendant(of: key('stage-panel'), matching: f)
 
 void main() {
   group('Home on a phone', () {
-    testWidgets('only her, her bubble, the quick replies and the input', (tester) async {
+    testWidgets('her, her bubble and the input over the sky', (tester) async {
       await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: phoneScreen);
-      expect(find.byType(OrbAvatar), findsOneWidget);
+      expect(key('home-avatar'), findsOneWidget);
       // The greeting is her line, in her bubble.
       expect(
         find.descendant(of: key('greeting-bubble'), matching: key('greeting')),
         findsOneWidget,
       );
       expect(find.text('Continue with “High School Math”?'), findsOneWidget);
-      // The hint is only the ball's tooltip.
-      expect(find.text('Tap the crystal ball to open your life tree.'), findsNothing);
-      expect(key('greeting-hint'), findsNothing);
-      expect(
-        tester.widget<Tooltip>(key('crystal-ball-hint')).message,
-        'Tap the crystal ball to open your life tree.',
-      );
-      // Nothing else is written on the page.
-      expect(textsIn(tester, key('stage-panel')).toSet(), {
-        'Continue with “High School Math”?',
-        'How was your day?',
-        'Start with “Discriminant”',
-        'Message…',
-      });
+      expect(find.text('I want to learn…'), findsOneWidget);
+      // No cards, no quick replies.
+      expect(key('suggestions'), findsNothing);
       // The history button stays, quiet.
       final history = tester.widget<Icon>(
         find.descendant(of: key('open-right-drawer'), matching: find.byType(Icon)),
       );
       expect(history.color, AppColors.textTertiary);
       expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('the quick replies do what the cards did', (tester) async {
-      await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: phoneScreen);
-      await tester.tap(key('suggestion-1'));
-      await tester.pumpAndSettle();
-      expect(find.text('route:/skill/6'), findsOneWidget);
     });
 
     testWidgets('a chat is the thread of this visit, her small figure on top', (tester) async {
@@ -80,13 +62,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('wide is unchanged: the headline, the hint, the cards, the big bubble', (
-      tester,
-    ) async {
+    testWidgets('wide: her bubble on the sky, then the big bubble in a chat', (tester) async {
       await pumpScene(tester, const HomeScene(), api: await seededFakeApi());
-      expect(key('greeting-bubble'), findsNothing);
-      expect(key('greeting-hint'), findsOneWidget);
-      expect(key('crystal-ball-hint'), findsNothing);
+      expect(key('greeting-bubble'), findsOneWidget);
       await say(tester, 'Hello there');
       expect(key('phone-thread'), findsNothing);
       expect(key('reply-bubble'), findsOneWidget);

@@ -11,7 +11,6 @@ import 'package:self_infinity/api/http_api.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/l10n/l10n.dart';
 import 'package:self_infinity/testing/test_app.dart';
-import 'package:self_infinity/widgets/keep_all.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _arb(String lang) =>
@@ -94,7 +93,7 @@ void main() {
 
     expect(LocaleController.current, AppLanguage.zh);
     expect(find.text('我的角色'), findsWidgets);
-    expect(find.text('今天学点什么？'), findsOneWidget);
+    expect(find.text('我想要学习…'), findsOneWidget);
     expect(find.text('My character'), findsNothing);
   });
 
@@ -104,7 +103,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('내 캐릭터'), findsWidgets);
-    // Korean prose is drawn with word joiners, so it breaks only at spaces.
-    expect(find.text(keepAll('오늘은 뭘 배워 볼까요?')), findsOneWidget);
+    // The input hint is Korean.
+    expect(find.text('배우고 싶은 건…'), findsOneWidget);
   });
 }

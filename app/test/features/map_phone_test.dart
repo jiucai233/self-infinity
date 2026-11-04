@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/models.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
+import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/testing/test_app.dart';
 import 'package:self_infinity/theme/tokens.dart';
 import 'package:self_infinity/widgets/life_constellation.dart';
@@ -26,7 +26,7 @@ void main() {
     testWidgets('every node is a touch target of at least 44 px; the nearest one wins', (
       tester,
     ) async {
-      await pumpScene(tester, const MapScene(), api: await seededFakeApi(), size: phoneScreen);
+      await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: phoneScreen);
       expect(LifeConstellation.hitRadius * 2, greaterThanOrEqualTo(44));
       final state = sky(tester);
       final tree = tester.widget<LifeConstellation>(find.byType(LifeConstellation)).tree;
@@ -50,7 +50,7 @@ void main() {
     });
 
     testWidgets('a tap next to a node, not on it, opens its card', (tester) async {
-      await pumpScene(tester, const MapScene(), api: await seededFakeApi(), size: phoneScreen);
+      await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: phoneScreen);
       final state = sky(tester);
       final p = state.positionOf('s5')!;
       // Off by 18 px towards the side with no other node nearer.
@@ -62,35 +62,8 @@ void main() {
       expect(find.byKey(const Key('node-sheet-s5')), findsOneWidget);
     });
 
-    for (final (name, size) in [('phone', phoneScreen), ('desktop', wideScreen)]) {
-      testWidgets('while searching ($name), no label lies over another or past the panel', (
-        tester,
-      ) async {
-        await pumpScene(tester, const MapScene(), api: await seededFakeApi(), size: size);
-        await type(tester, 'Function');
-        await tester.pump();
-        final state = sky(tester);
-        final labels = state.labelRects;
-        final panel = Offset.zero & tester.getSize(find.byType(LifeConstellation));
-        final rects = labels.values.toList();
-        for (var i = 0; i < rects.length; i++) {
-          expect(panel.contains(rects[i].topLeft), isTrue);
-          expect(rects[i].right, lessThanOrEqualTo(panel.right));
-          for (var j = i + 1; j < rects.length; j++) {
-            expect(rects[i].overlaps(rects[j]), isFalse, reason: '${labels.keys}');
-          }
-        }
-        // The hits are named.
-        final hits = tester.widget<LifeConstellation>(find.byType(LifeConstellation)).highlighted;
-        expect(hits, isNotEmpty);
-        for (final k in hits) {
-          expect(labels.containsKey(k), isTrue, reason: k);
-        }
-      });
-    }
-
     testWidgets('a selected node and its neighbours are named, none over another', (tester) async {
-      await pumpScene(tester, const MapScene(), api: await seededFakeApi(), size: phoneScreen);
+      await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: phoneScreen);
       final state = sky(tester);
       await tester.tapAt(global(tester, state.positionOf('s5')!));
       await tester.pumpAndSettle();
@@ -105,7 +78,7 @@ void main() {
     });
 
     testWidgets('the hint and the legend are readable on the night panel (4.5:1)', (tester) async {
-      await pumpScene(tester, const MapScene(), api: await seededFakeApi(), size: wideScreen);
+      await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: wideScreen);
       final hint = tester.widget<Text>(find.byKey(const Key('night-hint'))).style!.color!;
       expect(contrast(Color.alphaBlend(hint, AppColors.night), AppColors.night), greaterThanOrEqualTo(4.5));
       final legend = find.byKey(const Key('night-legend'));
@@ -120,7 +93,7 @@ void main() {
     testWidgets('is a bottom sheet that drags up to the whole stage; its button is reachable', (
       tester,
     ) async {
-      await pumpScene(tester, const MapScene(), api: await seededFakeApi(), size: phoneScreen);
+      await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: phoneScreen);
       await tester.tapAt(global(tester, sky(tester).positionOf('s5')!));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('node-bottom-sheet')), findsOneWidget);
@@ -152,7 +125,7 @@ void main() {
     });
 
     testWidgets('dragged down, it closes; × closes it too', (tester) async {
-      await pumpScene(tester, const MapScene(), api: await seededFakeApi(), size: phoneScreen);
+      await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: phoneScreen);
       await tester.tapAt(global(tester, sky(tester).positionOf('s5')!));
       await tester.pumpAndSettle();
       await tester.drag(find.byKey(const Key('node-sheet-handle')), const Offset(0, 700));
@@ -167,7 +140,7 @@ void main() {
     });
 
     testWidgets('a desktop keeps the card on the panel', (tester) async {
-      await pumpScene(tester, const MapScene(), api: await seededFakeApi(), size: wideScreen);
+      await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: wideScreen);
       await tester.tapAt(global(tester, sky(tester).positionOf('s5')!));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('node-sheet-s5')), findsOneWidget);

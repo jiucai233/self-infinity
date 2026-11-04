@@ -593,6 +593,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get menu => '菜单';
 
   @override
+  String get homeInputHint => '我想要学习…';
+
+  @override
   String get messageHint => '输入消息…';
 
   @override
@@ -1571,6 +1574,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetView => '回到初始视角';
+
+  @override
+  String get upNext => '接下来';
 
   @override
   String get questLearn => '学新';

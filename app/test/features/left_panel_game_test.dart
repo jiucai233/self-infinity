@@ -8,13 +8,10 @@ import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/app_state.dart';
 import 'package:self_infinity/app/panel_layout.dart';
-import 'package:self_infinity/features/chat/chat_controller.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
 import 'package:self_infinity/widgets/collapsible_section.dart';
 import 'package:self_infinity/testing/test_app.dart';
 import 'package:self_infinity/theme/tokens.dart';
-import 'package:provider/provider.dart';
 
 import '../support/scene_helpers.dart';
 import '../support/spy_api.dart';
@@ -50,7 +47,7 @@ void main() {
     testWidgets('identity placeholder, Win condition, Stakes and Rules with muted hints', (
       tester,
     ) async {
-      await pumpScene(tester, const MapScene(), api: FakeApiClient(latency: Duration.zero));
+      await pumpScene(tester, const HomeScene(), api: FakeApiClient(latency: Duration.zero));
       expect(find.text('I am the type of person who…'), findsOneWidget);
       expect(find.text('Win condition'), findsOneWidget);
       expect(find.text('Stakes'), findsOneWidget);
@@ -67,7 +64,7 @@ void main() {
     });
 
     testWidgets('top to bottom: sheet, stats, Daily quests, Today', (tester) async {
-      await pumpScene(tester, const MapScene(), api: FakeApiClient(latency: Duration.zero));
+      await pumpScene(tester, const HomeScene(), api: FakeApiClient(latency: Duration.zero));
       final order = [
         find.text('Character sheet'),
         find.text('Stats'),
@@ -92,7 +89,7 @@ void main() {
         antiVision: 'a' * 280,
         rules: List.generate(5, (i) => 'Rule number $i'),
       );
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(tester.takeException(), isNull);
       final button = tester.getRect(key('settings-button'));
       expect(button.bottom, lessThanOrEqualTo(900));
@@ -114,7 +111,7 @@ void main() {
         antiVision: 'Drifting',
         rules: ['No phone in bed', 'Audit before lunch'],
       );
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(find.text('I am the type of person who explains things first.'), findsOneWidget);
       expect(find.text('A clear mind'), findsOneWidget);
       expect(find.text('Drifting'), findsOneWidget);
@@ -128,7 +125,7 @@ void main() {
     testWidgets('tap → a field; Enter saves via PUT /profile and shows a saved mark', (
       tester,
     ) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('field-vision'));
       await tester.pump();
       expect(key('vision-input'), findsOneWidget);
@@ -145,7 +142,7 @@ void main() {
 
     testWidgets('Stakes saves anti_vision and keeps the win condition', (tester) async {
       await api.updateProfile(vision: 'A clear mind');
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await editAndEnter(tester, 'field-anti-vision', 'anti-vision-input', 'Drifting');
       final p = await api.getProfile();
       expect(p.antiVision, 'Drifting');
@@ -153,7 +150,7 @@ void main() {
     });
 
     testWidgets('leaving the field (blur) saves as well', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('field-vision'));
       await tester.pump();
       await tester.enterText(key('vision-input'), 'Ship the capstone');
@@ -167,7 +164,7 @@ void main() {
     testWidgets('an unchanged text is not saved; Esc cancels what was typed', (tester) async {
       await api.updateProfile(vision: 'A clear mind');
       api.profileSaves = 0;
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       // Unchanged + Enter.
       await tester.tap(key('field-vision'));
       await tester.pump();
@@ -190,14 +187,14 @@ void main() {
       tester,
     ) async {
       await api.updateProfile(vision: 'A clear mind');
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await editAndEnter(tester, 'field-vision', 'vision-input', '   ');
       expect((await api.getProfile()).vision, '');
       expect(find.text('What does winning look like?'), findsOneWidget);
     });
 
     testWidgets('the identity line starts from “I am the type of person who ”', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('field-identity'));
       await tester.pump();
       expect(fieldText(tester, 'identity-input'), 'I am the type of person who ');
@@ -217,7 +214,7 @@ void main() {
     });
 
     testWidgets('limit: at most 280 characters, a counter appears near it', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('field-vision'));
       await tester.pump();
       await tester.enterText(key('vision-input'), 'x' * 100);
@@ -235,7 +232,7 @@ void main() {
     testWidgets('a failed save keeps the field open with what was typed and says so', (
       tester,
     ) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('field-vision'));
       await tester.pump();
       await tester.enterText(key('vision-input'), 'A clear mind');
@@ -260,7 +257,7 @@ void main() {
     });
 
     testWidgets('a network failure says the server cannot be reached', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('field-anti-vision'));
       await tester.pump();
       await tester.enterText(key('anti-vision-input'), 'Drifting');
@@ -277,7 +274,7 @@ void main() {
       tester,
     ) async {
       api.failNext(method: 'getProfile');
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(find.text('What does winning look like?'), findsOneWidget);
       await editAndEnter(tester, 'field-vision', 'vision-input', 'A clear mind');
       expect((await api.getProfile()).vision, 'A clear mind');
@@ -292,7 +289,7 @@ void main() {
     });
 
     testWidgets('Add a rule → type → Enter appends it', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('rule-add'));
       await tester.pump();
       expect(key('rule-new-input'), findsOneWidget);
@@ -308,7 +305,7 @@ void main() {
     });
 
     testWidgets('an empty new rule is dropped without a call', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('rule-add'));
       await tester.pump();
       await tester.testTextInput.receiveAction(TextInputAction.done);
@@ -322,7 +319,7 @@ void main() {
       tester,
     ) async {
       await api.updateProfile(rules: ['a', 'b', 'c', 'd']);
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('rule-add'));
       await tester.pump();
       await tester.enterText(key('rule-new-input'), 'e' * 200);
@@ -337,7 +334,7 @@ void main() {
 
     testWidgets('✕ removes a rule', (tester) async {
       await api.updateProfile(rules: ['No phone in bed', 'Audit before lunch']);
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('rule-remove-0'));
       await tester.pumpAndSettle();
       expect((await api.getProfile()).rules, ['Audit before lunch']);
@@ -348,7 +345,7 @@ void main() {
 
     testWidgets('tap a rule to edit it; emptying it removes it', (tester) async {
       await api.updateProfile(rules: ['No phone in bed', 'Audit before lunch']);
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(key('rule-0'));
       await tester.pump();
       expect(fieldText(tester, 'rule-input-0'), 'No phone in bed');
@@ -367,7 +364,7 @@ void main() {
 
     testWidgets('a failed removal keeps the rule and shows the error', (tester) async {
       await api.updateProfile(rules: ['No phone in bed']);
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       api.failNext(method: 'updateProfile');
       await tester.tap(key('rule-remove-0'));
       await tester.pumpAndSettle();
@@ -385,7 +382,7 @@ void main() {
     ) async {
       final layout = PanelLayout();
       final api = FakeApiClient(latency: Duration.zero);
-      await pumpScene(tester, const MapScene(), api: api, layout: layout);
+      await pumpScene(tester, const HomeScene(), api: api, layout: layout);
       expect(key('character-sheet'), findsOneWidget);
       expect(key('stat-level'), findsOneWidget);
       expect(key('today-summary'), findsOneWidget);
@@ -408,7 +405,7 @@ void main() {
     });
 
     testWidgets('Rules folds inside the sheet', (tester) async {
-      await pumpScene(tester, const MapScene(), api: FakeApiClient(latency: Duration.zero));
+      await pumpScene(tester, const HomeScene(), api: FakeApiClient(latency: Duration.zero));
       expect(key('rule-add'), findsOneWidget);
       await tester.tap(key('toggle-rules'));
       await tester.pumpAndSettle();
@@ -420,18 +417,16 @@ void main() {
   group('Daily quests', () {
     testWidgets('no plan: the row “Get today’s quests →” asks the Guide', (tester) async {
       final api = await seededFakeApi();
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(key('daily-quests'), findsNothing);
       expect(find.text("Get today's quests →"), findsOneWidget);
       await tester.tap(key('get-quests'));
       await tester.pumpAndSettle();
       // The line is queued for the chat and the stage switches to scene 1/5.
       expect(find.text('route:/'), findsOneWidget);
-      final chat = Provider.of<ChatController>(
-        tester.element(find.text('route:/')),
-        listen: false,
-      );
-      expect(chat.queuedMessage, 'What should I do today?');
+      // The home scene took the queued line and sent it.
+      final sent = await api.getChatHistory();
+      expect(sent.map((m) => m.content), contains('What should I do today?'));
     });
 
     group('with a plan', () {
@@ -451,7 +446,7 @@ void main() {
         tester,
       ) async {
         await passAudit(api, 6);
-        await pumpScene(tester, const MapScene(), api: api);
+        await pumpScene(tester, const HomeScene(), api: api);
         final plan = (await api.getCurrentPlan())!;
         expect(plan.steps.map((s) => s.skillId), [6, 9, 11]);
         expect(mark(6, 'quest-done'), findsOneWidget);
@@ -476,7 +471,7 @@ void main() {
 
       testWidgets('a node audited today counts, even when the audit failed', (tester) async {
         await failAudit(api, 9);
-        await pumpScene(tester, const MapScene(), api: api);
+        await pumpScene(tester, const HomeScene(), api: api);
         expect(mark(9, 'quest-done'), findsOneWidget);
         expect(mark(11, 'quest-open'), findsOneWidget);
         expect(questCount('1/3'), findsOneWidget);
@@ -484,13 +479,13 @@ void main() {
 
       testWidgets('an audit that is still running does not count', (tester) async {
         await api.startAudit(11);
-        await pumpScene(tester, const MapScene(), api: api);
+        await pumpScene(tester, const HomeScene(), api: api);
         expect(mark(11, 'quest-open'), findsOneWidget);
         expect(questCount('0/3'), findsOneWidget);
       });
 
       testWidgets('nothing is checked at first', (tester) async {
-        await pumpScene(tester, const MapScene(), api: api);
+        await pumpScene(tester, const HomeScene(), api: api);
         expect(find.byKey(const Key('quest-done')), findsNothing);
         expect(find.byKey(const Key('quest-open')), findsNWidgets(3));
       });
@@ -506,7 +501,7 @@ void main() {
         await old.generateCourse(const GenerateRequest(topic: 'math'));
         await old.sendChat('What should I do today?');
         await failAudit(old, 9);
-        await pumpScene(tester, const MapScene(), api: old);
+        await pumpScene(tester, const HomeScene(), api: old);
         expect(mark(9, 'quest-open'), findsOneWidget);
         expect(questCount('0/3'), findsOneWidget);
       });
@@ -522,14 +517,14 @@ void main() {
         await failAudit(clocked, 9);
         await pumpScene(
           tester,
-          const MapScene(),
+          const HomeScene(),
           api: clocked,
           clock: () => DateTime.utc(2026, 10, 5, 13, 50), // still the 5th in Seoul
         );
         expect(mark(9, 'quest-done'), findsOneWidget);
         await pumpScene(
           tester,
-          const MapScene(),
+          const HomeScene(),
           api: clocked,
           clock: () => DateTime.utc(2026, 10, 5, 15, 30), // the 6th in Seoul
         );
@@ -537,7 +532,7 @@ void main() {
       });
 
       testWidgets('tapping a quest opens its node (scene 4)', (tester) async {
-        await pumpScene(tester, const MapScene(), api: api);
+        await pumpScene(tester, const HomeScene(), api: api);
         await tester.ensureVisible(key('quest-9')); // the left panel scrolls
         await tester.pumpAndSettle();
         await tester.tap(key('quest-9'));
@@ -547,7 +542,7 @@ void main() {
 
       testWidgets('finishing an audit refreshes the checks', (tester) async {
         final state = AppState();
-        await pumpScene(tester, const MapScene(), api: api, state: state);
+        await pumpScene(tester, const HomeScene(), api: api, state: state);
         expect(questCount('0/3'), findsOneWidget);
         await failAudit(api, 11);
         state.markDataChanged(); // what the audit scene does when an audit ends

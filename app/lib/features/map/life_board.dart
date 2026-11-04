@@ -10,38 +10,44 @@ import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
 import '../stage/profile_controller.dart';
 import '../stage/stage_controller.dart';
-import '../stage/stage_input_bar.dart';
-import '../stage/stage_scaffold.dart';
 import 'graph_view.dart';
 import 'node_sheet.dart';
 import 'stat_strip.dart';
 import '../../l10n/l10n.dart';
 
-/// Scene 2 of `docs/ux-chat.md`: your **life tree**.
+/// Your **life tree**, the home stage before a chat (scene 2 of
+/// `docs/ux-chat.md`, merged into home on 2026-11-04).
 ///
 /// * On top, your progress over every course in big numbers.
 /// * Below, the night panel: you in the middle, your courses and their
-///   nodes, turning slowly (`LifeConstellation`). Tap a
-///   point and its card opens (`NodeSheet`): audit history, lessons, `Take it
-///   on`.
+///   nodes, turning slowly (`LifeConstellation`). Tap a point and its card
+///   opens (`NodeSheet`): audit history, lessons, `Take it on`.
 /// * `Outline` switches to the layered graph of one course (the old map).
-/// * The search bar finds a node in **any** course.
-///
-/// Route `/map`.
-class MapScene extends StatefulWidget {
-  const MapScene({super.key});
+/// * [overlay] is drawn over the night panel (her and the nodes she points
+///   to); it hides while a node's card is open.
+class LifeBoard extends StatefulWidget {
+  const LifeBoard({super.key, this.overlay, this.legendLeft});
+
+  /// Built over the night panel with the sky (for node positions) and the
+  /// panel's constraints.
+  final Widget Function(
+    BuildContext context,
+    GlobalKey<LifeConstellationState> sky,
+    BoxConstraints box,
+  )?
+  overlay;
+
+  /// Room kept free at the bottom left of a night panel of a size (where
+  /// [overlay] puts her): the legend starts after it.
+  final double Function(BoxConstraints box)? legendLeft;
 
   @override
-  State<MapScene> createState() => _MapSceneState();
+  State<LifeBoard> createState() => _LifeBoardState();
 }
 
 enum _View { constellation, outline }
 
-class _MapSceneState extends State<MapScene> {
-  final TextEditingController _search = TextEditingController();
-  final FocusNode _focus = FocusNode();
-  String? _searchError;
-
+class _LifeBoardState extends State<LifeBoard> {
   _View _view = _View.constellation;
   final GlobalKey<LifeConstellationState> _sky = GlobalKey();
   String? _selected;
@@ -52,64 +58,32 @@ class _MapSceneState extends State<MapScene> {
   static const double phoneWidth = 600;
 
   @override
-  void dispose() {
-    _search.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  String get _query => _search.text.trim().toLowerCase();
-
-  /// Enter: open the first matching node. Nodes of the newest course come
-  /// first, then the other courses, newest first.
-  void _submitSearch(List<CourseMap> maps) {
-    final q = _query;
-    if (q.isEmpty) return;
-    for (final map in maps) {
-      final hit = map.nodes.where((n) => n.title.toLowerCase().contains(q)).firstOrNull;
-      if (hit != null) {
-        context.go(AppRoutes.skill(hit.id));
-        return;
-      }
-    }
-    setState(() => _searchError = context.l10n.noMatchingNode);
-  }
-
-  @override
   Widget build(BuildContext context) {
     final stage = context.watch<StageController>();
     final tree = stage.lifeTree;
     final maps = stage.courseMaps;
     final phone = MediaQuery.sizeOf(context).width < phoneWidth;
     final selected = _selected == null ? null : tree.byKey(_selected!);
-    return StageScaffold(
-      title: context.l10n.lifeTree,
-      topLeading: IconButton(
-        key: const Key('back-home'),
-        tooltip: context.l10n.back,
-        icon: const Icon(Icons.arrow_back_rounded),
-        onPressed: () => context.go(AppRoutes.home),
-      ),
-      stage: Stack(
-        children: [
-          Positioned.fill(child: _content(context, stage, tree, maps)),
-          if (phone && selected != null && _view == _View.constellation)
-            Positioned.fill(
-              child: _PhoneSheet(
-                key: ValueKey('phone-sheet-${selected.key}'),
+    return Stack(
+      key: const Key('life-board'),
+      children: [
+        Positioned.fill(child: _content(context, stage, tree, maps)),
+        if (phone && selected != null && _view == _View.constellation)
+          Positioned.fill(
+            child: _PhoneSheet(
+              key: ValueKey('phone-sheet-${selected.key}'),
+              onClose: _closeSheet,
+              builder: (controller) => NodeSheet(
+                node: selected,
+                tree: tree,
+                scrollController: controller,
                 onClose: _closeSheet,
-                builder: (controller) => NodeSheet(
-                  node: selected,
-                  tree: tree,
-                  scrollController: controller,
-                  onClose: _closeSheet,
-                  onOpenSkill: (id) => context.go(AppRoutes.skill(id)),
-                  onOutline: _showOutline,
-                ),
+                onOpenSkill: (id) => context.go(AppRoutes.skill(id)),
+                onOutline: _showOutline,
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -122,51 +96,36 @@ class _MapSceneState extends State<MapScene> {
     _view = _View.outline;
   });
 
-  Widget _content(BuildContext context, StageController stage, LifeTree tree, List<CourseMap> maps) {
+  Widget _content(
+    BuildContext context,
+    StageController stage,
+    LifeTree tree,
+    List<CourseMap> maps,
+  ) {
+    final compact = MediaQuery.sizeOf(context).width < 600;
     return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xl,
-              AppSpacing.xs,
-              AppSpacing.lg,
-              AppSpacing.lg,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: StatStrip(
-                    stats: tree.stats,
-                    compact: MediaQuery.sizeOf(context).width < 600,
-                  ),
-                ),
-                // Phones: no room for her next to the numbers.
-                if (MediaQuery.sizeOf(context).width >= 600) _Guide(empty: maps.isEmpty),
-              ],
-            ),
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            compact ? AppSpacing.lg : AppSpacing.xl,
+            AppSpacing.md,
+            AppSpacing.lg,
+            compact ? AppSpacing.sm : AppSpacing.lg,
           ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: !stage.loaded
-                  ? const LoadingView()
-                  : _view == _View.constellation
-                  ? _night(context, tree)
-                  : _outline(context, tree, maps),
-            ),
+          child: StatStrip(stats: tree.stats, compact: compact),
+        ),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: compact ? AppSpacing.sm : AppSpacing.lg),
+            child: !stage.loaded
+                ? const LoadingView()
+                : _view == _View.constellation
+                ? _night(context, tree)
+                : _outline(context, tree, maps),
           ),
-          StageInputBar(
-            controller: _search,
-            focusNode: _focus,
-            hint: context.l10n.searchNodesHint,
-            search: true,
-            onSubmit: () => _submitSearch(maps),
-            onChanged: (_) => setState(() => _searchError = null),
-            error: _searchError,
-          ),
-        ],
-      );
+        ),
+      ],
+    );
   }
 
   // -- constellation ----------------------------------------------------------
@@ -174,13 +133,6 @@ class _MapSceneState extends State<MapScene> {
   Widget _night(BuildContext context, LifeTree tree) {
     final identity = context.select<ProfileController, String>((p) => p.profile.identity);
     final theme = Theme.of(context).textTheme;
-    final q = _query;
-    final highlighted = q.isEmpty
-        ? const <String>{}
-        : {
-            for (final n in tree.nodes)
-              if (n.label.toLowerCase().contains(q)) n.key,
-          };
     final selected = _selected == null ? null : tree.byKey(_selected!);
     return ClipRRect(
       key: const Key('night-panel'),
@@ -197,7 +149,6 @@ class _MapSceneState extends State<MapScene> {
                     key: _sky,
                     tree: tree,
                     selected: _selected,
-                    highlighted: highlighted,
                     onSelect: (n) => setState(() => _selected = n.key),
                   ),
                 ),
@@ -228,8 +179,10 @@ class _MapSceneState extends State<MapScene> {
                       ),
                     ),
                   ),
+                if (widget.overlay case final overlay? when selected == null && !tree.isEmpty)
+                  Positioned.fill(child: overlay(context, _sky, box)),
                 Positioned(
-                  left: AppSpacing.lg,
+                  left: AppSpacing.lg + (selected == null ? widget.legendLeft?.call(box) ?? 0 : 0),
                   right: narrow ? AppSpacing.lg : null,
                   bottom: AppSpacing.lg,
                   child: const _NightLegend(),
@@ -321,7 +274,6 @@ class _MapSceneState extends State<MapScene> {
 
   Widget _outline(BuildContext context, LifeTree tree, List<CourseMap> maps) {
     final map = maps.where((m) => m.course.id == _outlineCourse).firstOrNull ?? maps.firstOrNull;
-    final q = _query;
     final failed = {
       for (final n in tree.nodes)
         if (n.failed && n.skillId != null) n.skillId!,
@@ -344,12 +296,6 @@ class _MapSceneState extends State<MapScene> {
                 key: ValueKey('graph-${map.course.id}'),
                 map: map,
                 failed: failed,
-                highlighted: q.isEmpty
-                    ? const {}
-                    : {
-                        for (final n in map.nodes)
-                          if (n.title.toLowerCase().contains(q)) n.id,
-                      },
                 onOpen: (id) => context.go(AppRoutes.skill(id)),
               ),
             ),
@@ -539,34 +485,6 @@ class _NightLegend extends StatelessWidget {
               Text(label, style: style),
             ],
           ),
-      ],
-    );
-  }
-}
-
-/// The small guide at the right of the numbers.
-class _Guide extends StatelessWidget {
-  const _Guide({required this.empty});
-
-  final bool empty;
-
-  @override
-  Widget build(BuildContext context) {
-    final narrow = MediaQuery.sizeOf(context).width < AppLayout.wideBreakpoint;
-    final line = empty ? context.l10n.mapEmptyLine : context.l10n.mapTapNode;
-    return Row(
-      key: const Key('map-guide'),
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        SpeechBubble(
-          key: const Key('map-bubble'),
-          tail: BubbleTail.bottomRight,
-          speaker: 'front_desk',
-          maxWidth: narrow ? 150 : 230,
-          child: Text(line, style: Theme.of(context).textTheme.bodySmall),
-        ),
-        Avatar(agent: 'front_desk', mood: AvatarMood.smile, size: narrow ? 56 : 72),
       ],
     );
   }

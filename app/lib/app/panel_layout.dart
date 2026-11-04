@@ -4,7 +4,12 @@ import 'package:flutter/foundation.dart';
 /// panels) and which sections of the left panel are folded. Kept in memory for the session, so the choice survives a scene
 /// change; nothing is persisted.
 class PanelLayout extends ChangeNotifier {
-  bool _leftCollapsed = false;
+  bool _leftCollapsed = leftStartsFolded;
+
+  /// Whether the left panel starts as a rail (2026-11-04: the first screen
+  /// shows only what is needed). Tests written before then expect it open,
+  /// and turn this off.
+  static bool leftStartsFolded = true;
   bool _rightCollapsed = false;
 
   /// The left panel (My character) is a rail.

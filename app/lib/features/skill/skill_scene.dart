@@ -154,7 +154,7 @@ class _SkillSceneState extends State<SkillScene> {
       courseName: courseNameOf(map),
       nodeCount: map.nodes.length,
     );
-    if (deleted && mounted) context.go(AppRoutes.map);
+    if (deleted && mounted) context.go(AppRoutes.home);
   }
 
   /// Breaks the node down into its parts (or fills in the ones missing); the
@@ -297,7 +297,7 @@ class _SkillSceneState extends State<SkillScene> {
   Future<void> _deleteNode(SkillNode node) async {
     if (!await confirmDeleteNode(context, title: node.title) || !mounted) return;
     final map = await _edit(() => _api.deleteSkill(node.id));
-    if (map != null && mounted) context.go(AppRoutes.map);
+    if (map != null && mounted) context.go(AppRoutes.home);
   }
 
   // -- chat about the node ------------------------------------------------------
@@ -340,7 +340,7 @@ class _SkillSceneState extends State<SkillScene> {
         key: const Key('back-map'),
         tooltip: context.l10n.back,
         icon: const Icon(Icons.arrow_back_rounded),
-        onPressed: () => context.go(AppRoutes.map),
+        onPressed: () => context.go(AppRoutes.home),
       ),
       stage: Column(
         children: [

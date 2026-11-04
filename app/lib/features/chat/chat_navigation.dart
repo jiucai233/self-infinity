@@ -15,7 +15,7 @@ bool followNavigation(BuildContext context, Iterable<ChatMessage> messages) {
     if (action is! NavigateAction) continue;
     switch (action.scene) {
       case NavScene.map:
-        context.go(AppRoutes.map);
+        context.go(AppRoutes.home);
         return true;
       case NavScene.skill:
         final id = action.skillId;

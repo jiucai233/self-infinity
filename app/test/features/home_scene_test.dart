@@ -5,10 +5,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:self_infinity/api/fake_api.dart';
-import 'package:self_infinity/api/life_tree.dart';
-import 'package:self_infinity/api/models.dart';
+import 'package:self_infinity/app/app.dart';
+import 'package:self_infinity/app/app_state.dart';
+import 'package:self_infinity/app/panel_layout.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
+import 'package:self_infinity/app/router.dart';
 import 'package:self_infinity/testing/fake_file_picker.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
 import 'package:self_infinity/testing/test_app.dart';
@@ -38,208 +41,107 @@ PickedFile file(String name, [String body = '# Course']) =>
     PickedFile(name: name, bytes: utf8.encode(body));
 
 void main() {
-  group('scene 1', () {
-    testWidgets('without a course: only you in the crystal ball, the two lines of the mockup', (
-      tester,
-    ) async {
-      await pumpHome(tester, FakeApiClient(latency: Duration.zero));
-      expect(avatar(tester).agent, 'front_desk');
-      expect(avatar(tester).holdOrb, isFalse); // the ball floats beside her
-      expect(avatar(tester).mood, AvatarMood.smile);
-      final tree = tester.widget<LifeConstellation>(find.byType(LifeConstellation));
-      expect(tree.compact, isTrue);
-      expect(tree.tree.isEmpty, isTrue);
-      expect(find.text('How was your day?'), findsOneWidget);
-      expect(find.text('Tell me what you want to learn'), findsOneWidget);
-      expect(find.text('Message…'), findsOneWidget);
-    });
-
-    testWidgets('the wizard holds the crystal ball; the avatar is about 30 % of the stage height', (
+  group('home is the life board', () {
+    testWidgets('wide: the board, the night panel, her, and the picks; no crystal ball', (
       tester,
     ) async {
       await pumpHome(tester, await seededFakeApi());
-      final ball = tester.getRect(find.byKey(const Key('crystal-ball')));
-      expect(ball.width, closeTo(ball.height, 0.01));
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('crystal-ball')),
-          matching: find.byType(LifeConstellation),
+      expect(find.byKey(const Key('life-board')), findsOneWidget);
+      expect(find.byKey(const Key('night-panel')), findsOneWidget);
+      expect(find.byKey(const Key('home-avatar')), findsOneWidget);
+      expect(find.byKey(const Key('orb-picks')), findsOneWidget);
+      expect(find.byKey(const Key('crystal-ball')), findsNothing);
+    });
+
+    Future<void> pumpRealApp(WidgetTester tester, Size size, {String? initialLocation}) async {
+      Avatar.animationsEnabled = false;
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        SelfInfinityApp(
+          api: await seededFakeApi(),
+          appState: AppState(),
+          voice: FakeVoiceService(),
+          filePicker: FakeFilePicker(),
+          initialLocation: initialLocation,
         ),
-        findsOneWidget,
       );
-      final avatarHeight = tester.getSize(find.byType(Avatar)).height;
-      expect(avatarHeight / 900, inInclusiveRange(0.25, 0.35));
-    });
-
-    testWidgets('the life tree in the ball opens scene 2', (tester) async {
-      await pumpHome(tester, await seededFakeApi());
-      expect(find.byType(LifeConstellation), findsOneWidget);
-      await tester.tap(find.byKey(const Key('mini-tree')));
       await tester.pumpAndSettle();
-      expect(find.text('route:/map'), findsOneWidget);
-    });
+    }
 
-    testWidgets('the ball holds every course around you; main quests are not points', (
-      tester,
-    ) async {
-      final api = await seededFakeApi();
-      await api.generateCourse(const GenerateRequest(topic: 'reinforcement learning'));
-      final goal = await api.createGoal('Become an RL researcher');
-      await api.updateGoal(goal.id, courseIds: [2]);
-      await pumpHome(tester, api);
-      final tree = tester.widget<LifeConstellation>(find.byType(LifeConstellation)).tree;
-      expect({for (final n in tree.nodes) n.courseId}..remove(null), {1, 2});
-      final rl = tree.nodes.firstWhere((n) => n.kind == LifeKind.course && n.courseId == 2);
-      expect((rl.parent, rl.goalId), (LifeTree.selfKey, goal.id));
-      final math = tree.nodes.firstWhere((n) => n.kind == LifeKind.course && n.courseId == 1);
-      expect((math.parent, math.goalId), (LifeTree.selfKey, null)); // a side quest
-      expect(tree.nodes.where((n) => n.label == goal.title), isEmpty);
-    });
-
-    testWidgets('an empty ball also opens scene 2', (tester) async {
-      await pumpHome(tester, FakeApiClient(latency: Duration.zero));
-      await tester.tap(find.byKey(const Key('mini-tree')));
-      await tester.pumpAndSettle();
-      expect(find.text('route:/map'), findsOneWidget);
-    });
-
-    testWidgets('an ink headline above the wizard, with a subtitle', (tester) async {
-      await pumpHome(tester, FakeApiClient(latency: Duration.zero));
-      expect(find.text('What shall we learn today?'), findsOneWidget);
-      expect(find.text('Tell the Guide what you want to learn.'), findsOneWidget);
-      final greeting = find.byKey(const Key('greeting'));
-      expect(greeting, findsOneWidget);
-      // Plain ink, no gradient.
-      expect(find.descendant(of: greeting, matching: find.byType(ShaderMask)), findsNothing);
+    testWidgets('/map redirects to home (real router)', (tester) async {
+      await pumpRealApp(tester, wideScreen, initialLocation: AppRoutes.map);
+      expect(find.byType(HomeScene), findsOneWidget);
+      expect(find.byKey(const Key('life-board')), findsOneWidget);
       expect(
-        tester.getBottomLeft(greeting).dy,
-        lessThanOrEqualTo(tester.getTopLeft(find.byType(OrbAvatar)).dy),
-        reason: 'above the wizard',
+        GoRouter.of(tester.element(find.byType(HomeScene))).state.uri.path,
+        AppRoutes.home,
       );
-      expect(
-        tester.getTopLeft(find.byKey(const Key('greeting-hint'))).dy,
-        greaterThanOrEqualTo(tester.getBottomLeft(greeting).dy),
-      );
-      // Wide: displayMedium (48, the display serif).
-      expect(tester.widget<Text>(greeting).style!.fontSize, 48);
-      expect(tester.widget<Text>(greeting).style!.fontFamily, AppFonts.display);
     });
+
+    testWidgets('the phone tab bar has exactly Home and Me', (tester) async {
+      await pumpRealApp(tester, phoneScreen);
+      expect(find.byKey(const Key('tab-home')), findsOneWidget);
+      expect(find.byKey(const Key('tab-me')), findsOneWidget);
+      final tabs = find.descendant(
+        of: find.byKey(const Key('tab-bar')),
+        matching: find.byWidgetPredicate(
+          (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('tab-'),
+        ),
+      );
+      expect(tabs, findsNWidgets(2));
+      expect(find.byKey(const Key('tab-tree')), findsNothing);
+    });
+  });
+
+  group('scene 1', () {
 
     testWidgets('with a course the greeting names it', (tester) async {
       await pumpHome(tester, await seededFakeApi());
       expect(find.text('Continue with “High School Math”?'), findsOneWidget);
-      expect(find.text('Tap the crystal ball to open your life tree.'), findsOneWidget);
       expect(find.text('What shall we learn today?'), findsNothing);
     });
 
-    testWidgets('at most two suggestions as Gemini cards, side by side, with an icon', (
-      tester,
-    ) async {
+    testWidgets('beside the ball, up to three nodes it points to; a tap opens one', (tester) async {
       await pumpHome(tester, await seededFakeApi());
-      expect(find.byKey(const Key('suggestion-0')), findsOneWidget);
-      expect(find.byKey(const Key('suggestion-1')), findsOneWidget);
-      expect(find.byKey(const Key('suggestion-2')), findsNothing);
-      expect(find.text('How was your day?'), findsOneWidget);
-      expect(find.text('Start with “Discriminant”'), findsOneWidget);
-      final first = tester.getRect(find.byKey(const Key('suggestion-0')));
-      final second = tester.getRect(find.byKey(const Key('suggestion-1')));
-      expect(first.top, second.top, reason: 'side by side');
-      expect(first.height, second.height);
-      expect(second.left, greaterThan(first.right));
-      // surfaceHigh, radius 16, a small icon in front of the text.
-      final card = tester.widget<Material>(
-        find
-            .descendant(
-              of: find.byKey(const Key('suggestion-0')),
-              matching: find.byType(Material),
-            )
-            .first,
+      expect(find.byKey(const Key('orb-picks')), findsOneWidget);
+      expect(find.text('Up next'), findsOneWidget);
+      final picks = find.byWidgetPredicate(
+        (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('orb-pick-'),
       );
-      expect(card.color, AppColors.surfaceHigh);
-      expect(card.shape, RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)));
-      expect(
-        find.descendant(of: find.byKey(const Key('suggestion-0')), matching: find.byType(Icon)),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: find.byKey(const Key('suggestion-1')), matching: find.byType(Icon)),
-        findsOneWidget,
-      );
+      expect(picks.evaluate().length, inInclusiveRange(1, 3));
+      // The picks sit on the right side of the night panel.
+      final night = tester.getRect(find.byKey(const Key('night-panel')));
+      expect(tester.getRect(picks.first).center.dx, greaterThan(night.center.dx));
+      final id = (tester.widget(picks.first).key! as ValueKey<String>).value.substring('orb-pick-'.length);
+      await tester.tap(picks.first);
+      await tester.pumpAndSettle();
+      expect(find.text('route:/skill/$id'), findsOneWidget);
     });
 
-    testWidgets('on a phone the cards are quick replies under her bubble', (tester) async {
-      await pumpHome(tester, await seededFakeApi(), size: phoneScreen);
-      final bubble = tester.getRect(find.byKey(const Key('greeting-bubble')));
-      final first = tester.getRect(find.byKey(const Key('suggestion-0')));
-      final second = tester.getRect(find.byKey(const Key('suggestion-1')));
-      expect(first.top, greaterThan(bubble.bottom));
-      expect(second.top, greaterThanOrEqualTo(first.top));
-      expect(first.height, lessThan(64), reason: 'a chip, not a card');
-      expect(tester.takeException(), isNull);
-      // Her line, in the serif.
-      final greeting = tester.widget<Text>(find.byKey(const Key('greeting')));
-      expect(greeting.style!.fontFamily, AppFonts.display);
+    testWidgets('without a course nothing is beside the ball', (tester) async {
+      await pumpHome(tester, FakeApiClient(latency: Duration.zero));
+      expect(find.byKey(const Key('orb-picks')), findsNothing);
     });
 
-    testWidgets('the cards hide while typing', (tester) async {
+    testWidgets('the input asks what to learn; in a chat it is a plain message', (tester) async {
       await pumpHome(tester, await seededFakeApi());
-      expect(find.byKey(const Key('suggestion-0')), findsOneWidget);
-      await type(tester, 'm');
-      expect(find.byKey(const Key('suggestion-0')), findsNothing);
-      expect(find.byKey(const Key('greeting')), findsOneWidget); // the greeting stays
-    });
-
-    testWidgets('suggestions are not shown when the server offers none', (tester) async {
-      final api = FakeApiClient(latency: Duration.zero)..failNext(method: 'getChatSuggestions');
-      await pumpHome(tester, api);
-      expect(find.byKey(const Key('suggestion-0')), findsNothing);
-      expect(find.byKey(const Key('stage-input')), findsOneWidget);
-    });
-
-    testWidgets('a suggestion with a skill_id opens that node (scene 4) and sends nothing', (
-      tester,
-    ) async {
-      final api = await seededFakeApi();
-      await pumpHome(tester, api);
-      await tester.tap(find.byKey(const Key('suggestion-1')));
+      expect(find.text('I want to learn…'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('stage-input')), 'hi');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pumpAndSettle();
-      expect(find.text('route:/skill/6'), findsOneWidget);
-      expect(await api.getChatHistory(), isEmpty);
+      expect(find.text('Message…'), findsOneWidget);
     });
 
-    testWidgets('a suggestion with a message sends it and goes to scene 5', (tester) async {
-      final api = await seededFakeApi();
-      await pumpHome(tester, api);
-      await tester.tap(find.byKey(const Key('suggestion-0')));
-      await tester.pumpAndSettle();
-      expect((await api.getChatHistory()).first.content, 'Let me log my day');
-      expect(find.byKey(const Key('reply-bubble')), findsOneWidget);
-      expect(find.byKey(const Key('chat-history')), findsOneWidget);
-      expect(find.byKey(const Key('suggestions')), findsNothing);
-    });
-
-    testWidgets('a suggestion with an empty message only puts the cursor in the input', (
-      tester,
-    ) async {
-      final api = FakeApiClient(latency: Duration.zero);
-      await pumpHome(tester, api);
-      final field = tester.widget<TextField>(find.byKey(const Key('stage-input')));
-      expect(field.focusNode!.hasFocus, isFalse);
-      await tester.tap(find.text('Tell me what you want to learn'));
-      await tester.pumpAndSettle();
-      expect(field.focusNode!.hasFocus, isTrue);
-      expect(await api.getChatHistory(), isEmpty);
-      expect(find.byKey(const Key('reply-bubble')), findsNothing);
-      expect(find.byKey(const Key('suggestions')), findsOneWidget); // still scene 1
-    });
-
-    testWidgets('typing hides the suggestions; clearing the text brings them back', (tester) async {
+    testWidgets('the left panel starts as a rail, and opens', (tester) async {
+      PanelLayout.leftStartsFolded = true;
+      addTearDown(() => PanelLayout.leftStartsFolded = false);
       await pumpHome(tester, await seededFakeApi());
-      expect(find.byKey(const Key('suggestions')), findsOneWidget);
-      await type(tester, 'm');
-      expect(find.byKey(const Key('suggestions')), findsNothing);
-      await type(tester, '');
-      expect(find.byKey(const Key('suggestions')), findsOneWidget);
+      expect(find.byKey(const Key('left-panel')), findsNothing);
+      await tester.tap(find.byKey(const Key('expand-left')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('left-panel')), findsOneWidget);
     });
 
     testWidgets('no chat panel; ⊕ and ∿ are there', (tester) async {
@@ -257,17 +159,19 @@ void main() {
       await pumpHome(tester, await seededFakeApi());
       expect(find.byKey(const Key('end-chat')), findsNothing);
       await say(tester, 'Hello there');
-      expect(find.byKey(const Key('mini-tree')), findsNothing);
+      expect(find.byKey(const Key('home-avatar')), findsNothing);
 
       await tester.tap(find.byKey(const Key('end-chat')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('mini-tree')), findsOneWidget);
+      expect(find.byKey(const Key('home-avatar')), findsOneWidget);
       expect(find.byKey(const Key('end-chat')), findsNothing);
 
       await say(tester, 'Hello again');
       await tester.tap(find.byKey(const Key('chat-open-map')));
       await tester.pumpAndSettle();
-      expect(find.text('route:/map'), findsOneWidget);
+      // The life tree is this page: the chat ends.
+      expect(find.byKey(const Key('life-board')), findsOneWidget);
+      expect(find.byKey(const Key('end-chat')), findsNothing);
     });
 
     testWidgets('on a phone the thread has the way back; the tabs reach the tree', (tester) async {
@@ -295,7 +199,6 @@ void main() {
       expect(find.byKey(const Key('history-panel')), findsOneWidget);
       expect(avatar(tester).mood, AvatarMood.neutral);
       expect(avatar(tester).wave, isFalse);
-      expect(find.byKey(const Key('mini-tree')), findsNothing);
       expect(inputText(tester), '');
     });
 
@@ -496,7 +399,7 @@ void main() {
       expect(bubbleText(tester), isNotEmpty);
     });
 
-    testWidgets('a generated course: Open life tree → opens scene 2', (tester) async {
+    testWidgets('a generated course: Open life tree → ends the chat on the life tree', (tester) async {
       final api = FakeApiClient(latency: Duration.zero);
       await pumpHome(tester, api);
       await say(tester, 'I want to learn math');
@@ -505,13 +408,16 @@ void main() {
       expect(find.text('Open life tree'), findsOneWidget);
       await tester.tap(find.byKey(const Key('action-map')));
       await tester.pumpAndSettle();
-      expect(find.text('route:/map'), findsOneWidget);
+      expect(find.byKey(const Key('life-board')), findsOneWidget);
+      expect(find.byKey(const Key('end-chat')), findsNothing);
     });
 
-    testWidgets('a navigate action switches the scene at once', (tester) async {
+    testWidgets('a navigate action to the tree ends the chat at once', (tester) async {
       await pumpHome(tester, await seededFakeApi());
       await say(tester, 'Show me the map');
-      expect(find.text('route:/map'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('life-board')), findsOneWidget);
+      expect(find.byKey(const Key('end-chat')), findsNothing);
     });
 
     testWidgets('opening a node by name goes to scene 4', (tester) async {
@@ -720,7 +626,6 @@ void main() {
       expect(find.byKey(const Key('upload')), findsNothing);
       expect(find.byKey(const Key('voice-mode')), findsNothing);
       expect(avatar(tester).state, AvatarState.listening);
-      expect(find.byKey(const Key('mini-tree')), findsNothing); // scene 5 already
       expect(find.byKey(const Key('history-panel')), findsOneWidget);
     });
 
@@ -845,7 +750,7 @@ void main() {
       await tester.tap(find.byKey(const Key('voice-mode')));
       await tester.pumpAndSettle();
       expect(find.text("Voice mode isn't available on this device."), findsOneWidget);
-      expect(find.byKey(const Key('mini-tree')), findsOneWidget);
+      expect(find.byKey(const Key('life-board')), findsOneWidget);
       expect(find.byKey(const Key('history-panel')), findsNothing);
     });
 

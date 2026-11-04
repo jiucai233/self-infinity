@@ -9,7 +9,6 @@ import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/panel_layout.dart';
 import 'package:self_infinity/features/audit/audit_scene.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
 import 'package:self_infinity/features/skill/skill_scene.dart';
 import 'package:self_infinity/features/stage/me_scene.dart';
 import 'package:self_infinity/testing/test_app.dart';
@@ -36,7 +35,7 @@ void main() {
   group('the left panel is on every scene', () {
     final scenes = <String, Widget Function()>{
       'scene 1': () => const HomeScene(),
-      'scene 2': () => const MapScene(),
+      'scene 2': () => const HomeScene(),
       'scene 4': () => const SkillScene(skillId: 1),
       'scene 4-1': () => const AuditScene(skillId: 6),
     };
@@ -94,7 +93,7 @@ void main() {
     });
 
     testWidgets('panel title bars are English: My character on the left', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(find.text('My character'), findsOneWidget);
       expect(find.byKey(const Key('panel-title')), findsOneWidget);
       expect(
@@ -118,7 +117,7 @@ void main() {
       tester,
     ) async {
       await passAudit(api, 6); // 1 of 12 mastered; 1 of 5 for the level
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(find.text('Lv 1 · 1/5'), findsOneWidget);
       expect(find.text('Cleared 1/12'), findsOneWidget);
       expect(find.text('Condition: No record'), findsOneWidget);
@@ -138,7 +137,7 @@ void main() {
 
     testWidgets('Cleared is green; the level bar is blue', (tester) async {
       await passAudit(api, 6);
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       Color colorOf(int i) => tester
           .widget<ColoredBox>(
             find.descendant(
@@ -162,7 +161,7 @@ void main() {
       for (final id in [6, 7, 5, 9, 10]) {
         await passAudit(api, id); // the first five of the learning order
       }
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(find.text('Lv 2 · 0/5'), findsOneWidget);
       expect(find.text('Cleared 5/12'), findsOneWidget);
       expect(fillOf(tester, 0), 0);
@@ -170,7 +169,7 @@ void main() {
 
     testWidgets('condition: Good is full, Low is half and red', (tester) async {
       await api.checkInVoice('I slept eight hours last night.');
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(find.text('Condition: Good'), findsOneWidget);
       expect(fillOf(tester, 2), 1);
       Color barColor() => tester
@@ -194,7 +193,7 @@ void main() {
       expect(labelColor(), AppColors.textPrimary);
 
       await api.checkInVoice('I slept four hours last night.');
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(find.text('Condition: Low'), findsOneWidget);
       expect(fillOf(tester, 2), 0.5);
       expect(barColor(), AppColors.danger);
@@ -204,13 +203,13 @@ void main() {
 
   group('Today', () {
     testWidgets('without a check-in all three rows show —', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       final summary = find.byKey(const Key('today-summary'));
       expect(textsIn(tester, summary), ['Sleep', '—', 'Meals', '—', 'Journal', '—', 'My life →']);
     });
 
     testWidgets('My life → opens the life overview', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.ensureVisible(find.byKey(const Key('open-life')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('open-life')));
@@ -224,7 +223,7 @@ void main() {
       await api.checkInVoice(
         'I slept six hours and had ramen for lunch.\nI am a bit tired.\nThird line',
       );
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       final texts = textsIn(tester, find.byKey(const Key('today-summary'))).toList();
       expect(texts[1], '6 h');
       expect(texts[3], 'lunch: ramen');
@@ -244,7 +243,7 @@ void main() {
     testWidgets('local mode: says so, offers the tutorial and the front page, no sign out', (
       tester,
     ) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(find.byIcon(Icons.adjust_rounded), findsOneWidget);
       await tester.tap(find.byKey(const Key('settings-button')));
       await tester.pumpAndSettle();
@@ -258,7 +257,7 @@ void main() {
     testWidgets('signed in: the email, and Sign out signs out', (tester) async {
       final auth = FakeAuthService(accounts: {'me@example.com': 'secret1'});
       await auth.signIn('me@example.com', 'secret1');
-      await pumpScene(tester, const MapScene(), api: api, auth: auth);
+      await pumpScene(tester, const HomeScene(), api: api, auth: auth);
       await tester.tap(find.byKey(const Key('settings-button')));
       await tester.pumpAndSettle();
       expect(find.text('me@example.com'), findsOneWidget);
@@ -268,7 +267,7 @@ void main() {
     });
 
     testWidgets('OpenAI | Claude: the model the agents run on; a tap chooses, the menu stays', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(find.byKey(const Key('settings-button')));
       await tester.pumpAndSettle();
       SegmentedButton<String> model() => tester.widget(find.byKey(const Key('settings-model')));
@@ -285,7 +284,7 @@ void main() {
 
     testWidgets('two voice switches: a tap saves one voice, the menu stays', (tester) async {
       final voiceApi = _VoiceOn();
-      await pumpScene(tester, const MapScene(), api: voiceApi);
+      await pumpScene(tester, const HomeScene(), api: voiceApi);
       await tester.tap(find.byKey(const Key('settings-button')));
       await tester.pumpAndSettle();
       SegmentedButton<String> guide() => tester.widget(find.byKey(const Key('settings-voice-guide')));
@@ -309,7 +308,7 @@ void main() {
     });
 
     testWidgets('without speech on the server all four voices are off', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       await tester.tap(find.byKey(const Key('settings-button')));
       await tester.pumpAndSettle();
       for (final key in ['settings-voice-guide', 'settings-voice-audit']) {
@@ -319,7 +318,7 @@ void main() {
     });
 
     testWidgets('a provider the server has no key for cannot be chosen', (tester) async {
-      await pumpScene(tester, const MapScene(), api: _OpenAiOnly());
+      await pumpScene(tester, const HomeScene(), api: _OpenAiOnly());
       await tester.tap(find.byKey(const Key('settings-button')));
       await tester.pumpAndSettle();
       final model = tester.widget<SegmentedButton<String>>(find.byKey(const Key('settings-model')));
@@ -327,7 +326,7 @@ void main() {
     });
 
     testWidgets('Replay the tutorial clears the onboarded flag', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect((await api.getProfile()).onboarded, isTrue);
       await tester.tap(find.byKey(const Key('settings-button')));
       await tester.pumpAndSettle();
@@ -345,7 +344,7 @@ void main() {
     });
 
     testWidgets('not on scene 2', (tester) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(historyPanel, findsNothing);
     });
 
@@ -374,7 +373,7 @@ void main() {
     testWidgets('no English panel or section titles are left', (tester) async {
       for (final scene in [
         const HomeScene(),
-        const MapScene(),
+        const HomeScene(),
         const SkillScene(skillId: 1),
         const AuditScene(skillId: 6),
       ]) {
@@ -397,7 +396,7 @@ void main() {
     testWidgets('left: fold and unfold; the content goes, the title is written sideways', (
       tester,
     ) async {
-      await pumpScene(tester, const MapScene(), api: api);
+      await pumpScene(tester, const HomeScene(), api: api);
       expect(find.byKey(const Key('collapse-left')), findsOneWidget);
       await tester.tap(find.byKey(const Key('collapse-left')));
       await tester.pumpAndSettle();
@@ -428,7 +427,7 @@ void main() {
 
     testWidgets('the choice is kept in memory across scenes', (tester) async {
       final layout = PanelLayout();
-      await pumpScene(tester, const MapScene(), api: api, layout: layout);
+      await pumpScene(tester, const HomeScene(), api: api, layout: layout);
       await tester.tap(find.byKey(const Key('collapse-left')));
       await tester.pumpAndSettle();
       expect(layout.leftCollapsed, isTrue);
@@ -459,17 +458,12 @@ void main() {
   });
 
   group('narrow screens (< 900 px): no side columns, no ☰', () {
-    testWidgets('scene 1 and 2: no left panel and no ☰; the Me tab has it', (tester) async {
-      for (final scene in [const HomeScene(), const MapScene()]) {
-        await pumpScene(tester, scene, api: api, size: phoneScreen);
-        expect(leftPanel, findsNothing);
-        expect(find.byIcon(Icons.menu_rounded), findsNothing);
-      }
-      // Only Home has the chat history button, before the first message too.
+    testWidgets('home: no left panel and no ☰; the Me tab has it', (tester) async {
       await pumpScene(tester, const HomeScene(), api: api, size: phoneScreen);
+      expect(leftPanel, findsNothing);
+      expect(find.byIcon(Icons.menu_rounded), findsNothing);
+      // Home has the chat history button, before the first message too.
       expect(find.byKey(const Key('open-right-drawer')), findsOneWidget);
-      await pumpScene(tester, const MapScene(), api: api, size: phoneScreen);
-      expect(find.byKey(const Key('open-right-drawer')), findsNothing);
     });
 
     testWidgets('the Me page holds the same panel', (tester) async {
@@ -505,7 +499,7 @@ void main() {
     testWidgets('no overflow on a phone, in any scene', (tester) async {
       final scenes = [
         const HomeScene(),
-        const MapScene(),
+        const HomeScene(),
         const SkillScene(skillId: 1),
         const AuditScene(skillId: 6),
       ];

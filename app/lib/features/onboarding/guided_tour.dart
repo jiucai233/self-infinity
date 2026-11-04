@@ -84,7 +84,7 @@ class GuidedTour extends StatefulWidget {
         anchor: const Key('replay-scene'),
         text: (l) => l.tourVerdict,
       ),
-    TourStop(route: AppRoutes.map, anchor: const Key('night-panel'), text: (l) => l.tourTree),
+    TourStop(route: AppRoutes.home, anchor: const Key('night-panel'), text: (l) => l.tourTree),
   ];
 
   @override

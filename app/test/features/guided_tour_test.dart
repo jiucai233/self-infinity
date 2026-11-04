@@ -9,7 +9,6 @@ import 'package:self_infinity/app/app_state.dart';
 import 'package:self_infinity/features/audit/audit_scene.dart';
 import 'package:self_infinity/features/audit/replay_scene.dart';
 import 'package:self_infinity/features/chat/home_scene.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
 import 'package:self_infinity/features/onboarding/guided_tour.dart';
 import 'package:self_infinity/testing/fake_file_picker.dart';
 import 'package:self_infinity/testing/fake_voice.dart';
@@ -86,7 +85,7 @@ void main() {
       await next(tester);
       seen.add(said(tester));
       pages.add(
-        [HomeScene, AuditScene, ReplayScene, MapScene].firstWhere((t) => find.byType(t).evaluate().isNotEmpty),
+        [HomeScene, AuditScene, ReplayScene, HomeScene].firstWhere((t) => find.byType(t).evaluate().isNotEmpty),
       );
       expect(lit(tester), isNotNull, reason: 'stop ${i + 2} lights its part');
     }
@@ -97,7 +96,7 @@ void main() {
       'Then you get a score, what you missed, and a lesson.',
       'Every node you clear lights up your life tree.',
     ]);
-    expect(pages, [HomeScene, AuditScene, ReplayScene, MapScene]);
+    expect(pages, [HomeScene, AuditScene, ReplayScene, HomeScene]);
     expect(progress(tester), '4 / 4');
     expect(find.text('Set up my character'), findsOneWidget);
     expect(key('tour-skip'), findsNothing); // the last stop only goes on
@@ -187,7 +186,7 @@ void main() {
     await tester.tap(key('onboarding-finish'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(MapScene), findsOneWidget); // the user's own tree
+    expect(find.byType(HomeScene), findsOneWidget); // the user's own tree
     expect((await api.listCourses()).single.id, 1);
     expect((await api.getProfile()).onboarded, isTrue);
   });

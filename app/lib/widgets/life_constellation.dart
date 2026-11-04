@@ -79,6 +79,10 @@ class LifeConstellationState extends State<LifeConstellation> with SingleTickerP
   /// Where node [key] was drawn last frame (local coordinates), or null.
   Offset? positionOf(String key) => _projected.at[key];
 
+  /// Ticks with every frame of the sky (it turns, zooms, drifts): something
+  /// drawn over it that follows a node repaints on it.
+  Listenable get frames => _clock;
+
   /// Where each label was drawn last frame (local coordinates), by node key.
   @visibleForTesting
   Map<String, Rect> get labelRects => Map.unmodifiable(_projected.labels);

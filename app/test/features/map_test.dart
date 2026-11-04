@@ -7,10 +7,9 @@ import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/app_state.dart';
 import 'package:self_infinity/features/map/graph_layout.dart';
 import 'package:self_infinity/features/map/graph_view.dart';
-import 'package:self_infinity/features/map/map_scene.dart';
+import 'package:self_infinity/features/chat/home_scene.dart';
 import 'package:self_infinity/testing/test_app.dart';
 import 'package:self_infinity/theme/tokens.dart';
-import 'package:self_infinity/widgets/widgets.dart';
 
 import '../support/scene_helpers.dart';
 
@@ -280,11 +279,8 @@ void main() {
       expect(find.text('route:/skill/12'), findsOneWidget);
     });
 
-    testWidgets('the title bar is “Life tree”; the outline names the course in a chip', (
-      tester,
-    ) async {
+    testWidgets('the outline names the course in a chip', (tester) async {
       await pumpOutline(tester, api: api);
-      expect(tester.widget<Text>(find.byKey(const Key('stage-title'))).data, 'Life tree');
       expect(
         find.descendant(
           of: find.byKey(const Key('outline-course-1')),
@@ -298,23 +294,6 @@ void main() {
           matching: find.text('High School Math'),
         ),
         findsOneWidget, // the root node
-      );
-    });
-
-    testWidgets('a small avatar top-right, next to the numbers, asks you to pick a node', (
-      tester,
-    ) async {
-      await pumpOutline(tester, api: api);
-      expect(find.text('Tap a node to take it on.'), findsOneWidget);
-      final avatar = tester.widget<Avatar>(find.byType(Avatar));
-      expect(avatar.size, lessThan(150));
-      expect(avatar.mood, AvatarMood.smile);
-      final center = tester.getCenter(find.byType(Avatar));
-      expect(center.dx, greaterThan(1000)); // right side of the 1440 px window
-      expect(center.dy, lessThan(200)); // beside the numbers, above the tree
-      expect(
-        find.descendant(of: find.byKey(const Key('map-bubble')), matching: find.text('Guide')),
-        findsOneWidget,
       );
     });
 
@@ -359,20 +338,13 @@ void main() {
         expect(fill(DotKind.locked), AppColors.locked);
       });
 
-      testWidgets('it does not overlap the avatar or the search bar, on a desktop or a phone', (
+      testWidgets('it does not overlap the input, on a desktop or a phone', (
         tester,
       ) async {
         for (final size in [wideScreen, phoneScreen]) {
           await pumpOutline(tester, api: api, size: size);
           if (find.byKey(const Key('graph-legend')).evaluate().isEmpty) await openLegend(tester);
           final legend = tester.getRect(find.byKey(const Key('graph-legend')));
-          // On a phone she is not shown on this scene.
-          if (size == wideScreen) {
-            final guide = tester.getRect(find.byKey(const Key('map-guide')));
-            expect(legend.overlaps(guide), isFalse, reason: '$size');
-          } else {
-            expect(find.byKey(const Key('map-guide')), findsNothing);
-          }
           expect(legend.overlaps(tester.getRect(find.byKey(const Key('stage-input')))), isFalse);
           expect(tester.takeException(), isNull);
         }
@@ -385,21 +357,6 @@ void main() {
         await openLegend(tester); // the ? closes it again
         expect(find.byKey(const Key('graph-legend')), findsNothing);
       });
-    });
-
-    testWidgets('the input is a search bar only: no ⊕, no ∿', (tester) async {
-      await pumpOutline(tester, api: api);
-      expect(find.text('Search nodes…'), findsOneWidget);
-      expect(find.byKey(const Key('upload')), findsNothing);
-      expect(find.byKey(const Key('voice-mode')), findsNothing);
-      expect(find.byKey(const Key('send')), findsOneWidget);
-    });
-
-    testWidgets('← goes back to scene 1', (tester) async {
-      await pumpOutline(tester, api: api);
-      await tester.tap(find.byKey(const Key('back-home')));
-      await tester.pumpAndSettle();
-      expect(find.text('route:/'), findsOneWidget);
     });
 
     testWidgets('it shows the newest course; the older one is not drawn', (tester) async {
@@ -424,70 +381,10 @@ void main() {
       expect(find.byKey(const Key('node-1')), findsNothing);
     });
 
-    testWidgets('typing highlights the matching nodes of the shown course', (tester) async {
-      await pumpOutline(tester, api: api);
-      await type(tester, 'Function');
-      final view = tester.widget<SkillGraphView>(find.byType(SkillGraphView));
-      expect(view.highlighted, {3, 9, 10}); // Functions, Linear Functions, Quadratic Functions
-      await type(tester, '');
-      expect(tester.widget<SkillGraphView>(find.byType(SkillGraphView)).highlighted, isEmpty);
-    });
-
-    testWidgets('Enter or → opens the first match', (tester) async {
-      await pumpOutline(tester, api: api);
-      await say(tester, 'Discrim');
-      expect(find.text('route:/skill/6'), findsOneWidget);
-    });
-
-    testWidgets('the search spans all courses: a node of an older course is found', (tester) async {
-      await api.generateCourse(const GenerateRequest(topic: 'reinforcement learning')); // shown now
-      await pumpOutline(tester, api: api);
-      expect(find.text('Discriminant'), findsNothing); // not drawn...
-      await say(tester, 'Discrim');
-      expect(find.text('route:/skill/6'), findsOneWidget); // ...but found
-    });
-
-    testWidgets('a match in the shown course wins over one in an older course', (tester) async {
-      await api.generateCourse(
-        const GenerateRequest(topic: 'Advanced math'),
-      ); // also has Quadratic Equations
-      await pumpOutline(tester, api: api);
-      await say(tester, 'Quadratic Equations');
-      expect(
-        find.text('route:/skill/17'),
-        findsOneWidget,
-      ); // the shown course's Quadratic Equations
-    });
-
-    testWidgets('no match: a short message, nothing opens', (tester) async {
-      await pumpOutline(tester, api: api);
-      await say(tester, 'a node that does not exist');
-      expect(find.text('No matching node.'), findsOneWidget);
-      expect(find.textContaining('route:'), findsNothing);
-      await type(tester, 'Disc');
-      expect(find.text('No matching node.'), findsNothing);
-    });
-
-    testWidgets('the search is case-insensitive and trims spaces', (tester) async {
-      final other = FakeApiClient(latency: Duration.zero);
-      await other.generateCourse(const GenerateRequest(topic: 'Python'));
-      await pumpOutline(tester, api: other);
-      await say(tester, '  python ');
-      expect(find.text('route:/skill/1'), findsOneWidget);
-    });
-
-    testWidgets('no course yet: the avatar says to tell her what to learn', (tester) async {
-      await pumpOutline(tester, api: FakeApiClient(latency: Duration.zero));
-      expect(find.byKey(const Key('graph-viewer')), findsNothing);
-      expect(find.textContaining('Tell the Guide what you want to learn'), findsOneWidget);
-      await say(tester, 'anything');
-      expect(find.text('No matching node.'), findsOneWidget);
-    });
-
     testWidgets('a failing load leaves the tree empty until the data changes', (tester) async {
       api.failNext(method: 'listCourses');
       final state = AppState();
-      await pumpScene(tester, const MapScene(), api: api, state: state);
+      await pumpScene(tester, const HomeScene(), api: api, state: state);
       expect(find.byKey(const Key('life-empty')), findsOneWidget);
       state.markDataChanged();
       await tester.pumpAndSettle();

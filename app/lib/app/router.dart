@@ -8,7 +8,6 @@ import '../features/audit/audit_scene.dart';
 import '../features/audit/replay_scene.dart';
 import '../features/life/life_scene.dart';
 import '../features/chat/home_scene.dart';
-import '../features/map/map_scene.dart';
 import '../features/skill/skill_scene.dart';
 import '../features/stage/app_tabs.dart';
 import '../features/stage/me_scene.dart';
@@ -27,10 +26,10 @@ import '../l10n/l10n.dart';
 /// | `/audit/:auditId` | `ReplayScene` | a finished audit, read again |
 ///
 /// Every scene is reached with `context.go(...)`; there are no other pages.
-/// On phones they all sit in a [TabShell] with the bottom bar (Home, Life
-/// tree, Me).
+/// On phones they all sit in a [TabShell] with the bottom bar (Home, Me).
 abstract final class AppRoutes {
   static const String home = '/';
+  /// The old life tree page: now the home stage, kept so links still land.
   static const String map = '/map';
 
   /// The phone's Me tab: My character as a page.
@@ -118,10 +117,8 @@ List<RouteBase> _sceneRoutes(Page<void> Function(GoRouterState, Widget) page) =>
     path: AppRoutes.home,
     pageBuilder: (context, state) => page(state, const HomeScene()),
   ),
-  GoRoute(
-    path: AppRoutes.map,
-    pageBuilder: (context, state) => page(state, const MapScene()),
-  ),
+  // The life tree is the home stage since 2026-11-04; old links land there.
+  GoRoute(path: AppRoutes.map, redirect: (context, state) => AppRoutes.home),
   GoRoute(
     path: AppRoutes.me,
     pageBuilder: (context, state) => page(state, const MeScene()),

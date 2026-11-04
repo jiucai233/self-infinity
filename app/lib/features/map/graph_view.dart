@@ -31,7 +31,7 @@ class SkillGraphView extends StatefulWidget {
     super.key,
     required this.map,
     required this.failed,
-    required this.highlighted,
+    this.highlighted = const {},
     required this.onOpen,
   });
 

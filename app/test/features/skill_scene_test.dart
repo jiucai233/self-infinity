@@ -72,7 +72,7 @@ void main() {
       await tester.tap(find.byKey(const Key('course-delete-confirm')));
       await tester.pumpAndSettle();
       expect(await api.listCourses(), isEmpty);
-      expect(find.text('route:/map'), findsOneWidget);
+      expect(find.text('route:/'), findsOneWidget);
     });
   });
 
@@ -140,7 +140,7 @@ void main() {
       await pumpSkill(tester, api, 6);
       await tester.tap(find.byKey(const Key('back-map')));
       await tester.pumpAndSettle();
-      expect(find.text('route:/map'), findsOneWidget);
+      expect(find.text('route:/'), findsOneWidget);
     });
 
     testWidgets('a missing node shows the error with a retry', (tester) async {
@@ -523,7 +523,7 @@ void main() {
     testWidgets('a navigate action in her answer switches the scene', (tester) async {
       await pumpSkill(tester, api, 6);
       await say(tester, 'Show me the map');
-      expect(find.text('route:/map'), findsOneWidget);
+      expect(find.text('route:/'), findsOneWidget);
     });
 
     testWidgets('after an answer the → is still there', (tester) async {
