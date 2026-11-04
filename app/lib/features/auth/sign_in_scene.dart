@@ -55,11 +55,34 @@ class _SignInSceneState extends State<SignInScene> {
     });
   }
 
+  late final AuthService _auth = context.read<AuthService>();
+
+  @override
+  void initState() {
+    super.initState();
+    _auth.addListener(_showLinkProblem);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showLinkProblem());
+  }
+
+  /// The page was opened from an email link that could not sign in: the
+  /// sign-in form, saying why.
+  void _showLinkProblem() {
+    final problem = _auth.linkProblem;
+    if (problem == null || !mounted) return;
+    _auth.clearLinkProblem();
+    setState(() {
+      _mode = _Mode.signIn;
+      _formOpen = true;
+      _error = problem;
+    });
+  }
+
   static final Map<String, LifeTree> _samples = {};
   static LifeTree _sample(AppLocalizations l) => _samples[l.localeName] ??= _sampleTree(l);
 
   @override
   void dispose() {
+    _auth.removeListener(_showLinkProblem);
     _email.dispose();
     _password.dispose();
     _passwordFocus.dispose();

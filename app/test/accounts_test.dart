@@ -307,15 +307,50 @@ void main() {
       await tapKey(tester, 'auth-submit');
       expect(key('check-inbox'), findsOneWidget);
       expect(find.textContaining('new@x.io'), findsOneWidget);
-      // Signing in before confirming fails.
+      // Signing in before confirming leads back to the inbox screen, where the link can be resent.
       await tapKey(tester, 'back-to-sign-in');
       await enter(tester, 'auth-email', 'new@x.io');
       await enter(tester, 'auth-password', 'secret1');
       await tapKey(tester, 'auth-submit');
-      expect(find.text('Confirm your email first — check your inbox.'), findsOneWidget);
+      expect(key('check-inbox'), findsOneWidget);
+      expect(key('resend-confirmation'), findsOneWidget);
       auth.confirm('new@x.io');
+      await tapKey(tester, 'back-to-sign-in');
+      await enter(tester, 'auth-password', 'secret1');
       await tapKey(tester, 'auth-submit');
       expect(key('onboarding'), findsOneWidget);
+    });
+
+    testWidgets('an email link that failed opens the sign-in form saying why', (tester) async {
+      final auth = FakeAuthService(accounts: {'me@x.io': 'secret1'});
+      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: auth);
+      expect(key('auth-card'), findsNothing);
+
+      auth.failLink('That link has expired or was already used.');
+      await tester.pumpAndSettle();
+
+      expect(key('auth-card'), findsOneWidget);
+      expect(find.text('That link has expired or was already used.'), findsOneWidget);
+      expect(auth.linkProblem, isNull);
+    });
+
+    testWidgets('a password-reset link asks for the new password before the app opens', (tester) async {
+      final auth = FakeAuthService(accounts: {'me@x.io': 'secret1'});
+      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: auth);
+
+      auth.openResetLink('me@x.io');
+      await tester.pumpAndSettle();
+      expect(key('set-password'), findsOneWidget);
+
+      await enter(tester, 'new-password', '123');
+      await tapKey(tester, 'save-password');
+      expect(key('set-password-error'), findsOneWidget);
+
+      await enter(tester, 'new-password', 'brand-new');
+      await tapKey(tester, 'save-password');
+      expect(key('set-password'), findsNothing);
+      await auth.signOut();
+      expect(await auth.signIn('me@x.io', 'brand-new'), AuthResult.ok);
     });
 
     testWidgets('forgot password sends the reset email', (tester) async {

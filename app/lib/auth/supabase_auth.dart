@@ -13,11 +13,48 @@ import '../l10n/l10n.dart';
 /// `Supabase.initialize` must have run (see `main.dart`).
 class SupabaseAuthService extends AuthService {
   SupabaseAuthService({GoTrueClient? client}) : _auth = client ?? Supabase.instance.client.auth {
-    _sub = _auth.onAuthStateChange.listen((_) => notifyListeners());
+    // The stream replays what happened before this listened, so a link the
+    // page was opened from (handled in `Supabase.initialize`) still arrives.
+    _sub = _auth.onAuthStateChange.listen(
+      (state) {
+        if (state.event == AuthChangeEvent.passwordRecovery) _recovering = true;
+        if (state.event == AuthChangeEvent.signedOut) _recovering = false;
+        notifyListeners();
+      },
+      onError: (Object e) {
+        _linkProblem = linkMessageFor(e);
+        notifyListeners();
+      },
+    );
   }
 
   final GoTrueClient _auth;
   late final StreamSubscription<AuthState> _sub;
+  String? _linkProblem;
+  bool _recovering = false;
+
+  @override
+  String? get linkProblem => _linkProblem;
+
+  @override
+  void clearLinkProblem() {
+    if (_linkProblem == null) return;
+    _linkProblem = null;
+    notifyListeners();
+  }
+
+  @override
+  bool get recovering => _recovering && signedIn;
+
+  @override
+  Future<AuthResult> updatePassword(String password) async {
+    final result = await _guard(() => _auth.updateUser(UserAttributes(password: password)));
+    if (result.isOk) {
+      _recovering = false;
+      notifyListeners();
+    }
+    return result;
+  }
 
   /// Where the links in Supabase's emails lead: the site on the web, the app
   /// itself on a phone (the `selfinfinity://` scheme of AndroidManifest.xml
@@ -40,8 +77,20 @@ class SupabaseAuthService extends AuthService {
   String? get accessToken => _auth.currentSession?.accessToken;
 
   @override
-  Future<AuthResult> signIn(String email, String password) =>
-      _guard(() => _auth.signInWithPassword(email: email.trim(), password: password));
+  Future<AuthResult> signIn(String email, String password) async {
+    try {
+      await _auth.signInWithPassword(email: email.trim(), password: password);
+      return AuthResult.ok;
+    } on AuthException catch (e) {
+      // Not confirmed yet: the inbox screen, where the link can be sent again.
+      if (e.message.toLowerCase().contains('email not confirmed')) {
+        return const AuthResult(needsConfirmation: true);
+      }
+      return AuthResult(error: messageFor(e));
+    } on Object {
+      return AuthResult(error: l10nNow.authOffline);
+    }
+  }
 
   @override
   Future<AuthResult> signUp(String email, String password) async {
@@ -107,6 +156,15 @@ class SupabaseAuthService extends AuthService {
     } on Object {
       return AuthResult(error: l10nNow.authOffline);
     }
+  }
+
+  /// A link that could not sign in. With PKCE the code can only be traded in
+  /// the browser that asked for the email; a confirmation link has confirmed
+  /// the address on Supabase's side before it gets here, so signing in works.
+  static String linkMessageFor(Object e) {
+    final m = (e is AuthException ? e.message : '$e').toLowerCase();
+    if (m.contains('code verifier') || m.contains('flow state')) return l10nNow.linkOtherBrowser;
+    return l10nNow.linkExpired;
   }
 
   /// Supabase's error, in the app's voice.

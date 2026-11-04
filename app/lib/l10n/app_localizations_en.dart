@@ -160,6 +160,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authAlreadyRegistered => 'That email already has an account. Sign in instead.';
 
   @override
+  String get linkOtherBrowser =>
+      'That link was opened in a different browser from the one you signed up in. Your email is confirmed anyway — sign in here.';
+
+  @override
+  String get linkExpired =>
+      'That link has expired or was already used. Sign in — if your email still needs confirming, you can get a new link.';
+
+  @override
+  String get setNewPassword => 'Set a new password';
+
+  @override
+  String get setNewPasswordBlurb => 'The reset link worked. Choose a new password to get back in.';
+
+  @override
+  String get saveNewPassword => 'Save and continue';
+
+  @override
   String get authConfirmEmailFirst => 'Confirm your email first — check your inbox.';
 
   @override

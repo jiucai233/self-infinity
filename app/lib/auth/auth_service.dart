@@ -54,6 +54,21 @@ abstract class AuthService extends ChangeNotifier {
   /// Sends the "confirm your email" link of a sign-up again.
   Future<AuthResult> resendConfirmation(String email) async => AuthResult.ok;
 
+  /// What went wrong with the email link this page was opened from (expired,
+  /// used already, or opened in another browser than the one that asked for
+  /// it); null when nothing did. The front page shows it until
+  /// [clearLinkProblem].
+  String? get linkProblem => null;
+
+  void clearLinkProblem() {}
+
+  /// Signed in by a password-reset link: a new password is set before
+  /// anything else.
+  bool get recovering => false;
+
+  /// Sets the signed-in account's new password and ends [recovering].
+  Future<AuthResult> updatePassword(String password) async => AuthResult.ok;
+
   /// Whether "Continue with Google" is offered.
   bool get supportsGoogle => false;
 

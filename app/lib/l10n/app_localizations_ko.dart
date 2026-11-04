@@ -159,6 +159,21 @@ class AppLocalizationsKo extends AppLocalizations {
   String get authAlreadyRegistered => '이미 가입된 이메일이에요. 로그인해 주세요.';
 
   @override
+  String get linkOtherBrowser => '가입한 브라우저와 다른 브라우저에서 링크를 열었어요. 이메일 인증은 끝났으니 여기서 로그인하면 돼요.';
+
+  @override
+  String get linkExpired => '링크가 만료됐거나 이미 사용됐어요. 로그인해 보고, 아직 인증 전이면 새 링크를 받을 수 있어요.';
+
+  @override
+  String get setNewPassword => '새 비밀번호 설정';
+
+  @override
+  String get setNewPasswordBlurb => '재설정 링크가 확인됐어요. 새 비밀번호를 정하면 바로 들어갈 수 있어요.';
+
+  @override
+  String get saveNewPassword => '저장하고 계속';
+
+  @override
   String get authConfirmEmailFirst => '먼저 이메일 인증을 해 주세요. 받은편지함을 확인해 보세요.';
 
   @override

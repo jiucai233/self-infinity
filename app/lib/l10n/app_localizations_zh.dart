@@ -159,6 +159,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authAlreadyRegistered => '这个邮箱已经注册过了，直接登录吧。';
 
   @override
+  String get linkOtherBrowser => '这个链接是在另一个浏览器里打开的，不过邮箱已经确认了，在这里登录就行。';
+
+  @override
+  String get linkExpired => '这个链接已经过期或用过了。先登录试试，邮箱还没确认的话可以再要一封。';
+
+  @override
+  String get setNewPassword => '设一个新密码';
+
+  @override
+  String get setNewPasswordBlurb => '重置链接没问题。设好新密码就能进去。';
+
+  @override
+  String get saveNewPassword => '保存并进入';
+
+  @override
   String get authConfirmEmailFirst => '请先确认邮箱——去收件箱看看。';
 
   @override

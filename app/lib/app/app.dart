@@ -6,6 +6,7 @@ import '../api/api.dart';
 import '../api/fake_api.dart';
 import '../api/http_api.dart';
 import '../auth/auth_service.dart';
+import '../features/auth/set_password_scene.dart';
 import '../features/auth/sign_in_scene.dart';
 import '../features/onboarding/guided_tour.dart';
 import '../features/onboarding/onboarding_scene.dart';
@@ -146,6 +147,21 @@ class _SelfInfinityAppState extends State<SelfInfinityApp> {
                 localizationsDelegates: _AppLook.delegates,
                 supportedLocales: _AppLook.locales,
                 home: const SignInScene(),
+              ),
+            );
+          }
+          // Back from a password-reset link: the new password first.
+          if (_auth.recovering) {
+            return ChangeNotifierProvider<AuthService>.value(
+              value: _auth,
+              child: MaterialApp(
+                title: 'Self-Infinity',
+                debugShowCheckedModeBanner: false,
+                theme: look.theme,
+                locale: look.locale,
+                localizationsDelegates: _AppLook.delegates,
+                supportedLocales: _AppLook.locales,
+                home: const SetPasswordScene(),
               ),
             );
           }

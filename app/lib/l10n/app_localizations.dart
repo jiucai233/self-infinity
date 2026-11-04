@@ -376,6 +376,36 @@ abstract class AppLocalizations {
   /// **'That email already has an account. Sign in instead.'**
   String get authAlreadyRegistered;
 
+  /// No description provided for @linkOtherBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'That link was opened in a different browser from the one you signed up in. Your email is confirmed anyway — sign in here.'**
+  String get linkOtherBrowser;
+
+  /// No description provided for @linkExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'That link has expired or was already used. Sign in — if your email still needs confirming, you can get a new link.'**
+  String get linkExpired;
+
+  /// No description provided for @setNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Set a new password'**
+  String get setNewPassword;
+
+  /// No description provided for @setNewPasswordBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'The reset link worked. Choose a new password to get back in.'**
+  String get setNewPasswordBlurb;
+
+  /// No description provided for @saveNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Save and continue'**
+  String get saveNewPassword;
+
   /// No description provided for @authConfirmEmailFirst.
   ///
   /// In en, this message translates to:
