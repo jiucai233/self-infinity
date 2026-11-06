@@ -191,7 +191,7 @@ def test_the_session_response_matches_the_contract_shape(client, math):
     assert set(body["session"]) == {
         "id", "skill_id", "node_position", "status", "score", "gaps", "comment", "turns", "test_out", "points",
         "evidence", "lessons", "principle", "skill_title", "created_at", "agreement", "too_hard", "disputed",
-        "audience", "depth",
+        "audience", "depth", "stars", "length",
     }
     assert body["session"]["test_out"] is False
     assert body["session"]["skill_id"] == math["discriminant"]
@@ -283,6 +283,7 @@ def test_it09_pass_upheld_opens_the_next_node_masters_this_one_and_records_the_r
         "type": "verdict",
         "passed": True,
         "score": 91,  # min(95, 70 + 210 // 10)
+        "stars": 2,
         "gaps": [],
         "evidence": [],
         "lessons": [],
@@ -315,7 +316,7 @@ def test_the_probe_and_verdict_shapes_are_exactly_the_contract_keys(client, math
 
     assert set(probe) == {"type", "question", "feedback", "point"}
     assert set(verdict) == {
-        "type", "passed", "score", "gaps", "evidence", "lessons", "comment", "feedback", "points",
+        "type", "passed", "score", "stars", "gaps", "evidence", "lessons", "comment", "feedback", "points",
         "unlocked_skill_ids", "reward_amount", "reward_multiplier",
     }
 
@@ -406,6 +407,7 @@ def test_it16_a_fail_closes_the_session_and_leaves_the_node_status_alone(client,
         "type": "verdict",
         "passed": False,
         "score": 45,
+        "stars": 0,
         "gaps": [
             "You stated the definition but not why it works.",
             "You didn't cover the exceptions.",

@@ -174,6 +174,9 @@ class SkillNode(SQLModel, table=True):
     # yet); note says what was wrong when it was missed. A leaf that has them is the smallest
     # node: it is audited point by point, not broken down.
     points_json: str | None = None
+    # The most stars (0-3) any passed audit of this node gave it; NULL: none yet (or passed before
+    # stars existed).
+    best_stars: int | None = None
 
     @property
     def points(self) -> list[dict]:
@@ -243,11 +246,24 @@ class AuditSession(SQLModel, table=True):
     audience: str | None = None
     depth: int | None = None
     style_context_json: str | None = None
+    # How long the user wanted this audit (`short` | `standard` | `thorough`, Profile.audit_length
+    # when it started); None: a challenge, or an audit from before the preference (standard).
+    length: str | None = None
+    # What the verdict is shown as, 0-3: a fail 0, a pass 1 / 2 / 3 by length, a passed challenge
+    # 3. None: closed before stars existed (shown as 2 for a pass, 0 for a fail).
+    stars: int | None = None
     created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
     @property
     def points(self) -> list[dict]:
         return parse_points(self.points_json)
+
+    @property
+    def shown_stars(self) -> int:
+        """The stars to show: the kept ones, else derived from the verdict (pass 2, anything else 0)."""
+        if self.stars is not None:
+            return self.stars
+        return 2 if self.status == AuditStatus.passed else 0
 
     @property
     def evidence(self) -> list[dict]:
@@ -495,6 +511,8 @@ class Profile(SQLModel, table=True):
     # One choice for both, 2026-10-12 only ("live", or "realtime" = realtime and turns): read
     # where the two above are NULL, never written.
     voice: str | None = None
+    # How long audits are: "short" | "standard" | "thorough" (PUT /api/audit-length); NULL = standard.
+    audit_length: str | None = None
 
 
 class JournalEntry(SQLModel, table=True):

@@ -749,6 +749,10 @@ void main() {
             await t.tap(find.byKey(const Key('open-left-drawer')));
             await t.pumpAndSettle();
           }
+          if (find.byKey(const Key('expand-left')).evaluate().isNotEmpty) {
+            await t.tap(find.byKey(const Key('expand-left')));
+            await t.pumpAndSettle();
+          }
           await t.tap(find.byKey(const Key('settings-button')));
           await t.pumpAndSettle();
           await t.tap(find.byKey(const Key('settings-dev')));
@@ -772,6 +776,10 @@ void main() {
             await t.tap(find.byKey(const Key('open-left-drawer')));
             await t.pumpAndSettle();
           }
+          if (find.byKey(const Key('expand-left')).evaluate().isNotEmpty) {
+            await t.tap(find.byKey(const Key('expand-left')));
+            await t.pumpAndSettle();
+          }
           await t.tap(find.byKey(const Key('settings-button')));
           await t.pumpAndSettle();
         },
@@ -792,7 +800,11 @@ void main() {
               await t.tap(find.byKey(const Key('open-left-drawer')));
               await t.pumpAndSettle();
             }
-            await t.tap(find.byKey(const Key('settings-button')));
+            if (find.byKey(const Key('expand-left')).evaluate().isNotEmpty) {
+            await t.tap(find.byKey(const Key('expand-left')));
+            await t.pumpAndSettle();
+          }
+          await t.tap(find.byKey(const Key('settings-button')));
             await t.pumpAndSettle();
             await t.tap(find.byKey(const Key('settings-dev')));
             await t.pumpAndSettle();

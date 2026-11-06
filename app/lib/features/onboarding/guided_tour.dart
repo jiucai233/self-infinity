@@ -20,7 +20,14 @@ import '../../widgets/widgets.dart';
 /// stays lit, and what the Guide says about it.
 @immutable
 class TourStop {
-  const TourStop({this.route, this.anchor, this.frame, required this.text, this.optional = false});
+  const TourStop({
+    this.route,
+    this.anchor,
+    this.frame,
+    required this.text,
+    this.optional = false,
+    this.tryIt = false,
+  });
 
   /// The page to be on; null keeps the page of the stop before.
   final String? route;
@@ -38,18 +45,23 @@ class TourStop {
   /// A stop whose [anchor] is not on this screen (a side panel on a phone)
   /// is passed over instead of shown without one.
   final bool optional;
+
+  /// The user does it: a tap on the lit part goes on, as using it would
+  /// (2026-11-04 review: after the highlight, let them try it).
+  final bool tryIt;
 }
 
 /// The guided tour a new account sees before the setup (`docs/ux-chat.md`
 /// §7): the real scenes over an example world, everything dark but the part
-/// the Guide is talking about. Four stops, the loop of the app: talk to the
-/// Guide on the home page, explain a node to the Auditor, what a verdict
-/// gives back, and the life tree it all grows; then the setup.
+/// the Guide is talking about. The loop of the app: talk to the Guide on the
+/// home page, tap a next node yourself, take it on yourself, explain it to
+/// the Auditor, what a verdict gives back, and the life tree it all grows;
+/// then the setup.
 ///
 /// The world is a [FakeApiClient] of its own (a character with a main quest,
 /// a course built from a syllabus, one node cleared and one failed, today's
 /// quests): nothing here reaches the account, and nothing can be tapped but
-/// the tour's own buttons.
+/// the tour's own buttons and, on a try-it stop, the lit part.
 class GuidedTour extends StatefulWidget {
   const GuidedTour({
     super.key,
@@ -72,6 +84,20 @@ class GuidedTour extends StatefulWidget {
       anchor: const Key('stage-input'),
       frame: Composer,
       text: (l) => l.tourTalk,
+    ),
+    TourStop(
+      route: AppRoutes.home,
+      anchor: const Key('orb-picks'),
+      text: (l) => l.tourPicks,
+      tryIt: true,
+      optional: true,
+    ),
+    TourStop(
+      route: AppRoutes.skill(nodeId),
+      anchor: const Key('start-audit'),
+      text: (l) => l.tourTakeItOn,
+      tryIt: true,
+      optional: true,
     ),
     TourStop(
       route: AppRoutes.audit(nodeId),
@@ -303,6 +329,7 @@ class _GuidedTourState extends State<GuidedTour> {
               child: _TourOverlay(
                 key: _overlay,
                 lit: _stop.anchor == null ? null : _lit,
+                tryIt: _stop.tryIt,
                 text: _stop.text(context.l10n),
                 index: _index,
                 count: _stops.length,
@@ -330,9 +357,13 @@ class _TourOverlay extends StatelessWidget {
     required this.onBack,
     required this.onNext,
     required this.onSkip,
+    this.tryIt = false,
   });
 
   final Rect? lit;
+
+  /// A tap on [lit] is the way on ([TourStop.tryIt]).
+  final bool tryIt;
   final String text;
   final int index;
   final int count;
@@ -370,10 +401,23 @@ class _TourOverlay extends StatelessWidget {
                   ),
           ),
         ),
+        if (tryIt && lit != null)
+          Positioned.fromRect(
+            rect: lit,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                key: const Key('tour-try'),
+                behavior: HitTestBehavior.opaque,
+                onTap: onNext,
+              ),
+            ),
+          ),
         Positioned.fill(
           child: CustomSingleChildLayout(
             delegate: _CardPlace(lit: lit, gap: _gap),
             child: _TourCard(
+              tryIt: tryIt && lit != null,
               text: text,
               index: index,
               count: count,
@@ -461,6 +505,7 @@ class _CardPlace extends SingleChildLayoutDelegate {
 /// The Guide and what she says, with the tour's buttons.
 class _TourCard extends StatelessWidget {
   const _TourCard({
+    this.tryIt = false,
     required this.text,
     required this.index,
     required this.count,
@@ -469,6 +514,9 @@ class _TourCard extends StatelessWidget {
     required this.onSkip,
   });
 
+  /// The lit part is to be tapped: the card says so, and its own way on is
+  /// only a quiet one.
+  final bool tryIt;
   final String text;
   final int index;
   final int count;
@@ -527,6 +575,22 @@ class _TourCard extends StatelessWidget {
                             key: const Key('tour-text'),
                             style: theme.bodyLarge?.copyWith(height: 1.45),
                           ),
+                          if (tryIt) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            Row(
+                              key: const Key('tour-try-hint'),
+                              children: [
+                                const Icon(Icons.touch_app_outlined, size: 16, color: AppColors.ember),
+                                const SizedBox(width: AppSpacing.xs),
+                                Flexible(
+                                  child: Text(
+                                    l.tourTryHint,
+                                    style: theme.labelMedium?.copyWith(color: AppColors.ember),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -564,11 +628,18 @@ class _TourCard extends StatelessWidget {
                               onPressed: onBack,
                               child: Text(l.back),
                             ),
-                          FilledButton(
-                            key: const Key('tour-next'),
-                            onPressed: onNext,
-                            child: Text(last ? l.tourBegin : l.tourNext),
-                          ),
+                          if (tryIt)
+                            TextButton(
+                              key: const Key('tour-next'),
+                              onPressed: onNext,
+                              child: Text(l.tourNext),
+                            )
+                          else
+                            FilledButton(
+                              key: const Key('tour-next'),
+                              onPressed: onNext,
+                              child: Text(last ? l.tourBegin : l.tourNext),
+                            ),
                         ],
                       ),
                     ),

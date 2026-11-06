@@ -10,6 +10,60 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get auditLengthMenu => 'Audit length';
+
+  @override
+  String get auditLengthTitle => 'How long should an audit be?';
+
+  @override
+  String get auditLengthShort => 'Short';
+
+  @override
+  String get auditLengthShortHint => 'One point, about 2 questions';
+
+  @override
+  String get auditLengthStandard => 'Standard';
+
+  @override
+  String get auditLengthStandardHint => 'Every open point';
+
+  @override
+  String get auditLengthThorough => 'Thorough';
+
+  @override
+  String get auditLengthThoroughHint => 'Every point again, more stars';
+
+  @override
+  String starsLabel(int n) {
+    return '$n of 3 stars';
+  }
+
+  @override
+  String get tourPicks => 'Your next nodes, each tied to its point on your tree. Tap one.';
+
+  @override
+  String get tourTakeItOn =>
+      'Read what is here first. When you are ready, tap Take it on: you explain it to the Auditor in your own words.';
+
+  @override
+  String get tourTryHint => 'Tap the lit part to try it';
+
+  @override
+  String get heroExampleStem => 'I want to learn';
+
+  @override
+  String get heroExample1 => 'computer systems';
+
+  @override
+  String get heroExample2 => 'ViT → VLM → robot policies';
+
+  @override
+  String get heroExample3 => 'high school math, from zero';
+
+  @override
+  String get heroExampleCaption => '→ a real syllabus, grown as a tree in the orb';
+
+  @override
   String get tabHome => 'Home';
 
   @override

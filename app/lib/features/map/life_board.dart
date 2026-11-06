@@ -53,6 +53,7 @@ class _LifeBoardState extends State<LifeBoard> {
   String? _selected;
   int? _outlineCourse;
   bool _legendOpen = false;
+  bool _nightLegendOpen = false;
 
   /// Narrower than this, the node card is a bottom sheet.
   static const double phoneWidth = 600;
@@ -185,7 +186,18 @@ class _LifeBoardState extends State<LifeBoard> {
                   left: AppSpacing.lg + (selected == null ? widget.legendLeft?.call(box) ?? 0 : 0),
                   right: narrow ? AppSpacing.lg : null,
                   bottom: AppSpacing.lg,
-                  child: const _NightLegend(),
+                  // Folded behind a `?` until asked for: the first screen shows
+                  // only what is needed (2026-11-04 review).
+                  child: Align(
+                    alignment: Alignment.bottomLeft,
+                    child: _LegendButton(
+                      toggleKey: const Key('night-legend-toggle'),
+                      dark: true,
+                      open: _nightLegendOpen,
+                      onToggle: () => setState(() => _nightLegendOpen = !_nightLegendOpen),
+                      legend: const _NightLegend(),
+                    ),
+                  ),
                 ),
                 Positioned(
                   right: AppSpacing.lg,
@@ -536,11 +548,21 @@ class _PhoneSheetState extends State<_PhoneSheet> {
 
 /// A small `?` at the bottom left of the outline; it opens the legend above it.
 class _LegendButton extends StatelessWidget {
-  const _LegendButton({required this.open, required this.onToggle, required this.legend});
+  const _LegendButton({
+    required this.open,
+    required this.onToggle,
+    required this.legend,
+    this.dark = false,
+    this.toggleKey = const Key('graph-legend-toggle'),
+  });
 
   final bool open;
   final VoidCallback onToggle;
   final Widget legend;
+
+  /// On the night panel: light marks on the dark.
+  final bool dark;
+  final Key toggleKey;
 
   @override
   Widget build(BuildContext context) {
@@ -550,11 +572,19 @@ class _LegendButton extends StatelessWidget {
       children: [
         if (open) ...[legend, const SizedBox(height: AppSpacing.sm)],
         IconButton.outlined(
-          key: const Key('graph-legend-toggle'),
+          key: toggleKey,
           tooltip: context.l10n.legend,
           isSelected: open,
           onPressed: onToggle,
           visualDensity: VisualDensity.compact,
+          color: dark ? AppColors.nightText : null,
+          style: dark
+              ? IconButton.styleFrom(
+                  side: const BorderSide(color: AppColors.nightLine),
+                  foregroundColor: AppColors.nightText,
+                  backgroundColor: AppColors.nightHigh,
+                )
+              : null,
           icon: const Icon(Icons.question_mark_rounded, size: 18),
           selectedIcon: const Icon(Icons.close_rounded, size: 18),
         ),

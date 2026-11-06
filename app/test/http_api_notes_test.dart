@@ -69,4 +69,15 @@ void main() {
       throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 400)),
     );
   });
+
+  test('getAuditLength / setAuditLength: GET and PUT /audit-length', () async {
+    expect(await api({'audit_length': 'short'}).getAuditLength(), 'short');
+    expect(requests.single.method, 'GET');
+    expect(requests.single.url.path, '/api/audit-length');
+
+    expect(await api({'audit_length': 'thorough'}).setAuditLength('thorough'), 'thorough');
+    expect(requests.single.method, 'PUT');
+    expect(requests.single.url.path, '/api/audit-length');
+    expect(jsonDecode(requests.single.body), {'audit_length': 'thorough'});
+  });
 }

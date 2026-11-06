@@ -43,6 +43,7 @@ Related plan sections: 4 (course structure), 5 (schema), 6 (API), 7.4 (agents), 
 - `status`: `locked` | `available` | `mastered`
 - `node_type`: `concept` | `task`
 - `mastery_score`: integer 0–100 or null; written when an audit passes.
+- `best_stars` **(added 2026-11-07)**: 0–3 or null: the most stars (section 53) any passed audit of the node gave it; a mastered node from before stars counts as 2 (a node mastered by a challenge from above has none of its own).
 - `unexpanded` **(added 2026-10-08)**: a category whose parts are not all listed yet: the Planner left it to break down later (no children), or a syllabus (endpoint 45) or the player (endpoint 43) added only some of them **(2026-10-09)**. Break it down with endpoint 38 (it adds the rest), or challenge it as a whole (endpoint 7, `test_out`). It cannot be audited on its own.
 - `tested_out` **(added 2026-10-08)**: mastered by passing a challenge on a node above it, not by its own audit.
 - `linked_course_id` **(added 2026-10-09)**: this node is another of the player's courses (“Computer Vision” inside a CS course), or null. Its parts are that course's tree, so it has no children of its own and is not broken down (38) or audited (7: 400 `This node is another course: learn it there.`); it is mastered with that course (endpoint 44).
@@ -749,3 +750,11 @@ The player's own notes on one node, written on the node page's Learn first area 
 - `DELETE /api/notes/{id}` → 204. 404 `note not found`.
 
 Deleting a node (#42) or a course with its nodes (#33, `delete_nodes=true`) deletes their notes; a course deleted keeping its nodes keeps them.
+
+### 53. Audit length and stars  (no LLM, added 2026-11-07)
+How long the user wants audits to be, and what a verdict is shown as. The auditor's pass / fail decision, and everything that follows it (status, mastery, unlocks, rewards, gaps, lessons), are as before; stars are only what the user sees.
+
+- `GET /api/audit-length` → `{"audit_length": "short" | "standard" | "thorough"}` (default `standard`; stored on the account's Profile row, `audit_length`, NULL = standard). `PUT /api/audit-length` with the same body → the same shape; any other value is a 422.
+- **Effect** (`start_audit`, ordinary audits of a node with knowledge points): `short` examines only the first of the points that `standard` would (`examined[:1]`) with at most 2 turns; `standard` is as before; `thorough` examines every point of the node again (held ones too, with `ok` and `note` reset) with `POINT_TURNS × points` turns, at least 4 and at most 14. A node without points: `short` has `max(2, base // 2)` turns, `thorough` `base + 2`. A challenge (`test_out`) ignores the preference. Night mode still doubles the turns. The length used is kept as `AuditSession.length` (null on a challenge and on audits from before).
+- **Stars**: a failed audit 0; a passed audit 1 (`short`), 2 (`standard`) or 3 (`thorough`); a passed challenge 3. Kept as `AuditSession.stars`; the node keeps the most of its passed audits as `SkillNode.best_stars`.
+- **Fields**: `stars` (int 0–3) is in the verdict of `POST /api/audits/{id}/turns` (endpoint 8), in `AuditSession` (with `length`) and in `AuditSummary` / `NodeAudit` (endpoints 9, 11 and the overview); `best_stars` (int or null) is on every `SkillNode` payload (endpoints 1, 2, the overview and the course map). An audit closed before stars existed shows 2 for a pass and 0 for a fail (derived on output, nothing migrated); an audit still active shows 0.

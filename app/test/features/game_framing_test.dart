@@ -171,6 +171,12 @@ void main() {
       expect(find.text('Cleared!'), findsNothing);
     });
 
+    testWidgets('it shows the stars the pass earned (standard length: two)', (tester) async {
+      api.debugSetStatus(1, SkillStatus.available);
+      await pass(tester, 1);
+      expect(tester.widget<StarRow>(key('celebration-stars')).stars, 2);
+    });
+
     testWidgets('a branch says Boss cleared!', (tester) async {
       await passAudit(api, 6);
       await passAudit(api, 7);

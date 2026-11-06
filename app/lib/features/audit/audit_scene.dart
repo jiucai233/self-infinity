@@ -557,6 +557,7 @@ class _AuditSceneState extends State<AuditScene> {
               child: CelebrationCard(
                 key: const Key('celebration'),
                 score: celebration.verdict.score,
+                stars: celebration.verdict.stars,
                 xp: celebration.verdict.rewardAmount,
                 levelBefore: celebration.levelBefore,
                 levelAfter: celebration.levelAfter,
@@ -857,6 +858,10 @@ class _SpeakerHeader extends StatelessWidget {
 
   final GlobalKey<Live2DFigureState> figureKey;
 
+  /// Her figure's size on a wide screen and on a phone.
+  static const double figureSize = 120;
+  static const double phoneFigureSize = 96;
+
   /// A phone: only her, centred, and the style as a tiny line under her —
   /// no name, no tagline.
   final bool compact;
@@ -871,6 +876,8 @@ class _SpeakerHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
+    // She is the one asking, so she is the biggest thing at the top of the column.
+    final size = compact ? phoneFigureSize : figureSize;
     final figure = GestureDetector(
       onTap: onTap,
       // On the web she is the Live2D student at her desk; the sprite stands in until it loads.
@@ -878,9 +885,9 @@ class _SpeakerHeader extends StatelessWidget {
         key: figureKey,
         mood: mood,
         state: state,
-        size: 76,
+        size: size,
         framing: 'upper',
-        fallback: Avatar(agent: agent, mood: mood, state: state, size: 76),
+        fallback: Avatar(agent: agent, mood: mood, state: state, size: size),
       ),
     );
     if (compact) {

@@ -369,6 +369,14 @@ abstract class SelfInfinityApi {
   /// when the server has no key for it.
   Future<LlmStatus> setLlm(String provider);
 
+  /// `GET /audit-length` (contract #53, no LLM): how long this account's audits
+  /// are: `short`, `standard` (the default) or `thorough`.
+  Future<String> getAuditLength();
+
+  /// `PUT /audit-length` (contract #53, no LLM): chooses `short`, `standard` or
+  /// `thorough`; answers what is kept.
+  Future<String> setAuditLength(String length);
+
   /// `GET /voice` (no LLM): the voices this account uses, chosen separately:
   /// the Guide's (`live`: GPT-Live, `realtime`: the Realtime model) and the
   /// audits' (`live`: GPT-Live, `turns`: live transcription, a pause ends the

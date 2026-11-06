@@ -61,6 +61,8 @@ def _session_out(session: Session, audit: AuditSession) -> AuditSessionOut:
         node_position=audit.node_position,
         status=audit.status,
         score=audit.score,
+        stars=audit.shown_stars,
+        length=audit.length,
         gaps=json.loads(audit.gaps_json) if audit.gaps_json else [],
         comment=audit.comment,
         turns=[
@@ -85,6 +87,7 @@ def audit_summary(audit: AuditSession, skill: SkillNode, reflected: set[int] = f
         skill_title=skill.title,
         status=audit.status,
         score=audit.score,
+        stars=audit.shown_stars,
         created_at=audit.created_at,
         test_out=bool(audit.test_out),
     )
@@ -246,6 +249,7 @@ def submit_turn(audit_id: int, body: SubmitTurnRequest, session: Session = Depen
     return VerdictResult(
         passed=outcome.passed,
         score=outcome.score,
+        stars=outcome.stars,
         gaps=outcome.gaps,
         comment=outcome.comment,
         feedback=outcome.feedback,

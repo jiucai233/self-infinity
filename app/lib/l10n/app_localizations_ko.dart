@@ -10,6 +10,59 @@ class AppLocalizationsKo extends AppLocalizations {
   AppLocalizationsKo([String locale = 'ko']) : super(locale);
 
   @override
+  String get auditLengthMenu => '감사 길이';
+
+  @override
+  String get auditLengthTitle => '감사를 얼마나 길게 할까요?';
+
+  @override
+  String get auditLengthShort => '짧게';
+
+  @override
+  String get auditLengthShortHint => '포인트 하나, 질문 2개 정도';
+
+  @override
+  String get auditLengthStandard => '보통';
+
+  @override
+  String get auditLengthStandardHint => '아직 열려 있는 모든 포인트';
+
+  @override
+  String get auditLengthThorough => '꼼꼼히';
+
+  @override
+  String get auditLengthThoroughHint => '모든 포인트를 다시, 별은 더 많이';
+
+  @override
+  String starsLabel(int n) {
+    return '별 $n / 3개';
+  }
+
+  @override
+  String get tourPicks => '다음에 배울 노드예요. 하나하나 나무 위 자기 자리와 이어져 있어요. 하나 눌러 보세요.';
+
+  @override
+  String get tourTakeItOn => '먼저 여기 있는 자료를 보세요. 준비되면 「도전하기」를 눌러 감사관에게 내 말로 설명해요.';
+
+  @override
+  String get tourTryHint => '밝게 표시된 곳을 눌러 보세요';
+
+  @override
+  String get heroExampleStem => '배우고 싶은 건';
+
+  @override
+  String get heroExample1 => '컴퓨터 시스템';
+
+  @override
+  String get heroExample2 => 'ViT → VLM → 로봇 정책';
+
+  @override
+  String get heroExample3 => '고등학교 수학, 처음부터';
+
+  @override
+  String get heroExampleCaption => '→ 실제 강의 계획서가 구 안의 나무로 자랍니다';
+
+  @override
   String get tabHome => '홈';
 
   @override

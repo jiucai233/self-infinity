@@ -3,6 +3,7 @@
 // the tree the setup built.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:self_infinity/features/skill/skill_scene.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/app/app.dart';
 import 'package:self_infinity/app/app_state.dart';
@@ -67,7 +68,7 @@ void main() {
     expect(find.byType(GuidedTour), findsOneWidget);
     expect(key('onboarding'), findsNothing);
     expect(said(tester), startsWith('Tell me here what you want to learn'));
-    expect(progress(tester), '1 / 4');
+    expect(progress(tester), '1 / 6');
     expect(find.byType(HomeScene), findsOneWidget);
     expect(key('tour-back'), findsNothing);
     // The example is its own world: the account has nothing yet.
@@ -76,28 +77,30 @@ void main() {
     expect(await api.listGoals(), isEmpty);
   });
 
-  testWidgets('four stops: talk to the Guide, explain to the Auditor, the verdict, the tree', (tester) async {
+  testWidgets('six stops: talk, tap a next node, take it on, explain, the verdict, the tree', (tester) async {
     await pumpNewAccount(tester);
     final seen = [said(tester)];
     final pages = <Type>[HomeScene];
     expect(lit(tester), isNotNull);
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 5; i++) {
       await next(tester);
       seen.add(said(tester));
       pages.add(
-        [HomeScene, AuditScene, ReplayScene, HomeScene].firstWhere((t) => find.byType(t).evaluate().isNotEmpty),
+        [HomeScene, SkillScene, AuditScene, ReplayScene].firstWhere((t) => find.byType(t).evaluate().isNotEmpty),
       );
       expect(lit(tester), isNotNull, reason: 'stop ${i + 2} lights its part');
     }
 
     expect(seen, [
       'Tell me here what you want to learn, typed or spoken.',
+      'Your next nodes, each tied to its point on your tree. Tap one.',
+      'Read what is here first. When you are ready, tap Take it on: you explain it to the Auditor in your own words.',
       'To clear a node, you teach it to the Auditor.',
       'Then you get a score, what you missed, and a lesson.',
       'Every node you clear lights up your life tree.',
     ]);
-    expect(pages, [HomeScene, AuditScene, ReplayScene, HomeScene]);
-    expect(progress(tester), '4 / 4');
+    expect(pages, [HomeScene, HomeScene, SkillScene, AuditScene, ReplayScene, HomeScene]);
+    expect(progress(tester), '6 / 6');
     expect(find.text('Set up my character'), findsOneWidget);
     expect(key('tour-skip'), findsNothing); // the last stop only goes on
   });
@@ -123,31 +126,51 @@ void main() {
     await settle(tester);
 
     expect(find.byType(HomeScene), findsOneWidget); // the quest did not open
-    expect(progress(tester), '1 / 4');
+    expect(progress(tester), '1 / 6');
+  });
+
+  testWidgets('a try-it stop goes on with a tap on the lit part', (tester) async {
+    await pumpNewAccount(tester);
+    await next(tester);
+    expect(progress(tester), '2 / 6');
+    expect(key('tour-try-hint'), findsOneWidget);
+    expect(tester.getRect(key('tour-try')), lit(tester));
+
+    await tester.tap(key('tour-try'));
+    await settle(tester);
+    expect(progress(tester), '3 / 6');
+    expect(find.byType(SkillScene), findsOneWidget);
+
+    await tester.tap(key('tour-try'));
+    await settle(tester);
+    expect(progress(tester), '4 / 6');
+    expect(find.byType(AuditScene), findsOneWidget);
+    expect(key('tour-try'), findsNothing); // an ordinary stop again
   });
 
   testWidgets('Back returns to the stop before, and to its page', (tester) async {
     await pumpNewAccount(tester);
     await next(tester);
-    expect(find.byType(AuditScene), findsOneWidget);
+    await next(tester);
+    expect(find.byType(SkillScene), findsOneWidget);
 
     await tester.tap(key('tour-back'));
     await settle(tester);
 
     expect(find.byType(HomeScene), findsOneWidget);
-    expect(progress(tester), '1 / 4');
+    expect(progress(tester), '2 / 6');
   });
 
   testWidgets('on a phone every stop fits', (tester) async {
     await pumpNewAccount(tester, size: phoneScreen);
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 6; i++) {
       expect(lit(tester), isNotNull);
       final card = tester.getRect(key('tour-card'));
       expect(card.left >= 0 && card.right <= phoneScreen.width, isTrue);
       expect(tester.takeException(), isNull);
-      if (i < 3) await next(tester);
+      if (i < 5) await next(tester);
     }
-    expect(progress(tester), '4 / 4');
+    expect(progress(tester), '6 / 6');
   });
 
   testWidgets('Skip the tour goes straight to the first question of the setup', (tester) async {
@@ -164,7 +187,7 @@ void main() {
     tester,
   ) async {
     final api = await pumpNewAccount(tester);
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 6; i++) {
       await next(tester);
     }
     // The tour ended on "Set up my character": no welcome page again.

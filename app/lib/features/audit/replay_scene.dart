@@ -184,11 +184,20 @@ class _ReplaySceneState extends State<ReplayScene> {
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                StatusChip(
-                  label: audit.status.label(context.l10n),
-                  color: audit.status.color,
-                  fill: audit.status.fill,
-                ),
+                if (audit.status == AuditStatus.active)
+                  StatusChip(
+                    label: audit.status.label(context.l10n),
+                    color: audit.status.color,
+                    fill: audit.status.fill,
+                  )
+                else ...[
+                  StarRow(key: const Key('replay-stars'), stars: audit.stars, size: 20),
+                  // A fail is not yet, not a grade.
+                  if (audit.status == AuditStatus.failed) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    StatusChip.neutral(context.l10n.auditOnceMore),
+                  ],
+                ],
                 if (audit.status == AuditStatus.failed) _feedbackMenu(context, audit),
               ],
             ),

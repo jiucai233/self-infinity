@@ -555,7 +555,7 @@ class _SkillSceneState extends State<SkillScene> {
       _ when node.isMastered => node.testedOut ? l.testedOut : l.dotCleared,
       _ when node.isLocked => l.dotLocked,
       _ when node.unexpanded && !node.isLinked => l.dotUnexpanded,
-      _ when last != null && last.status == AuditStatus.failed => l.auditFailed,
+      _ when last != null && last.status == AuditStatus.failed => l.auditOnceMore,
       _ => l.dotReady,
     };
     return [
@@ -565,14 +565,15 @@ class _SkillSceneState extends State<SkillScene> {
     ].join(' · ');
   }
 
-  /// Where the node stands: cleared, locked, failed last time or open.
+  /// Where the node stands: cleared, locked, to explain once more, or open.
   Widget _statusChip(SkillOverview overview) {
     final node = overview.skill;
     final l = context.l10n;
     if (node.isMastered) return StatusChip.success(node.testedOut ? l.testedOut : l.dotCleared);
     if (node.isLocked) return StatusChip.neutral(l.dotLocked);
     final last = overview.audits.firstOrNull;
-    if (last != null && last.status == AuditStatus.failed) return StatusChip.danger(l.auditFailed);
+    // Stars, not pass/fail (2026-11-04 review): a miss is not yet, not a failure.
+    if (last != null && last.status == AuditStatus.failed) return StatusChip.neutral(l.auditOnceMore);
     return StatusChip.primary(l.dotReady);
   }
 
@@ -647,7 +648,9 @@ class _SkillSceneState extends State<SkillScene> {
           actions: _actions(overview),
         );
         final contents = LearnPanel(overview: overview, points: points, lessons: lessons);
-        final avatar = avatarOf(size: (box.maxHeight * 0.3).clamp(120.0, 240.0));
+        // On the node page she only accompanies the node: smaller than on home
+        // or in the audit (2026-11-04 review: prominence follows the role).
+        final avatar = avatarOf(size: (box.maxHeight * 0.22).clamp(110.0, 170.0));
         final sideBySide = box.maxWidth >= 680;
         return SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(

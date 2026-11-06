@@ -138,6 +138,22 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('the front page shows how it is used, and a button that goes down a screen', (
+      tester,
+    ) async {
+      await pumpApp(tester, api: FakeApiClient(latency: Duration.zero), auth: FakeAuthService());
+      expect(key('hero-example'), findsOneWidget);
+      final example = tester.widget<Text>(key('hero-example-text'));
+      expect(example.textSpan!.toPlainText(), startsWith('I want to learn '));
+      expect(key('landing-next'), findsOneWidget);
+      final before = tester.widget<SingleChildScrollView>(key('landing-scroll')).controller!.offset;
+      await tester.tap(key('landing-next'));
+      await tester.pumpAndSettle();
+      final after = tester.widget<SingleChildScrollView>(key('landing-scroll')).controller!.offset;
+      expect(after, greaterThan(before));
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('each swipe turns a screen; the tree in the palm grows until it fills the window', (
       tester,
     ) async {

@@ -18,6 +18,7 @@ export 'panel.dart';
 export 'point_row.dart';
 export 'primary_button.dart';
 export 'speech_bubble.dart';
+export 'star_row.dart';
 export 'stat_bar.dart';
 export 'status_chip.dart';
 export 'toast.dart';

@@ -183,7 +183,7 @@ def test_overview_lists_parents_and_requires_with_reasons(client):
     assert set(body["requires"][0]) == {"skill", "reason"}
     assert set(body["requires"][0]["skill"]) == {
         "id", "course_id", "slug", "title", "description", "status", "node_type", "mastery_score",
-        "unexpanded", "tested_out", "linked_course_id", "points",
+        "unexpanded", "tested_out", "linked_course_id", "points", "best_stars",
     }
 
 
@@ -219,7 +219,7 @@ def test_overview_audits_are_this_nodes_newest_first(client):
     ]
     assert audits[0]["score"] == verdict["score"] and audits[1]["score"] == 45
     assert set(audits[0]) == {
-        "id", "skill_id", "skill_title", "status", "score", "created_at", "test_out", "reflected", "first_answer",
+        "id", "skill_id", "skill_title", "status", "score", "stars", "created_at", "test_out", "reflected", "first_answer",
     }
 
 
@@ -297,7 +297,7 @@ def test_audits_list_is_newest_first_across_courses(client):
     assert [x["skill_title"] for x in body] == ["Discriminant", "Core Concepts 1", "Discriminant"]
     assert body[0] == {
         "id": third, "skill_id": a["discriminant"], "skill_title": "Discriminant", "status": "failed",
-        "score": 45, "created_at": body[0]["created_at"], "test_out": False, "reflected": False,
+        "score": 45, "stars": 0, "created_at": body[0]["created_at"], "test_out": False, "reflected": False,
     }
     assert body[0]["created_at"].endswith("Z") or body[0]["created_at"].endswith("+00:00")
 

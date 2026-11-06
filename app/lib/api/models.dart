@@ -491,6 +491,7 @@ class SkillNode {
     this.testedOut = false,
     this.linkedCourseId,
     this.points = const [],
+    this.bestStars,
   });
 
   factory SkillNode.fromJson(Json json) => SkillNode(
@@ -506,6 +507,7 @@ class SkillNode {
     testedOut: _boolN(json, 'tested_out') ?? false,
     linkedCourseId: _intN(json, 'linked_course_id'),
     points: json['points'] == null ? const [] : _list(json, 'points', SkillPoint.fromJson),
+    bestStars: _intN(json, 'best_stars'),
   );
 
   final int id;
@@ -536,6 +538,9 @@ class SkillNode {
   /// and not broken down. Empty for every other node.
   final List<SkillPoint> points;
 
+  /// The most stars (0–3) a passed audit of it gave; null when it has none.
+  final int? bestStars;
+
   bool get isLinked => linkedCourseId != null;
 
   bool get isLocked => status == SkillStatus.locked;
@@ -553,6 +558,7 @@ class SkillNode {
     bool? testedOut,
     int? Function()? linkedCourseId,
     List<SkillPoint>? points,
+    int? bestStars,
   }) => SkillNode(
     id: id,
     courseId: courseId,
@@ -566,6 +572,7 @@ class SkillNode {
     testedOut: testedOut ?? this.testedOut,
     linkedCourseId: linkedCourseId == null ? this.linkedCourseId : linkedCourseId(),
     points: points ?? this.points,
+    bestStars: bestStars ?? this.bestStars,
   );
 }
 
@@ -882,7 +889,9 @@ class AuditSession {
     this.disputed = false,
     this.audience,
     this.depth,
-  });
+    int? stars,
+    this.length,
+  }) : stars = stars ?? (status == AuditStatus.passed ? 2 : 0);
 
   factory AuditSession.fromJson(Json json) => AuditSession(
     id: _int(json, 'id'),
@@ -905,6 +914,8 @@ class AuditSession {
     disputed: _boolN(json, 'disputed') ?? false,
     audience: _strN(json, 'audience'),
     depth: _intN(json, 'depth'),
+    stars: _intN(json, 'stars'),
+    length: _strN(json, 'length'),
   );
 
   final int id;
@@ -952,6 +963,14 @@ class AuditSession {
 
   /// How deep it asks: 0 what it is, 1 how it works, 2 one level deeper.
   final int? depth;
+
+  /// What the verdict is shown as, 0–3: a fail 0, a pass 1 / 2 / 3 by the
+  /// audit's length (a challenge 3); an older audit 2 for a pass.
+  final int stars;
+
+  /// `short`, `standard` or `thorough`; null for a challenge and for audits
+  /// from before the preference.
+  final String? length;
 }
 
 /// Body of `POST /skills/{id}/audits`. Contract endpoint 7.
@@ -1027,7 +1046,8 @@ final class VerdictResult extends TurnResult {
     this.unlockedSkillIds = const [],
     this.rewardAmount,
     this.rewardMultiplier,
-  });
+    int? stars,
+  }) : stars = stars ?? (passed ? 2 : 0);
 
   factory VerdictResult.fromJson(Json json) => VerdictResult(
     passed: _bool(json, 'passed'),
@@ -1041,12 +1061,16 @@ final class VerdictResult extends TurnResult {
     unlockedSkillIds: _intList(json, 'unlocked_skill_ids'),
     rewardAmount: _intN(json, 'reward_amount'),
     rewardMultiplier: _doubleN(json, 'reward_multiplier'),
+    stars: _intN(json, 'stars'),
   );
 
   final bool passed;
 
   /// 0–100.
   final int score;
+
+  /// What the verdict is shown as, 0–3 (a fail 0).
+  final int stars;
 
   /// Empty on a pass.
   final List<String> gaps;
@@ -2042,7 +2066,8 @@ class AuditSummary {
     this.testOut = false,
     this.reflected = false,
     this.firstAnswer,
-  });
+    int? stars,
+  }) : stars = stars ?? (status == AuditStatus.passed ? 2 : 0);
 
   factory AuditSummary.fromJson(Json json) => AuditSummary(
     id: _int(json, 'id'),
@@ -2054,6 +2079,7 @@ class AuditSummary {
     testOut: _boolN(json, 'test_out') ?? false,
     reflected: _boolN(json, 'reflected') ?? false,
     firstAnswer: _strN(json, 'first_answer'),
+    stars: _intN(json, 'stars'),
   );
 
   final int id;
@@ -2061,6 +2087,9 @@ class AuditSummary {
   final String skillTitle;
   final AuditStatus status;
   final int? score;
+
+  /// 0–3: what the audit is shown as.
+  final int stars;
   final DateTime createdAt;
 
   /// A challenge on a whole branch.

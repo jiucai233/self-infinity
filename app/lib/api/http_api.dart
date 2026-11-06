@@ -523,6 +523,19 @@ class HttpApi implements SelfInfinityApi {
   @override
   Future<LlmStatus> getLlm() => _get('/llm', parse: (j) => LlmStatus.fromJson(_object(j)));
 
+  static String _auditLength(Map<String, dynamic> json) => json['audit_length'] as String? ?? 'standard';
+
+  @override
+  Future<String> getAuditLength() => _get('/audit-length', parse: (j) => _auditLength(_object(j)));
+
+  @override
+  Future<String> setAuditLength(String length) => _send(
+    'PUT',
+    '/audit-length',
+    body: {'audit_length': length},
+    parse: (j) => _auditLength(_object(j)),
+  );
+
   @override
   Future<LlmStatus> setLlm(String provider) =>
       _send('PUT', '/llm', body: {'provider': provider}, parse: (j) => LlmStatus.fromJson(_object(j)));

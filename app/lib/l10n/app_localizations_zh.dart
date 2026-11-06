@@ -10,6 +10,59 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get auditLengthMenu => '审计长度';
+
+  @override
+  String get auditLengthTitle => '一次审计想多长？';
+
+  @override
+  String get auditLengthShort => '简短';
+
+  @override
+  String get auditLengthShortHint => '一个知识点，约 2 个问题';
+
+  @override
+  String get auditLengthStandard => '标准';
+
+  @override
+  String get auditLengthStandardHint => '每个还没过的知识点';
+
+  @override
+  String get auditLengthThorough => '深入';
+
+  @override
+  String get auditLengthThoroughHint => '每个知识点重来一遍，星星更多';
+
+  @override
+  String starsLabel(int n) {
+    return '$n / 3 颗星';
+  }
+
+  @override
+  String get tourPicks => '这是你接下来要学的节点，每个都连着树上它自己的那个点。点一个试试。';
+
+  @override
+  String get tourTakeItOn => '先看看这里的学习材料。准备好了就点「开始挑战」：用你自己的话讲给审核官听。';
+
+  @override
+  String get tourTryHint => '点亮起来的地方试一试';
+
+  @override
+  String get heroExampleStem => '我想要学习';
+
+  @override
+  String get heroExample1 => '计算机系统';
+
+  @override
+  String get heroExample2 => '从 ViT 到 VLM，再到机器人策略';
+
+  @override
+  String get heroExample3 => '高中数学，从零开始';
+
+  @override
+  String get heroExampleCaption => '→ 找到真实的课程大纲，长成球里的一棵树';
+
+  @override
   String get tabHome => '首页';
 
   @override

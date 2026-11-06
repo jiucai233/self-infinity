@@ -16,6 +16,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
 import '../chat/chat_controller.dart';
 import '../dev/dev_panel.dart';
+import 'audit_length_dialog.dart';
 import 'character_sheet.dart';
 import 'profile_controller.dart';
 import 'stage_controller.dart';
@@ -468,6 +469,8 @@ class _SettingsButtonState extends State<_SettingsButton> {
               showLicensePage(context: context, applicationName: 'Self-Infinity');
             case 'dev':
               await showDevPanel(context);
+            case 'audit-length':
+              await showAuditLengthDialog(context);
             case 'password':
               await Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const SetPasswordScene(fromSettings: true)),
@@ -556,6 +559,11 @@ class _SettingsButtonState extends State<_SettingsButton> {
               value: 'dev',
               child: Text(context.l10n.devPanel),
             ),
+          PopupMenuItem<String>(
+            key: const Key('settings-audit-length'),
+            value: 'audit-length',
+            child: Text(context.l10n.auditLengthMenu),
+          ),
           if (auth.enabled)
             PopupMenuItem<String>(
               key: const Key('settings-password'),

@@ -32,6 +32,7 @@ class CelebrationCard extends StatefulWidget {
   const CelebrationCard({
     super.key,
     required this.score,
+    this.stars,
     required this.onClose,
     required this.onContinue,
     required this.onOpenSkill,
@@ -49,6 +50,10 @@ class CelebrationCard extends StatefulWidget {
   });
 
   final int score;
+
+  /// The stars this pass earned (by the audit's length), shown under the
+  /// title; null shows none.
+  final int? stars;
 
   /// The node's scores, oldest first, this pass last; fewer than two hide
   /// the curve.
@@ -161,6 +166,12 @@ class _CelebrationCardState extends State<CelebrationCard> with SingleTickerProv
                   key: const Key('celebration-title'),
                   style: theme.displaySmall,
                 ),
+                if (widget.stars case final stars?) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Center(
+                    child: StarRow(key: const Key('celebration-stars'), stars: stars, size: 28),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   context.l10n.points(widget.score),

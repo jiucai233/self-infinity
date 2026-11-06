@@ -94,6 +94,108 @@ abstract class AppLocalizations {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[Locale('en'), Locale('ko'), Locale('zh')];
 
+  /// Settings menu item: how long audits are.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit length'**
+  String get auditLengthMenu;
+
+  /// Title of the audit length dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'How long should an audit be?'**
+  String get auditLengthTitle;
+
+  /// Audit length choice.
+  ///
+  /// In en, this message translates to:
+  /// **'Short'**
+  String get auditLengthShort;
+
+  /// One-line description of the short audit length.
+  ///
+  /// In en, this message translates to:
+  /// **'One point, about 2 questions'**
+  String get auditLengthShortHint;
+
+  /// Audit length choice.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get auditLengthStandard;
+
+  /// One-line description of the standard audit length.
+  ///
+  /// In en, this message translates to:
+  /// **'Every open point'**
+  String get auditLengthStandardHint;
+
+  /// Audit length choice.
+  ///
+  /// In en, this message translates to:
+  /// **'Thorough'**
+  String get auditLengthThorough;
+
+  /// One-line description of the thorough audit length.
+  ///
+  /// In en, this message translates to:
+  /// **'Every point again, more stars'**
+  String get auditLengthThoroughHint;
+
+  /// Accessibility label of the star row, n = filled stars.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} of 3 stars'**
+  String starsLabel(int n);
+
+  /// Guided tour, try-it stop on the home picks.
+  ///
+  /// In en, this message translates to:
+  /// **'Your next nodes, each tied to its point on your tree. Tap one.'**
+  String get tourPicks;
+
+  /// No description provided for @tourTakeItOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Read what is here first. When you are ready, tap Take it on: you explain it to the Auditor in your own words.'**
+  String get tourTakeItOn;
+
+  /// No description provided for @tourTryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the lit part to try it'**
+  String get tourTryHint;
+
+  /// Front page: the stem in the example input, before each typed example.
+  ///
+  /// In en, this message translates to:
+  /// **'I want to learn'**
+  String get heroExampleStem;
+
+  /// No description provided for @heroExample1.
+  ///
+  /// In en, this message translates to:
+  /// **'computer systems'**
+  String get heroExample1;
+
+  /// No description provided for @heroExample2.
+  ///
+  /// In en, this message translates to:
+  /// **'ViT → VLM → robot policies'**
+  String get heroExample2;
+
+  /// No description provided for @heroExample3.
+  ///
+  /// In en, this message translates to:
+  /// **'high school math, from zero'**
+  String get heroExample3;
+
+  /// No description provided for @heroExampleCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'→ a real syllabus, grown as a tree in the orb'**
+  String get heroExampleCaption;
+
   /// Phone bottom navigation: the home tab.
   ///
   /// In en, this message translates to:

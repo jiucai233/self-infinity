@@ -178,6 +178,8 @@ class FakeApiClient implements SelfInfinityApi {
     'reportVoiceUsage',
     'getLlm',
     'setLlm',
+    'getAuditLength',
+    'setAuditLength',
     'getVoice',
     'setVoice',
     'getDevLlm',
@@ -721,28 +723,42 @@ class FakeApiClient implements SelfInfinityApi {
     // A concept leaf is audited on its knowledge points; one that has none
     // gets them before its first audit (the Point Lister).
     var examined = const <SkillPoint>[];
+    var openCount = 0;
     if (!testOut && position == NodePosition.leaf && node.nodeType == NodeType.concept) {
       if (node.points.isEmpty) {
         node = node.copyWith(points: [for (final t in fakePointTitles(node.title)) SkillPoint(title: t)]);
         _nodes[skillId] = node;
       }
       final open = node.points.where((p) => p.ok != true).toList();
-      examined = [
-        for (final p in node.isMastered || open.isEmpty ? node.points : open)
-          SkillPoint(title: p.title, note: p.note),
+      final opened = [
+        for (final p in node.isMastered || open.isEmpty ? node.points : open) SkillPoint(title: p.title, note: p.note),
       ];
+      openCount = opened.length;
+      examined = switch (_auditLength) {
+        'short' => opened.take(1).toList(),
+        'thorough' => [for (final p in node.points) SkillPoint(title: p.title, note: p.note)],
+        _ => opened,
+      };
     }
+    final length = testOut ? null : _auditLength;
 
     final opening = testOut
         ? _testOutQuestion(node)
         : examined.isEmpty
         ? _openingQuestion(node, position)
-        : _pointsQuestion(node, examined);
+        : _pointsQuestion(node, examined, openCount);
+    final plain = testOut || node.nodeType == NodeType.concept ? 8 : 4;
     final base = examined.isNotEmpty
-        ? (2 * examined.length).clamp(4, 10)
-        : testOut || node.nodeType == NodeType.concept
-        ? 8
-        : 4;
+        ? switch (length) {
+            'short' => 2,
+            'thorough' => (2 * examined.length).clamp(4, 14),
+            _ => (2 * examined.length).clamp(4, 10),
+          }
+        : switch (length) {
+            'short' => math.max(2, plain ~/ 2),
+            'thorough' => plain + 2,
+            _ => plain,
+          };
     final audit = _FakeAudit(
       id: _nextAuditId++,
       skillId: skillId,
@@ -750,6 +766,7 @@ class FakeApiClient implements SelfInfinityApi {
       maxTurns: mode == 'night' ? base * 2 : base,
       createdAt: _clock(),
       testOut: testOut,
+      length: length,
     )..turns.add(AuditTurn(role: AuditRole.auditor, content: opening));
     audit.points = examined;
     _audits[audit.id] = audit;
@@ -1945,6 +1962,7 @@ class FakeApiClient implements SelfInfinityApi {
     testOut: a.testOut,
     reflected: a.principleId != null,
     firstAnswer: withFirstAnswer ? _firstAnswerOf(a) : null,
+    stars: a.stars,
   );
 
   static String? _firstAnswerOf(_FakeAudit a) {
@@ -2109,6 +2127,23 @@ class FakeApiClient implements SelfInfinityApi {
     _require(provider == 'openai' || provider == 'claude', 'provider must be openai or claude');
     _llmProvider = provider;
     return _llmStatus;
+  }
+
+  // How long audits are; it shapes the fake's audits as it does the server's.
+  String _auditLength = 'standard';
+
+  @override
+  Future<String> getAuditLength() async {
+    await _begin('getAuditLength');
+    return _auditLength;
+  }
+
+  @override
+  Future<String> setAuditLength(String length) async {
+    await _begin('setAuditLength');
+    _require(const ['short', 'standard', 'thorough'].contains(length), 'audit_length must be short, standard or thorough');
+    _auditLength = length;
+    return _auditLength;
   }
 
   // Offline there is no speech server; the choices are only kept.
@@ -2672,7 +2707,9 @@ class FakeApiClient implements SelfInfinityApi {
 
   /// The opening of an audit on a leaf with points: the Auditor is a student being taught, like a leaf
   /// without points — narrowed to the points still open when some held before.
-  String _pointsQuestion(SkillNode node, List<SkillPoint> examined) {
+  /// [open]: how many points were still open (a short audit asks only the first of them).
+  String _pointsQuestion(SkillNode node, List<SkillPoint> examined, int open) {
+    if (open == node.points.length) return _openingQuestion(node, NodePosition.leaf);
     if (examined.length == 1 && node.points.length > 1) {
       return 'What you taught me last time, I still have. This time teach me only '
           '“${examined.first.title}”, as if I had never heard of it.';
@@ -2778,6 +2815,7 @@ class FakeApiClient implements SelfInfinityApi {
       points: points,
       evidence: audit.evidence,
       lessons: audit.lessons,
+      stars: 0,
     );
   }
 
@@ -2807,6 +2845,7 @@ class FakeApiClient implements SelfInfinityApi {
     const comment = 'You explained the core idea and why it holds.';
     audit
       ..status = AuditStatus.passed
+      ..stars = audit.testOut ? 3 : const {'short': 1, 'thorough': 3}[audit.length] ?? 2
       ..score = score
       ..gaps = const []
       ..comment = comment;
@@ -2817,6 +2856,7 @@ class FakeApiClient implements SelfInfinityApi {
     final mastered = _nodes[audit.skillId]!.copyWith(
       status: SkillStatus.mastered,
       masteryScore: score,
+      bestStars: math.max(_nodes[audit.skillId]!.bestStars ?? 0, audit.stars),
     );
     _nodes[mastered.id] = mastered;
     if (audit.testOut) {
@@ -2842,6 +2882,7 @@ class FakeApiClient implements SelfInfinityApi {
     return VerdictResult(
       passed: true,
       score: score,
+      stars: audit.stars,
       comment: comment,
       feedback: passFeedback,
       points: points,
@@ -3090,10 +3131,12 @@ class _FakeAudit {
     required this.maxTurns,
     required this.createdAt,
     this.testOut = false,
+    this.length,
   });
 
   final int id;
   final DateTime createdAt;
+  final String? length;
   final bool testOut;
   int reward = 0;
   final int skillId;
@@ -3118,6 +3161,9 @@ class _FakeAudit {
   bool tooHard = false;
   bool disputed = false;
 
+  /// 0–3: a fail 0, a pass by length (a challenge 3); set when it closes.
+  int stars = 0;
+
   AuditSession toModel({Principle? principle, String skillTitle = ''}) => AuditSession(
     id: id,
     skillId: skillId,
@@ -3136,6 +3182,8 @@ class _FakeAudit {
     createdAt: createdAt,
     tooHard: tooHard,
     disputed: disputed,
+    stars: stars,
+    length: length,
   );
 }
 

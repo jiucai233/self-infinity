@@ -81,12 +81,26 @@ void main() {
       await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: wideScreen);
       final hint = tester.widget<Text>(find.byKey(const Key('night-hint'))).style!.color!;
       expect(contrast(Color.alphaBlend(hint, AppColors.night), AppColors.night), greaterThanOrEqualTo(4.5));
+      await tester.tap(find.byKey(const Key('night-legend-toggle')));
+      await tester.pumpAndSettle();
       final legend = find.byKey(const Key('night-legend'));
+      expect(legend, findsOneWidget);
       for (final text in tester.widgetList<Text>(find.descendant(of: legend, matching: find.byType(Text)))) {
         final c = text.style!.color!;
         expect(contrast(Color.alphaBlend(c, AppColors.night), AppColors.night), greaterThanOrEqualTo(4.5));
       }
     });
+  });
+
+  testWidgets('the legend is folded behind a ? until asked for', (tester) async {
+    await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: wideScreen);
+    expect(find.byKey(const Key('night-legend')), findsNothing);
+    await tester.tap(find.byKey(const Key('night-legend-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('night-legend')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('night-legend-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('night-legend')), findsNothing);
   });
 
   group('the node card on a phone', () {

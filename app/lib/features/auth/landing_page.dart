@@ -332,6 +332,20 @@ class _LandingPageState extends State<LandingPage> {
                       ),
                     ),
                   ),
+                // There is more below: a round button that turns to the next
+                // screen (2026-11-04 review), on every screen but the last.
+                if (_screen < LandingPage.screens - 1 && !_menuOpen)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: wide ? AppSpacing.xl : AppSpacing.lg,
+                    child: Center(
+                      child: _NextButton(
+                        label: l.scrollHint,
+                        onTap: () => _step(1, size.height),
+                      ),
+                    ),
+                  ),
                 Positioned(
                   left: 0,
                   right: 0,
@@ -869,6 +883,17 @@ class _HeroScreen extends StatelessWidget {
             ],
           ),
         ),
+        SizedBox(height: wide ? AppSpacing.xxl : AppSpacing.xl),
+        // How it is used: what people type, and where it goes (the orb).
+        _DropIn(
+          delay: const Duration(milliseconds: 300),
+          child: _ExamplePrompt(
+            stem: l.heroExampleStem,
+            examples: [l.heroExample1, l.heroExample2, l.heroExample3],
+            // A phone's caption would sit over the robot.
+            caption: wide ? l.heroExampleCaption : null,
+          ),
+        ),
       ],
     );
     return AnimatedBuilder(
@@ -895,21 +920,6 @@ class _HeroScreen extends StatelessWidget {
                 ),
               ),
             ),
-            if (wide)
-              Positioned(
-                left: 64,
-                bottom: AppSpacing.xxl,
-                child: Row(
-                  children: [
-                    const Icon(Icons.south_rounded, size: 16, color: AppColors.textTertiary),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      keepAll(l.scrollHint),
-                      style: theme.labelMedium?.copyWith(color: AppColors.textTertiary),
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
       ),
@@ -1769,4 +1779,194 @@ class _SparkPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SparkPainter old) => false;
+}
+
+/// The front page's way down: a pill with its word and an arrow, bobbing.
+class _NextButton extends StatefulWidget {
+  const _NextButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  State<_NextButton> createState() => _NextButtonState();
+}
+
+class _NextButtonState extends State<_NextButton> with SingleTickerProviderStateMixin {
+  late final AnimationController _bob = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (Avatar.animationsEnabled && !MediaQuery.of(context).disableAnimations) {
+      if (!_bob.isAnimating) _bob.repeat(reverse: true);
+    } else {
+      _bob.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _bob.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+    return Semantics(
+      button: true,
+      label: widget.label,
+      excludeSemantics: true,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          key: const Key('landing-next'),
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: AnimatedBuilder(
+            animation: _bob,
+            builder: (context, child) => Transform.translate(
+              offset: Offset(0, 4 * Curves.easeInOut.transform(_bob.value)),
+              child: child,
+            ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: AppRadius.pillBorder,
+                border: Border.all(color: AppColors.outlineStrong),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(widget.label, style: theme.labelLarge?.copyWith(color: AppColors.textPrimary)),
+                    const SizedBox(width: AppSpacing.xs),
+                    const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: AppColors.textPrimary),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// An example of using it: the input as it is in the app, with what people
+/// ask it typed in turn, and a line on where it goes.
+class _ExamplePrompt extends StatefulWidget {
+  const _ExamplePrompt({required this.stem, required this.examples, this.caption});
+
+  /// The words before each example ("I want to learn").
+  final String stem;
+  final List<String> examples;
+  final String? caption;
+
+  @override
+  State<_ExamplePrompt> createState() => _ExamplePromptState();
+}
+
+class _ExamplePromptState extends State<_ExamplePrompt> {
+  int _example = 0;
+  int _shown = 0;
+  Timer? _timer;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!Avatar.animationsEnabled || MediaQuery.of(context).disableAnimations) {
+      _timer?.cancel();
+      _shown = widget.examples.first.length;
+      return;
+    }
+    _timer ??= Timer.periodic(const Duration(milliseconds: 70), (_) => _tick());
+  }
+
+  /// Types the example a letter at a time, holds it, then the next one.
+  int _hold = 0;
+  void _tick() {
+    final text = widget.examples[_example];
+    setState(() {
+      if (_shown < text.length) {
+        _shown++;
+      } else if (++_hold > 28) {
+        _hold = 0;
+        _shown = 0;
+        _example = (_example + 1) % widget.examples.length;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+    final text = widget.examples[_example];
+    final typed = text.substring(0, _shown.clamp(0, text.length));
+    return Column(
+      key: const Key('hero-example'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceHigh,
+              borderRadius: AppRadius.pillBorder,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+              child: Row(
+                children: [
+                  const Icon(Icons.add_circle_outline_rounded, size: 20, color: AppColors.textTertiary),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${widget.stem} ',
+                            style: const TextStyle(color: AppColors.textSecondary),
+                          ),
+                          TextSpan(text: typed),
+                        ],
+                      ),
+                      key: const Key('hero-example-text'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.bodyLarge,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  const Icon(Icons.arrow_forward_rounded, size: 18, color: AppColors.textTertiary),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (widget.caption case final caption?) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Padding(
+            padding: const EdgeInsets.only(left: AppSpacing.lg),
+            child: Text(
+              keepAll(caption),
+              style: theme.labelMedium?.copyWith(color: AppColors.textTertiary),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }

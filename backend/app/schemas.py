@@ -94,6 +94,8 @@ class SkillNodeOut(_Out):
     status: SkillStatus
     node_type: NodeType
     mastery_score: int | None
+    # The most stars (0-3) a passed audit of it gave; an older mastered node counts as 2.
+    best_stars: int | None = None
     unexpanded: bool = False
     tested_out: bool = False
     linked_course_id: int | None = None
@@ -105,6 +107,12 @@ class SkillNodeOut(_Out):
     @classmethod
     def _null_is_false(cls, value):
         return bool(value)
+
+    @model_validator(mode="after")
+    def _old_mastery_is_two_stars(self):
+        if self.best_stars is None and self.status == SkillStatus.mastered and not self.tested_out:
+            self.best_stars = 2
+        return self
 
 
 # ---------------------------------------------------------------- editing a course (#41-#45)
@@ -250,6 +258,11 @@ class AuditSessionOut(BaseModel):
     node_position: NodePosition
     status: AuditStatus
     score: int | None
+    # 0-3: a fail 0, a pass 1 (short) / 2 (standard) / 3 (thorough or a challenge); an audit
+    # from before stars counts as 2 for a pass and 0 for a fail.
+    stars: int = 0
+    # `short` | `standard` | `thorough`; null on a challenge and on audits from before the preference.
+    length: str | None = None
     gaps: list[str]
     comment: str | None
     turns: list[AuditTurnOut]
@@ -366,6 +379,8 @@ class VerdictResult(BaseModel):
     type: Literal["verdict"] = "verdict"
     passed: bool
     score: int
+    # 0-3, what the verdict is shown as (a fail 0).
+    stars: int = 0
     gaps: list[str]
     comment: str
     # What she said about the last answer, before the verdict.
@@ -821,6 +836,7 @@ class AuditSummaryOut(BaseModel):
     skill_title: str
     status: AuditStatus
     score: int | None
+    stars: int = 0
     created_at: datetime
     test_out: bool = False
     # A failed audit whose lesson card has been made.
@@ -1170,6 +1186,14 @@ class LLMOut(BaseModel):
 
 class LLMIn(BaseModel):
     provider: Literal["openai", "claude"]
+
+
+class AuditLengthIn(BaseModel):
+    audit_length: Literal["short", "standard", "thorough"]
+
+
+class AuditLengthOut(AuditLengthIn):
+    """GET/PUT /api/audit-length (contract #53): how long this account's audits are."""
 
 
 class DevLLMTotalsOut(BaseModel):

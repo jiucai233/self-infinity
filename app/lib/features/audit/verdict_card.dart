@@ -250,6 +250,10 @@ class VerdictCard extends StatelessWidget {
                     key: const Key('verdict-title'),
                     style: AppTheme.serif(theme.headlineSmall)?.copyWith(height: 1.2),
                   ),
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
+                  child: StarRow(key: const Key('verdict-stars'), stars: verdict.stars, size: 24),
+                ),
                 if (passed && xp != null) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(

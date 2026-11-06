@@ -353,6 +353,8 @@ class _SkillBodyState extends State<_SkillBody> {
               children: [
                 if (n.boss && n.status != null) const _BossChip(),
                 _statusChip(context.l10n, n),
+                if (overview?.skill.bestStars case final stars?)
+                  StarRow(key: const Key('node-sheet-best-stars'), stars: stars, size: 16),
                 if (n.unexpanded)
                   StatusChip.neutral(context.l10n.dotUnexpanded, key: const Key('node-sheet-unexpanded')),
                 if (_courseName != null)
@@ -448,10 +450,7 @@ class _AuditRow extends StatelessWidget {
                   style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
                 ),
               ),
-              Text(
-                passed ? context.l10n.auditPassed : context.l10n.auditFailed,
-                style: theme.labelMedium?.copyWith(color: color),
-              ),
+              StarRow(stars: audit.stars, size: 16),
               const Spacer(),
               Text(score == null ? '—' : '$score', style: theme.labelLarge),
             ],

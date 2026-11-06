@@ -98,6 +98,14 @@ class SkillNodeCard extends StatelessWidget {
               children: chips,
             ),
           ],
+          if (overview.skill.bestStars case final stars?)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.md),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: StarRow(key: const Key('skill-best-stars'), stars: stars, size: 22),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(top: AppSpacing.lg, right: AppSpacing.md),
             child: Row(
@@ -410,10 +418,13 @@ class _AuditRow extends StatelessWidget {
                       style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
                     ),
                   ),
-                  Text(
-                    audit.status.label(context.l10n),
-                    style: theme.labelMedium?.copyWith(color: color),
-                  ),
+                  if (audit.status == AuditStatus.active)
+                    Text(
+                      audit.status.label(context.l10n),
+                      style: theme.labelMedium?.copyWith(color: color),
+                    )
+                  else
+                    StarRow(stars: audit.stars, size: 16),
                   if (audit.status == AuditStatus.failed && !audit.reflected) ...[
                     const SizedBox(width: AppSpacing.sm),
                     Flexible(

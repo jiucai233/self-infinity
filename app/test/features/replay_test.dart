@@ -258,7 +258,8 @@ void main() {
       final failed = await failAudit(api, 6);
       await pumpReplay(tester, api, failed.sessionId);
       expect(tester.widget<Text>(key('stage-title')).data, 'Discriminant');
-      expect(find.text('Failed'), findsOneWidget);
+      expect(find.byKey(const Key('stars-0')), findsOneWidget);
+      expect(find.text('Failed'), findsNothing);
       expect(
         tester.widget<Text>(key('replay-date')).data,
         matches(r'^[A-Z][a-z]{2} \d{1,2}, \d{4} \d{2}:\d{2}$'),
@@ -561,7 +562,7 @@ void main() {
       final passed = await passAudit(api, 6);
       final id = (await api.listAudits()).first.id;
       await pumpReplay(tester, api, id);
-      expect(find.text('Passed'), findsOneWidget);
+      expect(find.byKey(const Key('stars-2')), findsOneWidget);
       expect(tester.widget<Text>(key('replay-score')).data, '${passed.score}');
       expect(key('replay-gap-0'), findsNothing);
       expect(key('replay-reflection'), findsNothing);

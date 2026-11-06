@@ -90,7 +90,7 @@ void main() {
       expect(find.byKey(const Key('stage-title')), findsNothing);
     });
 
-    testWidgets('a status chip next to it: Locked / Ready / Cleared / Failed', (tester) async {
+    testWidgets('a status chip next to it: Locked / Ready / Cleared / Once more', (tester) async {
       await pumpSkill(tester, api, 5);
       expect(find.text('Locked'), findsOneWidget);
       await pumpSkill(tester, api, 6);
@@ -102,7 +102,7 @@ void main() {
       await pumpSkill(tester, api, 7);
       final chip = find.descendant(
         of: find.byKey(const Key('skill-chips')),
-        matching: find.text('Failed'),
+        matching: find.text('Once more'),
       );
       expect(chip, findsOneWidget);
       // The chips have their own line under the name.

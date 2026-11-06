@@ -36,6 +36,7 @@ from app.agents.challenger import Challenger
 from app.agents.memory_retriever import recent_misconceptions, retrieve_lessons
 from app.config import settings
 from app.llm import second_auditor_provider
+from app.llm.usage import PROFILE_ID
 from app.llm.base import LLMProvider, Message
 from app.models import (
     AuditSession,
@@ -44,6 +45,7 @@ from app.models import (
     NodePosition,
     NodeType,
     Principle,
+    Profile,
     PrincipleCheck,
     RewardEvent,
     SkillNode,
@@ -95,6 +97,7 @@ class VerdictOutcome:
     unlocked_skill_ids: list[int] = field(default_factory=list)
     reward_amount: int | None = None
     reward_multiplier: float | None = None
+    stars: int = 0
 
 
 TurnOutcome = ProbeOutcome | VerdictOutcome
@@ -110,6 +113,34 @@ RESUME_HOURS = 24
 POINT_TURNS = 2
 MIN_POINT_TURNS = 4
 MAX_POINT_TURNS = 10
+# A thorough audit may run longer than an ordinary one.
+THOROUGH_POINT_TURNS = 14
+
+LENGTHS = ("short", "standard", "thorough")
+DEFAULT_LENGTH = "standard"
+# What a passed audit shows, by length; a passed challenge shows the most.
+PASS_STARS = {"short": 1, "standard": 2, "thorough": 3}
+CHALLENGE_STARS = 3
+
+
+def get_audit_length(session: Session) -> str:
+    """The length this account wants its audits (Profile.audit_length; NULL is standard)."""
+    row = session.get(Profile, PROFILE_ID)
+    return row.audit_length if row is not None and row.audit_length in LENGTHS else DEFAULT_LENGTH
+
+
+def set_audit_length(session: Session, length: str) -> None:
+    row = session.get(Profile, PROFILE_ID) or Profile(id=PROFILE_ID)
+    row.audit_length = length
+    session.add(row)
+    session.commit()
+
+
+def stars_for(passed: bool, length: str | None, test_out: bool) -> int:
+    """The stars a verdict is shown as: a fail 0, a passed challenge 3, else by the audit's length."""
+    if not passed:
+        return 0
+    return CHALLENGE_STARS if test_out else PASS_STARS.get(length or DEFAULT_LENGTH, 2)
 
 
 def can_test_out(session: Session, skill: SkillNode) -> bool:
@@ -203,11 +234,22 @@ def closed_points(examined: list[dict], turns: list[AuditTurn]) -> list[str]:
     return [p["title"] for p in examined if asked[p["title"]] >= POINT_TURNS]
 
 
-def max_turns_for(node_type: NodeType, mode: str, examined: int = 0) -> int:
-    """`examined`: how many knowledge points the audit asks about (0: an audit without points)."""
+def max_turns_for(node_type: NodeType, mode: str, examined: int = 0, length: str = DEFAULT_LENGTH) -> int:
+    """`examined`: how many knowledge points the audit asks about (0: an audit without points).
+    `length`: short asks two questions on its one point (or half the turns without points),
+    thorough up to `THOROUGH_POINT_TURNS` (or two more)."""
     base = settings.audit_max_turns if node_type == NodeType.concept else settings.task_max_turns
     if examined:
-        base = max(MIN_POINT_TURNS, min(MAX_POINT_TURNS, POINT_TURNS * examined))
+        if length == "short":
+            base = POINT_TURNS
+        elif length == "thorough":
+            base = max(MIN_POINT_TURNS, min(THOROUGH_POINT_TURNS, POINT_TURNS * examined))
+        else:
+            base = max(MIN_POINT_TURNS, min(MAX_POINT_TURNS, POINT_TURNS * examined))
+    elif length == "short":
+        base = max(2, base // 2)
+    elif length == "thorough":
+        base += 2
     return base * 2 if mode == "night" else base
 
 
@@ -251,7 +293,14 @@ def start_audit(
     # The style is chosen on the learner model, so it must hold every audit before then.
     learner.catch_up(session)
     position = node_position(session, skill)
-    examined = points.to_examine(skill) if not test_out and points.has_points(session, skill) else []
+    length = None if test_out else get_audit_length(session)
+    opened = points.to_examine(skill) if not test_out and points.has_points(session, skill) else []
+    examined = opened
+    if length == "short":
+        examined = opened[:1]
+    elif length == "thorough" and opened:
+        # Every point again, the held ones too, as to_examine builds them.
+        examined = [{"title": p["title"], "ok": None, "note": p["note"]} for p in skill.points]
     # A challenge keeps its own standard (every part asked must hold); a style is for the
     # ordinary audit of one node.
     style, style_context = None, None
@@ -263,7 +312,10 @@ def start_audit(
         node_position=position,
         status=AuditStatus.active,
         # A challenge samples several parts: it gets a concept's turns even over a task.
-        max_turns=max_turns_for(NodeType.concept if test_out else skill.node_type, mode, len(examined)),
+        max_turns=max_turns_for(
+            NodeType.concept if test_out else skill.node_type, mode, len(examined), length or DEFAULT_LENGTH
+        ),
+        length=length,
         test_out=True if test_out else None,
         points_json=points.dump(examined) if examined else None,
         audience=style.audience if style else None,
@@ -280,7 +332,7 @@ def start_audit(
         parts,
         test_out,
         examined=[p["title"] for p in examined],
-        again=len(examined) < len(skill.points),
+        again=len(opened) < len(skill.points),
         audience=audit.audience,
     )
     # An opening on the first point is one of that point's questions.
@@ -520,6 +572,7 @@ def _finalize(
 
     audit.status = status
     audit.score = verdict.score
+    audit.stars = stars_for(bool(verdict.passed), audit.length, bool(audit.test_out))
     audit.gaps_json = json.dumps(verdict.gaps or [], ensure_ascii=False)
     audit.comment = verdict.comment
     if verdict.points:
@@ -562,10 +615,12 @@ def _finalize(
         points=list(verdict.points or []),
         evidence=audit.evidence,
         lessons=lesson_results(session, audit.id),
+        stars=audit.stars,
     )
     if verdict.passed:
         skill.status = SkillStatus.mastered
         skill.mastery_score = verdict.score
+        skill.best_stars = max(skill.best_stars or 0, audit.stars)
         session.add(skill)
         if audit.test_out:
             _master_under(session, skill)
