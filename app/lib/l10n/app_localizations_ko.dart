@@ -134,7 +134,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get attempts => '시도';
 
   @override
-  String get auditFailed => '미통과';
+  String get auditFailed => '한 번 더';
 
   @override
   String get lineNotYet => '아직 잘 모르겠어요. 한 번 더 설명해 줄래요?';

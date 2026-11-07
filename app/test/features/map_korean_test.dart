@@ -75,6 +75,6 @@ void main() {
       final status = find.byKey(const Key('node-sheet-status'));
       if (status.evaluate().isNotEmpty) statuses.addAll(_texts(tester, status));
     }
-    expect(statuses, containsAll(['클리어', '미통과', '도전 가능', '잠김']));
+    expect(statuses, containsAll(['클리어', '한 번 더', '도전 가능', '잠김']));
   });
 }

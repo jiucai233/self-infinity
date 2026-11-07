@@ -275,7 +275,7 @@ class _Numbers extends StatelessWidget {
 Widget _statusChip(AppLocalizations l, LifeNode n) {
   if (n.status == null) return const SizedBox.shrink();
   if (n.isMastered) return StatusChip.success(l.dotCleared, key: const Key('node-sheet-status'));
-  if (n.failed) return StatusChip.danger(l.auditFailed, key: const Key('node-sheet-status'));
+  if (n.failed) return StatusChip.neutral(l.auditFailed, key: const Key('node-sheet-status'));
   if (n.isAvailable) return StatusChip.primary(l.dotReady, key: const Key('node-sheet-status'));
   return StatusChip.neutral(l.dotLocked, key: const Key('node-sheet-status'));
 }

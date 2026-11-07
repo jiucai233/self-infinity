@@ -124,7 +124,7 @@ void main() {
     test('English labels', () {
       final l = lookupAppLocalizations(const Locale('en'));
       expect(AuditStatus.passed.label(l), 'Passed');
-      expect(AuditStatus.failed.label(l), 'Failed');
+      expect(AuditStatus.failed.label(l), 'Once more');
       expect(AuditStatus.active.label(l), 'In progress');
     });
 

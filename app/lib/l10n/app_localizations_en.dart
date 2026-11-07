@@ -135,7 +135,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get attempts => 'Attempts';
 
   @override
-  String get auditFailed => 'Failed';
+  String get auditFailed => 'Once more';
 
   @override
   String get lineNotYet => 'I don\'t get it yet. Explain it once more?';

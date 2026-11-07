@@ -337,7 +337,7 @@ abstract class AppLocalizations {
   /// No description provided for @auditFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed'**
+  /// **'Once more'**
   String get auditFailed;
 
   /// No description provided for @lineNotYet.

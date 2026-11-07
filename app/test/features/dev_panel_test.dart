@@ -320,7 +320,7 @@ void main() {
     );
     expect(textIn(tester, 'learner-step-0'), startsWith('Pooling | Passed | '));
     expect(textIn(tester, 'learner-step-0'), endsWith('Ability +0.12 · Progress 60%')); // not voted on
-    expect(textIn(tester, 'learner-step-1'), startsWith('U-Net | Failed | '));
+    expect(textIn(tester, 'learner-step-1'), startsWith('U-Net | Once more | '));
     expect(textIn(tester, 'learner-step-1'), endsWith('Ability -0.10 · Progress 12% · 67% agreed'));
     expect(textIn(tester, 'learner-step-2'), startsWith('Convolution | Passed | '));
     expect(textIn(tester, 'learner-step-2'), endsWith('Ability +0.20 · Progress 50%')); // all agreed

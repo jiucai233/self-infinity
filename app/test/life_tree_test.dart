@@ -195,7 +195,7 @@ void main() {
         'Roots and Coefficients',
       );
       expect(find.text('Audit history'), findsOneWidget);
-      expect(find.text('Failed'), findsWidgets);
+      expect(find.text('Once more'), findsWidgets);
       await tester.tap(find.byKey(const Key('node-sheet-open')));
       await tester.pumpAndSettle();
       expect(find.text('route:/skill/7'), findsOneWidget);

@@ -623,7 +623,7 @@ class _Learner extends StatelessWidget {
                       if (s.passed)
                         StatusChip.success(l.auditPassed)
                       else
-                        StatusChip.danger(l.auditFailed),
+                        StatusChip.neutral(l.auditFailed),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xs),
@@ -789,7 +789,7 @@ class _AuditCard extends StatelessWidget {
                 if (a.passed)
                   StatusChip.success(l.auditPassed)
                 else
-                  StatusChip.danger(l.auditFailed),
+                  StatusChip.neutral(l.auditFailed),
                 const SizedBox(width: AppSpacing.sm),
                 Text('${a.score ?? '—'} ${l.pointsUnit}', style: theme.labelMedium),
               ],

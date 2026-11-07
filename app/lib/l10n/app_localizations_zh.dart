@@ -134,7 +134,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get attempts => '尝试';
 
   @override
-  String get auditFailed => '未通过';
+  String get auditFailed => '再讲一次';
 
   @override
   String get lineNotYet => '我还没听懂……再讲一次嘛？';

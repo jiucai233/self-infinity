@@ -311,7 +311,7 @@ void main() {
         expect(legend, findsOneWidget);
         expect(
           textsIn(tester, legend).toList(),
-          ['Ready', 'Cleared', 'Failed', 'Locked', 'Boss'],
+          ['Ready', 'Cleared', 'Once more', 'Locked', 'Boss'],
         );
         final rect = tester.getRect(legend);
         final stage = tester.getRect(find.byKey(const Key('stage-panel')));
