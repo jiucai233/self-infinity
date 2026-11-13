@@ -482,19 +482,10 @@ class _SettingsButtonState extends State<_SettingsButton> {
         itemBuilder: (context) => [
           PopupMenuItem<String>(
             enabled: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.l10n.signedInAs,
-                  style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
-                ),
-                Text(
-                  auth.enabled ? (auth.email ?? '') : context.l10n.localModeNoAccount,
-                  key: const Key('settings-account'),
-                  style: theme.bodyMedium,
-                ),
-              ],
+            child: Text(
+              auth.enabled ? (auth.email ?? '') : context.l10n.localModeNoAccount,
+              key: const Key('settings-account'),
+              style: theme.bodyMedium,
             ),
           ),
           const PopupMenuDivider(),

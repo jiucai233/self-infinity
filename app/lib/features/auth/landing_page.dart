@@ -948,7 +948,6 @@ class _ChapterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
-    final l = context.l10n;
     final kicker = Text(
       keepAll(chapter.kicker),
       style: theme.labelLarge?.copyWith(color: AppColors.textTertiary, letterSpacing: 0.4),
@@ -957,7 +956,6 @@ class _ChapterScreen extends StatelessWidget {
       key: Key('landing-shot-${chapter.shot}'),
       shot: chapter.shot,
       wide: wide,
-      label: l.landingRealScreen,
       alt: chapter.title,
     );
     final Widget content;
@@ -1115,16 +1113,12 @@ class _UsageShot extends StatelessWidget {
     super.key,
     required this.shot,
     required this.wide,
-    required this.label,
     required this.alt,
   });
 
   /// learn, prove, remember or grow.
   final String shot;
   final bool wide;
-
-  /// The frame's caption ("From the app").
-  final String label;
 
   /// What the picture is, for screen readers.
   final String alt;
@@ -1184,13 +1178,6 @@ class _UsageShot extends StatelessWidget {
                             shape: BoxShape.circle,
                           ),
                         ),
-                      const Spacer(),
-                      Text(
-                        label,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.textTertiary,
-                        ),
-                      ),
                     ],
                   ),
                 ),

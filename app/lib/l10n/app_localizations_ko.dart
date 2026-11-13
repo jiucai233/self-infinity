@@ -239,9 +239,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get coursesTranslateFailed => '코스를 번역하지 못했어요. 지금은 원래 언어로 남아 있어요.';
 
   @override
-  String get auditorTagline => '당신에게 배우고, 따라가지 못한 곳을 물어봐요';
-
-  @override
   String get authAlreadyRegistered => '이미 가입된 이메일이에요. 로그인해 주세요.';
 
   @override
@@ -464,9 +461,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get dotReady => '도전 가능';
 
   @override
-  String get dragToTurn => '드래그해서 돌리기 · 스크롤로 확대 · 점 탭하기';
-
-  @override
   String get editUnderCharacter => '\'내 캐릭터\'에서 수정할 수 있어요.';
 
   @override
@@ -586,9 +580,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get journal => '일기';
-
-  @override
-  String get landingRealScreen => '실제 앱 화면';
 
   @override
   String get language => '언어';
@@ -742,9 +733,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get onbBuildingTitle => '당신의 세계를 만드는 중…';
 
   @override
-  String get onbCourseKicker => '첫 강좌';
-
-  @override
   String get onbDoneGuide => '다 됐어요.';
 
   @override
@@ -755,9 +743,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get onbIdentityHelper => '이미 사실인 것처럼 써 보세요.';
-
-  @override
-  String get onbIdentityKicker => '정체성';
 
   @override
   String get onbIdentityTitle => '문장을 완성해 보세요.';
@@ -793,9 +778,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get onbQuestHelper => '최대 세 개까지 둘 수 있어요. 시작은 하나면 충분해요.';
 
   @override
-  String get onbQuestKicker => '메인 퀘스트';
-
-  @override
   String get onbQuestTitle => '승리 조건에 가까워지게 해 줄 목표 하나는 뭔가요?';
 
   @override
@@ -815,9 +797,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get onbStakesHint => '또 1년 동안…';
-
-  @override
-  String get onbStakesKicker => '걸린 것';
 
   @override
   String get onbStakesTitle => '1년 뒤, 아무것도 바뀌지 않았어요. 당신의 삶은 어떤 모습인가요?';
@@ -855,9 +834,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get onbWinHint => '나는 …할 수 있다';
-
-  @override
-  String get onbWinKicker => '승리 조건';
 
   @override
   String get onbWinTitle => '1년 뒤, 당신이 이겼어요. 어떤 모습인가요?';
@@ -903,9 +879,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get recorderAsk => '어떤 부분을 잘못 이해했나요?';
-
-  @override
-  String get recorderTagline => '실수를 교훈으로 바꿔요';
 
   @override
   String get removeMainQuest => '메인 퀘스트 삭제';
@@ -1002,16 +975,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get signIn => '로그인';
 
   @override
-  String get signInBlurb => '로그인하고 하던 곳부터 이어서 하세요.';
-
-  @override
   String get signOut => '로그아웃';
 
   @override
   String get signUpBlurb => '나무, 교훈, 규칙이 모두 계정에 저장돼요.';
-
-  @override
-  String get signedInAs => '로그인 계정';
 
   @override
   String get skip => '건너뛰기';
@@ -1663,9 +1630,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get resetView => '처음 시점으로';
-
-  @override
-  String get upNext => '다음 할 일';
 
   @override
   String get questLearn => '배우기';

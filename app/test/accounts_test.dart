@@ -463,7 +463,9 @@ void main() {
       final api = FakeApiClient(latency: Duration.zero, onboarded: false);
       await pumpApp(tester, api: api);
       await tapKey(tester, 'onboarding-continue'); // Begin
-      expect(find.text('Step 1 of 5'), findsOneWidget); // the tour is no longer a step
+      // The bars alone show it; the words are their label for screen readers.
+      expect(find.text('Step 1 of 5'), findsNothing);
+      expect(find.bySemanticsLabel('Step 1 of 5'), findsOneWidget); // the tour is no longer a step
       await answer(tester, 'Another year of nodding along.');
       await answer(tester, 'I can teach calculus.');
       // The identity line starts with the stem.

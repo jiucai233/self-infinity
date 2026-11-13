@@ -85,7 +85,7 @@
 | **聊天面板** | 你的话右对齐 `userBubble` 气泡（圆角 20，右上角 4）；她的话左对齐无气泡，左侧 28px 圆形 agent 小头像 + 名字 + 时间，正文 `bodyLarge`。日期分隔是居中的小字。新消息自动滚到底。 |
 | **左栏** | 标题栏 `My character`：身份宣言、Win condition、Stakes、Main quests、Rules；三条属性条（`Lv 2 · 3/5`、`Cleared 4/12`、`Condition: …`），条高 8、圆角 4，填充墨色（Cleared 为琥珀，状态差为砖红）；Daily quests；Today。 |
 | **统计条**（scene 2） | 进度环（细墨线，中间 `3/22`）+ 大数字小标签：`Cleared 3 / 22`、`Progress 13%`、`Ready`、`Audits`、`Lessons`。 |
-| **人生树面板**（scene 2） | `night` 底、圆角 20。左上 `Tree | Outline` 胶囊切换；上方居中一行斜体身份宣言；左下图例；右下 `Drag to turn · tap a point`。小字用 `nightHint`（`nightText` 70%，约 8:1），不用 `nightMuted`。网格球壳很淡，节点才是主角；每个节点有 48px 的隐形点击区（最近的节点胜出）。名字只标选中节点及其父子、搜索结果、课程（手机上选中或搜索时课程名让位），标签互不重叠、不出面板。 |
+| **人生树面板**（scene 2） | `night` 底、圆角 20。左上 `Tree | Outline` 胶囊切换；上方居中一行斜体身份宣言；左下图例；右下只有缩放按钮，不再写手势提示。小字用 `nightHint`（`nightText` 70%，约 8:1），不用 `nightMuted`。网格球壳很淡，节点才是主角；每个节点有 48px 的隐形点击区（最近的节点胜出）。名字只标选中节点及其父子、搜索结果、课程（手机上选中或搜索时课程名让位），标签互不重叠、不出面板。 |
 | **节点卡片**（scene 2） | 一叠纸：前面一张 `surface` 卡片（1px `glow` 边、`float` 阴影），后面错开两张更暗的纸。小号大写 kicker（`BOSS` / `MAIN QUEST` / `COURSE` / `YOU`）→ 标题 → 状态 chip → 大数字（Best / Attempts / Lessons）→ `Audit history`（日期、Passed/Failed、分数条）→ 教训卡 → 墨色 `Take it on`。手机（宽 < 600）上是 Material 底部面板：顶部拖动条，打开约 2/3 高，可拖到整个舞台，往下拖关闭。 |
 | **contents 卡片**（scene 4） | 白卡、1px `outline`、圆角 16。资料是一行一个：网站小图标位（首字母圆点）+ 标题 + 域名（次要色），整行可点。 |
 | **技能图**（Outline 视图） | 圆点 14；可挑战 = 白底墨色描边，掌握 = `cleared` 金色实心（与 Tree 同色），失败 = 砖红实心，锁住 = 灰实心，Boss 多一圈；图例收在左下角的 `?` 按钮后。窄屏上列距收紧，放得下就缩小到整宽（最小 0.66），放不下就横向拖动，有更多内容的一侧边缘渐隐。 |

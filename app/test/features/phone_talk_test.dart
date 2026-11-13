@@ -111,10 +111,10 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('wide is unchanged: the header names her, the card is paper', (tester) async {
+    testWidgets('wide: the header names her (no tagline under the name), the card is paper', (tester) async {
       await pumpScene(tester, const AuditScene(skillId: 1), api: api);
       expect(find.text('Auditor'), findsWidgets);
-      expect(find.text('Learns from you and asks where it loses the thread'), findsOneWidget);
+      expect(find.text('Learns from you and asks where it loses the thread'), findsNothing);
       expect(find.byType(ThreadBubble), findsNothing);
       await say(tester, shortAnswer);
       await say(tester, shortAnswer);

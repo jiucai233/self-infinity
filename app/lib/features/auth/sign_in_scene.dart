@@ -322,13 +322,13 @@ class _SignInSceneState extends State<SignInScene> {
                 key: const Key('auth-title'),
                 style: theme.headlineMedium,
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                signUp
-                    ? context.l10n.signUpBlurb
-                    : context.l10n.signInBlurb,
-                style: theme.bodyMedium?.copyWith(color: AppColors.textTertiary),
-              ),
+              if (signUp) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  context.l10n.signUpBlurb,
+                  style: theme.bodyMedium?.copyWith(color: AppColors.textTertiary),
+                ),
+              ],
               const SizedBox(height: AppSpacing.xl),
               TextField(
                 key: const Key('auth-email'),

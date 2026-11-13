@@ -532,12 +532,6 @@ abstract class AppLocalizations {
   /// **'Your courses could not be translated; they stay in their language for now.'**
   String get coursesTranslateFailed;
 
-  /// No description provided for @auditorTagline.
-  ///
-  /// In en, this message translates to:
-  /// **'Learns from you and asks where it loses the thread'**
-  String get auditorTagline;
-
   /// No description provided for @authAlreadyRegistered.
   ///
   /// In en, this message translates to:
@@ -946,12 +940,6 @@ abstract class AppLocalizations {
   /// **'Ready'**
   String get dotReady;
 
-  /// No description provided for @dragToTurn.
-  ///
-  /// In en, this message translates to:
-  /// **'Drag to turn · scroll to zoom · tap a point'**
-  String get dragToTurn;
-
   /// No description provided for @editUnderCharacter.
   ///
   /// In en, this message translates to:
@@ -1185,12 +1173,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Journal'**
   String get journal;
-
-  /// No description provided for @landingRealScreen.
-  ///
-  /// In en, this message translates to:
-  /// **'From the app'**
-  String get landingRealScreen;
 
   /// No description provided for @language.
   ///
@@ -1468,12 +1450,6 @@ abstract class AppLocalizations {
   /// **'Building your world…'**
   String get onbBuildingTitle;
 
-  /// No description provided for @onbCourseKicker.
-  ///
-  /// In en, this message translates to:
-  /// **'FIRST COURSE'**
-  String get onbCourseKicker;
-
   /// No description provided for @onbDoneGuide.
   ///
   /// In en, this message translates to:
@@ -1497,12 +1473,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Write it as if it\'s already true.'**
   String get onbIdentityHelper;
-
-  /// No description provided for @onbIdentityKicker.
-  ///
-  /// In en, this message translates to:
-  /// **'IDENTITY'**
-  String get onbIdentityKicker;
 
   /// No description provided for @onbIdentityTitle.
   ///
@@ -1558,12 +1528,6 @@ abstract class AppLocalizations {
   /// **'You can have up to three. One is plenty to start.'**
   String get onbQuestHelper;
 
-  /// No description provided for @onbQuestKicker.
-  ///
-  /// In en, this message translates to:
-  /// **'MAIN QUEST'**
-  String get onbQuestKicker;
-
   /// No description provided for @onbQuestTitle.
   ///
   /// In en, this message translates to:
@@ -1605,12 +1569,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Another year of…'**
   String get onbStakesHint;
-
-  /// No description provided for @onbStakesKicker.
-  ///
-  /// In en, this message translates to:
-  /// **'STAKES'**
-  String get onbStakesKicker;
 
   /// No description provided for @onbStakesTitle.
   ///
@@ -1677,12 +1635,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'I can…'**
   String get onbWinHint;
-
-  /// No description provided for @onbWinKicker.
-  ///
-  /// In en, this message translates to:
-  /// **'WIN CONDITION'**
-  String get onbWinKicker;
 
   /// No description provided for @onbWinTitle.
   ///
@@ -1761,12 +1713,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'What did you misunderstand?'**
   String get recorderAsk;
-
-  /// No description provided for @recorderTagline.
-  ///
-  /// In en, this message translates to:
-  /// **'Turns a miss into a lesson'**
-  String get recorderTagline;
 
   /// No description provided for @removeMainQuest.
   ///
@@ -1948,12 +1894,6 @@ abstract class AppLocalizations {
   /// **'Sign in'**
   String get signIn;
 
-  /// No description provided for @signInBlurb.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in to pick up where you left off.'**
-  String get signInBlurb;
-
   /// No description provided for @signOut.
   ///
   /// In en, this message translates to:
@@ -1965,12 +1905,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your tree, your lessons and your rules stay in your account.'**
   String get signUpBlurb;
-
-  /// No description provided for @signedInAs.
-  ///
-  /// In en, this message translates to:
-  /// **'Signed in as'**
-  String get signedInAs;
 
   /// No description provided for @skip.
   ///
@@ -3159,12 +3093,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to the start'**
   String get resetView;
-
-  /// Home stage: header over the nodes the crystal ball points to.
-  ///
-  /// In en, this message translates to:
-  /// **'Up next'**
-  String get upNext;
 
   /// No description provided for @questLearn.
   ///

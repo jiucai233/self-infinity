@@ -239,9 +239,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get coursesTranslateFailed => '课程没能翻译，暂时保持原来的语言。';
 
   @override
-  String get auditorTagline => '听你讲，哪里没跟上就问';
-
-  @override
   String get authAlreadyRegistered => '这个邮箱已经注册过了，直接登录吧。';
 
   @override
@@ -458,9 +455,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dotReady => '可挑战';
 
   @override
-  String get dragToTurn => '拖动旋转 · 滚轮或双指缩放 · 点选一个点';
-
-  @override
   String get editUnderCharacter => '可以在「我的角色」里编辑。';
 
   @override
@@ -580,9 +574,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get journal => '日记';
-
-  @override
-  String get landingRealScreen => '真实界面';
 
   @override
   String get language => '语言';
@@ -736,9 +727,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onbBuildingTitle => '正在搭建你的世界……';
 
   @override
-  String get onbCourseKicker => '第一门课';
-
-  @override
   String get onbDoneGuide => '好了。';
 
   @override
@@ -749,9 +737,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get onbIdentityHelper => '就当它已经是真的来写。';
-
-  @override
-  String get onbIdentityKicker => '身份';
 
   @override
   String get onbIdentityTitle => '把这句话补完。';
@@ -787,9 +772,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onbQuestHelper => '最多可以有三个。开始时一个就够了。';
 
   @override
-  String get onbQuestKicker => '主线任务';
-
-  @override
   String get onbQuestTitle => '有什么目标能让你离胜利条件更近一步？';
 
   @override
@@ -809,9 +791,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get onbStakesHint => '又一年的……';
-
-  @override
-  String get onbStakesKicker => '代价';
 
   @override
   String get onbStakesTitle => '一年后，什么都没变。你的生活是什么样？';
@@ -849,9 +828,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get onbWinHint => '我能……';
-
-  @override
-  String get onbWinKicker => '胜利条件';
 
   @override
   String get onbWinTitle => '一年后，你赢了。那是什么样子？';
@@ -897,9 +873,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get recorderAsk => '你哪里理解错了？';
-
-  @override
-  String get recorderTagline => '把失误变成教训';
 
   @override
   String get removeMainQuest => '删除主线任务';
@@ -996,16 +969,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get signIn => '登录';
 
   @override
-  String get signInBlurb => '登录后从上次停下的地方继续。';
-
-  @override
   String get signOut => '退出登录';
 
   @override
   String get signUpBlurb => '你的树、教训和规则都会保存在你的账户里。';
-
-  @override
-  String get signedInAs => '当前登录';
 
   @override
   String get skip => '跳过';
@@ -1657,9 +1624,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetView => '回到初始视角';
-
-  @override
-  String get upNext => '接下来';
 
   @override
   String get questLearn => '学新';

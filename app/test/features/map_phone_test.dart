@@ -77,10 +77,11 @@ void main() {
       }
     });
 
-    testWidgets('the hint and the legend are readable on the night panel (4.5:1)', (tester) async {
+    testWidgets('no gesture hint under the zoom buttons; the legend is readable on the night panel (4.5:1)', (tester) async {
       await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: wideScreen);
-      final hint = tester.widget<Text>(find.byKey(const Key('night-hint'))).style!.color!;
-      expect(contrast(Color.alphaBlend(hint, AppColors.night), AppColors.night), greaterThanOrEqualTo(4.5));
+      // The zoom buttons say it: no line of words explaining the gestures.
+      expect(find.byKey(const Key('night-hint')), findsNothing);
+      expect(find.textContaining('Drag to turn'), findsNothing);
       await tester.tap(find.byKey(const Key('night-legend-toggle')));
       await tester.pumpAndSettle();
       final legend = find.byKey(const Key('night-legend'));

@@ -202,23 +202,10 @@ class _LifeBoardState extends State<LifeBoard> {
                 Positioned(
                   right: AppSpacing.lg,
                   bottom: narrow ? AppSpacing.lg + 64 : AppSpacing.lg,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _ZoomButtons(
-                        onZoomIn: () => _sky.currentState?.zoomStep(1.5),
-                        onZoomOut: () => _sky.currentState?.zoomStep(1 / 1.5),
-                        onReset: () => _sky.currentState?.resetView(),
-                      ),
-                      if (!narrow) ...[
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          context.l10n.dragToTurn,
-                          key: const Key('night-hint'),
-                          style: theme.bodySmall?.copyWith(color: AppColors.nightHint),
-                        ),
-                      ],
-                    ],
+                  child: _ZoomButtons(
+                    onZoomIn: () => _sky.currentState?.zoomStep(1.5),
+                    onZoomOut: () => _sky.currentState?.zoomStep(1 / 1.5),
+                    onReset: () => _sky.currentState?.resetView(),
                   ),
                 ),
                 if (tree.isEmpty)

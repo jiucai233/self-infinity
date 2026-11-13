@@ -106,7 +106,8 @@ void main() {
     testWidgets('beside the ball, up to three nodes it points to; a tap opens one', (tester) async {
       await pumpHome(tester, await seededFakeApi());
       expect(find.byKey(const Key('orb-picks')), findsOneWidget);
-      expect(find.text('Up next'), findsOneWidget);
+      // The numbered rows tied to their points say it: no header over them.
+      expect(find.text('Up next'), findsNothing);
       final picks = find.byWidgetPredicate(
         (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('orb-pick-'),
       );

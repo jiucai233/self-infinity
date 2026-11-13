@@ -351,7 +351,6 @@ class _SkillBodyState extends State<_SkillBody> {
               runSpacing: AppSpacing.xs,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                if (n.boss && n.status != null) const _BossChip(),
                 _statusChip(context.l10n, n),
                 if (overview?.skill.bestStars case final stars?)
                   StarRow(key: const Key('node-sheet-best-stars'), stars: stars, size: 16),
@@ -409,18 +408,6 @@ class _SkillBodyState extends State<_SkillBody> {
       },
     );
   }
-}
-
-class _BossChip extends StatelessWidget {
-  const _BossChip();
-
-  @override
-  Widget build(BuildContext context) => StatusChip(
-    label: context.l10n.boss,
-    color: AppColors.onAccent,
-    fill: AppColors.primary,
-    key: const Key('node-sheet-boss'),
-  );
 }
 
 /// One finished audit: date, verdict, score, and a bar as long as the score.

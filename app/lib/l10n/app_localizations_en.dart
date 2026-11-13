@@ -246,9 +246,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your courses could not be translated; they stay in their language for now.';
 
   @override
-  String get auditorTagline => 'Learns from you and asks where it loses the thread';
-
-  @override
   String get authAlreadyRegistered => 'That email already has an account. Sign in instead.';
 
   @override
@@ -475,9 +472,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dotReady => 'Ready';
 
   @override
-  String get dragToTurn => 'Drag to turn · scroll to zoom · tap a point';
-
-  @override
   String get editUnderCharacter => 'Edit these under My character.';
 
   @override
@@ -598,9 +592,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get journal => 'Journal';
-
-  @override
-  String get landingRealScreen => 'From the app';
 
   @override
   String get language => 'Language';
@@ -757,9 +748,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onbBuildingTitle => 'Building your world…';
 
   @override
-  String get onbCourseKicker => 'FIRST COURSE';
-
-  @override
   String get onbDoneGuide => 'Done.';
 
   @override
@@ -770,9 +758,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onbIdentityHelper => 'Write it as if it\'s already true.';
-
-  @override
-  String get onbIdentityKicker => 'IDENTITY';
 
   @override
   String get onbIdentityTitle => 'Finish the sentence.';
@@ -808,9 +793,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onbQuestHelper => 'You can have up to three. One is plenty to start.';
 
   @override
-  String get onbQuestKicker => 'MAIN QUEST';
-
-  @override
   String get onbQuestTitle => 'What\'s one goal that moves you toward your win condition?';
 
   @override
@@ -830,9 +812,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onbStakesHint => 'Another year of…';
-
-  @override
-  String get onbStakesKicker => 'STAKES';
 
   @override
   String get onbStakesTitle =>
@@ -873,9 +852,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onbWinHint => 'I can…';
-
-  @override
-  String get onbWinKicker => 'WIN CONDITION';
 
   @override
   String get onbWinTitle => 'A year from now, you\'ve won. What does that look like?';
@@ -921,9 +897,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get recorderAsk => 'What did you misunderstand?';
-
-  @override
-  String get recorderTagline => 'Turns a miss into a lesson';
 
   @override
   String get removeMainQuest => 'Remove main quest';
@@ -1020,16 +993,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signIn => 'Sign in';
 
   @override
-  String get signInBlurb => 'Sign in to pick up where you left off.';
-
-  @override
   String get signOut => 'Sign out';
 
   @override
   String get signUpBlurb => 'Your tree, your lessons and your rules stay in your account.';
-
-  @override
-  String get signedInAs => 'Signed in as';
 
   @override
   String get skip => 'Skip';
@@ -1687,9 +1654,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resetView => 'Back to the start';
-
-  @override
-  String get upNext => 'Up next';
 
   @override
   String get questLearn => 'Learn';

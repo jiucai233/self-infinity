@@ -237,13 +237,6 @@ class _HomeSkyState extends State<HomeSky> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: AppSpacing.md, bottom: AppSpacing.sm),
-                      child: Text(
-                        context.l10n.upNext,
-                        style: theme.labelMedium?.copyWith(color: AppColors.nightLine),
-                      ),
-                    ),
                     for (var i = 0; i < picks.length; i++) ...[
                       if (i > 0) const SizedBox(height: AppSpacing.sm),
                       _PickRow(key: _rows[i], index: i, pick: picks[i]),

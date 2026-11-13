@@ -211,7 +211,7 @@ void main() {
       expect(find.byType(HomeScene), findsOneWidget);
     });
 
-    testWidgets('an "Up next" pick on home goes to its node', (tester) async {
+    testWidgets('a pick on home goes to its node', (tester) async {
       await pumpApp(tester);
       final pick = find.byWidgetPredicate(
         (w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('orb-pick-'),

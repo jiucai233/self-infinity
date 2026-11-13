@@ -339,35 +339,35 @@ class _OnboardingSceneState extends State<OnboardingScene> {
           Expanded(
             child: Row(
               children: [
-                if (index >= 0) ...[
-                  // Phones: the bars alone.
-                  if (MediaQuery.sizeOf(context).width >= 600)
-                    Flexible(
-                      child: Text(
-                        context.l10n.onbStepOf(index + 1, _counted.length),
-                        key: const Key('onboarding-progress'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.labelMedium?.copyWith(color: AppColors.textTertiary),
+                if (index >= 0)
+                  // The bars alone say how far along; the words are for screen readers.
+                  Flexible(
+                    child: Semantics(
+                      key: const Key('onboarding-progress'),
+                      label: context.l10n.onbStepOf(index + 1, _counted.length),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (var i = 0; i < _counted.length; i++)
+                            Flexible(
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 240),
+                                  constraints: const BoxConstraints(maxWidth: 16),
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    color: i <= index ? AppColors.primary : AppColors.outline,
+                                    borderRadius: BorderRadius.circular(AppRadius.bar),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                  if (MediaQuery.sizeOf(context).width >= 600) const SizedBox(width: AppSpacing.md),
-                  for (var i = 0; i < _counted.length; i++)
-                    Flexible(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 240),
-                          constraints: const BoxConstraints(maxWidth: 16),
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color: i <= index ? AppColors.primary : AppColors.outline,
-                            borderRadius: BorderRadius.circular(AppRadius.bar),
-                          ),
-                        ),
-                      ),
-                    ),
-                ] else
+                  )
+                else
                   Flexible(
                     child: Text(
                       'SELF-INFINITY',
@@ -402,7 +402,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
       case _Step.welcome:
         return _Page(
           guideLine: context.l10n.onbHiGuide,
-          kicker: null,
           title: context.l10n.onbSetUpCharacter,
           body: context.l10n.onbWelcomeBody,
           wide: wide,
@@ -412,7 +411,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
         return _question(
           wide,
           guideLine: context.l10n.onbStakesGuide,
-          kicker: context.l10n.onbStakesKicker,
           title: context.l10n.onbStakesTitle,
           helper: context.l10n.onbStakesHelper,
           hint: context.l10n.onbStakesHint,
@@ -422,7 +420,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
         return _question(
           wide,
           guideLine: context.l10n.onbFlipGuide,
-          kicker: context.l10n.onbWinKicker,
           title: context.l10n.onbWinTitle,
           helper: context.l10n.onbWinHelper,
           hint: context.l10n.onbWinHint,
@@ -432,7 +429,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
         return _question(
           wide,
           guideLine: context.l10n.onbWhoGuide,
-          kicker: context.l10n.onbIdentityKicker,
           title: context.l10n.onbIdentityTitle,
           helper: context.l10n.onbIdentityHelper,
           hint: identityStem,
@@ -442,7 +438,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
         return _question(
           wide,
           guideLine: context.l10n.onbQuestGuide,
-          kicker: context.l10n.onbQuestKicker,
           title: context.l10n.onbQuestTitle,
           helper: context.l10n.onbQuestHelper,
           hint: context.l10n.mainQuestPlaceholder,
@@ -457,7 +452,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
   Widget _question(
     bool wide, {
     required String guideLine,
-    required String kicker,
     required String title,
     required String helper,
     required String hint,
@@ -466,7 +460,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
   }) {
     return _Page(
       guideLine: guideLine,
-      kicker: kicker,
       title: title,
       body: helper,
       wide: wide,
@@ -493,7 +486,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
       final reading = _build == _Build.reading;
       return _Page(
         guideLine: context.l10n.onbMomentGuide,
-        kicker: context.l10n.onbCourseKicker,
         title: reading ? context.l10n.onbReadingTitle : context.l10n.onbBuildingTitle,
         body: reading ? context.l10n.onbReadingBody : context.l10n.onbBuildingBody,
         wide: wide,
@@ -509,7 +501,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
       final course = _course!;
       return _Page(
         guideLine: context.l10n.onbDoneGuide,
-        kicker: context.l10n.onbCourseKicker,
         title: context.l10n.onbWorldReady(courseNameOf(course)),
         body: quest == null
             ? context.l10n.onbNodesToProve(course.nodes.length)
@@ -532,7 +523,6 @@ class _OnboardingSceneState extends State<OnboardingScene> {
     final scouted = _scouted;
     return _Page(
       guideLine: context.l10n.onbSkillsGuide,
-      kicker: context.l10n.onbCourseKicker,
       title: scouted != null
           ? context.l10n.onbPickTitle
           : quest == null
@@ -616,12 +606,11 @@ class _OnboardingSceneState extends State<OnboardingScene> {
   }
 }
 
-/// One page of the tutorial: the Guide with her line, a kicker, the question
+/// One page of the tutorial: the Guide with her line, the question
 /// as a headline, a helper line, the field and the buttons.
 class _Page extends StatelessWidget {
   const _Page({
     required this.guideLine,
-    required this.kicker,
     required this.title,
     required this.body,
     required this.wide,
@@ -631,7 +620,6 @@ class _Page extends StatelessWidget {
   });
 
   final String? guideLine;
-  final String? kicker;
   final String title;
   final String body;
   final bool wide;
@@ -666,13 +654,6 @@ class _Page extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.xl),
-        ],
-        if (kicker != null) ...[
-          Text(
-            kicker!,
-            style: theme.labelSmall?.copyWith(color: AppColors.textTertiary, letterSpacing: 1.6),
-          ),
-          const SizedBox(height: AppSpacing.sm),
         ],
         Text(
           keepAll(title),

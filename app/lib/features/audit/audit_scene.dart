@@ -905,12 +905,13 @@ class _SpeakerHeader extends StatelessWidget {
         ],
       );
     }
+    // What she is doing right now; at rest the line is empty but keeps its
+    // height, so her name does not jump when she starts to think.
     final doing = switch (state) {
       AvatarState.thinking => context.l10n.voiceThinking,
       AvatarState.listening => context.l10n.voiceListening,
       AvatarState.speaking => context.l10n.voiceSpeaking,
-      AvatarState.idle =>
-        agent == 'recorder' ? context.l10n.recorderTagline : context.l10n.auditorTagline,
+      AvatarState.idle => '',
     };
     return Row(
       key: const Key('audit-speaker'),
@@ -923,13 +924,13 @@ class _SpeakerHeader extends StatelessWidget {
             children: [
               Text(agentLabel(context.l10n, agent), style: theme.titleMedium),
               const SizedBox(height: AppSpacing.xs),
-              Text(doing, style: theme.bodySmall?.copyWith(color: AppColors.textTertiary)),
               if (style != null)
                 Text(
                   style!,
                   key: const Key('audit-style'),
                   style: theme.bodySmall?.copyWith(color: AppColors.textTertiary),
                 ),
+              Text(doing, style: theme.bodySmall?.copyWith(color: AppColors.textTertiary)),
             ],
           ),
         ),
