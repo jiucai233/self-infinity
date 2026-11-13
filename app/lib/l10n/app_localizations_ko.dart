@@ -42,10 +42,43 @@ class AppLocalizationsKo extends AppLocalizations {
   String get tourPicks => '다음에 배울 노드예요. 하나하나 나무 위 자기 자리와 이어져 있어요. 하나 눌러 보세요.';
 
   @override
-  String get tourTakeItOn => '먼저 여기 있는 자료를 보세요. 준비되면 「도전하기」를 눌러 감사관에게 내 말로 설명해요.';
+  String get tourTakeItOn => '먼저 여기 있는 자료를 보세요. 준비되면 「도전하기」를 눌러 심사관에게 내 말로 설명해요.';
 
   @override
   String get tourTryHint => '밝게 표시된 곳을 눌러 보세요';
+
+  @override
+  String get tryWithoutAccount => '계정 없이 체험하기';
+
+  @override
+  String get tourAsk => '배우고 싶은 걸 여기에 말해 주세요. 아무거나 적고 보내 보세요.';
+
+  @override
+  String get tourBuilt => '코스가 만들어졌어요. 하나씩 증명해 갈 개념 나무예요. 열어 보세요.';
+
+  @override
+  String get tourExplain => '노드를 깨려면 심사관에게 가르쳐요. 내 말로 설명해 보세요. 체험에서는 무슨 말이든 괜찮아요.';
+
+  @override
+  String get tourExplainAgain => '부족한 부분은 다시 물어봐요. 한 번 더 답해 보세요.';
+
+  @override
+  String get tourCleared => '클리어! 얼마나 깊이 물었는지에 따라 별을 받고, XP는 레벨로 쌓여요.';
+
+  @override
+  String get tourTypeHint => '밝게 표시된 입력창에 적고 보내 보세요';
+
+  @override
+  String get tourDoForMe => '예시로 해 보기';
+
+  @override
+  String get tourSampleAnswer => '주어진 조건에서 값을 구하는 방법이에요. 조건이 답을 딱 하나로 정해 주기 때문에 성립해요.';
+
+  @override
+  String get tourGuestBegin => '계정 만들고 시작하기';
+
+  @override
+  String get tourVerdict => '심사마다 판정이 남아요. 점수, 설명해 낸 포인트, 보완할 점까지요.';
 
   @override
   String get heroExampleStem => '배우고 싶은 건';
@@ -1685,19 +1718,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get tourSkip => '둘러보기 건너뛰기';
 
   @override
-  String get tourVerdict => '그러면 점수, 놓친 부분, 교훈이 남아요.';
-
-  @override
   String get tourBegin => '내 캐릭터 설정하기';
 
   @override
-  String get tourTalk => '배우고 싶은 걸 여기서 쓰거나 말해 주세요.';
-
-  @override
   String get tourTree => '깬 노드마다 인생 나무에 불이 켜져요.';
-
-  @override
-  String get tourAudit => '노드를 깨려면 심사관에게 가르쳐요.';
 
   @override
   String get tourLessonsTitle => '모든 실수는 교훈이 돼요.';

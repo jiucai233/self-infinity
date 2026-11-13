@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/app/panel_layout.dart';
+import 'package:self_infinity/features/onboarding/guided_tour.dart';
 import 'package:self_infinity/widgets/avatar.dart';
 
 /// Runs before every test file: fakes made without a clock start at 10:00 KST
@@ -20,6 +21,8 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   // The left panel starts open in tests (most reach it directly);
   // test/features/home_scene_test.dart covers the fold.
   PanelLayout.leftStartsFolded = false;
+  // The tour's example world answers at once (no timers to wait for).
+  GuidedTour.latency = Duration.zero;
   await Avatar.precache();
   await testMain();
 }

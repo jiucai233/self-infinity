@@ -44,9 +44,9 @@ void main() {
     expect(AppLanguage.zh.speechLocale, 'zh_CN');
   });
 
-  test('English the first time; the picked language is remembered', () async {
+  test('Korean the first time; the picked language is remembered', () async {
     SharedPreferences.setMockInitialValues({});
-    expect((await LocaleController.load()).language, AppLanguage.en);
+    expect((await LocaleController.load()).language, AppLanguage.ko);
 
     await LocaleController().setLanguage(AppLanguage.ko);
     expect((await LocaleController.load()).language, AppLanguage.ko);

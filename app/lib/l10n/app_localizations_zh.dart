@@ -48,6 +48,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tourTryHint => '点亮起来的地方试一试';
 
   @override
+  String get tryWithoutAccount => '不注册，先体验';
+
+  @override
+  String get tourAsk => '想学什么，在这里告诉我。随便输入一个，发出去试试。';
+
+  @override
+  String get tourBuilt => '课程建好了：一棵要逐个证明的知识树。打开看看。';
+
+  @override
+  String get tourExplain => '想通关节点，就把它教给审核官。用自己的话讲讲看，体验里说什么都可以。';
+
+  @override
+  String get tourExplainAgain => '讲得不够的地方，她会追问。再回答一次。';
+
+  @override
+  String get tourCleared => '通关！按审核的深度给星星，经验值会累积成等级。';
+
+  @override
+  String get tourTypeHint => '在亮起来的输入框里输入并发送';
+
+  @override
+  String get tourDoForMe => '用示例试试';
+
+  @override
+  String get tourSampleAnswer => '它是在给定条件下求出一个值的方法。之所以成立，是因为这些条件把答案限定成唯一的一个。';
+
+  @override
+  String get tourGuestBegin => '注册并开始';
+
+  @override
+  String get tourVerdict => '每次审核都会留下判定：分数、讲对的点，还有要补的地方。';
+
+  @override
   String get heroExampleStem => '我想要学习';
 
   @override
@@ -290,8 +323,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chapterGrowKicker => '04 · 成长';
 
   @override
-  String get chapterGrowPoints =>
-      '每门课程都挂在今年的某个主线任务下面\n每证明一个知识点，人生树上就亮起一颗星\n点一颗星，就能看到它来自哪门课、哪个节点';
+  String get chapterGrowPoints => '每门课程都挂在今年的某个主线任务下面\n每证明一个知识点，人生树上就亮起一颗星\n点一颗星，就能看到它来自哪门课、哪个节点';
 
   @override
   String get chapterGrowTitle => '你的整个人生，一棵树。';
@@ -316,8 +348,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chapterProveKicker => '02 · 证明';
 
   @override
-  String get chapterProvePoints =>
-      '审核官像新手一样不停追问“为什么”\n它会故意埋一个错误，看你能不能识破\n就算通过了，质疑者还会再复核一次';
+  String get chapterProvePoints => '审核官像新手一样不停追问“为什么”\n它会故意埋一个错误，看你能不能识破\n就算通过了，质疑者还会再复核一次';
 
   @override
   String get chapterRememberBody => '答错了就写下原因。它会变成一张教训卡，审核官下次会专门提起，同一个误解没法溜过去两次。';
@@ -326,8 +357,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chapterRememberKicker => '03 · 记住';
 
   @override
-  String get chapterRememberPoints =>
-      '答错了，就写下自己误解了什么\n这段反思会变成一张教训卡\n下次审核会把相关的教训翻出来再问';
+  String get chapterRememberPoints => '答错了，就写下自己误解了什么\n这段反思会变成一张教训卡\n下次审核会把相关的教训翻出来再问';
 
   @override
   String get characterSheet => '角色卡';
@@ -1682,19 +1712,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tourSkip => '跳过导览';
 
   @override
-  String get tourVerdict => '然后你会得到分数、漏掉的点和一条教训。';
-
-  @override
   String get tourBegin => '开始设置我的角色';
 
   @override
-  String get tourTalk => '想学什么，在这里打字或说给我听。';
-
-  @override
   String get tourTree => '每通关一个节点，人生树就亮一处。';
-
-  @override
-  String get tourAudit => '想通关节点，就把它教给审核官。';
 
   @override
   String get tourLessonsTitle => '每次失误都会变成教训。';

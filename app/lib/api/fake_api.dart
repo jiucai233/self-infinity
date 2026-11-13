@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import '../voice/live_link.dart';
 import 'api.dart';
 import 'api_exception.dart';
+import 'fake_script.dart';
 import 'graph_utils.dart';
 import 'models.dart';
 import 'reflection_prompts.dart';
@@ -96,12 +97,31 @@ class FakeApiClient implements SelfInfinityApi {
   ///
   /// [onboarded] is the profile's tutorial flag at the start: `true` (the
   /// default, what most tests want) skips the first-run tutorial.
+  ///
+  /// [language] (`en`, `zh` or `ko`; anything else is English) is the language
+  /// of everything the fake writes: course content, audit questions and
+  /// verdicts, chat replies (the words are in `fake_script.dart`).
+  ///
+  /// [demo] makes the fake lenient, for the tutorial and the landing page: with
+  /// no course yet, a plain chat message builds one; and an audit can never
+  /// fail (the second answer passes, with no Challenger round).
   FakeApiClient({
     this.latency = const Duration(milliseconds: 300),
     DateTime Function()? clock,
     bool onboarded = true,
+    this.language = 'en',
+    this.demo = false,
   }) : _clock = clock ?? defaultClock ?? (() => DateTime.now().toUtc()),
+       _s = FakeScript.of(language),
        _profile = Profile(onboarded: onboarded);
+
+  /// `en`, `zh` or `ko`: the language of what the fake says.
+  final String language;
+
+  /// Lenient mode (see the constructor).
+  final bool demo;
+
+  final FakeScript _s;
 
   /// The clock of every fake made without one. Tests set it
   /// (`test/flutter_test_config.dart`) so that plans, which follow the time of
@@ -321,21 +341,27 @@ class FakeApiClient implements SelfInfinityApi {
     await _begin('generateCourse');
     _require(request.topic.trim().isNotEmpty, 'topic must not be blank');
 
-    // `수학` is a Korean fallback; the English demo uses `math`.
-    final isMath = request.topic.toLowerCase().contains('math') || request.topic.contains('수학');
+    // `수학` and `数学` are the Korean and Chinese words for it.
+    final isMath =
+        request.topic.toLowerCase().contains('math') ||
+        request.topic.contains('수학') ||
+        request.topic.contains('数学');
     final List<_NodeSpec> specs;
     final List<_RequiresSpec> requires;
     if (isMath) {
-      specs = _mathNodes;
-      requires = _mathRequires;
+      specs = _withText(_mathShape, _s.mathNodes);
+      requires = _requiresOf(_mathRequiresShape, _s.mathRequires);
     } else if (request.topic.toLowerCase().contains('vision')) {
-      specs = _visionNodes;
+      specs = _withText(_visionShape, _s.visionNodes);
       requires = const [];
     } else {
       final firstLine = request.topic.split('\n').first.trim();
-      final rootTitle = firstLine.isEmpty ? 'New Topic' : _shortTitle(firstLine);
-      specs = _genericNodes(rootTitle);
-      requires = _genericRequires;
+      final rootTitle = firstLine.isEmpty ? _s.newTopic : _shortTitle(firstLine);
+      specs = [
+        _NodeSpec('root', rootTitle, const [], _s.genericRoot(rootTitle)),
+        ..._withText(_genericShape, _s.genericNodes),
+      ];
+      requires = _requiresOf(_genericRequiresShape, _s.genericRequires);
     }
 
     final foundSyllabus = sourceFiles.isEmpty && isMath && request.searchSyllabus;
@@ -345,9 +371,9 @@ class FakeApiClient implements SelfInfinityApi {
       sourceCourse: sourceFiles.isNotEmpty
           ? sourceFiles.join(', ')
           : foundSyllabus
-          ? 'High School Mathematics Curriculum (Ministry of Education)'
+          ? _s.mathSource
           : null,
-      sourceUrl: foundSyllabus ? _mockSearch('High School Mathematics Curriculum').first.url : null,
+      sourceUrl: foundSyllabus ? _mockSearch(_s, 'High School Mathematics Curriculum').first.url : null,
       createdAt: _clock(),
     );
     _courses.add(course);
@@ -420,15 +446,13 @@ class FakeApiClient implements SelfInfinityApi {
     }
     _nodes[skillId] = node.copyWith(unexpanded: false);
     // A node with parts is filled in: one part it was missing.
-    final titles = hasParts ? ['More ${node.title}'] : [for (var i = 1; i <= 3; i++) '${node.title} $i'];
+    final titles = hasParts ? [_s.expandMoreTitle(node.title)] : [for (var i = 1; i <= 3; i++) '${node.title} $i'];
     for (final (i, title) in titles.indexed) {
       _addPart(
         node,
         slug: hasParts ? '${node.slug}-more' : '${node.slug}-part-${i + 1}',
         title: _shortTitle(title),
-        description: hasParts
-            ? 'What ${node.title} still lacked.'
-            : 'Explain how part ${i + 1} of ${node.title} works and why it holds.',
+        description: hasParts ? _s.expandMoreBody(node.title) : _s.expandPartBody(node.title, i + 1),
       );
     }
     _openNext(node.courseId);
@@ -619,7 +643,7 @@ class FakeApiClient implements SelfInfinityApi {
     if (course == null || root == null) throw const ApiException(404, 'course not found');
     final uploads = [for (final id in uploadIds) _uploads[id] ?? (throw const ApiException(404, 'upload not found'))];
     // The fake reads no syllabus: each file adds one part named after it, a search adds one.
-    final titles = uploads.isEmpty ? ['${root.title} in Practice'] : [for (final u in uploads) _stem(u.filename)];
+    final titles = uploads.isEmpty ? [_s.inPractice(root.title)] : [for (final u in uploads) _stem(u.filename)];
     final have = {
       for (final n in _nodes.values)
         if (n.courseId == courseId) n.title.toLowerCase(),
@@ -726,7 +750,7 @@ class FakeApiClient implements SelfInfinityApi {
     var openCount = 0;
     if (!testOut && position == NodePosition.leaf && node.nodeType == NodeType.concept) {
       if (node.points.isEmpty) {
-        node = node.copyWith(points: [for (final t in fakePointTitles(node.title)) SkillPoint(title: t)]);
+        node = node.copyWith(points: [for (final t in fakePointTitles(node.title, language)) SkillPoint(title: t)]);
         _nodes[skillId] = node;
       }
       final open = node.points.where((p) => p.ok != true).toList();
@@ -791,48 +815,48 @@ class FakeApiClient implements SelfInfinityApi {
       final lessons = _retrieveLessons(audit.skillId);
       final withMisconception = lessons.where((p) => p.hasMisconception);
       final question = withMisconception.isEmpty
-          ? _genericProbe
-          : 'You once thought “${withMisconception.first.misconception}”. '
-                'How is this explanation different?';
+          ? _s.genericProbe
+          : _s.onceThought(withMisconception.first.misconception!);
       return _probeOrForcedFail(
         audit,
         question,
         userTurns.length,
-        feedback: probeFeedback,
+        feedback: _s.probeFeedback,
         point: audit.points.firstOrNull?.title,
       );
     }
 
     // Later answers: verdict.
     final n = userTurns.join(' ').runes.length;
+    // The demo user cannot fail: the second answer passes, whatever it says.
+    if (demo) return _finishPass(audit, n);
     final latest = userTurns.last.toLowerCase().replaceAll('\u2019', "'");
-    // `모르` is a Korean fallback for "don't know".
+    // `모르`, `不知道` and `不确定` are the Korean and Chinese "don't know".
     final passed =
         n >= 80 &&
         !latest.contains("don't know") &&
         !latest.contains('not sure') &&
-        !latest.contains('모르');
+        !latest.contains('모르') &&
+        !latest.contains('不知道') &&
+        !latest.contains('不确定');
     if (!passed) {
       return _finishFail(
         audit,
         score: 45,
-        gaps: const [
-          'You stated the definition but not why it works.',
-          "You didn't cover the exceptions.",
-        ],
-        comment: 'The answer stops at the conclusion and lacks reasons.',
-        feedback: failFeedback,
+        gaps: _s.failGaps,
+        comment: _s.failComment,
+        feedback: _s.failFeedback,
         // A fail misses the first point examined; the others held.
         points: [
           for (final (i, p) in audit.points.indexed)
-            SkillPoint(title: p.title, ok: i > 0, note: i == 0 ? failNote : null),
+            SkillPoint(title: p.title, ok: i > 0, note: i == 0 ? _s.failNote : null),
         ],
       );
     }
     if (!audit.challenged && n < 160) {
       audit.challenged = true;
       // The Challenger's question, after what the Auditor said about the answer.
-      return _probeOrForcedFail(audit, _challengerQuestion, userTurns.length, feedback: passFeedback);
+      return _probeOrForcedFail(audit, _s.challenger, userTurns.length, feedback: _s.passFeedback);
     }
     return _finishPass(audit, n);
   }
@@ -854,8 +878,8 @@ class FakeApiClient implements SelfInfinityApi {
     final skill = _nodes[audit.skillId]!;
     final principle = Principle(
       id: _nextPrincipleId++,
-      title: _cut('Revisit “${skill.title}”', 40),
-      body: _cut('When I explain “${skill.title}”, I give the reason before the conclusion.', 120),
+      title: _cut(_s.lessonTitle(skill.title), 40),
+      body: _cut(_s.lessonBody(skill.title), 120),
       misconception: _cut(reflection.trim(), 60),
       sourceSessionId: audit.id,
       skillId: skill.id,
@@ -872,16 +896,18 @@ class FakeApiClient implements SelfInfinityApi {
           principle.id,
           previous.id,
           GraphEdgeKind.related,
-          'Same concept, similar misconception',
+          _s.linkRelated,
         ),
       );
-      if (reflection.toLowerCase().contains('contradict') || reflection.contains('모순')) {
+      if (reflection.toLowerCase().contains('contradict') ||
+          reflection.contains('모순') ||
+          reflection.contains('矛盾')) {
         _links.add(
           _Link(
             principle.id,
             previous.id,
             GraphEdgeKind.contradicts,
-            'Conflicts with the earlier lesson',
+            _s.linkContradicts,
           ),
         );
       }
@@ -996,13 +1022,13 @@ class FakeApiClient implements SelfInfinityApi {
     await _begin('narrate');
     final facts = _facts();
     final sentences = <String>[
-      "You've cleared ${facts.nodes.mastered} of ${facts.nodes.total} nodes.",
+      _s.cleared(facts.nodes.mastered, facts.nodes.total),
       for (final c in facts.misconceptionClusters)
-        'The misconception “${c.label}” showed up ${c.occurrences} ${c.occurrences == 1 ? 'time' : 'times'} in ${c.skills.join(', ')}.',
+        _s.misconceptionSeen(c.label, c.occurrences, c.skills.join(', ')),
       if (facts.condition.avgSleepHours != null)
-        'Average sleep over the last ${facts.condition.days == 1 ? 'day' : '${facts.condition.days} days'}: ${_num(facts.condition.avgSleepHours!)} h.',
+        _s.avgSleep(facts.condition.days, _num(facts.condition.avgSleepHours!)),
     ];
-    _narrative = _cut(sentences.join(' '), 400);
+    _narrative = _cut(sentences.join(_s.sentenceJoin), 400);
     _narrativeAt = _clock();
     return _briefing();
   }
@@ -1079,8 +1105,8 @@ class FakeApiClient implements SelfInfinityApi {
               courseId: n.courseId,
               skillTitle: n.title,
               nodeType: n.nodeType,
-              rationale: 'Prerequisites checked — you can take this on now.',
-              focusHint: 'Explain the why before the definition.',
+              rationale: _s.planRationale,
+              focusHint: _s.planFocusHint,
               kind: n.unexpanded ? QuestKind.challenge : QuestKind.learn,
               minutes: minutes,
             ),
@@ -1097,34 +1123,26 @@ class FakeApiClient implements SelfInfinityApi {
               courseId: n.courseId,
               skillTitle: n.title,
               nodeType: n.nodeType,
-              rationale: tonight
-                  ? 'You learned it today: explain it once more before sleep so it sticks.'
-                  : 'You explained it $days days ago: tell it again before it fades.',
-              focusHint: 'Say it from memory first, then check what you left out.',
+              rationale: tonight ? _s.reviewTonight : _s.reviewDays(days),
+              focusHint: _s.reviewHint,
               kind: QuestKind.review,
               minutes: 10,
             ),
         ]);
     }
-    String duration(int minutes) {
-      final h = minutes ~/ 60, m = minutes % 60;
-      return h > 0 && m > 0 ? '$h h $m min' : (h > 0 ? '$h h' : '$m min');
-    }
+    String duration(int minutes) => _s.duration(minutes ~/ 60, minutes % 60);
 
     final summary = [
       switch (slot) {
-        DaySlot.morning => 'Morning: judgement first, new nodes and challenges; review waits for the evening.',
-        DaySlot.afternoon => 'Afternoon: new nodes, with some review.',
-        DaySlot.evening => 'Evening: mostly review. Explaining again what you learned helps sleep keep it.',
-        DaySlot.night => "It's late: one short review at most, then sleep. Sleep does the consolidating.",
+        DaySlot.morning => _s.slotMorning,
+        DaySlot.afternoon => _s.slotAfternoon,
+        DaySlot.evening => _s.slotEvening,
+        DaySlot.night => _s.slotNight,
       },
-      if (low)
-        "Your recent check-ins show a low condition, so today's load is halved: small nodes and review only.",
-      if (flag == ConditionFlag.unknown) 'No check-in yet, so I planned for three hours.',
-      left < 10
-          ? "Today's focus is used up (${duration(spent)}). The rest of the day is for rest and sleep."
-          : 'About ${duration(left)} of focus left today (${duration(spent)} done).',
-    ].join(' ');
+      if (low) _s.lowCondition,
+      if (flag == ConditionFlag.unknown) _s.noCheckIn,
+      left < 10 ? _s.focusUsedUp(duration(spent)) : _s.focusLeft(duration(left), duration(spent)),
+    ].join(_s.sentenceJoin);
     final bucket = _contextBucket(condition);
     final plan = StudyPlan(
       id: _nextPlanId++,
@@ -1209,13 +1227,13 @@ class FakeApiClient implements SelfInfinityApi {
       target = principle.misconception!;
     }
 
-    final queries = ['${skill.title} ${_cut(target, 30)}', '${skill.title} explained'];
+    final queries = ['${skill.title} ${_cut(target, 30)}', _s.explainedQuery(skill.title)];
     final plan = SearchPlan(
       id: _nextSearchPlanId++,
       skillId: skillId,
       gap: target,
       queries: queries,
-      items: _mockSearch(queries.first, reason: 'Covers this gap directly.'),
+      items: _mockSearch(_s, queries.first, reason: _s.searchReason),
       createdAt: _clock(),
     );
     _searchPlans.add(plan);
@@ -1238,13 +1256,13 @@ class FakeApiClient implements SelfInfinityApi {
       for (final goal in _goals.take(2))
         ScoutOption(
           topic: goal.title.replaceFirst(_questVerb, ''),
-          why: 'It is what “${goal.title}” needs first.',
+          why: _s.scoutWhy(goal.title),
         ),
-      for (final (topic, why) in _starterCourses) ScoutOption(topic: topic, why: why),
+      for (final (topic, why) in _s.starterCourses) ScoutOption(topic: topic, why: why),
     ].take(3).toList();
     return CourseScout(
       isClear: false,
-      question: 'Here are a few places to start. Pick one:',
+      question: _s.scoutQuestion,
       options: options,
     );
   }
@@ -1258,11 +1276,6 @@ class FakeApiClient implements SelfInfinityApi {
     r'^(complete|finish|pass|get|learn|build|do|make|start)\s+',
     caseSensitive: false,
   );
-  static const _starterCourses = [
-    ('Python programming basics', 'A tool almost every other course leans on.'),
-    ('Linear algebra', 'The language of data, graphics and machine learning.'),
-    ('Clear technical writing', 'Explaining things well is how you prove them here.'),
-  ];
 
   // ===========================================================================
   // 18–23: stage UI (contract Section 5)
@@ -1305,6 +1318,10 @@ class FakeApiClient implements SelfInfinityApi {
         : courseTopic != null
         ? const _None('')
         : _frontDesk(message);
+    // Demo: with no course yet, any plain message builds one.
+    if (demo && courseTopic == null && _courses.isEmpty && (intent is _GenerateCourse || intent is _None)) {
+      intent = _GenerateCourse(_learnTopic(message));
+    }
     // With files, `generate_course` and `none` both build a course from them.
     if (files.isNotEmpty && (intent is _GenerateCourse || intent is _None)) {
       // "I want to learn this" names no topic: the file does.
@@ -1330,13 +1347,13 @@ class FakeApiClient implements SelfInfinityApi {
         case _None(:final reply):
           out.add(assistant('front_desk', reply));
         case _GenerateCourse(:final topic, :final files):
-          out.add(assistant('front_desk', "I'll build a world for “$topic”."));
+          out.add(assistant('front_desk', _s.buildWorld(topic)));
           final map = await _generateCourse(GenerateRequest(topic: topic), sourceFiles: files);
           final root = rootNodes(map.nodes, map.edges).first;
           out.add(
             assistant(
               'planner',
-              'Your world “${root.title}” is ready — ${map.nodes.length} nodes.',
+              _s.worldReady(root.title, map.nodes.length),
               CourseAction(course: map.course, nodeCount: map.nodes.length),
             ),
           );
@@ -1344,30 +1361,30 @@ class FakeApiClient implements SelfInfinityApi {
           out.add(
             assistant(
               'front_desk',
-              'Taking you to “${skill.title}”.',
+              _s.takingTo(skill.title),
               NavigateAction(scene: NavScene.skill, skillId: skill.id),
             ),
           );
         case _CheckIn():
-          out.add(assistant('front_desk', 'Got it, logging that.'));
+          out.add(assistant('front_desk', _s.loggingThat));
           final result = await checkInVoice(message);
           out.add(
             assistant('checkin_converter', _checkInSummary(result.checkin), CheckInAction(result)),
           );
         case _Plan():
-          out.add(assistant('front_desk', "Let me pick today's quests."));
+          out.add(assistant('front_desk', _s.pickQuests));
           final plan = await generatePlan();
-          final titles = plan.steps.map((s) => '“${s.skillTitle}”').join(', ');
-          out.add(assistant('recommender', "Today's quests: $titles.", PlanAction(plan)));
+          final titles = plan.steps.map((s) => _s.quote(s.skillTitle)).join(', ');
+          out.add(assistant('recommender', _s.todayQuests(titles), PlanAction(plan)));
         case _Briefing():
-          out.add(assistant('front_desk', 'Let me sum up where you are.'));
+          out.add(assistant('front_desk', _s.sumUp));
           final briefing = await narrate();
           out.add(assistant('narrator', briefing.narrative ?? '', BriefingAction(briefing)));
         case _OpenMap():
           out.add(
             assistant(
               'front_desk',
-              'Opening your life tree.',
+              _s.openingTree,
               const NavigateAction(scene: NavScene.map),
             ),
           );
@@ -1397,7 +1414,7 @@ class FakeApiClient implements SelfInfinityApi {
     final out = [
       line(ChatRole.assistant, prompt, agent: 'front_desk'),
       line(ChatRole.user, message),
-      line(ChatRole.assistant, "Noted. It's in your journal.", agent: 'front_desk'),
+      line(ChatRole.assistant, _s.noted, agent: 'front_desk'),
     ];
     _journal.add(
       JournalEntry(
@@ -1455,28 +1472,26 @@ class FakeApiClient implements SelfInfinityApi {
   /// Pipeline failures are explained in a message, not thrown (endpoint 18).
   String _pipelineFailure(_Intent intent, ApiException e) {
     if (e.statusCode == 400 && intent is _Plan) {
-      return 'No node is ready yet. Make a world first.';
+      return _s.noNodeReady;
     }
     return switch (intent) {
-      _GenerateCourse() => "I couldn't build that world. Please try again in a moment.",
-      _CheckIn() => "I couldn't log that. Please try again in a moment.",
-      _Plan() => "I couldn't pick today's quests. Please try again.",
-      _Briefing() => "I couldn't put your status together. Please try again.",
-      _ => "I couldn't do that right now. Please try again in a moment.",
+      _GenerateCourse() => _s.failBuild,
+      _CheckIn() => _s.failLog,
+      _Plan() => _s.failPlan,
+      _Briefing() => _s.failBrief,
+      _ => _s.failOther,
     };
   }
 
   String _checkInSummary(DailyCheckIn c) {
     final parts = <String>[
-      if (c.sleepHours != null) 'sleep ${_num(c.sleepHours!)} h',
-      if (c.exercised != null) 'exercise ${c.exercised! ? 'yes' : 'no'}',
-      if (c.dietNote != null) 'meals ${c.dietNote}',
-      if (c.focus != null) 'focus ${c.focus}/5',
-      if (c.stress != null) 'stress ${c.stress}/5',
+      if (c.sleepHours != null) _s.sleepPart(_num(c.sleepHours!)),
+      if (c.exercised != null) _s.exercisePart(c.exercised!),
+      if (c.dietNote != null) _s.mealsPart(c.dietNote!),
+      if (c.focus != null) _s.focusPart(c.focus!),
+      if (c.stress != null) _s.stressPart(c.stress!),
     ];
-    return parts.isEmpty
-        ? "I couldn't find anything to log. Tell me about sleep, exercise or meals."
-        : 'Logged: ${parts.join(' · ')}';
+    return parts.isEmpty ? _s.nothingToLog : _s.logged(parts);
   }
 
   static String _num(double v) => v == v.roundToDouble() ? '${v.toInt()}' : '$v';
@@ -1485,36 +1500,50 @@ class FakeApiClient implements SelfInfinityApi {
   _Intent _frontDesk(String message) {
     final skill = _titleInMessage(message);
     if (skill != null &&
-        RegExp('challenge|audit|try|open|continue|start', caseSensitive: false).hasMatch(message)) {
+        RegExp('challenge|audit|try|open|continue|start|이어서|시작|열어|도전|심사|继续|开始|打开|挑战|审核', caseSensitive: false)
+            .hasMatch(message)) {
       return _OpenSkill(skill);
     }
     if (RegExp(
-      r'\b(?:sleep|slept|tired|exercis|worked out|ate\b|had .* for (?:breakfast|lunch|dinner)|log my day|my day)',
+      r'\b(?:sleep|slept|tired|exercis|worked out|ate\b|had .* for (?:breakfast|lunch|dinner)|log my day|my day)'
+      r'|오늘 하루|기록할래|잤어|먹었|运动了|记录一下|睡了|吃了',
       caseSensitive: false,
     ).hasMatch(message)) {
       return const _CheckIn();
     }
-    if (RegExp(r'learn|study|build|make|create|teach me', caseSensitive: false).hasMatch(message)) {
-      var topic = message.trim().replaceFirst(
-        RegExp(
-          r"^(?:i want to learn|i['\u2019]d like to learn|i want to study|teach me|"
-          r'build me a world (?:for|about)|make a world (?:for|about))\s*',
-          caseSensitive: false,
-        ),
-        '',
-      );
-      topic = topic.replaceFirst(RegExp(r'[\s.!?]+$'), '').trim();
-      if (topic.isEmpty) return const _None('What topic should I build?');
+    if (RegExp(r'learn|study|build|make|create|teach me|배우고 싶|공부하고 싶|만들어|想学|想要学|教我', caseSensitive: false).hasMatch(message)) {
+      final topic = _learnTopic(message, blankIfEmpty: true);
+      if (topic.isEmpty) return _None(_s.askTopic);
       return _GenerateCourse(topic);
     }
-    if (RegExp('quest|what should i|recommend', caseSensitive: false).hasMatch(message)) {
+    if (RegExp('quest|what should i|recommend|오늘 뭐 하|퀘스트|今天做什么|任务', caseSensitive: false).hasMatch(message)) {
       return const _Plan();
     }
-    if (RegExp('status|report|how am i doing', caseSensitive: false).hasMatch(message)) {
+    if (RegExp('status|report|how am i doing|현황|상태|进度|报告', caseSensitive: false).hasMatch(message)) {
       return const _Briefing();
     }
-    if (RegExp('map|world', caseSensitive: false).hasMatch(message)) return const _OpenMap();
-    return const _None('Sure. What would you like to do today?');
+    if (RegExp('map|world|인생 나무|人生树|地图', caseSensitive: false).hasMatch(message)) return const _OpenMap();
+    return _None(_s.noneReply);
+  }
+
+  /// The topic of a learn request: the message without its "I want to learn"
+  /// stem (English, Korean or Chinese) and its closing punctuation. With
+  /// nothing left it is the whole message, or `''` when [blankIfEmpty].
+  static String _learnTopic(String message, {bool blankIfEmpty = false}) {
+    final trimmed = message.trim();
+    var topic = trimmed.replaceFirst(
+      RegExp(
+        r"^(?:i want to learn|i['\u2019]d like to learn|i want to study|teach me|learn|"
+        r'build me a world (?:for|about)|make a world (?:for|about)|'
+        r'배우고\s*싶은\s*(?:건|것은|게)|공부하고\s*싶은\s*(?:건|것은|게)|'
+        r'我想要学习|我想要学|我想学习|我想学|想学习|想学|教我)\s*',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    topic = topic.replaceFirst(RegExp(r'\s*[을를]?\s*(?:배우고|공부하고)\s*싶(?:어요|어|습니다)?[\s.!?]*$'), '');
+    topic = topic.replaceFirst(RegExp(r'[\s.!?。！？]+$'), '').trim();
+    return topic.isEmpty && !blankIfEmpty ? trimmed : topic;
   }
 
   /// The node whose title is contained in [message]: the longest title wins,
@@ -1548,7 +1577,7 @@ class FakeApiClient implements SelfInfinityApi {
     // (unless it was answered today).
     final now = _clock();
     if (!_checkIns.containsKey(formatKstDate(now))) {
-      out.add(const ChatSuggestion(label: 'How was your day?', message: 'Let me log my day'));
+      out.add(ChatSuggestion(label: _s.howWasDay, message: _s.logMyDay));
     } else {
       final kst = toKst(now);
       final prompt = reflectionPromptAt(kst.hour * 60 + kst.minute);
@@ -1566,8 +1595,8 @@ class FakeApiClient implements SelfInfinityApi {
     if (lastNode != null && !lastNode.isMastered) {
       out.add(
         ChatSuggestion(
-          label: 'Continue “${lastNode.title}”',
-          message: 'Continue “${lastNode.title}”',
+          label: _s.continueLabel(lastNode.title),
+          message: _s.continueLabel(lastNode.title),
           skillId: lastNode.id,
         ),
       );
@@ -1578,13 +1607,13 @@ class FakeApiClient implements SelfInfinityApi {
       if (available != null) {
         out.add(
           ChatSuggestion(
-            label: 'Start with “${available.title}”',
-            message: 'Start with “${available.title}”',
+            label: _s.startLabel(available.title),
+            message: _s.startLabel(available.title),
             skillId: available.id,
           ),
         );
       } else {
-        out.add(const ChatSuggestion(label: 'Tell me what you want to learn', message: ''));
+        out.add(ChatSuggestion(label: _s.tellMeWhat, message: ''));
       }
     }
     return out;
@@ -1612,23 +1641,12 @@ class FakeApiClient implements SelfInfinityApi {
     await _begin('requestLifeAdvice');
     final s = _life(14).summary;
     final items = [
-      if (s.avgSleepHours != null)
-        LifeAdviceItem(
-          title: 'Protect your sleep',
-          body: 'Pick a fixed time to stop screens this week and keep it five nights.',
-          basedOn: 'slept ${s.avgSleepHours} h on average',
-        ),
-      if (s.avgFocus != null)
-        LifeAdviceItem(
-          title: 'Audit when you focus best',
-          body: 'Put this week\'s audits in the part of the day you feel sharpest.',
-          basedOn: 'focus ${s.avgFocus} of 5 on average',
-        ),
-      LifeAdviceItem(
-        title: 'Log a few more days',
-        body: 'Check in every day this week, even briefly, so your own patterns can show up.',
-        basedOn: '${s.daysLogged} of 14 days logged',
-      ),
+      for (final (title, body, basedOn) in _s.lifeAdvice(
+        sleep: s.avgSleepHours == null ? null : '${s.avgSleepHours}',
+        focus: s.avgFocus == null ? null : '${s.avgFocus}',
+        daysLogged: s.daysLogged,
+      ))
+        LifeAdviceItem(title: title, body: body, basedOn: basedOn),
     ].take(3).toList();
     return _lifeAdvice = LifeAdvice(items: items, generatedAt: _clock());
   }
@@ -2678,30 +2696,24 @@ class FakeApiClient implements SelfInfinityApi {
         if (_nodes[id] case final n? when n.unexpanded || containsChildren(id, _edges).isEmpty)
           n.title,
     ];
-    if (parts.isEmpty) {
-      return 'So you already know “${node.title}”? Then teach me: what are its main parts, '
-          'and how does the most important one work?';
-    }
-    return 'So you already know “${node.title}”? Then teach me, one part at a time. '
-        'Start with “${parts.first}”: how does it work?';
+    if (parts.isEmpty) return _s.testOutNoParts(node.title);
+    return _s.testOutFirst(node.title, parts.first);
   }
 
   String _openingQuestion(SkillNode node, NodePosition position) {
     final title = node.title;
-    if (node.nodeType == NodeType.task) return 'How exactly will you do “$title”?';
+    if (node.nodeType == NodeType.task) return _s.openingTask(title);
     switch (position) {
       case NodePosition.leaf:
-        return 'I have never learned “$title”. Start small: in a sentence or two, what is it, and what problem does it solve?';
+        return _s.openingLeaf(title);
       case NodePosition.branch:
         final children = containsChildren(
           node.id,
           _edges,
         ).map((id) => _nodes[id]!.title).join(', ');
-        return '“$title” covers $children. '
-            'Why do these belong together, and when do you use which?';
+        return _s.openingBranch(title, children);
       case NodePosition.root:
-        return 'Which problems call for “$title”, and which don\'t? '
-            'How do you decide?';
+        return _s.openingRoot(title);
     }
   }
 
@@ -2711,39 +2723,30 @@ class FakeApiClient implements SelfInfinityApi {
   String _pointsQuestion(SkillNode node, List<SkillPoint> examined, int open) {
     if (open == node.points.length) return _openingQuestion(node, NodePosition.leaf);
     if (examined.length == 1 && node.points.length > 1) {
-      return 'What you taught me last time, I still have. This time teach me only '
-          '“${examined.first.title}”, as if I had never heard of it.';
+      return _s.pointsOne(examined.first.title);
     }
     if (examined.length < node.points.length) {
-      return 'What you taught me last time, I still have. This time teach me '
-          '${examined.map((p) => p.title).join(', ')}, as if I had never heard of them.';
+      return _s.pointsSome(examined.map((p) => p.title).join(', '));
     }
     return _openingQuestion(node, NodePosition.leaf);
   }
 
   /// The knowledge points the script gives a leaf titled [title].
-  static List<String> fakePointTitles(String title) => [
-    _cut('What $title is', 40),
-    _cut('Why $title holds', 40),
-    _cut('Where $title fails', 40),
+  static List<String> fakePointTitles(String title, [String language = 'en']) => [
+    for (final t in FakeScript.of(language).pointTitles(title)) _cut(t, 40),
   ];
 
   static const Duration _resumeWindow = Duration(hours: 24);
-  static const String _genericProbe =
-      'Pick the most important term in your explanation and tell me what it means and why it matters.';
-  static const String _challengerQuestion =
-      'Before I pass this: give one case where this idea does not hold, and explain why.';
 
-  /// What the scripted Auditor says about an answer before her next line.
-  static const String probeFeedback =
-      'That gives the outline. One part of it is still only named, not explained.';
-  static const String passFeedback = 'That is right, and you gave the reason for it.';
-  static const String failFeedback = 'The conclusion is there, but the reason behind it is missing.';
-  static const String failNote = 'Named it without saying why it holds.';
+  /// What the scripted Auditor says about an answer before her next line
+  /// (English; the other languages are in `fake_script.dart`).
+  static String get probeFeedback => FakeScript.en.probeFeedback;
+  static String get passFeedback => FakeScript.en.passFeedback;
+  static String get failFeedback => FakeScript.en.failFeedback;
+  static String get failNote => FakeScript.en.failNote;
 
   /// What holds instead, for every gap of a fail.
-  static const String failRight =
-      'The mechanism has to be explained step by step, with what each step is for.';
+  static String get failRight => FakeScript.en.failRight;
 
   /// Returns the probe, or — if the turn limit is reached — a failing verdict.
   TurnResult _probeOrForcedFail(
@@ -2757,8 +2760,8 @@ class FakeApiClient implements SelfInfinityApi {
       return _finishFail(
         audit,
         score: 0,
-        gaps: const ["You couldn't explain the core idea within the turn limit."],
-        comment: 'The turns ran out before the explanation was complete.',
+        gaps: [_s.forcedGap],
+        comment: _s.forcedComment,
         // Nothing was settled: every point stays open.
         points: audit.points,
       );
@@ -2802,7 +2805,7 @@ class FakeApiClient implements SelfInfinityApi {
       ..score = score
       ..gaps = gaps
       ..comment = comment
-      ..evidence = [for (final gap in gaps) GapEvidence(gap: gap, said: said, right: failRight)]
+      ..evidence = [for (final gap in gaps) GapEvidence(gap: gap, said: said, right: _s.failRight)]
       ..lessons = _relapse(audit.skillId);
     _recordPoints(audit, points);
     _recordLearnerStep(audit, passed: false);
@@ -2842,7 +2845,7 @@ class FakeApiClient implements SelfInfinityApi {
 
   VerdictResult _finishPass(_FakeAudit audit, int characters) {
     final score = math.min(95, 70 + characters ~/ 10);
-    const comment = 'You explained the core idea and why it holds.';
+    final comment = _s.passComment;
     audit
       ..status = AuditStatus.passed
       ..stars = audit.testOut ? 3 : const {'short': 1, 'thorough': 3}[audit.length] ?? 2
@@ -2884,7 +2887,7 @@ class FakeApiClient implements SelfInfinityApi {
       score: score,
       stars: audit.stars,
       comment: comment,
-      feedback: passFeedback,
+      feedback: _s.passFeedback,
       points: points,
       unlockedSkillIds: unlocked,
       rewardAmount: reward,
@@ -3077,12 +3080,12 @@ class FakeApiClient implements SelfInfinityApi {
 // =============================================================================
 
 /// The first three results of the mock search provider.
-List<SearchItem> _mockSearch(String query, {String reason = ''}) => [
+List<SearchItem> _mockSearch(FakeScript s, String query, {String reason = ''}) => [
   for (var i = 1; i <= 3; i++)
     SearchItem(
-      title: '“$query” — resource $i',
+      title: s.searchTitle(query, i),
       url: 'https://example.org/$i',
-      snippet: 'Mock search result $i for “$query”. Offline demo text.',
+      snippet: s.searchSnippet(query, i),
       reason: reason,
     ),
 ];
@@ -3283,124 +3286,63 @@ class _RequiresSpec {
   final String reason;
 }
 
-const List<_NodeSpec> _mathNodes = [
-  _NodeSpec(
-    'high-school-math',
-    'High School Math',
-    [],
-    'The backbone of high school math: knowing which tool solves which problem.',
-  ),
-  _NodeSpec('algebra', 'Algebra', [
-    1,
-  ], 'Working with numbers and expressions: equations, inequalities, sequences.'),
-  _NodeSpec('functions', 'Functions', [
-    1,
-  ], 'Describing how two variables relate, with formulas and graphs.'),
-  _NodeSpec('calculus', 'Calculus', [
-    1,
-  ], 'Using limits and rates of change to handle slopes and areas.'),
-  _NodeSpec('quadratic-equation', 'Quadratic Equations', [
-    2,
-  ], 'How to solve equations of the form ax²+bx+c=0 and what the roots mean.'),
-  _NodeSpec('discriminant', 'Discriminant', [
-    5,
-  ], 'A tool that tells you the kind of roots from the coefficients alone.'),
-  _NodeSpec('root-coefficient', 'Roots and Coefficients', [
-    5,
-  ], 'The link between the sum and product of the roots and the coefficients.'),
-  _NodeSpec('sequences', 'Sequences', [
-    2,
-  ], 'Numbers listed by a rule, including arithmetic and geometric sequences.'),
-  _NodeSpec('linear-function', 'Linear Functions', [
-    3,
-  ], 'The slope and intercept of the straight line y=ax+b.'),
-  _NodeSpec('quadratic-function', 'Quadratic Functions', [
-    3,
-  ], 'The vertex, axis and x-intercepts of a parabola.'),
-  _NodeSpec('sequence-limit', 'Limits of Sequences', [
-    4,
-    8,
-  ], 'The value a sequence approaches as its terms go on forever.'),
-  _NodeSpec('derivative', 'Derivatives', [
-    4,
-  ], 'The instantaneous rate of change at a point, defined as a limit.'),
+/// A node's place in a course script: slug, contains parents (1-based, the
+/// first is the main one) and whether it is left to break down later. Its
+/// words come from [FakeScript].
+typedef _Shape = (String, List<int>, bool);
+
+List<_NodeSpec> _withText(List<_Shape> shapes, List<(String, String)> texts) => [
+  for (final (i, (slug, parents, expand)) in shapes.indexed)
+    _NodeSpec(slug, texts[i].$1, parents, texts[i].$2, expand: expand),
 ];
 
-const List<_RequiresSpec> _mathRequires = [
-  _RequiresSpec(
-    5,
-    10,
-    'The x-intercepts of a quadratic function are the roots of a quadratic equation.',
-  ),
-  _RequiresSpec(9, 10, 'You need the graph of a linear function first.'),
-  _RequiresSpec(11, 12, 'The derivative is defined as a limit.'),
+List<_RequiresSpec> _requiresOf(List<(int, int)> shapes, List<String> reasons) => [
+  for (final (i, (from, to)) in shapes.indexed) _RequiresSpec(from, to, reasons[i]),
 ];
+
+const List<_Shape> _mathShape = [
+  ('high-school-math', [], false),
+  ('algebra', [1], false),
+  ('functions', [1], false),
+  ('calculus', [1], false),
+  ('quadratic-equation', [2], false),
+  ('discriminant', [5], false),
+  ('root-coefficient', [5], false),
+  ('sequences', [2], false),
+  ('linear-function', [3], false),
+  ('quadratic-function', [3], false),
+  ('sequence-limit', [4, 8], false),
+  ('derivative', [4], false),
+];
+
+const List<(int, int)> _mathRequiresShape = [(5, 10), (9, 10), (11, 12)];
 
 /// The `vision` course, in layers (the server Mock's `_VISION_NODES`).
-const List<_NodeSpec> _visionNodes = [
-  _NodeSpec(
-    'computer-vision',
-    'Computer Vision',
-    [],
-    'Seeing with cameras and code: features, geometry and recognition.',
-  ),
-  _NodeSpec(
-    'image-features',
-    'Image Features',
-    [1],
-    'Points and patches an algorithm can find again: corners and descriptors.',
-  ),
-  _NodeSpec(
-    'harris',
-    'Harris Corners',
-    [2],
-    'Find corners from the structure tensor and explain why edges and flat areas are rejected.',
-  ),
-  _NodeSpec(
-    'sift',
-    'SIFT',
-    [2],
-    'Build scale-invariant keypoints and descriptors and explain how they are matched.',
-  ),
-  _NodeSpec(
-    'geometry',
-    'Geometric Vision',
-    [1],
-    'Cameras and 3D: calibration, homography, epipolar geometry, triangulation.',
-    expand: true,
-  ),
-  _NodeSpec(
-    'recognition',
-    'Visual Recognition',
-    [1],
-    'Telling what is in an image: classification, detection, segmentation.',
-    expand: true,
-  ),
+const List<_Shape> _visionShape = [
+  ('computer-vision', [], false),
+  ('image-features', [1], false),
+  ('harris', [2], false),
+  ('sift', [2], false),
+  ('geometry', [1], true),
+  ('recognition', [1], true),
 ];
 
-/// Generic course: root = topic, branches `Core Concepts` / `Key Methods` / `Applications`,
-/// two leaves each.
-List<_NodeSpec> _genericNodes(String rootTitle) => [
-  _NodeSpec('root', rootTitle, const [], 'The starting point that covers all of “$rootTitle”.'),
-  const _NodeSpec('core-concepts', 'Core Concepts', [
-    1,
-  ], 'The basic ideas that hold this field up.'),
-  const _NodeSpec('main-methods', 'Key Methods', [1], 'The standard ways to solve problems.'),
-  const _NodeSpec('applications', 'Applications', [
-    1,
-  ], 'Applying what you learned to real problems.'),
-  const _NodeSpec('core-concept-1', 'Core Concepts 1', [2], 'The first core concept.'),
-  const _NodeSpec('core-concept-2', 'Core Concepts 2', [2], 'The second core concept.'),
-  const _NodeSpec('main-method-1', 'Key Methods 1', [3], 'The first key method.'),
-  const _NodeSpec('main-method-2', 'Key Methods 2', [3], 'The second key method.'),
-  const _NodeSpec('application-1', 'Applications 1', [4], 'The first application.'),
-  const _NodeSpec('application-2', 'Applications 2', [4], 'The second application.'),
+/// Generic course: root = topic (made in [FakeApiClient._generateCourse]),
+/// branches `Core Concepts` / `Key Methods` / `Applications`, two leaves each.
+/// Positions count the root as 1.
+const List<_Shape> _genericShape = [
+  ('core-concepts', [1], false),
+  ('main-methods', [1], false),
+  ('applications', [1], false),
+  ('core-concept-1', [2], false),
+  ('core-concept-2', [2], false),
+  ('main-method-1', [3], false),
+  ('main-method-2', [3], false),
+  ('application-1', [4], false),
+  ('application-2', [4], false),
 ];
 
-const List<_RequiresSpec> _genericRequires = [
-  _RequiresSpec(5, 7, 'You need the core concepts before using this method.'),
-  _RequiresSpec(7, 9, 'You need the method before you can apply it.'),
-];
+const List<(int, int)> _genericRequiresShape = [(5, 7), (7, 9)];
 
 // =============================================================================
 // Check-in parsing (contract Section 4.5)

@@ -166,6 +166,72 @@ abstract class AppLocalizations {
   /// **'Tap the lit part to try it'**
   String get tourTryHint;
 
+  /// No description provided for @tryWithoutAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Try it without an account'**
+  String get tryWithoutAccount;
+
+  /// No description provided for @tourAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell me here what you want to learn. Type anything and send it.'**
+  String get tourAsk;
+
+  /// No description provided for @tourBuilt.
+  ///
+  /// In en, this message translates to:
+  /// **'Your course is built: a tree of ideas to prove, one node at a time. Open it.'**
+  String get tourBuilt;
+
+  /// No description provided for @tourExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'To clear a node, you teach it to the Auditor. Explain it in your own words; in this tour anything you say works.'**
+  String get tourExplain;
+
+  /// No description provided for @tourExplainAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'She asks again where it was thin. Answer once more.'**
+  String get tourExplainAgain;
+
+  /// No description provided for @tourCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleared! Stars for how thoroughly you were asked, and XP toward your level.'**
+  String get tourCleared;
+
+  /// No description provided for @tourTypeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type in the lit box and send'**
+  String get tourTypeHint;
+
+  /// No description provided for @tourDoForMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Use an example'**
+  String get tourDoForMe;
+
+  /// No description provided for @tourSampleAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'It is a way to find a value under given conditions. It works because the conditions pin the value down to exactly one answer.'**
+  String get tourSampleAnswer;
+
+  /// No description provided for @tourGuestBegin.
+  ///
+  /// In en, this message translates to:
+  /// **'Create my account'**
+  String get tourGuestBegin;
+
+  /// No description provided for @tourVerdict.
+  ///
+  /// In en, this message translates to:
+  /// **'Each audit leaves a verdict: your score, the points you held, and what to tighten.'**
+  String get tourVerdict;
+
   /// Front page: the stem in the example input, before each typed example.
   ///
   /// In en, this message translates to:
@@ -3196,35 +3262,17 @@ abstract class AppLocalizations {
   /// **'Skip the tour'**
   String get tourSkip;
 
-  /// No description provided for @tourVerdict.
-  ///
-  /// In en, this message translates to:
-  /// **'Then you get a score, what you missed, and a lesson.'**
-  String get tourVerdict;
-
   /// No description provided for @tourBegin.
   ///
   /// In en, this message translates to:
   /// **'Set up my character'**
   String get tourBegin;
 
-  /// No description provided for @tourTalk.
-  ///
-  /// In en, this message translates to:
-  /// **'Tell me here what you want to learn, typed or spoken.'**
-  String get tourTalk;
-
   /// No description provided for @tourTree.
   ///
   /// In en, this message translates to:
   /// **'Every node you clear lights up your life tree.'**
   String get tourTree;
-
-  /// No description provided for @tourAudit.
-  ///
-  /// In en, this message translates to:
-  /// **'To clear a node, you teach it to the Auditor.'**
-  String get tourAudit;
 
   /// No description provided for @tourLessonsTitle.
   ///

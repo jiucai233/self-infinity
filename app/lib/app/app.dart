@@ -95,7 +95,8 @@ class SelfInfinityApp extends StatefulWidget {
   /// Overrides the start page (see [createRouter]).
   final String? initialLocation;
 
-  /// The app's language; English (not remembered) when null.
+  /// The app's language; English (not remembered) when null — tests; the
+  /// app itself passes [LocaleController.load], Korean the first time.
   final LocaleController? locale;
 
   /// Whether a new account sees the guided tour before the setup. Tests of
@@ -127,6 +128,15 @@ class _SelfInfinityAppState extends State<SelfInfinityApp> {
   late final LiveVoice? _live = widget.voice == null ? LiveVoice(api: widget.api, device: _voice) : null;
   late final FilePickerService _filePicker = widget.filePicker ?? PlatformFilePickerService();
 
+  /// The guided tour's microphone: the device's own, never the server's.
+  late final VoiceService _tourVoice = widget.voice ?? PlatformVoiceService();
+
+  /// `Try it without an account` on the front page: the guided tour, signed out.
+  bool _guest = false;
+
+  /// That tour ended: the front page opens on `Create account`.
+  bool _signUpNext = false;
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<LocaleController>.value(
@@ -136,6 +146,24 @@ class _SelfInfinityAppState extends State<SelfInfinityApp> {
         builder: (context, _) {
           final look = _AppLook(_locale.language);
           // Local mode can sign out too, to show the front page (LocalAuth).
+          if (!_auth.signedIn && _guest) {
+            return MultiProvider(
+              providers: [
+                ChangeNotifierProvider<AuthService>.value(value: _auth),
+                Provider<VoiceService>.value(value: _tourVoice),
+                Provider<FilePickerService>.value(value: _filePicker),
+              ],
+              child: GuidedTour(
+                theme: look.theme,
+                locale: look.locale,
+                guest: true,
+                onDone: () => setState(() {
+                  _guest = false;
+                  _signUpNext = true;
+                }),
+              ),
+            );
+          }
           if (!_auth.signedIn) {
             return ChangeNotifierProvider<AuthService>.value(
               value: _auth,
@@ -146,7 +174,11 @@ class _SelfInfinityAppState extends State<SelfInfinityApp> {
                 locale: look.locale,
                 localizationsDelegates: _AppLook.delegates,
                 supportedLocales: _AppLook.locales,
-                home: const SignInScene(),
+                home: SignInScene(
+                  key: ValueKey('sign-in:$_signUpNext'),
+                  openSignUp: _signUpNext,
+                  onGuest: () => setState(() => _guest = true),
+                ),
               ),
             );
           }
@@ -178,6 +210,7 @@ class _SelfInfinityAppState extends State<SelfInfinityApp> {
                 look: look,
                 initialLocation: widget.initialLocation,
                 tour: widget.tour,
+                tourVoice: _tourVoice,
               ),
             ),
           );
@@ -191,7 +224,14 @@ class _SelfInfinityAppState extends State<SelfInfinityApp> {
 /// guided tour (the app on an example) and then the setup; then the router
 /// with the scenes, opening on the life tree right after a setup.
 class _AccountShell extends StatefulWidget {
-  const _AccountShell({required this.look, this.initialLocation, this.tour = true});
+  const _AccountShell({
+    required this.look,
+    required this.tourVoice,
+    this.initialLocation,
+    this.tour = true,
+  });
+
+  final VoiceService tourVoice;
 
   final _AppLook look;
   final String? initialLocation;
@@ -249,6 +289,7 @@ class _AccountShellState extends State<_AccountShell> {
         return GuidedTour(
           theme: look.theme,
           locale: look.locale,
+          voice: widget.tourVoice,
           onDone: () => setState(() => _toured = true),
         );
       }

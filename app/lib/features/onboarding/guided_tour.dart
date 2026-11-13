@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/fake_api.dart';
-import '../../api/models.dart';
 import '../../app/app_state.dart';
 import '../../app/providers.dart';
 import '../../app/router.dart';
@@ -16,8 +16,48 @@ import '../../upload/file_picker_service.dart';
 import '../../voice/voice_service.dart';
 import '../../widgets/widgets.dart';
 
-/// One stop of the [GuidedTour]: the page it is on, the part of it that
-/// stays lit, and what the Guide says about it.
+/// What the user does at a stop of the [GuidedTour].
+enum TourAct {
+  /// Only looks; the card's button goes on.
+  look,
+
+  /// Taps the lit part, for real.
+  tap,
+
+  /// Types into the lit input bar and sends, for real.
+  type,
+}
+
+/// What a [TourStop] can see and do on the page under the tour.
+abstract interface class TourHands {
+  AppLocalizations get l;
+
+  /// Whether a widget with [key] is on the page.
+  bool has(Key key);
+
+  /// The text of the `Text` with [key], if it is on the page.
+  String? textOf(Key key);
+
+  /// The path of the page shown (`/skill/3/audit`).
+  String get path;
+
+  /// Presses the first button at or under [key]; false when there is none.
+  bool press(Key key);
+
+  /// Puts [text] into the page's input bar and sends it; false without one.
+  bool send(String text);
+
+  void go(String location);
+
+  /// Opens the first node of the example course that can be taken on.
+  void openFirstNode();
+
+  /// A note a stop keeps for itself while it is shown.
+  Object? memo;
+}
+
+/// One stop of the [GuidedTour]: the part of the page that stays lit, what
+/// the Guide says about it, and what the user does there.
 @immutable
 class TourStop {
   const TourStop({
@@ -25,11 +65,14 @@ class TourStop {
     this.anchor,
     this.frame,
     required this.text,
-    this.optional = false,
-    this.tryIt = false,
+    this.act = TourAct.look,
+    this.done,
+    this.auto,
+    this.leave,
   });
 
-  /// The page to be on; null keeps the page of the stop before.
+  /// The page to go to; null stays where the stop before (or the user's own
+  /// tap) left the app.
   final String? route;
 
   /// The widget that stays lit (found by its key); null darkens everything
@@ -42,32 +85,38 @@ class TourStop {
   final Type? frame;
   final String Function(AppLocalizations l) text;
 
-  /// A stop whose [anchor] is not on this screen (a side panel on a phone)
-  /// is passed over instead of shown without one.
-  final bool optional;
+  /// [TourAct.tap] and [TourAct.type]: the lit part takes the user's taps and
+  /// keys, and the tour goes on by itself once [done] holds.
+  final TourAct act;
+  final bool Function(TourHands h)? done;
 
-  /// The user does it: a tap on the lit part goes on, as using it would
-  /// (2026-11-04 review: after the highlight, let them try it).
-  final bool tryIt;
+  /// What the card's own button does at a tap / type stop: the same thing,
+  /// done for the user.
+  final void Function(TourHands h)? auto;
+
+  /// Done on the way to the next stop (closing a card the stop showed).
+  final void Function(TourHands h)? leave;
 }
 
-/// The guided tour a new account sees before the setup (`docs/ux-chat.md`
-/// §7): the real scenes over an example world, everything dark but the part
-/// the Guide is talking about. The loop of the app: talk to the Guide on the
-/// home page, tap a next node yourself, take it on yourself, explain it to
-/// the Auditor, what a verdict gives back, and the life tree it all grows;
-/// then the setup.
+/// The guided tour (`docs/ux-chat.md` §7): the real scenes over an example
+/// world, everything veiled but the part the Guide is talking about — and
+/// that part works. The user does the loop of the app once, by hand: says
+/// what to learn and gets a course built, opens the tree, taps a next node,
+/// takes it on, explains it to the Auditor in two answers, sees the
+/// celebration and the verdict, and the tree with its first light.
 ///
-/// The world is a [FakeApiClient] of its own (a character with a main quest,
-/// a course built from a syllabus, one node cleared and one failed, today's
-/// quests): nothing here reaches the account, and nothing can be tapped but
-/// the tour's own buttons and, on a try-it stop, the lit part.
+/// The world is a [FakeApiClient] of its own in demo mode: rule-based, in
+/// the app's language, nothing reaches the server or the account. A new
+/// account sees the tour before the setup; the front page opens it without
+/// an account ([guest]).
 class GuidedTour extends StatefulWidget {
   const GuidedTour({
     super.key,
     required this.theme,
     required this.locale,
     required this.onDone,
+    this.guest = false,
+    this.voice,
   });
 
   final ThemeData theme;
@@ -76,40 +125,92 @@ class GuidedTour extends StatefulWidget {
   /// The tour was finished or skipped.
   final VoidCallback onDone;
 
-  /// The stops, given the example node (a leaf with knowledge points) and the
-  /// failed audit of it whose verdict is shown.
-  static List<TourStop> stops(int nodeId, int? auditId) => [
+  /// Opened from the front page, without an account: it ends at `Create my
+  /// account` instead of the setup.
+  final bool guest;
+
+  /// The microphone of the tour's input bars; the app's own when null.
+  final VoiceService? voice;
+
+  /// How long the example world takes to answer, so that her thinking shows.
+  /// Tests set it to zero.
+  static Duration latency = const Duration(milliseconds: 450);
+
+  static final RegExp _nodePath = RegExp(r'^/skill/\d+$');
+  static final RegExp _auditPath = RegExp(r'^/skill/(\d+)/audit$');
+
+  static const Key _input = Key('stage-input');
+  static const Key _openTree = Key('action-map');
+  static const Key _picks = Key('orb-picks');
+  static const Key _takeOn = Key('start-audit');
+  static const Key _asked = Key('audit-bubble-text');
+  static const Key _celebration = Key('celebration-card');
+
+  /// She said something new since the stop began.
+  static bool _answered(TourHands h) {
+    final now = h.textOf(_asked);
+    h.memo ??= now;
+    return now != null && h.memo != null && now != h.memo;
+  }
+
+  /// The stops, in order.
+  static List<TourStop> stops() => [
     TourStop(
       route: AppRoutes.home,
-      anchor: const Key('stage-input'),
+      anchor: _input,
       frame: Composer,
-      text: (l) => l.tourTalk,
+      text: (l) => l.tourAsk,
+      act: TourAct.type,
+      done: (h) => h.has(_openTree),
+      auto: (h) => h.send(h.l.heroExample1),
     ),
     TourStop(
-      route: AppRoutes.home,
-      anchor: const Key('orb-picks'),
+      anchor: _openTree,
+      text: (l) => l.tourBuilt,
+      act: TourAct.tap,
+      done: (h) => !h.has(_openTree) && h.has(const Key('life-board')),
+      auto: (h) => h.press(_openTree),
+    ),
+    TourStop(
+      anchor: _picks,
       text: (l) => l.tourPicks,
-      tryIt: true,
-      optional: true,
+      act: TourAct.tap,
+      done: (h) => _nodePath.hasMatch(h.path),
+      auto: (h) {
+        if (!h.press(_picks)) h.openFirstNode();
+      },
     ),
     TourStop(
-      route: AppRoutes.skill(nodeId),
-      anchor: const Key('start-audit'),
+      anchor: _takeOn,
       text: (l) => l.tourTakeItOn,
-      tryIt: true,
-      optional: true,
+      act: TourAct.tap,
+      done: (h) => _auditPath.hasMatch(h.path),
+      auto: (h) {
+        if (!h.press(_takeOn) && _nodePath.hasMatch(h.path)) h.go('${h.path}/audit');
+      },
     ),
     TourStop(
-      route: AppRoutes.audit(nodeId),
-      anchor: const Key('audit-bubble'),
-      text: (l) => l.tourAudit,
+      anchor: _input,
+      frame: Composer,
+      text: (l) => l.tourExplain,
+      act: TourAct.type,
+      done: _answered,
+      auto: (h) => h.send(h.l.tourSampleAnswer),
     ),
-    if (auditId != null)
-      TourStop(
-        route: AppRoutes.replay(auditId),
-        anchor: const Key('replay-scene'),
-        text: (l) => l.tourVerdict,
-      ),
+    TourStop(
+      anchor: _input,
+      frame: Composer,
+      text: (l) => l.tourExplainAgain,
+      act: TourAct.type,
+      done: (h) => h.has(_celebration),
+      auto: (h) => h.send(h.l.tourSampleAnswer),
+    ),
+    TourStop(
+      anchor: _celebration,
+      text: (l) => l.tourCleared,
+      leave: (h) => h.press(const Key('celebration-close')),
+    ),
+    TourStop(anchor: const Key('audit-verdict'), text: (l) => l.tourVerdict),
     TourStop(route: AppRoutes.home, anchor: const Key('night-panel'), text: (l) => l.tourTree),
   ];
 
@@ -117,140 +218,178 @@ class GuidedTour extends StatefulWidget {
   State<GuidedTour> createState() => _GuidedTourState();
 }
 
-class _GuidedTourState extends State<GuidedTour> {
-  final FakeApiClient _world = FakeApiClient(latency: Duration.zero);
+class _GuidedTourState extends State<GuidedTour> implements TourHands {
+  late final FakeApiClient _world = FakeApiClient(
+    latency: GuidedTour.latency,
+    language: widget.locale.languageCode,
+    demo: true,
+  );
   final AppState _appState = AppState();
   final GlobalKey _scenes = GlobalKey();
   final GlobalKey _overlay = GlobalKey();
-  GoRouter? _router;
-  List<TourStop> _stops = const [];
+  final List<TourStop> _stops = GuidedTour.stops();
+  late final GoRouter _router = createRouter(initialLocation: _stops.first.route);
 
   int _index = 0;
-
-  /// +1 or -1: which way a stop without its anchor is passed over.
-  int _direction = 1;
 
   /// The lit part, in the overlay's coordinates; null while it is looked for
   /// or when the stop has none.
   Rect? _lit;
 
-  /// How often the anchor of this stop was looked for without finding it.
-  int _misses = 0;
+  /// The card's button did this stop's part for the user; how many looks ago.
+  int? _autoLooks;
   Timer? _watch;
+
+  @override
+  Object? memo;
 
   static const Duration _watchEvery = Duration(milliseconds: 120);
 
-  static const String _exampleQuest = 'Teach calculus to a stranger';
-  static const String _exampleIdentity =
-      'I am the type of person who explains it before I memorize it.';
-
-  /// Long enough for the scripted Auditor to pass it.
-  static const String _exampleAnswer =
-      'It is a way to find a value under given conditions. It works because the conditions pin '
-      'the value down to exactly one answer, and it fails when they contradict each other or are '
-      'too loose, so the range has to be stated first.';
-
-  /// After this many looks an anchor counts as not on this screen.
-  static const int _patience = 12;
+  /// After this many looks a part done for the user counts as not working
+  /// here, and the tour goes on anyway.
+  static const int _patience = 25;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_buildWorld());
+    _watch = Timer.periodic(_watchEvery, (_) => _look());
   }
 
   @override
   void dispose() {
     _watch?.cancel();
-    _router?.dispose();
+    _router.dispose();
     super.dispose();
-  }
-
-  /// Plays an audit of [nodeId] in the example world with the same [answer]
-  /// until its verdict; its id.
-  Future<int> _audit(int nodeId, String answer) async {
-    final audit = await _world.startAudit(nodeId);
-    for (var i = 0; i < 12; i++) {
-      if (await _world.submitTurn(audit.session.id, answer) is VerdictResult) break;
-    }
-    return audit.session.id;
-  }
-
-  /// The example world: a character with a main quest, a course from a
-  /// syllabus under it, one node cleared (lit on the tree) and the next tried
-  /// and failed (its knowledge points show what held and what did not), and
-  /// today's quests asked for.
-  Future<void> _buildWorld() async {
-    var nodeId = 1;
-    int? failed;
-    try {
-      final course = await _world.generateCourse(const GenerateRequest(topic: 'math'));
-      int? open(CourseMap map) => map.nodes.where((n) => n.isAvailable).firstOrNull?.id;
-      final first = open(await _world.getCourseMap(course.course.id));
-      if (first != null) await _audit(first, _exampleAnswer);
-      nodeId = open(await _world.getCourseMap(course.course.id)) ?? first ?? nodeId;
-      failed = await _audit(nodeId, "I'm not sure");
-      final quest = await _world.createGoal(_exampleQuest);
-      await _world.updateGoal(quest.id, courseIds: [course.course.id]);
-      await _world.updateProfile(identity: _exampleIdentity);
-      await _world.sendChat('What should I do today?');
-    } on Object {
-      // An emptier example still shows where things are.
-    }
-    if (!mounted) return;
-    setState(() {
-      _stops = GuidedTour.stops(nodeId, failed);
-      _router = createRouter(initialLocation: _stops.first.route);
-    });
-    _watch = Timer.periodic(_watchEvery, (_) => _look());
   }
 
   TourStop get _stop => _stops[_index];
 
-  void _go(int index) {
-    final direction = index >= _index ? 1 : -1;
-    // A stop on the page already shown whose part is not on this screen (a side
-    // panel on a phone) is passed over at once, without showing it first.
-    while (index >= 0 &&
-        index < _stops.length &&
-        _stops[index].optional &&
-        _stops[index].route == null &&
-        _find(_stops[index].anchor!) == null) {
-      index += direction;
+  // -- what a stop sees and does ---------------------------------------------
+
+  @override
+  AppLocalizations get l => lookupAppLocalizations(widget.locale);
+
+  @override
+  bool has(Key key) => _find(key) != null;
+
+  @override
+  String? textOf(Key key) {
+    final widget = _find(key)?.widget;
+    return widget is Text ? widget.data : null;
+  }
+
+  @override
+  String get path => _router.routerDelegate.currentConfiguration.uri.path;
+
+  @override
+  bool press(Key key) {
+    final root = _find(key);
+    if (root == null) return false;
+    VoidCallback? tap;
+    void visit(Element element) {
+      if (tap != null) return;
+      final widget = element.widget;
+      tap = switch (widget) {
+        ButtonStyleButton() => widget.onPressed,
+        InkResponse() => widget.onTap,
+        GestureDetector() => widget.onTap,
+        _ => null,
+      };
+      if (tap == null) element.visitChildElements(visit);
     }
-    if (index < 0) return;
+
+    visit(root);
+    tap?.call();
+    return tap != null;
+  }
+
+  @override
+  bool send(String text) {
+    final bar = _around(_find(GuidedTour._input), Composer)?.widget;
+    if (bar is! Composer || bar.onSend == null) return false;
+    bar.controller.text = text;
+    bar.onSend!();
+    return true;
+  }
+
+  @override
+  void go(String location) => _router.go(location);
+
+  @override
+  void openFirstNode() => unawaited(_openFirstNode());
+
+  Future<void> _openFirstNode() async {
+    try {
+      final course = (await _world.listCourses()).firstOrNull;
+      if (course == null) return;
+      final map = await _world.getCourseMap(course.id);
+      final open = map.nodes.where((n) => n.isAvailable && !n.unexpanded).firstOrNull;
+      if (open != null && mounted) _router.go(AppRoutes.skill(open.id));
+    } on Object {
+      // The tour goes on without it.
+    }
+  }
+
+  // -- the stops -------------------------------------------------------------
+
+  void _go(int index) {
     if (index >= _stops.length) {
       widget.onDone();
       return;
     }
-    final route = _stops[index].route;
+    if (index > _index) _stop.leave?.call(this);
     setState(() {
-      _direction = direction;
       _index = index;
       _lit = null;
-      _misses = 0;
+      _autoLooks = null;
+      memo = null;
     });
-    // Going back needs the page of the nearest stop before that names one.
-    final page = route ?? _stops.sublist(0, index).reversed.map((s) => s.route).nonNulls.firstOrNull;
-    if (page != null) _router?.go(page);
+    final route = _stops[index].route;
+    if (route != null && path != route) _router.go(route);
   }
 
-  /// Finds the anchor of this stop on the page and follows it (the page
-  /// loads, scrolls and resizes under the tour).
+  /// The card's button: on, or this stop's part done for the user.
+  void _next() {
+    final auto = _stop.auto;
+    if (_stop.act == TourAct.look || auto == null) {
+      _go(_index + 1);
+      return;
+    }
+    setState(() => _autoLooks = 0);
+    auto(this);
+  }
+
+  /// Goes on when the stop's part was done, and finds its lit part on the
+  /// page and follows it (the page loads, scrolls and resizes under the tour).
   void _look() {
-    if (!mounted || _stops.isEmpty) return;
-    final anchor = _stop.anchor;
+    if (!mounted) return;
+    final stop = _stop;
+    if (stop.done?.call(this) ?? false) {
+      _go(_index + 1);
+      return;
+    }
+    if (_autoLooks case final looks?) {
+      if (looks >= _patience) {
+        _go(_index + 1);
+        return;
+      }
+      _autoLooks = looks + 1;
+    }
+    final anchor = stop.anchor;
     if (anchor == null) return;
     final found = _find(anchor);
     final overlay = _overlay.currentContext?.findRenderObject();
-    final box = (_frame(found) ?? found)?.findRenderObject();
+    final box = (_around(found, stop.frame) ?? found)?.findRenderObject();
     if (found == null || box is! RenderBox || !box.hasSize || overlay is! RenderBox) {
-      if (++_misses == _patience && _stop.optional) _go(_index + _direction);
+      // Gone from the page (her answer is on its way): nothing is lit until it is back.
+      if (_lit != null) setState(() => _lit = null);
       return;
     }
     if (_lit == null) {
-      // Bring it into view once (the quests sit low in the left panel).
+      // Bring it into view once, and put the cursor in a box to type in.
       unawaited(Scrollable.ensureVisible(found, alignment: 0.5, duration: Duration.zero));
+      final field = found.widget;
+      if (stop.act == TourAct.type && field is TextField) field.focusNode?.requestFocus();
     }
     final rect = box.localToGlobal(Offset.zero, ancestor: overlay) & box.size;
     final lit = rect.intersect(Offset.zero & overlay.size);
@@ -260,9 +399,8 @@ class _GuidedTourState extends State<GuidedTour> {
     }
   }
 
-  /// The nearest widget of the stop's frame type around [found], if any.
-  Element? _frame(Element? found) {
-    final type = _stop.frame;
+  /// The nearest widget of [type] around [found], if any.
+  Element? _around(Element? found, Type? type) {
     if (found == null || type == null) return null;
     Element? frame;
     found.visitAncestorElements((element) {
@@ -292,22 +430,14 @@ class _GuidedTourState extends State<GuidedTour> {
 
   @override
   Widget build(BuildContext context) {
-    final router = _router;
-    if (router == null) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: widget.theme,
-        locale: widget.locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const Scaffold(key: Key('tour-loading'), body: LoadingView()),
-      );
-    }
-    // The example world's own controllers; the device (voice, files, account) is the app's.
+    final stop = _stop;
+    final lit = stop.anchor == null ? null : _lit;
+    final hands = stop.act != TourAct.look && lit != null;
+    // The example world's own controllers; the device (files, account) is the app's.
     return AppProviders(
       api: _world,
       appState: _appState,
-      voice: context.read<VoiceService>(),
+      voice: widget.voice ?? context.read<VoiceService>(),
       filePicker: context.read<FilePickerService>(),
       auth: context.read<AuthService>(),
       child: MaterialApp.router(
@@ -317,24 +447,28 @@ class _GuidedTourState extends State<GuidedTour> {
         locale: widget.locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        routerConfig: router,
+        routerConfig: _router,
         builder: (context, child) => Stack(
           key: const Key('guided-tour'),
           children: [
-            // Looked at, never touched: only the tour's buttons take input.
+            // Only the lit part of a tap / type stop takes input (the overlay
+            // lets it through there); everything else is looked at.
             IgnorePointer(
+              ignoring: !hands,
               child: KeyedSubtree(key: _scenes, child: child ?? const SizedBox.shrink()),
             ),
             Positioned.fill(
               child: _TourOverlay(
                 key: _overlay,
-                lit: _stop.anchor == null ? null : _lit,
-                tryIt: _stop.tryIt,
-                text: _stop.text(context.l10n),
+                lit: lit,
+                act: lit == null ? TourAct.look : stop.act,
+                canAuto: stop.act != TourAct.look,
+                busy: _autoLooks != null,
+                guest: widget.guest,
+                text: stop.text(context.l10n),
                 index: _index,
                 count: _stops.length,
-                onBack: _index == 0 ? null : () => _go(_index - 1),
-                onNext: () => _go(_index + 1),
+                onNext: _next,
                 onSkip: widget.onDone,
               ),
             ),
@@ -345,34 +479,44 @@ class _GuidedTourState extends State<GuidedTour> {
   }
 }
 
-/// The dark sheet over the page with one part left lit, and the Guide's card
-/// next to it.
+/// The veil over the page with one part left lit, and the Guide's card next
+/// to it.
 class _TourOverlay extends StatelessWidget {
   const _TourOverlay({
     super.key,
     required this.lit,
+    required this.act,
+    required this.canAuto,
+    required this.busy,
+    required this.guest,
     required this.text,
     required this.index,
     required this.count,
-    required this.onBack,
     required this.onNext,
     required this.onSkip,
-    this.tryIt = false,
   });
 
   final Rect? lit;
 
-  /// A tap on [lit] is the way on ([TourStop.tryIt]).
-  final bool tryIt;
+  /// What the user does with [lit]; [TourAct.look] when nothing is lit.
+  final TourAct act;
+
+  /// The stop is one the user does: the card's button does it for them.
+  final bool canAuto;
+
+  /// That button was pressed and its part is under way.
+  final bool busy;
+  final bool guest;
   final String text;
   final int index;
   final int count;
-  final VoidCallback? onBack;
   final VoidCallback onNext;
   final VoidCallback onSkip;
 
-  /// Air between the lit part and its edge, and between it and the card.
-  static const double _halo = 4;
+  /// How far the frame stands off the lit part: just its line, so the
+  /// part's own shadow stays under the veil and nothing inside the frame
+  /// looks shaded. The gap is between the frame and the card.
+  static const double _halo = 1;
   static const double _gap = 16;
 
   @override
@@ -380,11 +524,11 @@ class _TourOverlay extends StatelessWidget {
     final lit = this.lit?.inflate(_halo);
     return Stack(
       children: [
-        // Takes every tap that is not on the card.
+        // Takes every tap that is not on the card — except, at a tap / type
+        // stop, the ones on the lit part: those reach the page.
         Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {},
+          child: _Gate(
+            hole: act == TourAct.look ? null : lit,
             // The lit part glides from one stop to the next.
             child: lit == null
                 ? const CustomPaint(key: Key('tour-scrim'), painter: _ScrimPainter(null))
@@ -401,27 +545,17 @@ class _TourOverlay extends StatelessWidget {
                   ),
           ),
         ),
-        if (tryIt && lit != null)
-          Positioned.fromRect(
-            rect: lit,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                key: const Key('tour-try'),
-                behavior: HitTestBehavior.opaque,
-                onTap: onNext,
-              ),
-            ),
-          ),
         Positioned.fill(
           child: CustomSingleChildLayout(
             delegate: _CardPlace(lit: lit, gap: _gap),
             child: _TourCard(
-              tryIt: tryIt && lit != null,
+              act: act,
+              canAuto: canAuto,
+              busy: busy,
+              guest: guest,
               text: text,
               index: index,
               count: count,
-              onBack: onBack,
               onNext: onNext,
               onSkip: onSkip,
             ),
@@ -432,6 +566,36 @@ class _TourOverlay extends StatelessWidget {
   }
 }
 
+/// Absorbs every pointer on it but those inside [hole].
+class _Gate extends SingleChildRenderObjectWidget {
+  const _Gate({required this.hole, super.child});
+
+  final Rect? hole;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderGate(hole);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderGate renderObject) =>
+      renderObject.hole = hole;
+}
+
+class _RenderGate extends RenderProxyBox {
+  _RenderGate(this.hole);
+
+  Rect? hole;
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    if (!size.contains(position) || (hole?.contains(position) ?? false)) return false;
+    result.add(BoxHitTestEntry(this, position));
+    return true;
+  }
+}
+
+/// The veil: a fog over the whole page, light or dark, so that the lit part
+/// is the only place in its true colours (a dark sheet would leave the night
+/// panel looking shaded inside its frame too).
 class _ScrimPainter extends CustomPainter {
   const _ScrimPainter(this.lit);
 
@@ -443,14 +607,14 @@ class _ScrimPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final sheet = Path()..addRect(Offset.zero & size);
     final lit = this.lit;
-    final dark = Paint()..color = AppColors.night.withValues(alpha: 0.74);
+    final fog = Paint()..color = AppColors.nightLine.withValues(alpha: 0.82);
     if (lit == null) {
-      canvas.drawPath(sheet, dark);
+      canvas.drawPath(sheet, fog);
       return;
     }
     final hole = RRect.fromRectAndRadius(lit, _corner);
     canvas
-      ..drawPath(Path.combine(PathOperation.difference, sheet, Path()..addRRect(hole)), dark)
+      ..drawPath(Path.combine(PathOperation.difference, sheet, Path()..addRRect(hole)), fog)
       ..drawRRect(
         hole,
         Paint()
@@ -465,8 +629,9 @@ class _ScrimPainter extends CustomPainter {
 }
 
 /// Puts the card beside the lit part — where there is room, in this order:
-/// to its right, to its left, below, above — and in the middle of the screen
-/// when nothing is lit or the lit part takes the whole page.
+/// to its right, to its left, below, above — in the middle of the screen when
+/// nothing is lit, and at the top or bottom edge when the lit part leaves no
+/// room beside it.
 class _CardPlace extends SingleChildLayoutDelegate {
   const _CardPlace({required this.lit, required this.gap});
 
@@ -495,7 +660,9 @@ class _CardPlace extends SingleChildLayoutDelegate {
     if (lit.left >= card.width + gap + _margin) return Offset(lit.left - gap - card.width, top);
     if (size.height - lit.bottom >= card.height + gap + _margin) return Offset(left, lit.bottom + gap);
     if (lit.top >= card.height + gap + _margin) return Offset(left, lit.top - gap - card.height);
-    return centre;
+    // No room beside it: at the edge of the screen farther from its middle.
+    final below = lit.center.dy < size.height / 2;
+    return Offset(centre.dx, below ? size.height - card.height - _margin : _margin);
   }
 
   @override
@@ -505,22 +672,27 @@ class _CardPlace extends SingleChildLayoutDelegate {
 /// The Guide and what she says, with the tour's buttons.
 class _TourCard extends StatelessWidget {
   const _TourCard({
-    this.tryIt = false,
+    required this.act,
+    required this.canAuto,
+    required this.busy,
+    required this.guest,
     required this.text,
     required this.index,
     required this.count,
-    required this.onBack,
     required this.onNext,
     required this.onSkip,
   });
 
-  /// The lit part is to be tapped: the card says so, and its own way on is
-  /// only a quiet one.
-  final bool tryIt;
+  /// The lit part is to be tapped or typed into: the card says so.
+  final TourAct act;
+
+  /// The card's button does the stop's part for the user (a quiet button).
+  final bool canAuto;
+  final bool busy;
+  final bool guest;
   final String text;
   final int index;
   final int count;
-  final VoidCallback? onBack;
   final VoidCallback onNext;
   final VoidCallback onSkip;
 
@@ -575,17 +747,23 @@ class _TourCard extends StatelessWidget {
                             key: const Key('tour-text'),
                             style: theme.bodyLarge?.copyWith(height: 1.45),
                           ),
-                          if (tryIt) ...[
+                          if (act != TourAct.look) ...[
                             const SizedBox(height: AppSpacing.sm),
                             Row(
                               key: const Key('tour-try-hint'),
                               children: [
-                                const Icon(Icons.touch_app_outlined, size: 16, color: AppColors.ember),
+                                Icon(
+                                  act == TourAct.type
+                                      ? Icons.keyboard_alt_outlined
+                                      : Icons.touch_app_outlined,
+                                  size: 16,
+                                  color: AppColors.success,
+                                ),
                                 const SizedBox(width: AppSpacing.xs),
                                 Flexible(
                                   child: Text(
-                                    l.tourTryHint,
-                                    style: theme.labelMedium?.copyWith(color: AppColors.ember),
+                                    act == TourAct.type ? l.tourTypeHint : l.tourTryHint,
+                                    style: theme.labelMedium?.copyWith(color: AppColors.success),
                                   ),
                                 ),
                               ],
@@ -622,23 +800,23 @@ class _TourCard extends StatelessWidget {
                             key: const Key('tour-progress'),
                             style: theme.labelMedium?.copyWith(color: AppColors.textTertiary),
                           ),
-                          if (onBack != null)
-                            TextButton(
-                              key: const Key('tour-back'),
-                              onPressed: onBack,
-                              child: Text(l.back),
-                            ),
-                          if (tryIt)
+                          if (canAuto)
                             TextButton(
                               key: const Key('tour-next'),
-                              onPressed: onNext,
-                              child: Text(l.tourNext),
+                              onPressed: busy ? null : onNext,
+                              child: Text(act == TourAct.type ? l.tourDoForMe : l.tourNext),
                             )
                           else
                             FilledButton(
                               key: const Key('tour-next'),
                               onPressed: onNext,
-                              child: Text(last ? l.tourBegin : l.tourNext),
+                              child: Text(
+                                !last
+                                    ? l.tourNext
+                                    : guest
+                                    ? l.tourGuestBegin
+                                    : l.tourBegin,
+                              ),
                             ),
                         ],
                       ),

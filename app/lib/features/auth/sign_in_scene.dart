@@ -21,7 +21,14 @@ import 'landing_page.dart';
 /// buttons. Everything eases in once, staggered. The form opens as a card in
 /// the middle (a sheet at the bottom on a phone); Esc or × closes it.
 class SignInScene extends StatefulWidget {
-  const SignInScene({super.key});
+  const SignInScene({super.key, this.onGuest, this.openSignUp = false});
+
+  /// `Try it without an account`: the guided tour on an example world. The
+  /// button is not shown when null.
+  final VoidCallback? onGuest;
+
+  /// Opens on the `Create account` form (back from that tour).
+  final bool openSignUp;
 
   @override
   State<SignInScene> createState() => _SignInSceneState();
@@ -30,11 +37,11 @@ class SignInScene extends StatefulWidget {
 enum _Mode { signIn, signUp, checkInbox, resetSent }
 
 class _SignInSceneState extends State<SignInScene> {
-  bool _formOpen = false;
+  late bool _formOpen = widget.openSignUp;
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _passwordFocus = FocusNode();
-  _Mode _mode = _Mode.signIn;
+  late _Mode _mode = widget.openSignUp ? _Mode.signUp : _Mode.signIn;
   bool _busy = false;
   bool _showPassword = false;
   String? _error;
@@ -406,6 +413,16 @@ class _SignInSceneState extends State<SignInScene> {
                   style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                   icon: const GoogleMark(),
                   label: Text(context.l10n.continueWithGoogle),
+                ),
+              ],
+              if (widget.onGuest != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                OutlinedButton.icon(
+                  key: const Key('auth-guest'),
+                  onPressed: _busy ? null : widget.onGuest,
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                  label: Text(context.l10n.tryWithoutAccount),
                 ),
               ],
               const SizedBox(height: AppSpacing.md),

@@ -49,6 +49,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tourTryHint => 'Tap the lit part to try it';
 
   @override
+  String get tryWithoutAccount => 'Try it without an account';
+
+  @override
+  String get tourAsk => 'Tell me here what you want to learn. Type anything and send it.';
+
+  @override
+  String get tourBuilt =>
+      'Your course is built: a tree of ideas to prove, one node at a time. Open it.';
+
+  @override
+  String get tourExplain =>
+      'To clear a node, you teach it to the Auditor. Explain it in your own words; in this tour anything you say works.';
+
+  @override
+  String get tourExplainAgain => 'She asks again where it was thin. Answer once more.';
+
+  @override
+  String get tourCleared =>
+      'Cleared! Stars for how thoroughly you were asked, and XP toward your level.';
+
+  @override
+  String get tourTypeHint => 'Type in the lit box and send';
+
+  @override
+  String get tourDoForMe => 'Use an example';
+
+  @override
+  String get tourSampleAnswer =>
+      'It is a way to find a value under given conditions. It works because the conditions pin the value down to exactly one answer.';
+
+  @override
+  String get tourGuestBegin => 'Create my account';
+
+  @override
+  String get tourVerdict =>
+      'Each audit leaves a verdict: your score, the points you held, and what to tighten.';
+
+  @override
   String get heroExampleStem => 'I want to learn';
 
   @override
@@ -1706,19 +1744,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tourSkip => 'Skip the tour';
 
   @override
-  String get tourVerdict => 'Then you get a score, what you missed, and a lesson.';
-
-  @override
   String get tourBegin => 'Set up my character';
 
   @override
-  String get tourTalk => 'Tell me here what you want to learn, typed or spoken.';
-
-  @override
   String get tourTree => 'Every node you clear lights up your life tree.';
-
-  @override
-  String get tourAudit => 'To clear a node, you teach it to the Auditor.';
 
   @override
   String get tourLessonsTitle => 'Every miss becomes a lesson.';

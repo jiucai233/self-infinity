@@ -5,8 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/font_loader.dart';
 
-/// The languages of the app. English is the default; the user picks another
-/// in the ◎ menu or on the front page, and the choice is remembered.
+/// The languages of the app. Korean is what a first visit gets
+/// ([LocaleController.firstVisit]); the user picks another in the ◎ menu or
+/// on the front page, and the choice is remembered.
 enum AppLanguage {
   en('en', 'English', 'en_US'),
   zh('zh', '中文', 'zh_CN'),
@@ -39,6 +40,9 @@ class LocaleController extends ChangeNotifier {
 
   static const String _prefsKey = 'language';
 
+  /// The language before the user has picked one (2026-11-12: Korean).
+  static const AppLanguage firstVisit = AppLanguage.ko;
+
   /// The language of the running app, for code that has no `BuildContext`:
   /// the request header of the API client and the speech services.
   static AppLanguage current = AppLanguage.en;
@@ -46,15 +50,16 @@ class LocaleController extends ChangeNotifier {
   AppLanguage _language;
   AppLanguage get language => _language;
 
-  /// The remembered language (English the first time), with its fonts loaded.
+  /// The remembered language ([firstVisit] the first time), with its fonts loaded.
   static Future<LocaleController> load() async {
     await initializeDateFormatting();
-    var language = AppLanguage.en;
+    var language = firstVisit;
     try {
       final prefs = await SharedPreferences.getInstance();
-      language = AppLanguage.fromCode(prefs.getString(_prefsKey));
+      final saved = prefs.getString(_prefsKey);
+      if (saved != null) language = AppLanguage.fromCode(saved);
     } catch (e) {
-      // No storage (private window, blocked site data): English, not remembered.
+      // No storage (private window, blocked site data): the first-visit language, not remembered.
       debugPrint('language preference unavailable: $e');
     }
     await AppFontLoader.ensure(language);

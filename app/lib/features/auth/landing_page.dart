@@ -1020,7 +1020,7 @@ class _ChapterScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   keepAll(chapter.title),
-                  style: theme.headlineLarge?.copyWith(fontSize: 30, height: 1.1),
+                  style: theme.headlineMedium?.copyWith(height: 1.1),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Row(
