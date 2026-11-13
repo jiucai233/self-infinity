@@ -605,16 +605,21 @@ class _ScrimPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final sheet = Path()..addRect(Offset.zero & size);
     final lit = this.lit;
     final fog = Paint()..color = AppColors.nightLine.withValues(alpha: 0.82);
     if (lit == null) {
-      canvas.drawPath(sheet, fog);
+      canvas.drawRect(Offset.zero & size, fog);
       return;
     }
     final hole = RRect.fromRectAndRadius(lit, _corner);
+    // Even-odd, not Path.combine: in the browser the combined path came out
+    // as the whole sheet, and the lit part stayed under the veil.
+    final sheet = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(Offset.zero & size)
+      ..addRRect(hole);
     canvas
-      ..drawPath(Path.combine(PathOperation.difference, sheet, Path()..addRRect(hole)), fog)
+      ..drawPath(sheet, fog)
       ..drawRRect(
         hole,
         Paint()
