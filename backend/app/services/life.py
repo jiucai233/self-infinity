@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 from sqlmodel import Session, col, select
 
 from app.config import settings
-from app.models import AuditSession, AuditStatus, DailyCheckIn, Goal, LifeAdvice, Profile, SkillNode, SkillStatus
+from app.models import AuditSession, AuditStatus, DailyCheckIn, Goal, LifeAdvice, Profile, SkillNode, SkillStatus, Workout
 from app.schemas import (
     LifeAdviceItemOut,
     LifeAdviceOut,
@@ -98,14 +98,18 @@ def patterns(checkins: list[DailyCheckIn], audits: dict[date, tuple[int, int]]) 
     return found
 
 
-def _summary(window: int, logged: list[DailyCheckIn], days: list[LifeDayOut]) -> LifeSummaryOut:
+def _summary(
+    window: int, logged: list[DailyCheckIn], days: list[LifeDayOut], workout_days: set[date] = frozenset()
+) -> LifeSummaryOut:
     weights = [c.weight_kg for c in logged if c.weight_kg is not None]
+    # A day counts as exercised when the check-in says so or a workout was logged that day.
+    exercised = {c.date for c in logged if _exercised(c) is True} | workout_days
     return LifeSummaryOut(
         days=window,
         days_logged=len(logged),
         avg_sleep_hours=_mean([c.sleep_hours for c in logged]),
         avg_sleep_quality=_mean([c.sleep_quality for c in logged]),
-        exercise_days=sum(1 for c in logged if _exercised(c) is True),
+        exercise_days=len(exercised),
         avg_exercise_minutes=_mean([c.exercise_minutes for c in logged if c.exercise_minutes]),
         avg_focus=_mean([c.focus for c in logged]),
         avg_stress=_mean([c.stress for c in logged]),
@@ -151,8 +155,9 @@ def overview(session: Session, window: int = 30) -> LifeOut:
         days.append(LifeDayOut(date=day, checked_in=c is not None, audits=finished, passed=passed, **fields))
 
     logged = [c for c in checkins if first <= c.date <= today]
+    workout_days = set(session.exec(select(Workout.date).where(Workout.date >= first, Workout.date <= today)).all())
     return LifeOut(
-        summary=_summary(window, logged, days),
+        summary=_summary(window, logged, days, workout_days),
         days=days,
         patterns=patterns(checkins, audits),
         pattern_min_days=PATTERN_MIN_DAYS,

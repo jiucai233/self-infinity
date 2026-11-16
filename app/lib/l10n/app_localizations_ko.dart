@@ -1952,4 +1952,135 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get notesLoadFailed => '노트를 불러오지 못했어요.';
+
+  @override
+  String get workoutTitle => '운동';
+
+  @override
+  String get workoutSayHint => '스쿼트 3세트 20회, 러닝 30분…';
+
+  @override
+  String workoutStreak(int n) {
+    return '$n일 연속';
+  }
+
+  @override
+  String get workoutNone => '이 날은 기록이 없어요.';
+
+  @override
+  String get workoutAdd => '추가';
+
+  @override
+  String get workoutNew => '운동 추가';
+
+  @override
+  String get workoutEdit => '운동 수정';
+
+  @override
+  String get workoutExercise => '운동';
+
+  @override
+  String get workoutCategory => '분류';
+
+  @override
+  String get workoutCatStrength => '근력';
+
+  @override
+  String get workoutCatCardio => '유산소';
+
+  @override
+  String get workoutCatFlexibility => '유연성';
+
+  @override
+  String get workoutCatSports => '스포츠';
+
+  @override
+  String get workoutCatOther => '기타';
+
+  @override
+  String get workoutSets => '세트';
+
+  @override
+  String get workoutReps => '횟수';
+
+  @override
+  String get workoutWeight => '무게 (kg)';
+
+  @override
+  String get workoutMinutes => '시간 (분)';
+
+  @override
+  String get workoutDistance => '거리 (km)';
+
+  @override
+  String get workoutNote => '메모';
+
+  @override
+  String get workoutNeedAmount => '숫자를 하나 이상 넣어 주세요.';
+
+  @override
+  String workoutSaved(int n) {
+    return '$n개 기록했어요.';
+  }
+
+  @override
+  String workoutUnread(String text) {
+    return '못 알아들었어요: $text';
+  }
+
+  @override
+  String get workoutSaidNothing => '운동을 찾지 못했어요. 예: “스쿼트 3세트 20회”';
+
+  @override
+  String get workoutSave => '저장';
+
+  @override
+  String get workoutPrevDay => '전날';
+
+  @override
+  String get workoutNextDay => '다음 날';
+
+  @override
+  String get workoutExportCsv => 'CSV로 내보내기';
+
+  @override
+  String get workoutExportXlsx => 'Excel로 내보내기';
+
+  @override
+  String get workoutImport => 'CSV·Excel 가져오기';
+
+  @override
+  String workoutImported(int n, int skipped) {
+    return '$n개 가져오고 $skipped개는 건너뛰었어요.';
+  }
+
+  @override
+  String get workoutExportUnavailable => '내보내기는 브라우저에서만 돼요.';
+
+  @override
+  String get routinesTitle => '루틴';
+
+  @override
+  String get routineNew => '새 루틴';
+
+  @override
+  String get routineEdit => '루틴 수정';
+
+  @override
+  String get routineName => '이름';
+
+  @override
+  String get routineDays => '요일';
+
+  @override
+  String get routineAddItem => '운동 추가';
+
+  @override
+  String get routineNone => '아직 루틴이 없어요.';
+
+  @override
+  String get routineNeedDay => '요일을 하나 이상 골라 주세요.';
+
+  @override
+  String get routineNeedItem => '운동을 하나 이상 넣어 주세요.';
 }

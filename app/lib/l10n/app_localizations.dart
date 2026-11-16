@@ -3699,6 +3699,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t load your notes.'**
   String get notesLoadFailed;
+
+  /// No description provided for @workoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workouts'**
+  String get workoutTitle;
+
+  /// No description provided for @workoutSayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Squats 3x20, a 30 min run…'**
+  String get workoutSayHint;
+
+  /// No description provided for @workoutStreak.
+  ///
+  /// In en, this message translates to:
+  /// **'{n}-day streak'**
+  String workoutStreak(int n);
+
+  /// No description provided for @workoutNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing logged this day.'**
+  String get workoutNone;
+
+  /// No description provided for @workoutAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get workoutAdd;
+
+  /// No description provided for @workoutNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a workout'**
+  String get workoutNew;
+
+  /// No description provided for @workoutEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit workout'**
+  String get workoutEdit;
+
+  /// No description provided for @workoutExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercise'**
+  String get workoutExercise;
+
+  /// No description provided for @workoutCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get workoutCategory;
+
+  /// No description provided for @workoutCatStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'Strength'**
+  String get workoutCatStrength;
+
+  /// No description provided for @workoutCatCardio.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio'**
+  String get workoutCatCardio;
+
+  /// No description provided for @workoutCatFlexibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Flexibility'**
+  String get workoutCatFlexibility;
+
+  /// No description provided for @workoutCatSports.
+  ///
+  /// In en, this message translates to:
+  /// **'Sports'**
+  String get workoutCatSports;
+
+  /// No description provided for @workoutCatOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get workoutCatOther;
+
+  /// No description provided for @workoutSets.
+  ///
+  /// In en, this message translates to:
+  /// **'Sets'**
+  String get workoutSets;
+
+  /// No description provided for @workoutReps.
+  ///
+  /// In en, this message translates to:
+  /// **'Reps'**
+  String get workoutReps;
+
+  /// No description provided for @workoutWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight (kg)'**
+  String get workoutWeight;
+
+  /// No description provided for @workoutMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes'**
+  String get workoutMinutes;
+
+  /// No description provided for @workoutDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance (km)'**
+  String get workoutDistance;
+
+  /// No description provided for @workoutNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get workoutNote;
+
+  /// No description provided for @workoutNeedAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter at least one number.'**
+  String get workoutNeedAmount;
+
+  /// No description provided for @workoutSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Logged {n}.'**
+  String workoutSaved(int n);
+
+  /// No description provided for @workoutUnread.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t read: {text}'**
+  String workoutUnread(String text);
+
+  /// No description provided for @workoutSaidNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'I couldn\'t find a workout in that. Try “squats 3x20”.'**
+  String get workoutSaidNothing;
+
+  /// No description provided for @workoutSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get workoutSave;
+
+  /// No description provided for @workoutPrevDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous day'**
+  String get workoutPrevDay;
+
+  /// No description provided for @workoutNextDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Next day'**
+  String get workoutNextDay;
+
+  /// No description provided for @workoutExportCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export CSV'**
+  String get workoutExportCsv;
+
+  /// No description provided for @workoutExportXlsx.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Excel'**
+  String get workoutExportXlsx;
+
+  /// No description provided for @workoutImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import CSV or Excel'**
+  String get workoutImport;
+
+  /// No description provided for @workoutImported.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {n}, skipped {skipped}.'**
+  String workoutImported(int n, int skipped);
+
+  /// No description provided for @workoutExportUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Export works in the browser.'**
+  String get workoutExportUnavailable;
+
+  /// No description provided for @routinesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Routines'**
+  String get routinesTitle;
+
+  /// No description provided for @routineNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New routine'**
+  String get routineNew;
+
+  /// No description provided for @routineEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit routine'**
+  String get routineEdit;
+
+  /// No description provided for @routineName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get routineName;
+
+  /// No description provided for @routineDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get routineDays;
+
+  /// No description provided for @routineAddItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add exercise'**
+  String get routineAddItem;
+
+  /// No description provided for @routineNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No routines yet.'**
+  String get routineNone;
+
+  /// No description provided for @routineNeedDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick at least one day.'**
+  String get routineNeedDay;
+
+  /// No description provided for @routineNeedItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least one exercise.'**
+  String get routineNeedItem;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

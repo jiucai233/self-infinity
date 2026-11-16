@@ -574,6 +574,98 @@ class HttpApi implements SelfInfinityApi {
   static List<ChatMessage> _chatMessages(Object? j) =>
       _array(_object(j)['messages']).map((e) => ChatMessage.fromJson(_object(e))).toList();
 
+  // -- 54: workouts and routines -------------------------------------------------
+
+  @override
+  Future<WorkoutCatalog> getWorkoutCatalog() =>
+      _get('/workouts/catalog', parse: (j) => WorkoutCatalog.fromJson(_object(j)));
+
+  @override
+  Future<List<Workout>> listWorkouts({String? from, String? to}) => _get(
+    '/workouts',
+    query: {'from': ?from, 'to': ?to},
+    parse: (j) => _array(j).map((e) => Workout.fromJson(_object(e))).toList(),
+  );
+
+  @override
+  Future<Workout> createWorkout(WorkoutDraft draft) =>
+      _post('/workouts', body: draft.toJson(), parse: (j) => Workout.fromJson(_object(j)));
+
+  @override
+  Future<Workout> updateWorkout(int id, WorkoutDraft draft) =>
+      _send('PUT', '/workouts/$id', body: draft.toJson(), parse: (j) => Workout.fromJson(_object(j)));
+
+  @override
+  Future<void> deleteWorkout(int id) => _send('DELETE', '/workouts/$id', parse: (_) {});
+
+  @override
+  Future<WorkoutSaid> sayWorkout(String text, {String? date}) => _post(
+    '/workouts/say',
+    body: {'text': text, 'date': ?date},
+    parse: (j) => WorkoutSaid.fromJson(_object(j)),
+  );
+
+  @override
+  Future<WorkoutSummary> getWorkoutSummary({int days = 7}) => _get(
+    '/workouts/summary',
+    query: {'days': '$days'},
+    parse: (j) => WorkoutSummary.fromJson(_object(j)),
+  );
+
+  @override
+  Future<Uint8List> exportWorkouts(String format) => _send(
+    'GET',
+    '/workouts/export',
+    query: {'format': format},
+    bytes: true,
+    parse: (b) => b! as Uint8List,
+  );
+
+  @override
+  Future<WorkoutImport> importWorkouts({required String filename, required List<int> bytes}) => _send(
+    'POST',
+    '/workouts/import',
+    file: http.MultipartFile.fromBytes('file', bytes, filename: filename),
+    parse: (j) => WorkoutImport.fromJson(_object(j)),
+  );
+
+  @override
+  Future<List<Routine>> listRoutines() =>
+      _get('/routines', parse: (j) => _array(j).map((e) => Routine.fromJson(_object(e))).toList());
+
+  @override
+  Future<Routine> createRoutine(RoutineDraft draft) =>
+      _post('/routines', body: draft.toJson(), parse: (j) => Routine.fromJson(_object(j)));
+
+  @override
+  Future<Routine> updateRoutine(int id, RoutineDraft draft) =>
+      _send('PUT', '/routines/$id', body: draft.toJson(), parse: (j) => Routine.fromJson(_object(j)));
+
+  @override
+  Future<void> deleteRoutine(int id) => _send('DELETE', '/routines/$id', parse: (_) {});
+
+  @override
+  Future<List<RoutineDay>> getRoutineDay({String? date}) => _get(
+    '/routines/day',
+    query: {'date': ?date},
+    parse: (j) => _array(j).map((e) => RoutineDay.fromJson(_object(e))).toList(),
+  );
+
+  @override
+  Future<Workout> checkRoutineItem(int routineId, int index, {String? date}) => _post(
+    '/routines/$routineId/items/$index/check',
+    body: {'date': ?date},
+    parse: (j) => Workout.fromJson(_object(j)),
+  );
+
+  @override
+  Future<void> uncheckRoutineItem(int routineId, int index, {String? date}) => _send(
+    'DELETE',
+    '/routines/$routineId/items/$index/check',
+    query: {'date': ?date},
+    parse: (_) {},
+  );
+
   // -- transport --------------------------------------------------------------
 
   Future<T> _get<T>(

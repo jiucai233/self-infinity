@@ -10,6 +10,7 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.services.workouts import BOUNDS
 from app.models import AuditStatus, CheckInSource, EdgeKind, FactCategory, FactSource, NodePosition, NodeType, SkillStatus
 
 
@@ -1272,3 +1273,159 @@ class RejudgeOut(BaseModel):
     changed: int
     # Finished audits given under other rules and not yet judged again.
     left: int
+
+
+# ---------------------------------------------------------------- workouts (contract #54)
+
+WorkoutCategory = Literal["strength", "cardio", "flexibility", "sports", "other"]
+
+
+_B = BOUNDS  # the one table of limits (app/services/workouts.py)
+
+
+class _WorkoutNumbers(BaseModel):
+    """The fields a workout and a routine item share; at least one number is required."""
+
+    exercise: str = Field(min_length=1, max_length=40)
+    exercise_key: str | None = None
+    category: WorkoutCategory | None = None
+    sets: int | None = Field(default=None, ge=_B["sets"][0], le=_B["sets"][1])
+    reps: int | None = Field(default=None, ge=_B["reps"][0], le=_B["reps"][1])
+    weight_kg: float | None = Field(default=None, ge=_B["weight_kg"][0], le=_B["weight_kg"][1])
+    duration_min: int | None = Field(default=None, ge=_B["duration_min"][0], le=_B["duration_min"][1])
+    distance_km: float | None = Field(default=None, ge=_B["distance_km"][0], le=_B["distance_km"][1])
+
+    @field_validator("exercise")
+    @classmethod
+    def _exercise_not_blank(cls, value: str) -> str:
+        return _not_blank(value)
+
+    @model_validator(mode="after")
+    def _needs_a_number(self):
+        if all(getattr(self, name) is None for name in ("sets", "reps", "duration_min", "distance_km")):
+            raise ValueError("set at least one of sets, reps, duration_min, distance_km")
+        return self
+
+
+class WorkoutIn(_WorkoutNumbers):
+    date: date_ | None = None
+    note: str | None = Field(default=None, max_length=200)
+
+
+class WorkoutOut(_Out):
+    id: int
+    date: date_
+    exercise: str
+    exercise_key: str | None
+    category: WorkoutCategory
+    sets: int | None
+    reps: int | None
+    weight_kg: float | None
+    duration_min: int | None
+    distance_km: float | None
+    note: str | None
+    source: Literal["manual", "said", "routine", "import"]
+    routine_id: int | None
+    routine_item: int | None
+    created_at: datetime
+
+
+class WorkoutSayIn(BaseModel):
+    text: str = Field(min_length=1, max_length=300)
+    date: date_ | None = None
+
+    @field_validator("text")
+    @classmethod
+    def _text_not_blank(cls, value: str) -> str:
+        return _not_blank(value)
+
+
+class WorkoutSayOut(BaseModel):
+    workouts: list[WorkoutOut]
+    unread: list[str]
+
+
+class CatalogExerciseOut(BaseModel):
+    key: str
+    name: str
+    category: WorkoutCategory
+    unit: Literal["reps", "time", "distance"]
+
+
+class WorkoutCatalogOut(BaseModel):
+    categories: list[WorkoutCategory]
+    exercises: list[CatalogExerciseOut]
+
+
+class WorkoutDayOut(BaseModel):
+    date: date_
+    minutes: int
+    workouts: int
+
+
+class WorkoutSummaryOut(BaseModel):
+    days: int
+    streak: int
+    best_streak: int
+    xp: int
+    total_minutes: int
+    workouts: int
+    by_category: dict[str, int]
+    by_day: list[WorkoutDayOut]
+
+
+class RoutineItemModel(_WorkoutNumbers):
+    pass
+
+
+class RoutineIn(BaseModel):
+    name: str = Field(min_length=1, max_length=30)
+    weekdays: list[int] = Field(min_length=1, max_length=7)
+    items: list[RoutineItemModel] = Field(min_length=1, max_length=12)
+
+    @field_validator("name")
+    @classmethod
+    def _name_not_blank(cls, value: str) -> str:
+        return _not_blank(value)
+
+    @field_validator("weekdays")
+    @classmethod
+    def _weekdays_valid(cls, value: list[int]) -> list[int]:
+        if any(day < 0 or day > 6 for day in value):
+            raise ValueError("weekdays are 0 (Monday) to 6 (Sunday)")
+        return sorted(set(value))
+
+
+class RoutineOut(BaseModel):
+    id: int
+    name: str
+    weekdays: list[int]
+    items: list[dict]
+    created_at: datetime
+
+
+class RoutineDayItemOut(BaseModel):
+    index: int
+    item: dict
+    workout_id: int | None
+
+
+class RoutineDayOut(BaseModel):
+    routine: RoutineOut
+    items: list[RoutineDayItemOut]
+    done: bool
+
+
+class RoutineCheckIn(BaseModel):
+    date: date_ | None = None
+
+
+class WorkoutImportError(BaseModel):
+    row: int
+    reason: str
+
+
+class WorkoutImportOut(BaseModel):
+    imported: int
+    skipped: int
+    errors: list[WorkoutImportError]

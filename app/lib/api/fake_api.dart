@@ -15,6 +15,7 @@ import '../voice/live_link.dart';
 import 'api.dart';
 import 'api_exception.dart';
 import 'fake_script.dart';
+import 'fake_workouts.dart';
 import 'graph_utils.dart';
 import 'models.dart';
 import 'reflection_prompts.dart';
@@ -136,6 +137,22 @@ class FakeApiClient implements SelfInfinityApi {
 
   /// The method names accepted by [failNext]'s `method` argument.
   static const Set<String> methodNames = {
+    'getWorkoutCatalog',
+    'listWorkouts',
+    'createWorkout',
+    'updateWorkout',
+    'deleteWorkout',
+    'sayWorkout',
+    'getWorkoutSummary',
+    'exportWorkouts',
+    'importWorkouts',
+    'listRoutines',
+    'createRoutine',
+    'updateRoutine',
+    'deleteRoutine',
+    'getRoutineDay',
+    'checkRoutineItem',
+    'uncheckRoutineItem',
     'generateCourse',
     'scoutCourse',
     'listCourses',
@@ -2640,6 +2657,108 @@ class FakeApiClient implements SelfInfinityApi {
     _require(t.isNotEmpty, 'title must not be blank');
     _require(t.length <= Goal.maxTitleLength, 'title is too long');
     return t;
+  }
+
+  // ===========================================================================
+  // 54: workouts and routines
+  // ===========================================================================
+
+  late final FakeWorkoutStore _gym = FakeWorkoutStore(clock: _clock, language: language);
+
+  @override
+  Future<WorkoutCatalog> getWorkoutCatalog() async {
+    await _begin('getWorkoutCatalog');
+    return _gym.catalog();
+  }
+
+  @override
+  Future<List<Workout>> listWorkouts({String? from, String? to}) async {
+    await _begin('listWorkouts');
+    return _gym.list(from: from, to: to);
+  }
+
+  @override
+  Future<Workout> createWorkout(WorkoutDraft draft) async {
+    await _begin('createWorkout');
+    return _gym.create(draft);
+  }
+
+  @override
+  Future<Workout> updateWorkout(int id, WorkoutDraft draft) async {
+    await _begin('updateWorkout');
+    return _gym.update(id, draft);
+  }
+
+  @override
+  Future<void> deleteWorkout(int id) async {
+    await _begin('deleteWorkout');
+    _gym.delete(id);
+  }
+
+  @override
+  Future<WorkoutSaid> sayWorkout(String text, {String? date}) async {
+    await _begin('sayWorkout');
+    return _gym.say(text, date: date);
+  }
+
+  @override
+  Future<WorkoutSummary> getWorkoutSummary({int days = 7}) async {
+    await _begin('getWorkoutSummary');
+    return _gym.summary(days: days);
+  }
+
+  @override
+  Future<Uint8List> exportWorkouts(String format) async {
+    await _begin('exportWorkouts');
+    return _gym.export(format);
+  }
+
+  @override
+  Future<WorkoutImport> importWorkouts({required String filename, required List<int> bytes}) async {
+    await _begin('importWorkouts');
+    return _gym.import(filename, bytes);
+  }
+
+  @override
+  Future<List<Routine>> listRoutines() async {
+    await _begin('listRoutines');
+    return _gym.routines();
+  }
+
+  @override
+  Future<Routine> createRoutine(RoutineDraft draft) async {
+    await _begin('createRoutine');
+    return _gym.createRoutine(draft);
+  }
+
+  @override
+  Future<Routine> updateRoutine(int id, RoutineDraft draft) async {
+    await _begin('updateRoutine');
+    return _gym.updateRoutine(id, draft);
+  }
+
+  @override
+  Future<void> deleteRoutine(int id) async {
+    await _begin('deleteRoutine');
+    _gym.deleteRoutine(id);
+  }
+
+  @override
+  Future<List<RoutineDay>> getRoutineDay({String? date}) async {
+    await _begin('getRoutineDay');
+    return _gym.routineDay(date: date);
+  }
+
+  @override
+  Future<Workout> checkRoutineItem(int routineId, int index, {String? date}) async {
+    await _begin('checkRoutineItem');
+    return _gym.check(routineId, index, date: date);
+  }
+
+  @override
+  Future<void> uncheckRoutineItem(int routineId, int index, {String? date}) async {
+    await _begin('uncheckRoutineItem');
+    _gym.uncheck(routineId, index, date: date);
   }
 
   // ===========================================================================

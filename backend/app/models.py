@@ -593,3 +593,37 @@ class LLMCall(SQLModel, table=True):
     ok: bool = True
     # The audit the call was made for, when it answered one (POST /api/audits/{id}/turns).
     audit_id: int | None = Field(default=None, index=True)
+
+
+class Workout(SQLModel, table=True):
+    """One workout record (contract #54): an exercise on a calendar day (APP_TIMEZONE)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    date: date_ = Field(index=True)
+    exercise: str
+    # Set when the exercise matched the catalog (app/services/workouts.py).
+    exercise_key: str | None = None
+    category: str = "other"
+    sets: int | None = None
+    reps: int | None = None
+    weight_kg: float | None = None
+    duration_min: int | None = None
+    distance_km: float | None = None
+    note: str | None = None
+    # manual | said | routine | import
+    source: str = "manual"
+    # Kept as history when the routine is deleted, so it is not a foreign key.
+    routine_id: int | None = Field(default=None, index=True)
+    routine_item: int | None = None
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+
+
+class Routine(SQLModel, table=True):
+    """A named list of exercises scheduled on some weekdays (contract #54)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    # JSON list of weekday numbers (0 = Monday) and of RoutineItem dicts.
+    weekdays_json: str = "[]"
+    items_json: str = "[]"
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)

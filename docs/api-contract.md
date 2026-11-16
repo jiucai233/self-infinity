@@ -758,3 +758,40 @@ How long the user wants audits to be, and what a verdict is shown as. The audito
 - **Effect** (`start_audit`, ordinary audits of a node with knowledge points): `short` examines only the first of the points that `standard` would (`examined[:1]`) with at most 2 turns; `standard` is as before; `thorough` examines every point of the node again (held ones too, with `ok` and `note` reset) with `POINT_TURNS × points` turns, at least 4 and at most 14. A node without points: `short` has `max(2, base // 2)` turns, `thorough` `base + 2`. A challenge (`test_out`) ignores the preference. Night mode still doubles the turns. The length used is kept as `AuditSession.length` (null on a challenge and on audits from before).
 - **Stars**: a failed audit 0; a passed audit 1 (`short`), 2 (`standard`) or 3 (`thorough`); a passed challenge 3. Kept as `AuditSession.stars`; the node keeps the most of its passed audits as `SkillNode.best_stars`.
 - **Fields**: `stars` (int 0–3) is in the verdict of `POST /api/audits/{id}/turns` (endpoint 8), in `AuditSession` (with `length`) and in `AuditSummary` / `NodeAudit` (endpoints 9, 11 and the overview); `best_stars` (int or null) is on every `SkillNode` payload (endpoints 1, 2, the overview and the course map). An audit closed before stars existed shows 2 for a pass and 0 for a fail (derived on output, nothing migrated); an audit still active shows 0.
+
+### 54. Workouts and routines  (no LLM on the rule path, added 2026-11-16, branch `workout-tracker`)
+
+A workout log in the Life page: records by date, a fixed set of categories, one line said or typed and split into records, routines checked off day by day, and CSV / Excel in and out. Rule-based throughout (`app/services/workouts.py`); the LLM is only asked for the pieces of a said line the rules could not read, and only when a real provider is set (Mock: never). Dates are calendar dates in `APP_TIMEZONE` (KST), `YYYY-MM-DD`; a missing `date` means today.
+
+**Types.**
+
+- `WorkoutCategory`: `strength` | `cardio` | `flexibility` | `sports` | `other`.
+- `CatalogExercise`: `{"key": "squat", "name": "스쿼트", "category": "strength", "unit": "reps"}` — `unit` is `reps` (sets × reps, maybe weight), `time` (minutes) or `distance` (km and minutes). `name` is in the request language. The catalog has about 30 common exercises (squat, push-up, pull-up, bench press, deadlift, lunge, plank, running, walking, cycling, swimming, jump rope, stretching, yoga, basketball, soccer, badminton, tennis, …), each with names in en / zh / ko and a few aliases (`런닝`/`달리기`/`跑步`/`run`).
+- `Workout`: `{"id": 1, "date": "2026-11-16", "exercise": "스쿼트", "exercise_key": "squat" | null, "category": "strength", "sets": 3 | null, "reps": 20 | null, "weight_kg": 40.0 | null, "duration_min": 10 | null, "distance_km": 5.0 | null, "note": "" | null, "source": "manual" | "said" | "routine" | "import", "routine_id": 2 | null, "routine_item": 0 | null, "created_at": "…"}`. `exercise` is the name as entered or the catalog name; `exercise_key` is set when it matched the catalog. At least one of sets, reps, duration_min, distance_km must be set (422 otherwise). Bounds: sets 1–50, reps 1–1000, weight 0–500, minutes 1–600, km 0.1–300; exercise 1–40 chars; note ≤ 200.
+- `WorkoutIn`: `Workout` without `id`, `source`, `routine_id`, `routine_item`, `created_at`; `category` optional (taken from the catalog, else `other`).
+- `RoutineItem`: `{"exercise": "벤치프레스", "exercise_key": "bench_press" | null, "category": "strength", "sets": 4 | null, "reps": 10 | null, "weight_kg": 50 | null, "duration_min": null, "distance_km": null}` (same rules as a workout).
+- `Routine`: `{"id": 2, "name": "상체 A", "weekdays": [0, 2, 4], "items": [RoutineItem, …], "created_at": "…"}`. `weekdays`: 0 = Monday … 6 = Sunday, at least one; name 1–30 chars; 1–12 items.
+- `WorkoutSummary`: `{"days": 7, "streak": 3, "best_streak": 9, "xp": 120, "total_minutes": 95, "workouts": 6, "by_category": {"strength": 4, "cardio": 2}, "by_day": [{"date": "2026-11-10", "minutes": 0, "workouts": 0}, …]}`. `streak`: consecutive days with at least one workout, ending today (or yesterday when today has none yet). `by_day` has every day of the window, oldest first. `xp` (all time): 10 per workout, +20 for each day on which a routine scheduled that day was completed in full. Workout XP is its own number; it does not touch the learning level.
+
+**Endpoints.**
+
+| # | Method | Path | Body / query | Response |
+|---|---|---|---|---|
+| 54a | GET | `/api/workouts/catalog` | — | `{"categories": [WorkoutCategory…], "exercises": [CatalogExercise…]}` |
+| 54b | GET | `/api/workouts` | `from`, `to` (inclusive; default the last 30 days) | `[Workout]`, newest date first, then newest created |
+| 54c | POST | `/api/workouts` | `WorkoutIn` | 201 `Workout` |
+| 54d | PUT | `/api/workouts/{id}` | `WorkoutIn` | `Workout` (404 unknown) |
+| 54e | DELETE | `/api/workouts/{id}` | — | 204 (404 unknown) |
+| 54f | POST | `/api/workouts/say` | `{"text": "…", "date": "…"?}` (text 1–300) | 201 `{"workouts": [Workout], "unread": ["…"]}`: every record read out of the line is saved (`source` `said`); `unread` is the pieces that named nothing. Nothing read → 200 with `workouts: []`. |
+| 54g | GET | `/api/workouts/summary` | `days` = 7 \| 30 \| 90 (default 7) | `WorkoutSummary` |
+| 54h | GET | `/api/workouts/export` | `format` = `csv` \| `xlsx` | the file (`text/csv; charset=utf-8` with a BOM so Excel reads Korean / `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), `Content-Disposition: attachment; filename="workouts-YYYYMMDD.csv"`. Columns: `date, exercise, category, sets, reps, weight_kg, duration_min, distance_km, note`. |
+| 54i | POST | `/api/workouts/import` | multipart `file` (.csv or .xlsx, ≤ 2 MB, the export's columns; header row required) | `{"imported": 12, "skipped": 1, "errors": [{"row": 5, "reason": "…"}]}`; a row identical to an existing workout (same date, exercise and numbers) is skipped; bad rows are reported, the rest imported. |
+| 54j | GET | `/api/routines` | — | `[Routine]` |
+| 54k | POST | `/api/routines` | `Routine` without id / created_at | 201 `Routine` |
+| 54l | PUT | `/api/routines/{id}` | same | `Routine` |
+| 54m | DELETE | `/api/routines/{id}` | — | 204; its past workouts stay (their `routine_id` is kept as history) |
+| 54n | GET | `/api/routines/day` | `date` | `[{"routine": Routine, "items": [{"index": 0, "item": RoutineItem, "workout_id": 7 \| null}], "done": false}]` — the routines scheduled on that weekday; `workout_id` is the workout that checked the item off that day; `done` when every item is. |
+| 54o | POST | `/api/routines/{id}/items/{index}/check` | `{"date": "…"?}` | 201 `Workout` (`source` `routine`, the item's numbers); 409 when already checked that day |
+| 54p | DELETE | `/api/routines/{id}/items/{index}/check` | `date` query | 204: the workout that checked it is deleted |
+
+**Reading a said line (rules, en / zh / ko).** The line is split on `,` `、` `，` `;` ` and ` ` 그리고 ` ` 하고 ` `和` and line breaks; each piece is matched against the catalog names and aliases (longest first; a piece with no catalog name but numbers keeps its own words as `exercise`, category `other`). Numbers: `3세트`/`3 sets`/`3组`, `20회`/`20개`/`20 reps`/`20次`/`20个`, `3x20` / `3×20` (sets × reps), `40kg`/`40킬로`/`40公斤`, `30분`/`30 min`/`30分钟`, `1시간`/`1 hour`/`1小时` (→ 60), `5km`/`5키로`/`5公里`. A time exercise with only a number and no unit takes it as minutes. Words for yesterday (`어제`, `yesterday`, `昨天`) move that line to the day before `date`.

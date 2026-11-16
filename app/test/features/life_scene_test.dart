@@ -68,6 +68,10 @@ void main() {
     await api.editCheckIn(day(0), {'sleep_hours': 6, 'focus': 3});
     await pumpScene(tester, const LifeScene(), api: api);
 
+    await tester.ensureVisible(key('life-advice-get'));
+
+    await tester.pumpAndSettle();
+
     await tester.tap(key('life-advice-get'));
     await tester.pumpAndSettle();
 
@@ -81,6 +85,10 @@ void main() {
     await pumpScene(tester, const LifeScene(), api: api);
     api.failNext(method: 'requestLifeAdvice');
 
+    await tester.ensureVisible(key('life-advice-get'));
+
+    await tester.pumpAndSettle();
+
     await tester.tap(key('life-advice-get'));
     await tester.pumpAndSettle();
 
@@ -92,10 +100,14 @@ void main() {
     final api = newApi();
     await pumpScene(tester, const LifeScene(), api: api);
 
+    await tester.ensureVisible(key('life-day-${day(0)}'));
+    await tester.pumpAndSettle();
     await tester.tap(key('life-day-${day(0)}'));
     await tester.pumpAndSettle();
     await tester.enterText(key('edit-weight'), '71.5');
     await tester.enterText(key('edit-minutes'), '40');
+    await tester.ensureVisible(key('edit-save'));
+    await tester.pumpAndSettle();
     await tester.tap(key('edit-save'));
     await tester.pumpAndSettle();
 
@@ -107,6 +119,8 @@ void main() {
 
   testWidgets('the window can be 7 days', (tester) async {
     await pumpScene(tester, const LifeScene(), api: newApi());
+    await tester.ensureVisible(key('life-window-7'));
+    await tester.pumpAndSettle();
     await tester.tap(key('life-window-7'));
     await tester.pumpAndSettle();
     expect(find.text('Last 7 days'), findsOneWidget);
@@ -136,10 +150,18 @@ void main() {
     final api = newApi();
     await pumpScene(tester, const LifeScene(), api: api);
 
+    await tester.ensureVisible(key('life-fact-add'));
+
+    await tester.pumpAndSettle();
+
     await tester.tap(key('life-fact-add'));
     await tester.pumpAndSettle();
     await tester.enterText(key('fact-text'), 'No screens after 23:00');
+    await tester.ensureVisible(key('fact-category-constraint'));
+    await tester.pumpAndSettle();
     await tester.tap(key('fact-category-constraint'));
+    await tester.ensureVisible(key('fact-save'));
+    await tester.pumpAndSettle();
     await tester.tap(key('fact-save'));
     await tester.pumpAndSettle();
 
@@ -155,18 +177,30 @@ void main() {
     await pumpScene(tester, const LifeScene(), api: api);
 
     await tester.ensureVisible(key('life-fact-menu-${fact.id}'));
+    await tester.ensureVisible(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
     await tester.tap(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(key('fact-end'));
     await tester.pumpAndSettle();
     await tester.tap(key('fact-end'));
     await tester.pumpAndSettle();
 
     expect(find.text('Exams until Friday'), findsNothing);
     expect(find.text('Past (1)'), findsOneWidget);
+    await tester.ensureVisible(key('life-facts-past'));
+    await tester.pumpAndSettle();
     await tester.tap(key('life-facts-past'));
     await tester.pumpAndSettle();
     expect(textsIn(tester, key('life-fact-${fact.id}')).last, 'Schedule · Oct 8 – Oct 8');
 
+    await tester.ensureVisible(key('life-fact-menu-${fact.id}'));
+
+    await tester.pumpAndSettle();
+
     await tester.tap(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(key('fact-restore'));
     await tester.pumpAndSettle();
     await tester.tap(key('fact-restore'));
     await tester.pumpAndSettle();
@@ -180,11 +214,17 @@ void main() {
     await pumpScene(tester, const LifeScene(), api: api);
 
     await tester.ensureVisible(key('life-fact-menu-${fact.id}'));
+    await tester.ensureVisible(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
     await tester.tap(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(key('fact-edit'));
     await tester.pumpAndSettle();
     await tester.tap(key('fact-edit'));
     await tester.pumpAndSettle();
     await tester.enterText(key('fact-text'), 'Knee injury');
+    await tester.ensureVisible(key('fact-save'));
+    await tester.pumpAndSettle();
     await tester.tap(key('fact-save'));
     await tester.pumpAndSettle();
 
@@ -198,11 +238,17 @@ void main() {
     await pumpScene(tester, const LifeScene(), api: api);
 
     await tester.ensureVisible(key('life-fact-menu-${fact.id}'));
+    await tester.ensureVisible(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
     await tester.tap(key('life-fact-menu-${fact.id}'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(key('fact-delete'));
     await tester.pumpAndSettle();
     await tester.tap(key('fact-delete'));
     await tester.pumpAndSettle();
     expect(key('fact-delete-dialog'), findsOneWidget);
+    await tester.ensureVisible(key('fact-delete-confirm'));
+    await tester.pumpAndSettle();
     await tester.tap(key('fact-delete-confirm'));
     await tester.pumpAndSettle();
 
@@ -217,9 +263,15 @@ void main() {
     }
     await pumpScene(tester, const LifeScene(), api: api);
 
+    await tester.ensureVisible(key('life-fact-add'));
+
+    await tester.pumpAndSettle();
+
     await tester.tap(key('life-fact-add'));
     await tester.pumpAndSettle();
     await tester.enterText(key('fact-text'), 'one more');
+    await tester.ensureVisible(key('fact-save'));
+    await tester.pumpAndSettle();
     await tester.tap(key('fact-save'));
     await tester.pumpAndSettle();
 

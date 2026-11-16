@@ -12,9 +12,13 @@ class FakeFilePicker implements FilePickerService {
   /// How often [pick] was called.
   int calls = 0;
 
+  /// The extensions the last [pick] asked for.
+  List<String>? lastExtensions;
+
   @override
-  Future<PickedFile?> pick() async {
+  Future<PickedFile?> pick({List<String> extensions = kUploadExtensions}) async {
     calls++;
+    lastExtensions = extensions;
     final file = next;
     next = null;
     return file;

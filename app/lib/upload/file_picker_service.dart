@@ -22,19 +22,20 @@ const int kUploadMaxBytes = 4 * 1024 * 1024;
 
 /// Opens the system file dialog.
 abstract class FilePickerService {
-  /// Lets the user pick one `.pdf` / `.txt` / `.md` file. Returns null when
-  /// the dialog is cancelled or the file cannot be read. Never throws.
-  Future<PickedFile?> pick();
+  /// Lets the user pick one file with one of [extensions] (default the
+  /// upload's: `.pdf` / `.txt` / `.md`). Returns null when the dialog is
+  /// cancelled or the file cannot be read. Never throws.
+  Future<PickedFile?> pick({List<String> extensions = kUploadExtensions});
 }
 
 /// [FilePickerService] over the `file_picker` plugin.
 class PlatformFilePickerService implements FilePickerService {
   @override
-  Future<PickedFile?> pick() async {
+  Future<PickedFile?> pick({List<String> extensions = kUploadExtensions}) async {
     try {
       final file = await FilePicker.pickFile(
         type: FileType.custom,
-        allowedExtensions: kUploadExtensions,
+        allowedExtensions: extensions,
       );
       if (file == null) return null;
       return PickedFile(name: file.name, bytes: await file.readAsBytes());

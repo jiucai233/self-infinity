@@ -409,6 +409,61 @@ abstract class SelfInfinityApi {
   /// `POST /dev/rejudge` (developers only; one model call per audit): judges
   /// the next few audits given under older rules again.
   Future<RejudgeStatus> rejudge({int limit = 5});
+  // -- 54: workouts and routines (no LLM on the rule path) --------------------
+
+  /// `GET /workouts/catalog`: the categories and the exercises the app knows,
+  /// named in the app's language.
+  Future<WorkoutCatalog> getWorkoutCatalog();
+
+  /// `GET /workouts?from=&to=` (inclusive, `YYYY-MM-DD`; default the last 30
+  /// days): newest date first, then newest made.
+  Future<List<Workout>> listWorkouts({String? from, String? to});
+
+  /// `POST /workouts`. 422 when no number is set or one is out of bounds.
+  Future<Workout> createWorkout(WorkoutDraft draft);
+
+  /// `PUT /workouts/{id}`. 404 unknown, 422 as [createWorkout].
+  Future<Workout> updateWorkout(int id, WorkoutDraft draft);
+
+  /// `DELETE /workouts/{id}`. 404 unknown.
+  Future<void> deleteWorkout(int id);
+
+  /// `POST /workouts/say`: one line said or typed, split into workouts that
+  /// are saved at once ([date] null = today). Rules first; the LLM only reads
+  /// what the rules could not, and only with a real provider.
+  Future<WorkoutSaid> sayWorkout(String text, {String? date});
+
+  /// `GET /workouts/summary?days=` (7 | 30 | 90).
+  Future<WorkoutSummary> getWorkoutSummary({int days = 7});
+
+  /// `GET /workouts/export?format=csv|xlsx`: the file's bytes.
+  Future<Uint8List> exportWorkouts(String format);
+
+  /// `POST /workouts/import` (multipart `file`, .csv or .xlsx).
+  Future<WorkoutImport> importWorkouts({required String filename, required List<int> bytes});
+
+  /// `GET /routines`.
+  Future<List<Routine>> listRoutines();
+
+  /// `POST /routines`. 422 on a bad name, no weekday, or 0 / over 12 items.
+  Future<Routine> createRoutine(RoutineDraft draft);
+
+  /// `PUT /routines/{id}`.
+  Future<Routine> updateRoutine(int id, RoutineDraft draft);
+
+  /// `DELETE /routines/{id}`: its past workouts stay.
+  Future<void> deleteRoutine(int id);
+
+  /// `GET /routines/day?date=`: the routines scheduled on that weekday.
+  Future<List<RoutineDay>> getRoutineDay({String? date});
+
+  /// `POST /routines/{id}/items/{index}/check`: a workout with the item's
+  /// numbers. 409 when it is already checked that day.
+  Future<Workout> checkRoutineItem(int routineId, int index, {String? date});
+
+  /// `DELETE /routines/{id}/items/{index}/check?date=`: its workout is deleted.
+  Future<void> uncheckRoutineItem(int routineId, int index, {String? date});
+
 }
 
 /// What the user says about a failed audit (`POST /audits/{id}/feedback`).
@@ -419,4 +474,5 @@ enum AuditFeedback {
   const AuditFeedback(this.wire);
 
   final String wire;
+
 }

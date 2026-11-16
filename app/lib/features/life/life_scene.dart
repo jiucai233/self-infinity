@@ -15,6 +15,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/widgets.dart';
 import '../stage/stage_scaffold.dart';
 import 'life_chart.dart';
+import 'workout_section.dart';
 
 /// The player's own record (contract #39): how they live next to how they
 /// learn. The window's numbers and chart, their own patterns, what lasts
@@ -132,6 +133,8 @@ class _LifeSceneState extends State<LifeScene> {
                         _windowToggle(context),
                         const SizedBox(height: AppSpacing.lg),
                         _Summary(summary: life.summary, compact: box.maxWidth < 600),
+                        const SizedBox(height: AppSpacing.lg),
+                        WorkoutSection(onChanged: () => context.read<AppState>().markDataChanged()),
                         const SizedBox(height: AppSpacing.lg),
                         _Card(
                           key: const Key('life-chart-card'),

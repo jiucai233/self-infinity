@@ -3072,3 +3072,426 @@ class StyleStat {
   /// Null until an audit of this style has been rewarded.
   final double? meanReward;
 }
+
+// ---------------------------------------------------------------------------
+// Workouts and routines (contract #54, branch workout-tracker)
+// ---------------------------------------------------------------------------
+
+/// What kind of exercise a workout is.
+enum WorkoutCategory {
+  strength,
+  cardio,
+  flexibility,
+  sports,
+  other;
+
+  /// An unknown category reads as [other].
+  static WorkoutCategory fromJson(Object? v) =>
+      values.firstWhere((c) => c.name == v, orElse: () => WorkoutCategory.other);
+}
+
+/// How an exercise is counted: sets × reps (maybe with a weight), minutes,
+/// or a distance and minutes.
+enum WorkoutUnit {
+  reps,
+  time,
+  distance;
+
+  static WorkoutUnit fromJson(Object? v) =>
+      values.firstWhere((u) => u.name == v, orElse: () => WorkoutUnit.reps);
+}
+
+/// One exercise the app knows, its name in the request language.
+@immutable
+class CatalogExercise {
+  const CatalogExercise({
+    required this.key,
+    required this.name,
+    required this.category,
+    required this.unit,
+  });
+
+  factory CatalogExercise.fromJson(Json json) => CatalogExercise(
+    key: _str(json, 'key'),
+    name: _str(json, 'name'),
+    category: WorkoutCategory.fromJson(json['category']),
+    unit: WorkoutUnit.fromJson(json['unit']),
+  );
+
+  final String key;
+  final String name;
+  final WorkoutCategory category;
+  final WorkoutUnit unit;
+}
+
+/// `GET /workouts/catalog`.
+@immutable
+class WorkoutCatalog {
+  const WorkoutCatalog({required this.categories, required this.exercises});
+
+  factory WorkoutCatalog.fromJson(Json json) => WorkoutCatalog(
+    categories: [for (final c in _strList(json, 'categories')) WorkoutCategory.fromJson(c)],
+    exercises: _list(json, 'exercises', CatalogExercise.fromJson),
+  );
+
+  final List<WorkoutCategory> categories;
+  final List<CatalogExercise> exercises;
+
+  CatalogExercise? byKey(String? key) =>
+      key == null ? null : exercises.where((e) => e.key == key).firstOrNull;
+}
+
+/// The numbers of a workout or a routine item: at least one is set.
+@immutable
+class WorkoutAmount {
+  const WorkoutAmount({this.sets, this.reps, this.weightKg, this.durationMin, this.distanceKm});
+
+  factory WorkoutAmount.fromJson(Json json) => WorkoutAmount(
+    sets: _intN(json, 'sets'),
+    reps: _intN(json, 'reps'),
+    weightKg: _doubleN(json, 'weight_kg'),
+    durationMin: _intN(json, 'duration_min'),
+    distanceKm: _doubleN(json, 'distance_km'),
+  );
+
+  final int? sets;
+  final int? reps;
+  final double? weightKg;
+  final int? durationMin;
+  final double? distanceKm;
+
+  bool get isEmpty => sets == null && reps == null && durationMin == null && distanceKm == null;
+
+  Json toJson() => {
+    'sets': sets,
+    'reps': reps,
+    'weight_kg': weightKg,
+    'duration_min': durationMin,
+    'distance_km': distanceKm,
+  };
+
+  /// `3×20 · 40kg`, `30min`, `5km · 28min` (units are the same in every language).
+  String get label {
+    final parts = <String>[
+      if (sets != null && reps != null)
+        '$sets×$reps'
+      else if (sets != null)
+        '$sets sets'
+      else if (reps != null)
+        '×$reps',
+      if (weightKg != null) '${_trim(weightKg!)}kg',
+      if (distanceKm != null) '${_trim(distanceKm!)}km',
+      if (durationMin != null) '${durationMin}min',
+    ];
+    return parts.join(' · ');
+  }
+
+  static String _trim(double v) => v == v.roundToDouble() ? '${v.toInt()}' : '$v';
+
+  @override
+  bool operator ==(Object other) =>
+      other is WorkoutAmount &&
+      other.sets == sets &&
+      other.reps == reps &&
+      other.weightKg == weightKg &&
+      other.durationMin == durationMin &&
+      other.distanceKm == distanceKm;
+
+  @override
+  int get hashCode => Object.hash(sets, reps, weightKg, durationMin, distanceKm);
+}
+
+/// Where a workout came from.
+enum WorkoutSource {
+  manual,
+  said,
+  routine,
+  import;
+
+  static WorkoutSource fromJson(Object? v) =>
+      values.firstWhere((s) => s.name == v, orElse: () => WorkoutSource.manual);
+}
+
+/// What the client sends to make or change a workout (`WorkoutIn`).
+@immutable
+class WorkoutDraft {
+  const WorkoutDraft({
+    required this.date,
+    required this.exercise,
+    required this.amount,
+    this.exerciseKey,
+    this.category,
+    this.note,
+  });
+
+  final String date;
+  final String exercise;
+  final String? exerciseKey;
+
+  /// Null: the server takes it from the catalog (else `other`).
+  final WorkoutCategory? category;
+  final WorkoutAmount amount;
+  final String? note;
+
+  Json toJson() => {
+    'date': date,
+    'exercise': exercise,
+    'exercise_key': exerciseKey,
+    if (category != null) 'category': category!.name,
+    ...amount.toJson(),
+    'note': (note?.trim().isEmpty ?? true) ? null : note!.trim(),
+  };
+}
+
+/// One workout on one day (`Workout`).
+@immutable
+class Workout {
+  const Workout({
+    required this.id,
+    required this.date,
+    required this.exercise,
+    required this.category,
+    required this.amount,
+    required this.source,
+    required this.createdAt,
+    this.exerciseKey,
+    this.note,
+    this.routineId,
+    this.routineItem,
+  });
+
+  factory Workout.fromJson(Json json) => Workout(
+    id: _int(json, 'id'),
+    date: _str(json, 'date'),
+    exercise: _str(json, 'exercise'),
+    exerciseKey: _strN(json, 'exercise_key'),
+    category: WorkoutCategory.fromJson(json['category']),
+    amount: WorkoutAmount.fromJson(json),
+    note: _strN(json, 'note'),
+    source: WorkoutSource.fromJson(json['source']),
+    routineId: _intN(json, 'routine_id'),
+    routineItem: _intN(json, 'routine_item'),
+    createdAt: _time(json, 'created_at'),
+  );
+
+  final int id;
+
+  /// `YYYY-MM-DD`, a KST calendar date.
+  final String date;
+  final String exercise;
+  final String? exerciseKey;
+  final WorkoutCategory category;
+  final WorkoutAmount amount;
+  final String? note;
+  final WorkoutSource source;
+  final int? routineId;
+  final int? routineItem;
+  final DateTime createdAt;
+
+  WorkoutDraft toDraft() => WorkoutDraft(
+    date: date,
+    exercise: exercise,
+    exerciseKey: exerciseKey,
+    category: category,
+    amount: amount,
+    note: note,
+  );
+}
+
+/// `POST /workouts/say`: what was saved from the line, and what named nothing.
+@immutable
+class WorkoutSaid {
+  const WorkoutSaid({required this.workouts, required this.unread});
+
+  factory WorkoutSaid.fromJson(Json json) => WorkoutSaid(
+    workouts: _list(json, 'workouts', Workout.fromJson),
+    unread: _strList(json, 'unread'),
+  );
+
+  final List<Workout> workouts;
+  final List<String> unread;
+}
+
+/// One day of the summary window.
+@immutable
+class WorkoutDay {
+  const WorkoutDay({required this.date, required this.minutes, required this.workouts});
+
+  factory WorkoutDay.fromJson(Json json) => WorkoutDay(
+    date: _str(json, 'date'),
+    minutes: _int(json, 'minutes'),
+    workouts: _int(json, 'workouts'),
+  );
+
+  final String date;
+  final int minutes;
+  final int workouts;
+}
+
+/// `GET /workouts/summary`.
+@immutable
+class WorkoutSummary {
+  const WorkoutSummary({
+    required this.days,
+    required this.streak,
+    required this.bestStreak,
+    required this.xp,
+    required this.totalMinutes,
+    required this.workouts,
+    required this.byCategory,
+    required this.byDay,
+  });
+
+  factory WorkoutSummary.fromJson(Json json) {
+    final raw = json['by_category'];
+    final counts = <WorkoutCategory, int>{};
+    if (raw is Map) {
+      for (final e in raw.entries) {
+        final n = e.value;
+        if (n is num) counts[WorkoutCategory.fromJson(e.key)] = n.toInt();
+      }
+    }
+    return WorkoutSummary(
+      days: _int(json, 'days'),
+      streak: _int(json, 'streak'),
+      bestStreak: _int(json, 'best_streak'),
+      xp: _int(json, 'xp'),
+      totalMinutes: _int(json, 'total_minutes'),
+      workouts: _int(json, 'workouts'),
+      byCategory: Map.unmodifiable(counts),
+      byDay: _list(json, 'by_day', WorkoutDay.fromJson),
+    );
+  }
+
+  final int days;
+  final int streak;
+  final int bestStreak;
+  final int xp;
+  final int totalMinutes;
+  final int workouts;
+  final Map<WorkoutCategory, int> byCategory;
+  final List<WorkoutDay> byDay;
+}
+
+/// One exercise of a routine.
+@immutable
+class RoutineItem {
+  const RoutineItem({required this.exercise, required this.amount, this.exerciseKey, this.category});
+
+  factory RoutineItem.fromJson(Json json) => RoutineItem(
+    exercise: _str(json, 'exercise'),
+    exerciseKey: _strN(json, 'exercise_key'),
+    category: WorkoutCategory.fromJson(json['category']),
+    amount: WorkoutAmount.fromJson(json),
+  );
+
+  final String exercise;
+  final String? exerciseKey;
+  final WorkoutCategory? category;
+  final WorkoutAmount amount;
+
+  Json toJson() => {
+    'exercise': exercise,
+    'exercise_key': exerciseKey,
+    if (category != null) 'category': category!.name,
+    ...amount.toJson(),
+  };
+}
+
+/// A routine: exercises done on some weekdays (0 = Monday … 6 = Sunday).
+@immutable
+class Routine {
+  const Routine({
+    required this.id,
+    required this.name,
+    required this.weekdays,
+    required this.items,
+    required this.createdAt,
+  });
+
+  factory Routine.fromJson(Json json) => Routine(
+    id: _int(json, 'id'),
+    name: _str(json, 'name'),
+    weekdays: _intList(json, 'weekdays'),
+    items: _list(json, 'items', RoutineItem.fromJson),
+    createdAt: _time(json, 'created_at'),
+  );
+
+  static const int maxName = 30;
+  static const int maxItems = 12;
+
+  final int id;
+  final String name;
+  final List<int> weekdays;
+  final List<RoutineItem> items;
+  final DateTime createdAt;
+}
+
+/// What the client sends to make or change a routine.
+@immutable
+class RoutineDraft {
+  const RoutineDraft({required this.name, required this.weekdays, required this.items});
+
+  final String name;
+  final List<int> weekdays;
+  final List<RoutineItem> items;
+
+  Json toJson() => {
+    'name': name.trim(),
+    'weekdays': [...weekdays]..sort(),
+    'items': [for (final i in items) i.toJson()],
+  };
+}
+
+/// One item of a routine on one day, and the workout that checked it off.
+@immutable
+class RoutineDayItem {
+  const RoutineDayItem({required this.index, required this.item, this.workoutId});
+
+  factory RoutineDayItem.fromJson(Json json) => RoutineDayItem(
+    index: _int(json, 'index'),
+    item: RoutineItem.fromJson(_obj(json, 'item')),
+    workoutId: _intN(json, 'workout_id'),
+  );
+
+  final int index;
+  final RoutineItem item;
+  final int? workoutId;
+
+  bool get checked => workoutId != null;
+}
+
+/// `GET /routines/day`: a routine scheduled that day, item by item.
+@immutable
+class RoutineDay {
+  const RoutineDay({required this.routine, required this.items, required this.done});
+
+  factory RoutineDay.fromJson(Json json) => RoutineDay(
+    routine: Routine.fromJson(_obj(json, 'routine')),
+    items: _list(json, 'items', RoutineDayItem.fromJson),
+    done: _bool(json, 'done'),
+  );
+
+  final Routine routine;
+  final List<RoutineDayItem> items;
+  final bool done;
+}
+
+/// `POST /workouts/import`.
+@immutable
+class WorkoutImport {
+  const WorkoutImport({required this.imported, required this.skipped, required this.errors});
+
+  factory WorkoutImport.fromJson(Json json) => WorkoutImport(
+    imported: _int(json, 'imported'),
+    skipped: _int(json, 'skipped'),
+    errors: [
+      for (final e in (json['errors'] as List? ?? const []))
+        if (e is Map) (row: (e['row'] as num?)?.toInt() ?? 0, reason: '${e['reason'] ?? ''}'),
+    ],
+  );
+
+  final int imported;
+  final int skipped;
+  final List<({int row, String reason})> errors;
+}

@@ -1946,4 +1946,135 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get notesLoadFailed => '笔记没加载出来。';
+
+  @override
+  String get workoutTitle => '运动';
+
+  @override
+  String get workoutSayHint => '深蹲3组20个，跑步30分钟…';
+
+  @override
+  String workoutStreak(int n) {
+    return '连续 $n 天';
+  }
+
+  @override
+  String get workoutNone => '这天还没有记录。';
+
+  @override
+  String get workoutAdd => '添加';
+
+  @override
+  String get workoutNew => '添加运动';
+
+  @override
+  String get workoutEdit => '编辑运动';
+
+  @override
+  String get workoutExercise => '项目';
+
+  @override
+  String get workoutCategory => '分类';
+
+  @override
+  String get workoutCatStrength => '力量';
+
+  @override
+  String get workoutCatCardio => '有氧';
+
+  @override
+  String get workoutCatFlexibility => '柔韧';
+
+  @override
+  String get workoutCatSports => '球类';
+
+  @override
+  String get workoutCatOther => '其他';
+
+  @override
+  String get workoutSets => '组数';
+
+  @override
+  String get workoutReps => '次数';
+
+  @override
+  String get workoutWeight => '重量 (kg)';
+
+  @override
+  String get workoutMinutes => '时长 (分钟)';
+
+  @override
+  String get workoutDistance => '距离 (km)';
+
+  @override
+  String get workoutNote => '备注';
+
+  @override
+  String get workoutNeedAmount => '至少填一个数字。';
+
+  @override
+  String workoutSaved(int n) {
+    return '记了 $n 条。';
+  }
+
+  @override
+  String workoutUnread(String text) {
+    return '没读懂：$text';
+  }
+
+  @override
+  String get workoutSaidNothing => '没找到运动。比如：“深蹲3组20个”。';
+
+  @override
+  String get workoutSave => '保存';
+
+  @override
+  String get workoutPrevDay => '前一天';
+
+  @override
+  String get workoutNextDay => '后一天';
+
+  @override
+  String get workoutExportCsv => '导出 CSV';
+
+  @override
+  String get workoutExportXlsx => '导出 Excel';
+
+  @override
+  String get workoutImport => '导入 CSV 或 Excel';
+
+  @override
+  String workoutImported(int n, int skipped) {
+    return '导入 $n 条，跳过 $skipped 条。';
+  }
+
+  @override
+  String get workoutExportUnavailable => '导出只能在浏览器里用。';
+
+  @override
+  String get routinesTitle => '例程';
+
+  @override
+  String get routineNew => '新例程';
+
+  @override
+  String get routineEdit => '编辑例程';
+
+  @override
+  String get routineName => '名称';
+
+  @override
+  String get routineDays => '星期';
+
+  @override
+  String get routineAddItem => '添加动作';
+
+  @override
+  String get routineNone => '还没有例程。';
+
+  @override
+  String get routineNeedDay => '至少选一天。';
+
+  @override
+  String get routineNeedItem => '至少加一个动作。';
 }

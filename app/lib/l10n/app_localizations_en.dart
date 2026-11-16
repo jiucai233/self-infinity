@@ -1990,4 +1990,135 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notesLoadFailed => 'Couldn\'t load your notes.';
+
+  @override
+  String get workoutTitle => 'Workouts';
+
+  @override
+  String get workoutSayHint => 'Squats 3x20, a 30 min run…';
+
+  @override
+  String workoutStreak(int n) {
+    return '$n-day streak';
+  }
+
+  @override
+  String get workoutNone => 'Nothing logged this day.';
+
+  @override
+  String get workoutAdd => 'Add';
+
+  @override
+  String get workoutNew => 'Add a workout';
+
+  @override
+  String get workoutEdit => 'Edit workout';
+
+  @override
+  String get workoutExercise => 'Exercise';
+
+  @override
+  String get workoutCategory => 'Category';
+
+  @override
+  String get workoutCatStrength => 'Strength';
+
+  @override
+  String get workoutCatCardio => 'Cardio';
+
+  @override
+  String get workoutCatFlexibility => 'Flexibility';
+
+  @override
+  String get workoutCatSports => 'Sports';
+
+  @override
+  String get workoutCatOther => 'Other';
+
+  @override
+  String get workoutSets => 'Sets';
+
+  @override
+  String get workoutReps => 'Reps';
+
+  @override
+  String get workoutWeight => 'Weight (kg)';
+
+  @override
+  String get workoutMinutes => 'Minutes';
+
+  @override
+  String get workoutDistance => 'Distance (km)';
+
+  @override
+  String get workoutNote => 'Note';
+
+  @override
+  String get workoutNeedAmount => 'Enter at least one number.';
+
+  @override
+  String workoutSaved(int n) {
+    return 'Logged $n.';
+  }
+
+  @override
+  String workoutUnread(String text) {
+    return 'Couldn\'t read: $text';
+  }
+
+  @override
+  String get workoutSaidNothing => 'I couldn\'t find a workout in that. Try “squats 3x20”.';
+
+  @override
+  String get workoutSave => 'Save';
+
+  @override
+  String get workoutPrevDay => 'Previous day';
+
+  @override
+  String get workoutNextDay => 'Next day';
+
+  @override
+  String get workoutExportCsv => 'Export CSV';
+
+  @override
+  String get workoutExportXlsx => 'Export Excel';
+
+  @override
+  String get workoutImport => 'Import CSV or Excel';
+
+  @override
+  String workoutImported(int n, int skipped) {
+    return 'Imported $n, skipped $skipped.';
+  }
+
+  @override
+  String get workoutExportUnavailable => 'Export works in the browser.';
+
+  @override
+  String get routinesTitle => 'Routines';
+
+  @override
+  String get routineNew => 'New routine';
+
+  @override
+  String get routineEdit => 'Edit routine';
+
+  @override
+  String get routineName => 'Name';
+
+  @override
+  String get routineDays => 'Days';
+
+  @override
+  String get routineAddItem => 'Add exercise';
+
+  @override
+  String get routineNone => 'No routines yet.';
+
+  @override
+  String get routineNeedDay => 'Pick at least one day.';
+
+  @override
+  String get routineNeedItem => 'Add at least one exercise.';
 }
