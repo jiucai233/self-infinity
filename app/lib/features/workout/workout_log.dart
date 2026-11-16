@@ -315,8 +315,6 @@ class WorkoutLogState extends State<WorkoutLog> {
                   icon: const Icon(Icons.more_horiz_rounded, size: 20, color: AppColors.textSecondary),
                   onSelected: (a) => unawaited(_menu(a)),
                   itemBuilder: (_) => [
-                    PopupMenuItem(key: const Key('workout-routines'), value: 'routines', child: Text(l.routinesTitle)),
-                    const PopupMenuDivider(),
                     PopupMenuItem(key: const Key('workout-export-csv'), value: 'csv', child: Text(l.workoutExportCsv)),
                     PopupMenuItem(
                       key: const Key('workout-export-xlsx'),
@@ -351,6 +349,7 @@ class WorkoutLogState extends State<WorkoutLog> {
                 onPrev: () => _pick(_shift(_date, -1)),
                 onNext: _date.compareTo(_today()) >= 0 ? null : () => _pick(_shift(_date, 1)),
                 onAdd: () => unawaited(_edit()),
+                onRoutines: () => unawaited(_menu('routines')),
               ),
               for (final day in _routines) _RoutineChecklist(day: day, onToggle: (i) => unawaited(_toggle(day, i))),
               if (_workouts.isEmpty && _routines.isEmpty)
@@ -439,12 +438,19 @@ class WorkoutWeek extends StatelessWidget {
 
 /// `‹ Mon, Nov 16 ›` and Add.
 class _DayHeader extends StatelessWidget {
-  const _DayHeader({required this.date, required this.onPrev, required this.onNext, required this.onAdd});
+  const _DayHeader({
+    required this.date,
+    required this.onPrev,
+    required this.onNext,
+    required this.onAdd,
+    required this.onRoutines,
+  });
 
   final String date;
   final VoidCallback onPrev;
   final VoidCallback? onNext;
   final VoidCallback onAdd;
+  final VoidCallback onRoutines;
 
   @override
   Widget build(BuildContext context) {
@@ -483,12 +489,36 @@ class _DayHeader extends StatelessWidget {
             ],
           ),
         ),
-        IconButton(
-          key: const Key('workout-add'),
-          tooltip: l.workoutNew,
-          onPressed: onAdd,
-          icon: const Icon(Icons.add_rounded, size: 20),
-        ),
+        // A phone keeps the icons; the words come back where there is room.
+        if (MediaQuery.sizeOf(context).width < AppLayout.wideBreakpoint) ...[
+          IconButton.outlined(
+            key: const Key('workout-routines'),
+            tooltip: l.routinesTitle,
+            onPressed: onRoutines,
+            icon: const Icon(Icons.event_repeat_rounded, size: 18),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          IconButton.filled(
+            key: const Key('workout-add'),
+            tooltip: l.workoutNew,
+            onPressed: onAdd,
+            icon: const Icon(Icons.add_rounded, size: 18),
+          ),
+        ] else ...[
+          OutlinedButton.icon(
+            key: const Key('workout-routines'),
+            onPressed: onRoutines,
+            icon: const Icon(Icons.event_repeat_rounded, size: 18),
+            label: Text(l.routinesTitle),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          FilledButton.icon(
+            key: const Key('workout-add'),
+            onPressed: onAdd,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: Text(l.workoutAdd),
+          ),
+        ],
       ],
     );
   }

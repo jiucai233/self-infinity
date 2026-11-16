@@ -170,11 +170,9 @@ void main() {
     expect(find.byIcon(Icons.close_rounded), findsNothing);
   });
 
-  testWidgets('a routine is made in ⋯ Routines: name, days, exercises', (tester) async {
+  testWidgets('a routine is made from Routines beside Add: name, days, exercises', (tester) async {
     final api = newApi();
     await pumpSection(tester, api);
-    await tester.tap(key('workout-menu'));
-    await tester.pumpAndSettle();
     await tester.tap(key('workout-routines'));
     await tester.pumpAndSettle();
     expect(find.text('No routines yet.'), findsOneWidget);
