@@ -2077,4 +2077,117 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get routineNeedItem => '至少加一个动作。';
+
+  @override
+  String get workoutTabLog => '记录';
+
+  @override
+  String get workoutTabLibrary => '动作';
+
+  @override
+  String get workoutTabStats => '进步';
+
+  @override
+  String get bodyAll => '全部';
+
+  @override
+  String get bodyChest => '胸';
+
+  @override
+  String get bodyBack => '背';
+
+  @override
+  String get bodyShoulders => '肩';
+
+  @override
+  String get bodyArms => '手臂';
+
+  @override
+  String get bodyLegs => '腿';
+
+  @override
+  String get bodyCore => '核心';
+
+  @override
+  String get bodyCardio => '有氧';
+
+  @override
+  String get bodyStretch => '拉伸';
+
+  @override
+  String get equipBody => '徒手';
+
+  @override
+  String get equipDumbbell => '哑铃';
+
+  @override
+  String get equipBarbell => '杠铃';
+
+  @override
+  String get equipMachine => '器械';
+
+  @override
+  String get equipCable => '绳索';
+
+  @override
+  String get equipKettlebell => '壶铃';
+
+  @override
+  String get equipBand => '弹力带';
+
+  @override
+  String get equipOther => '其他';
+
+  @override
+  String get libSearch => '搜索动作';
+
+  @override
+  String get libNone => '没有符合的动作。';
+
+  @override
+  String get libLog => '记录';
+
+  @override
+  String get libSteps => '做法';
+
+  @override
+  String get libHistory => '我的记录';
+
+  @override
+  String get libNoHistory => '还没记录过。';
+
+  @override
+  String libBest(String value) {
+    return '最佳 $value';
+  }
+
+  @override
+  String get libSource => '动作图片来自 free-exercise-db（公共领域）';
+
+  @override
+  String get statsPick => '动作';
+
+  @override
+  String get statsNone => '记几次运动后，这里会显示进步。';
+
+  @override
+  String get statsWeight => '最大重量 (kg)';
+
+  @override
+  String get statsVolume => '训练量 (kg × 次)';
+
+  @override
+  String get statsMinutes => '分钟';
+
+  @override
+  String get statsByBody => '近 30 天各部位';
+
+  @override
+  String get workoutDays90 => '近 90 天';
+
+  @override
+  String get workoutOpen => '打开运动';
+
+  @override
+  String get workoutToday => '今天';
 }

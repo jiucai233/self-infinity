@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../features/audit/audit_scene.dart';
 import '../features/audit/replay_scene.dart';
 import '../features/life/life_scene.dart';
+import '../features/workout/workout_scene.dart';
 import '../features/chat/home_scene.dart';
 import '../features/skill/skill_scene.dart';
 import '../features/stage/app_tabs.dart';
@@ -38,6 +39,9 @@ abstract final class AppRoutes {
   /// The player's own record (contract #39).
   static const String life = '/life';
 
+  /// The workout log, opened from the Life page (contract #54).
+  static const String workout = '/life/workout';
+
   /// `/skill/<skillId>`.
   static String skill(int skillId) => '/skill/$skillId';
 
@@ -57,6 +61,7 @@ abstract final class AppRoutes {
 int _depthOf(Uri uri) {
   final segments = uri.pathSegments;
   if (segments.isEmpty) return 0;
+  if (segments.first == 'life' && segments.length > 1) return 2;
   if (const {'map', 'life', 'me'}.contains(segments.first)) return 1;
   if (segments.first == 'audit') return 3;
   return segments.length >= 3 ? 3 : 2;
@@ -126,6 +131,10 @@ List<RouteBase> _sceneRoutes(Page<void> Function(GoRouterState, Widget) page) =>
   GoRoute(
     path: AppRoutes.life,
     pageBuilder: (context, state) => page(state, const LifeScene()),
+  ),
+  GoRoute(
+    path: AppRoutes.workout,
+    pageBuilder: (context, state) => page(state, const WorkoutScene()),
   ),
   GoRoute(
     path: '/skill/:skillId',

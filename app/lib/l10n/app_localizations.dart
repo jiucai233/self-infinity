@@ -3945,6 +3945,228 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add at least one exercise.'**
   String get routineNeedItem;
+
+  /// No description provided for @workoutTabLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Log'**
+  String get workoutTabLog;
+
+  /// No description provided for @workoutTabLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercises'**
+  String get workoutTabLibrary;
+
+  /// No description provided for @workoutTabStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get workoutTabStats;
+
+  /// No description provided for @bodyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get bodyAll;
+
+  /// No description provided for @bodyChest.
+  ///
+  /// In en, this message translates to:
+  /// **'Chest'**
+  String get bodyChest;
+
+  /// No description provided for @bodyBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get bodyBack;
+
+  /// No description provided for @bodyShoulders.
+  ///
+  /// In en, this message translates to:
+  /// **'Shoulders'**
+  String get bodyShoulders;
+
+  /// No description provided for @bodyArms.
+  ///
+  /// In en, this message translates to:
+  /// **'Arms'**
+  String get bodyArms;
+
+  /// No description provided for @bodyLegs.
+  ///
+  /// In en, this message translates to:
+  /// **'Legs'**
+  String get bodyLegs;
+
+  /// No description provided for @bodyCore.
+  ///
+  /// In en, this message translates to:
+  /// **'Core'**
+  String get bodyCore;
+
+  /// No description provided for @bodyCardio.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio'**
+  String get bodyCardio;
+
+  /// No description provided for @bodyStretch.
+  ///
+  /// In en, this message translates to:
+  /// **'Stretch'**
+  String get bodyStretch;
+
+  /// No description provided for @equipBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Body weight'**
+  String get equipBody;
+
+  /// No description provided for @equipDumbbell.
+  ///
+  /// In en, this message translates to:
+  /// **'Dumbbell'**
+  String get equipDumbbell;
+
+  /// No description provided for @equipBarbell.
+  ///
+  /// In en, this message translates to:
+  /// **'Barbell'**
+  String get equipBarbell;
+
+  /// No description provided for @equipMachine.
+  ///
+  /// In en, this message translates to:
+  /// **'Machine'**
+  String get equipMachine;
+
+  /// No description provided for @equipCable.
+  ///
+  /// In en, this message translates to:
+  /// **'Cable'**
+  String get equipCable;
+
+  /// No description provided for @equipKettlebell.
+  ///
+  /// In en, this message translates to:
+  /// **'Kettlebell'**
+  String get equipKettlebell;
+
+  /// No description provided for @equipBand.
+  ///
+  /// In en, this message translates to:
+  /// **'Band'**
+  String get equipBand;
+
+  /// No description provided for @equipOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get equipOther;
+
+  /// No description provided for @libSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search exercises'**
+  String get libSearch;
+
+  /// No description provided for @libNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No exercise matches.'**
+  String get libNone;
+
+  /// No description provided for @libLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Log it'**
+  String get libLog;
+
+  /// No description provided for @libSteps.
+  ///
+  /// In en, this message translates to:
+  /// **'How to'**
+  String get libSteps;
+
+  /// No description provided for @libHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Your history'**
+  String get libHistory;
+
+  /// No description provided for @libNoHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Not logged yet.'**
+  String get libNoHistory;
+
+  /// No description provided for @libBest.
+  ///
+  /// In en, this message translates to:
+  /// **'Best {value}'**
+  String libBest(String value);
+
+  /// No description provided for @libSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercise images: free-exercise-db (public domain)'**
+  String get libSource;
+
+  /// No description provided for @statsPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercise'**
+  String get statsPick;
+
+  /// No description provided for @statsNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Log a few workouts and your progress shows here.'**
+  String get statsNone;
+
+  /// No description provided for @statsWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Top weight (kg)'**
+  String get statsWeight;
+
+  /// No description provided for @statsVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume (kg × reps)'**
+  String get statsVolume;
+
+  /// No description provided for @statsMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes'**
+  String get statsMinutes;
+
+  /// No description provided for @statsByBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 30 days by body part'**
+  String get statsByBody;
+
+  /// No description provided for @workoutDays90.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 90 days'**
+  String get workoutDays90;
+
+  /// No description provided for @workoutOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open workouts'**
+  String get workoutOpen;
+
+  /// No description provided for @workoutToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get workoutToday;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

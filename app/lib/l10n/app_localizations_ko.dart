@@ -2083,4 +2083,117 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get routineNeedItem => '운동을 하나 이상 넣어 주세요.';
+
+  @override
+  String get workoutTabLog => '기록';
+
+  @override
+  String get workoutTabLibrary => '동작';
+
+  @override
+  String get workoutTabStats => '통계';
+
+  @override
+  String get bodyAll => '전체';
+
+  @override
+  String get bodyChest => '가슴';
+
+  @override
+  String get bodyBack => '등';
+
+  @override
+  String get bodyShoulders => '어깨';
+
+  @override
+  String get bodyArms => '팔';
+
+  @override
+  String get bodyLegs => '하체';
+
+  @override
+  String get bodyCore => '코어';
+
+  @override
+  String get bodyCardio => '유산소';
+
+  @override
+  String get bodyStretch => '스트레칭';
+
+  @override
+  String get equipBody => '맨몸';
+
+  @override
+  String get equipDumbbell => '덤벨';
+
+  @override
+  String get equipBarbell => '바벨';
+
+  @override
+  String get equipMachine => '머신';
+
+  @override
+  String get equipCable => '케이블';
+
+  @override
+  String get equipKettlebell => '케틀벨';
+
+  @override
+  String get equipBand => '밴드';
+
+  @override
+  String get equipOther => '기타';
+
+  @override
+  String get libSearch => '동작 검색';
+
+  @override
+  String get libNone => '맞는 동작이 없어요.';
+
+  @override
+  String get libLog => '기록하기';
+
+  @override
+  String get libSteps => '방법';
+
+  @override
+  String get libHistory => '내 기록';
+
+  @override
+  String get libNoHistory => '아직 기록이 없어요.';
+
+  @override
+  String libBest(String value) {
+    return '최고 $value';
+  }
+
+  @override
+  String get libSource => '동작 이미지: free-exercise-db (퍼블릭 도메인)';
+
+  @override
+  String get statsPick => '동작';
+
+  @override
+  String get statsNone => '운동을 몇 번 기록하면 여기에 변화가 보여요.';
+
+  @override
+  String get statsWeight => '최고 무게 (kg)';
+
+  @override
+  String get statsVolume => '볼륨 (kg × 회)';
+
+  @override
+  String get statsMinutes => '분';
+
+  @override
+  String get statsByBody => '최근 30일 부위별';
+
+  @override
+  String get workoutDays90 => '최근 90일';
+
+  @override
+  String get workoutOpen => '운동 열기';
+
+  @override
+  String get workoutToday => '오늘';
 }

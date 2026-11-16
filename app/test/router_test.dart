@@ -269,7 +269,7 @@ void main() {
     expect(app.title, 'Self-Infinity');
   });
 
-  testWidgets('createRouter has exactly the seven scene routes, all in the tab shell', (tester) async {
+  testWidgets('createRouter has exactly the eight scene routes, all in the tab shell', (tester) async {
     final router = createRouter();
     addTearDown(router.dispose);
     final shell = router.configuration.routes.single as ShellRoute;
@@ -279,6 +279,7 @@ void main() {
       '/map',
       '/me',
       '/life',
+      '/life/workout',
       '/skill/:skillId',
       '/skill/:skillId/audit',
       '/audit/:auditId',

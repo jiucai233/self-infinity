@@ -2121,4 +2121,117 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get routineNeedItem => 'Add at least one exercise.';
+
+  @override
+  String get workoutTabLog => 'Log';
+
+  @override
+  String get workoutTabLibrary => 'Exercises';
+
+  @override
+  String get workoutTabStats => 'Progress';
+
+  @override
+  String get bodyAll => 'All';
+
+  @override
+  String get bodyChest => 'Chest';
+
+  @override
+  String get bodyBack => 'Back';
+
+  @override
+  String get bodyShoulders => 'Shoulders';
+
+  @override
+  String get bodyArms => 'Arms';
+
+  @override
+  String get bodyLegs => 'Legs';
+
+  @override
+  String get bodyCore => 'Core';
+
+  @override
+  String get bodyCardio => 'Cardio';
+
+  @override
+  String get bodyStretch => 'Stretch';
+
+  @override
+  String get equipBody => 'Body weight';
+
+  @override
+  String get equipDumbbell => 'Dumbbell';
+
+  @override
+  String get equipBarbell => 'Barbell';
+
+  @override
+  String get equipMachine => 'Machine';
+
+  @override
+  String get equipCable => 'Cable';
+
+  @override
+  String get equipKettlebell => 'Kettlebell';
+
+  @override
+  String get equipBand => 'Band';
+
+  @override
+  String get equipOther => 'Other';
+
+  @override
+  String get libSearch => 'Search exercises';
+
+  @override
+  String get libNone => 'No exercise matches.';
+
+  @override
+  String get libLog => 'Log it';
+
+  @override
+  String get libSteps => 'How to';
+
+  @override
+  String get libHistory => 'Your history';
+
+  @override
+  String get libNoHistory => 'Not logged yet.';
+
+  @override
+  String libBest(String value) {
+    return 'Best $value';
+  }
+
+  @override
+  String get libSource => 'Exercise images: free-exercise-db (public domain)';
+
+  @override
+  String get statsPick => 'Exercise';
+
+  @override
+  String get statsNone => 'Log a few workouts and your progress shows here.';
+
+  @override
+  String get statsWeight => 'Top weight (kg)';
+
+  @override
+  String get statsVolume => 'Volume (kg × reps)';
+
+  @override
+  String get statsMinutes => 'Minutes';
+
+  @override
+  String get statsByBody => 'Last 30 days by body part';
+
+  @override
+  String get workoutDays90 => 'Last 90 days';
+
+  @override
+  String get workoutOpen => 'Open workouts';
+
+  @override
+  String get workoutToday => 'Today';
 }

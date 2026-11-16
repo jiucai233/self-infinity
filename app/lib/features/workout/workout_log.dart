@@ -13,20 +13,80 @@ import '../../theme/tokens.dart';
 import '../../upload/file_picker_service.dart';
 import '../../upload/file_saver.dart';
 import '../../widgets/widgets.dart';
+import 'exercise_library.dart';
+import 'exercise_motion.dart';
+import 'workout_charts.dart';
 
-/// The workout log on the Life page (contract #54): say a line and it is
-/// split into workouts; the last seven days as bars (a tap picks the day);
-/// that day's routines to check off and its workouts to fix or delete; the
-/// streak and workout XP on top; export and import behind ⋯.
-class WorkoutSection extends StatefulWidget {
-  const WorkoutSection({super.key, this.onChanged});
+/// The log of the workout page (contract #54): say a line and it is split
+/// into workouts; the last 90 days as a heatmap (a tap picks the day); that
+/// day's routines to check off and its workouts to fix or delete; the streak
+/// and workout XP on top; routines, export and import behind ⋯.
+class WorkoutLog extends StatefulWidget {
+  const WorkoutLog({super.key, this.onChanged});
 
   /// A workout was added, changed or removed.
   final VoidCallback? onChanged;
 
   @override
-  State<WorkoutSection> createState() => _WorkoutSectionState();
+  State<WorkoutLog> createState() => WorkoutLogState();
 }
+
+/// One exercise the add dialog offers: from the bundled library (with its
+/// frames) or the server's quick-log catalog.
+@immutable
+class ExerciseOption {
+  const ExerciseOption({required this.name, required this.category, required this.unit, this.key, this.library});
+
+  final String name;
+  final WorkoutCategory category;
+  final WorkoutUnit unit;
+
+  /// The server's catalog key, when the movement has one.
+  final String? key;
+  final LibraryExercise? library;
+}
+
+/// What can be picked when logging: the library first, then the catalog
+/// movements the library does not have.
+class ExerciseChoices {
+  ExerciseChoices(WorkoutCatalog? catalog, ExerciseLibrary? library, this.language)
+    : _library = library,
+      options = [
+        for (final e in library?.exercises ?? const <LibraryExercise>[])
+          ExerciseOption(name: e.name(language), category: e.category, unit: e.unit, key: e.catalog, library: e),
+        for (final c in catalog?.exercises ?? const <CatalogExercise>[])
+          if (!(library?.exercises.any((e) => e.catalog == c.key) ?? false))
+            ExerciseOption(name: c.name, category: c.category, unit: c.unit, key: c.key),
+      ];
+
+  final String language;
+  final ExerciseLibrary? _library;
+  final List<ExerciseOption> options;
+
+  /// The option [name] means (its name in any language), if any.
+  ExerciseOption? match(String name) {
+    final n = name.trim().toLowerCase();
+    if (n.isEmpty) return null;
+    return options.where((o) => o.name.toLowerCase() == n || (o.library?.isCalled(n) ?? false)).firstOrNull;
+  }
+
+  LibraryExercise? libraryOf(Workout w) => _library?.of(w);
+}
+
+/// Add a workout ([prefill] picks the exercise); true when one was saved.
+Future<bool> showWorkoutDialog(
+  BuildContext context, {
+  required SelfInfinityApi api,
+  required ExerciseChoices choices,
+  required String date,
+  ExerciseOption? prefill,
+  Workout? workout,
+}) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => _WorkoutDialog(api: api, choices: choices, date: date, workout: workout, prefill: prefill),
+    ) ??
+    false;
 
 String _today() => formatKstDate(DateTime.now());
 
@@ -41,13 +101,15 @@ String categoryLabel(AppLocalizations l, WorkoutCategory c) => switch (c) {
   WorkoutCategory.other => l.workoutCatOther,
 };
 
-class _WorkoutSectionState extends State<WorkoutSection> {
+class WorkoutLogState extends State<WorkoutLog> {
   late final SelfInfinityApi _api = context.read<SelfInfinityApi>();
   final TextEditingController _say = TextEditingController();
 
   String _date = _today();
   WorkoutCatalog? _catalog;
+  ExerciseLibrary? _library;
   WorkoutSummary? _summary;
+  WorkoutSummary? _quarter;
   List<Workout> _workouts = const [];
   List<RoutineDay> _routines = const [];
   Object? _error;
@@ -72,15 +134,19 @@ class _WorkoutSectionState extends State<WorkoutSection> {
       final results = await Future.wait([
         if (_catalog == null) _api.getWorkoutCatalog() else Future.value(_catalog),
         _api.getWorkoutSummary(),
+        _api.getWorkoutSummary(days: 90),
         _api.listWorkouts(from: _date, to: _date),
         _api.getRoutineDay(date: _date),
+        if (_library == null) ExerciseLibrary.load() else Future.value(_library),
       ]);
       if (!mounted || token != _token) return;
       setState(() {
         _catalog = results[0] as WorkoutCatalog?;
         _summary = results[1] as WorkoutSummary?;
-        _workouts = results[2] as List<Workout>;
-        _routines = results[3] as List<RoutineDay>;
+        _quarter = results[2] as WorkoutSummary?;
+        _workouts = results[3] as List<Workout>;
+        _routines = results[4] as List<RoutineDay>;
+        _library = results[5] as ExerciseLibrary?;
         _error = null;
       });
     } on Object catch (e) {
@@ -88,6 +154,12 @@ class _WorkoutSectionState extends State<WorkoutSection> {
       setState(() => _error = e);
     }
   }
+
+  ExerciseChoices get choices =>
+      ExerciseChoices(_catalog, _library, Localizations.localeOf(context).languageCode);
+
+  /// Reloads (a workout was logged elsewhere on the page).
+  Future<void> reload() => _load();
 
   Future<void> _changed() async {
     widget.onChanged?.call();
@@ -128,13 +200,9 @@ class _WorkoutSectionState extends State<WorkoutSection> {
   }
 
   Future<void> _edit([Workout? workout]) async {
-    final catalog = _catalog;
-    if (catalog == null) return;
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (_) => _WorkoutDialog(api: _api, catalog: catalog, date: _date, workout: workout),
-    );
-    if (saved == true && mounted) await _changed();
+    if (_catalog == null) return;
+    final saved = await showWorkoutDialog(context, api: _api, choices: choices, date: _date, workout: workout);
+    if (saved && mounted) await _changed();
   }
 
   Future<void> _delete(Workout w) async {
@@ -163,11 +231,11 @@ class _WorkoutSectionState extends State<WorkoutSection> {
     final l = context.l10n;
     switch (action) {
       case 'routines':
-        final catalog = _catalog;
-        if (catalog == null) return;
+        if (_catalog == null) return;
+        final choices = this.choices;
         await showDialog<void>(
           context: context,
-          builder: (_) => _RoutinesDialog(api: _api, catalog: catalog),
+          builder: (_) => _RoutinesDialog(api: _api, choices: choices),
         );
         if (mounted) await _load();
       case 'csv' || 'xlsx':
@@ -210,7 +278,7 @@ class _WorkoutSectionState extends State<WorkoutSection> {
     final summary = _summary;
     // A Material, not a DecoratedBox: the rows' ink and checkboxes paint on it.
     return Material(
-      key: const Key('workout-section'),
+      key: const Key('workout-log'),
       color: AppColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: AppRadius.cardBorder,
@@ -223,14 +291,7 @@ class _WorkoutSectionState extends State<WorkoutSection> {
           children: [
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    l.workoutTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.labelLarge?.copyWith(color: AppColors.textSecondary),
-                  ),
-                ),
+                const Spacer(),
                 if (summary != null) ...[
                   if (summary.streak > 0) ...[
                     const Icon(Icons.local_fire_department_rounded, size: 16, color: AppColors.ember),
@@ -283,7 +344,7 @@ class _WorkoutSectionState extends State<WorkoutSection> {
             else if (summary == null)
               const SizedBox(height: 120, child: LoadingView())
             else ...[
-              _Week(days: summary.byDay, selected: _date, onPick: _pick),
+              WorkoutHeatmap(days: (_quarter ?? summary).byDay, selected: _date, onPick: _pick),
               const SizedBox(height: AppSpacing.lg),
               _DayHeader(
                 date: _date,
@@ -302,7 +363,12 @@ class _WorkoutSectionState extends State<WorkoutSection> {
                   ),
                 ),
               for (final w in _workouts.where((w) => w.source != WorkoutSource.routine))
-                _WorkoutRow(workout: w, onEdit: () => unawaited(_edit(w)), onDelete: () => unawaited(_delete(w))),
+                _WorkoutRow(
+                  workout: w,
+                  library: _library?.of(w),
+                  onEdit: () => unawaited(_edit(w)),
+                  onDelete: () => unawaited(_delete(w)),
+                ),
             ],
           ],
         ),
@@ -312,12 +378,12 @@ class _WorkoutSectionState extends State<WorkoutSection> {
 }
 
 /// The last days as bars of how much was done; the picked day is dark.
-class _Week extends StatelessWidget {
-  const _Week({required this.days, required this.selected, required this.onPick});
+class WorkoutWeek extends StatelessWidget {
+  const WorkoutWeek({super.key, required this.days, required this.selected, this.onPick});
 
   final List<WorkoutDay> days;
   final String selected;
-  final ValueChanged<String> onPick;
+  final ValueChanged<String>? onPick;
 
   @override
   Widget build(BuildContext context) {
@@ -335,7 +401,7 @@ class _Week extends StatelessWidget {
               child: InkWell(
                 key: Key('workout-day-${d.date}'),
                 borderRadius: AppRadius.chipBorder,
-                onTap: () => onPick(d.date),
+                onTap: onPick == null ? null : () => onPick!(d.date),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -481,9 +547,12 @@ class _RoutineChecklist extends StatelessWidget {
 
 /// One workout: name, numbers, category; tap to fix, × to delete.
 class _WorkoutRow extends StatelessWidget {
-  const _WorkoutRow({required this.workout, required this.onEdit, required this.onDelete});
+  const _WorkoutRow({required this.workout, required this.onEdit, required this.onDelete, this.library});
 
   final Workout workout;
+
+  /// The movement in the library, for its picture.
+  final LibraryExercise? library;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -499,6 +568,11 @@ class _WorkoutRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xs, 0, AppSpacing.xs),
         child: Row(
           children: [
+            SizedBox(
+              width: 48,
+              child: ExerciseMotion(images: library?.images.take(1).toList() ?? const []),
+            ),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -575,13 +649,13 @@ class _AmountFields extends StatelessWidget {
 class _ExerciseForm extends StatefulWidget {
   const _ExerciseForm({
     super.key,
-    required this.catalog,
+    required this.choices,
     this.exercise = '',
     this.category,
     this.amount = const WorkoutAmount(),
   });
 
-  final WorkoutCatalog catalog;
+  final ExerciseChoices choices;
   final String exercise;
   final WorkoutCategory? category;
   final WorkoutAmount amount;
@@ -604,10 +678,7 @@ class _ExerciseFormState extends State<_ExerciseForm> {
   static String _text(num? v) =>
       v == null ? '' : (v is double && v == v.roundToDouble() ? '${v.toInt()}' : '$v');
 
-  CatalogExercise? get match {
-    final n = _name.text.trim().toLowerCase();
-    return widget.catalog.exercises.where((e) => e.name.toLowerCase() == n).firstOrNull;
-  }
+  ExerciseOption? get match => widget.choices.match(_name.text);
 
   WorkoutUnit get _unit =>
       match?.unit ??
@@ -651,13 +722,13 @@ class _ExerciseFormState extends State<_ExerciseForm> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Autocomplete<CatalogExercise>(
+        Autocomplete<ExerciseOption>(
           initialValue: TextEditingValue(text: widget.exercise),
           displayStringForOption: (e) => e.name,
           optionsBuilder: (v) {
             final q = v.text.trim().toLowerCase();
-            if (q.isEmpty) return widget.catalog.exercises;
-            return widget.catalog.exercises.where((e) => e.name.toLowerCase().contains(q));
+            if (q.isEmpty) return widget.choices.options;
+            return widget.choices.options.where((e) => e.name.toLowerCase().contains(q));
           },
           onSelected: (e) => setState(() {
             _name.text = e.name;
@@ -701,12 +772,15 @@ class _ExerciseFormState extends State<_ExerciseForm> {
 
 /// Add or fix one workout.
 class _WorkoutDialog extends StatefulWidget {
-  const _WorkoutDialog({required this.api, required this.catalog, required this.date, this.workout});
+  const _WorkoutDialog({required this.api, required this.choices, required this.date, this.workout, this.prefill});
 
   final SelfInfinityApi api;
-  final WorkoutCatalog catalog;
+  final ExerciseChoices choices;
   final String date;
   final Workout? workout;
+
+  /// The exercise to log, picked before (the library's Log it).
+  final ExerciseOption? prefill;
 
   @override
   State<_WorkoutDialog> createState() => _WorkoutDialogState();
@@ -778,9 +852,9 @@ class _WorkoutDialogState extends State<_WorkoutDialog> {
             children: [
               _ExerciseForm(
                 key: _form,
-                catalog: widget.catalog,
-                exercise: w?.exercise ?? '',
-                category: w?.category,
+                choices: widget.choices,
+                exercise: w?.exercise ?? widget.prefill?.name ?? '',
+                category: w?.category ?? widget.prefill?.category,
                 amount: w?.amount ?? const WorkoutAmount(),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -817,10 +891,10 @@ class _WorkoutDialogState extends State<_WorkoutDialog> {
 
 /// The routines: each with its days and exercises; tap to change, × to delete.
 class _RoutinesDialog extends StatefulWidget {
-  const _RoutinesDialog({required this.api, required this.catalog});
+  const _RoutinesDialog({required this.api, required this.choices});
 
   final SelfInfinityApi api;
-  final WorkoutCatalog catalog;
+  final ExerciseChoices choices;
 
   @override
   State<_RoutinesDialog> createState() => _RoutinesDialogState();
@@ -847,7 +921,7 @@ class _RoutinesDialogState extends State<_RoutinesDialog> {
   Future<void> _edit([Routine? routine]) async {
     final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => _RoutineEditor(api: widget.api, catalog: widget.catalog, routine: routine),
+      builder: (_) => _RoutineEditor(api: widget.api, choices: widget.choices, routine: routine),
     );
     if (saved == true) await _load();
   }
@@ -921,10 +995,10 @@ String weekdaysLabel(BuildContext context, List<int> days) =>
 
 /// Make or change a routine: its name, its days, its exercises.
 class _RoutineEditor extends StatefulWidget {
-  const _RoutineEditor({required this.api, required this.catalog, this.routine});
+  const _RoutineEditor({required this.api, required this.choices, this.routine});
 
   final SelfInfinityApi api;
-  final WorkoutCatalog catalog;
+  final ExerciseChoices choices;
   final Routine? routine;
 
   @override
@@ -947,7 +1021,7 @@ class _RoutineEditorState extends State<_RoutineEditor> {
   Future<void> _addItem() async {
     final item = await showDialog<RoutineItem>(
       context: context,
-      builder: (_) => _ItemDialog(catalog: widget.catalog),
+      builder: (_) => _ItemDialog(choices: widget.choices),
     );
     if (item != null) setState(() => _items.add(item));
   }
@@ -1072,9 +1146,9 @@ class _RoutineEditorState extends State<_RoutineEditor> {
 
 /// One exercise of a routine.
 class _ItemDialog extends StatefulWidget {
-  const _ItemDialog({required this.catalog});
+  const _ItemDialog({required this.choices});
 
-  final WorkoutCatalog catalog;
+  final ExerciseChoices choices;
 
   @override
   State<_ItemDialog> createState() => _ItemDialogState();
@@ -1113,7 +1187,7 @@ class _ItemDialogState extends State<_ItemDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _ExerciseForm(key: _form, catalog: widget.catalog),
+            _ExerciseForm(key: _form, choices: widget.choices),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.sm),
               Text(_error!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.danger)),

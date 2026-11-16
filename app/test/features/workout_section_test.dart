@@ -7,7 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/features/life/life_scene.dart';
-import 'package:self_infinity/features/life/workout_section.dart';
+import 'package:self_infinity/features/workout/exercise_library.dart';
+import 'package:self_infinity/features/workout/workout_log.dart';
 import 'package:self_infinity/testing/fake_file_picker.dart';
 import 'package:self_infinity/upload/file_picker_service.dart';
 
@@ -21,7 +22,7 @@ String today() => formatKstDate(DateTime.now());
 
 Future<void> pumpSection(WidgetTester tester, FakeApiClient api, {FakeFilePicker? picker}) => pumpScene(
   tester,
-  const Scaffold(body: SingleChildScrollView(child: WorkoutSection())),
+  const Scaffold(body: SingleChildScrollView(child: WorkoutLog())),
   api: api,
   picker: picker,
 );
@@ -29,17 +30,20 @@ Future<void> pumpSection(WidgetTester tester, FakeApiClient api, {FakeFilePicker
 String xp(WidgetTester tester) => tester.widget<Text>(key('workout-xp')).data!;
 
 void main() {
+  setUp(() => ExerciseLibrary.debugOverride = ExerciseLibrary(const []));
+  tearDown(() => ExerciseLibrary.debugOverride = null);
+
   testWidgets('the Life page has the workout log', (tester) async {
     await pumpScene(tester, const LifeScene(), api: newApi());
     expect(key('workout-section'), findsOneWidget);
   });
 
-  testWidgets('empty: today with nothing logged, no streak, 0 XP, seven days', (tester) async {
+  testWidgets('empty: today with nothing logged, no streak, 0 XP, 90 days', (tester) async {
     await pumpSection(tester, newApi());
     expect(key('workout-none'), findsOneWidget);
     expect(key('workout-streak'), findsNothing);
     expect(xp(tester), '0 XP');
-    expect(find.descendant(of: key('workout-week'), matching: find.byType(InkWell)), findsNWidgets(7));
+    expect(find.descendant(of: key('workout-heatmap'), matching: find.byType(InkWell)), findsNWidgets(90));
     expect(key('workout-next'), findsOneWidget);
     expect(tester.widget<IconButton>(key('workout-next')).onPressed, isNull); // no future days
   });
