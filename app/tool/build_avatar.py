@@ -30,7 +30,7 @@ CLIPS = {
     "success": (1, 113, 112, 115),  # check mark, +100 XP
     "wave": (2, 118, 110, 115),  # waves hello
     "sleep": (2, 100, 100, 120),  # asleep on a cloud
-    "study": (2, 118, 118, 115),  # reads her book
+    "study": (2, 177, 177, 172),  # reads her book
 }
 
 
