@@ -522,22 +522,10 @@ class _SettingsButtonState extends State<_SettingsButton> {
           const PopupMenuItem<String>(enabled: false, child: _ModelSwitch()),
           const PopupMenuItem<String>(enabled: false, child: _VoiceSwitches()),
           const PopupMenuDivider(),
-          // Licenses, with the credit 大肥鱼's license asks for.
           PopupMenuItem<String>(
             key: const Key('settings-licenses'),
             value: 'licenses',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(MaterialLocalizations.of(context).licensesPageTitle),
-                Text(
-                  dafeiyuCredit,
-                  key: const Key('settings-credit'),
-                  style: theme.labelSmall?.copyWith(color: AppColors.textTertiary),
-                ),
-              ],
-            ),
+            child: Text(MaterialLocalizations.of(context).licensesPageTitle),
           ),
           PopupMenuItem<String>(
             key: const Key('settings-tutorial'),

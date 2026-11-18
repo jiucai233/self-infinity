@@ -98,6 +98,10 @@ class Live2DFigure extends StatefulWidget {
   final bool follow;
   final Widget fallback;
 
+  /// Whether the whale-girl Live2D model is loaded at all. Off: the app's own
+  /// companion ([fallback], an [Avatar]) is drawn everywhere instead.
+  static bool modelEnabled = false;
+
   /// Replaces the platform's host; tests use it to see the messages.
   @visibleForTesting
   static Live2DHostFactory? debugHostFactory;
@@ -120,7 +124,9 @@ class Live2DFigureState extends State<Live2DFigure> {
   @override
   void initState() {
     super.initState();
-    final make = Live2DFigure.debugHostFactory ?? platform.createLive2DHost;
+    final make =
+        Live2DFigure.debugHostFactory ??
+        (Live2DFigure.modelEnabled ? platform.createLive2DHost : (_) => null);
     _host = make(
       Live2DHostConfig(
         framing: widget.framing == 'upper' ? 'upper' : 'full',

@@ -13,7 +13,6 @@ import 'widgets/live2d_figure.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  registerDafeiyuLicense();
   registerLive2DLicense();
   unawaited(Avatar.precache());
   final locale = await LocaleController.load();
