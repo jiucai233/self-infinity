@@ -358,5 +358,249 @@
     ],
     "expected_passed": true,
     "label_rationale": "记不清确切命令，但说出了建环境、装包这两个动作；按 2026-10-15 定的标准（没人背命令，说个大概就算会）算会。"
+  },
+  {
+    "id": "linear-function-slope-pass",
+    "node_type": "concept",
+    "skill_title": "一次函数的斜率",
+    "skill_description": "y = ax + b 中 a 决定直线倾斜方向和陡峭程度",
+    "student_turns": [
+      "一次函数 y = ax + b 里，a 就是 x 每增加 1 时 y 的变化量。不管从哪一点开始，这个变化量都一样，所以图像是一条直线；a 是正数往右上走，负数往右下走，陡不陡看 |a|：|a| 越大越陡，所以 a = -5 比 a = -1 陡。",
+      "因为任取两点算 (y2 - y1) / (x2 - x1)，b 会被消掉，结果总是 a，跟取哪两点无关。变化率处处相同，画出来就不会弯。b 只是 x = 0 时的高度，决定直线上下平移，不影响倾斜。",
+      "a = 0 的时候 y 恒等于 b，是一条水平线，变化量为零。严格说那时候它已经不是一次函数了，是常数函数。还有竖直线 x = c 根本写不成 y = ax + b，因为斜率没有定义。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "讲清斜率是恒定变化率、b 不影响倾斜，并主动说出 a = 0 与竖直线两个边界。"
+  },
+  {
+    "id": "linear-function-slope-fail",
+    "node_type": "concept",
+    "skill_title": "一次函数的斜率",
+    "skill_description": "y = ax + b 中 a 决定直线倾斜方向和陡峭程度",
+    "student_turns": [
+      "一次函数就是 y = ax + b，图像是直线，因为它是一次的嘛。b 是斜率，a 是截距，老师讲过。",
+      "为什么是直线……一次函数的图像就是直线，这个是定义，课本上就这么写的。",
+      "a = 0 也还是一次函数啊，只要写成 y = ax + b 的形式都是一次函数，图像一样是斜的直线。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "把 a、b 的角色弄反；用'因为是一次的'循环论证直线性；认为 a = 0 仍是斜线，边界完全错误。"
+  },
+  {
+    "id": "derivative-pass",
+    "node_type": "concept",
+    "skill_title": "导数的定义",
+    "skill_description": "函数在某点的瞬时变化率，用差商的极限定义",
+    "student_turns": [
+      "导数是函数在某一点的瞬时变化率。先算一小段区间上的平均变化率 (f(x+h) - f(x)) / h，再让 h 趋近于 0，这个极限就是导数，几何上是切线的斜率。",
+      "之所以要取极限，是因为瞬时这个时刻区间长度是 0，直接代进去是 0/0 没意义；但区间越来越短时平均变化率会逼近一个确定的数，割线也就慢慢转成切线。",
+      "不是每个点都有导数。像 |x| 在 0 处，从左边逼近差商是 -1，从右边是 1，两边不一致，极限不存在，图像上是个尖角；函数不连续的地方也一定不可导。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "从平均变化率讲到极限，解释了为何不能直接代 h = 0，并用 |x| 准确说明不可导的情形。"
+  },
+  {
+    "id": "derivative-fail",
+    "node_type": "concept",
+    "skill_title": "导数的定义",
+    "skill_description": "函数在某点的瞬时变化率，用差商的极限定义",
+    "student_turns": [
+      "导数就是斜率，求导公式就是 x 的 n 次方求导等于 n 乘 x 的 n 减一次方，背下来就会了。",
+      "为什么是斜率……老师说导数的几何意义是切线斜率，就是这样规定的，我主要是会算。",
+      "只要函数能写出来就能求导吧，套公式就行，没见过不能求的。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "只会背求导公式和'导数是斜率'的结论，说不出差商与极限，并错误地认为所有函数都可导。"
+  },
+  {
+    "id": "limit-fail",
+    "node_type": "concept",
+    "skill_title": "函数的极限",
+    "skill_description": "自变量无限接近某值时函数值的趋近行为",
+    "student_turns": [
+      "极限就是把 x 的值代进去算出来的那个数，比如 x 趋近 2 的时候，就把 2 代进去。",
+      "因为 x 越来越接近 2，那最后就等于 2 了嘛，所以代进去算就是极限。",
+      "如果代进去是 0/0，那就说明极限不存在，或者是 0。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "把极限等同于函数值，认为'接近'就是'等于'，遇到 0/0 给出错误结论，核心概念理解错误。"
+  },
+  {
+    "id": "pythagorean-fail",
+    "node_type": "concept",
+    "skill_title": "勾股定理",
+    "skill_description": "直角三角形两直角边平方和等于斜边平方",
+    "student_turns": [
+      "勾股定理就是 a² + b² = c²，三角形的边都满足这个关系。",
+      "为什么成立我没想过，考试只要会用就行，好像有个拼图的证明但我记不得了。",
+      "所有三角形都可以用吧，只要知道两条边就能算第三条边。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "只会背公式，说不出为何成立，且错误地推广到所有三角形，忽略了直角这一前提。"
+  },
+  {
+    "id": "logarithm-fail",
+    "node_type": "concept",
+    "skill_title": "对数",
+    "skill_description": "对数是指数运算的逆运算",
+    "student_turns": [
+      "对数就是 log，有个底数，算出来一个数，计算器上有这个键。",
+      "跟指数好像有关系吧，具体什么关系我说不太清楚，反正有公式。",
+      "log 0 应该是 0 吧，不太确定，没想过。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "说不出对数是指数的逆运算，全程含糊复述，对 log 0 的边界给出错误猜测。"
+  },
+  {
+    "id": "conditional-probability-pass",
+    "node_type": "concept",
+    "skill_title": "条件概率",
+    "skill_description": "在事件 B 已发生的前提下事件 A 发生的概率",
+    "student_turns": [
+      "P(A|B) 是已知 B 发生了，A 发生的概率。等于 P(A 且 B) 除以 P(B)：既然 B 已经发生，样本空间就缩小成 B，再看其中有多少也属于 A。",
+      "除以 P(B) 是在重新归一化，因为只剩 B 这部分可能，要把它当成新的全部。比如掷骰子已知是偶数，那是 6 的概率就是 1/3 而不是 1/6。",
+      "P(A|B) 和 P(B|A) 一般不相等。检测阳性时真的患病的概率和患病时检测阳性的概率是两回事，病很罕见的时候前者可能很小，要用贝叶斯公式把基础比例算进去。P(B) = 0 时条件概率也没有定义。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "用缩小样本空间解释定义，举例准确，并主动区分 P(A|B) 与 P(B|A)，说明基础比例与 P(B) = 0 的边界。"
+  },
+  {
+    "id": "conditional-probability-fail",
+    "node_type": "concept",
+    "skill_title": "条件概率",
+    "skill_description": "在事件 B 已发生的前提下事件 A 发生的概率",
+    "student_turns": [
+      "条件概率就是两个事件一起发生的概率，P(A|B) 就是 A 乘 B。",
+      "检测准确率 99%，那检测阳性就有 99% 的概率真的得病，这就是条件概率。",
+      "P(A|B) 和 P(B|A) 是一样的，反过来写而已。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "把条件概率当成联合概率，混淆 P(A|B) 与 P(B|A)，犯了忽略基础比例的典型错误。"
+  },
+  {
+    "id": "quadratic-vertex-fail",
+    "node_type": "concept",
+    "skill_title": "二次函数的顶点",
+    "skill_description": "y = ax² + bx + c 的对称轴与最值位置",
+    "student_turns": [
+      "顶点的横坐标是 -b/2a，代进去就是纵坐标，这个公式背过。",
+      "为什么是 -b/2a 我不知道，配方好像能推出来，但我不会配。",
+      "顶点就是函数的最小值，二次函数都有最小值。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "只会背顶点公式，说不出来源，并忽略 a < 0 时顶点是最大值。"
+  },
+  {
+    "id": "gradient-descent-pass",
+    "node_type": "concept",
+    "skill_title": "梯度下降",
+    "skill_description": "沿损失函数负梯度方向迭代更新参数以求最小值",
+    "student_turns": [
+      "梯度下降就是每一步沿着损失函数下降最快的方向挪一小步。梯度指向上升最快的方向，所以参数减去学习率乘梯度，损失就会变小，重复直到基本不动。",
+      "为什么是负梯度：在当前点附近把函数近似成一个平面，往梯度反方向走一点，一阶近似下损失减少最多。步长要小，因为这个近似只在附近成立。",
+      "不保证找到全局最小。函数不是凸的时候可能停在局部最小或鞍点；学习率太大会来回震荡甚至发散，太小又很慢。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "讲清负梯度方向的来由和学习率的作用，并指出非凸、局部最小与步长过大等边界。"
+  },
+  {
+    "id": "overfitting-fail",
+    "node_type": "concept",
+    "skill_title": "过拟合",
+    "skill_description": "模型在训练集上表现好但在新数据上表现差的现象",
+    "student_turns": [
+      "过拟合就是模型训练得太好了，训练准确率 100% 说明模型非常强。",
+      "数据越多越容易过拟合，因为模型记的东西太多了。",
+      "解决办法就是多训练几轮，让它学得更透。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "把训练集上的高分当成好事，因果方向弄反（数据多反而缓解过拟合），给出加剧问题的错误对策。"
+  },
+  {
+    "id": "graph-linear-function-pass",
+    "node_type": "task",
+    "skill_title": "画出 y = 2x + 1 的图像",
+    "skill_description": "在坐标纸上画出一次函数的图像",
+    "student_turns": [
+      "先取两个点：x = 0 时 y = 1，x = 1 时 y = 3。在坐标系里描出 (0, 1) 和 (1, 3)，用尺子连成直线并向两端延长。再取 x = -1 得 y = -1 验证第三个点也在线上，确认直线往右上走、和 y 轴交在 1。"
+    ],
+    "expected_passed": true,
+    "label_rationale": "给出取点、描点、连线、验证的完整可执行步骤。"
+  },
+  {
+    "id": "graph-linear-function-fail",
+    "node_type": "task",
+    "skill_title": "画出 y = 2x + 1 的图像",
+    "skill_description": "在坐标纸上画出一次函数的图像",
+    "student_turns": [
+      "这个我画过了，就是一条直线，画出来了。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "只报告结果，没有说取哪些点、怎么确定位置，没有任何动作。"
+  },
+  {
+    "id": "excel-vlookup-fail",
+    "node_type": "task",
+    "skill_title": "用 VLOOKUP 合并两张表",
+    "skill_description": "按学号把成绩表中的分数匹配到名单表里",
+    "student_turns": [
+      "我做完了，用了个公式，结果能用。具体那个公式怎么写、参数是什么我不会，是同学帮我弄的。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "只说结果，并且明确表示主要动作不会，是别人做的。"
+  },
+  {
+    "id": "backup-phone-photos-fail",
+    "node_type": "task",
+    "skill_title": "把手机照片备份到电脑",
+    "skill_description": "换手机前把相册完整备份下来",
+    "student_turns": [
+      "这个我不太会，没弄过，反正应该就是存到哪里去吧，具体怎么弄不知道。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "自己说不知道怎么做，没有说出任何一个动作。"
+  },
+  {
+    "id": "bake-bread-fail",
+    "node_type": "task",
+    "skill_title": "烤一条吐司面包",
+    "skill_description": "从和面到出炉做出一条吐司",
+    "student_turns": [
+      "我烤过，挺成功的，出炉之后很香，家里人都说好吃。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "只描述结果和评价，和面、发酵、烤制等动作一个都没说。"
+  },
+  {
+    "id": "git-merge-conflict-fail",
+    "node_type": "task",
+    "skill_title": "解决 git 合并冲突",
+    "skill_description": "合并分支时处理两边改了同一处的冲突",
+    "student_turns": [
+      "冲突了我一般就把本地文件夹删掉，重新 clone 一份，然后把我改的东西再手动抄进去就没冲突了。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "动作绕开而非解决冲突：没有查看冲突标记、选择保留内容、标记解决并提交，且会丢失本地提交历史。"
+  },
+  {
+    "id": "python-read-csv-fail",
+    "node_type": "task",
+    "skill_title": "用 pandas 读取并清洗 CSV",
+    "skill_description": "读入成绩 CSV，去掉空值后算平均分",
+    "student_turns": [
+      "已经搞定了，平均分也有了。不过代码是网上找的一段直接跑的，pandas 怎么读文件、空值怎么处理我自己说不出来。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "只报告结果，并自己说读取和处理空值的动作说不出来；被追问时也说不出任何一个动作。"
+  },
+  {
+    "id": "set-up-2fa-fail",
+    "node_type": "task",
+    "skill_title": "给邮箱开启两步验证",
+    "skill_description": "为邮箱账号开启双重认证以防被盗",
+    "student_turns": [
+      "没弄过，不知道在哪里开，应该是手机上点一点吧，我也说不上来。"
+    ],
+    "expected_passed": false,
+    "label_rationale": "自己说不知道怎么做，也说不出在哪里设置、如何验证，没有可执行动作。"
   }
 ]

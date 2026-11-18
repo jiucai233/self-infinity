@@ -1,7 +1,7 @@
 # Auditor calibration harness
 
 Offline evaluation of `Auditor.next_turn` judgment quality against a hand-labeled
-30-scenario calibration set (`calibration_set.json`), per docs/WHITEPAPER.md §8: accuracy ≥ 80%, leniency ≤ 10%.
+50-scenario calibration set (`calibration_set.json`, 30 until 2026-11-18), per docs/WHITEPAPER.md §8: accuracy ≥ 80%, leniency ≤ 10%.
 
 ## Running
 
@@ -286,6 +286,39 @@ next step is tightening the task protocol's leniency rule for
 follow-up-round answers (or accepting more runs / an averaged multi-run
 metric to separate genuine leniency from single-run variance) before
 claiming M2 passing — not yet done, flagging as the next actionable item.
+
+## 50 scenarios (2026-11-18, `gpt-6-luna`)
+
+20 scenarios added, mostly school maths (linear function slope, derivative, limit, Pythagoras,
+logarithm, conditional probability, quadratic vertex) plus gradient descent, overfitting and seven
+tasks. Most are should-fail, because 9 should-fail items made one false pass worth 11 points. The set
+is now 26 pass / 24 fail (concept 12 / 15, task 14 / 9). The new failures are not only "can't say":
+confident wrong explanations (`limit-fail`, `overfitting-fail`), swapped roles (`linear-function-slope-fail`,
+`conditional-probability-fail`), recited formulas with a wrong scope (`pythagorean-fail`,
+`quadratic-vertex-fail`), and tasks that report only the result or say the actions are unknown.
+
+Run from `backend/` (the settings read `.env` relative to the working directory):
+
+| run | accuracy | false pass | false fail |
+|---|---|---|---|
+| 1 | 48/50 | 1/24 (`index-btree-vs-hash-fail`) | 1/26 (`recursion-pass`) |
+| 2 | 48/50 | 0/24 | 2/26 (`recursion-pass`, `consistent-hashing-pass`) |
+| 3 | 49/50 | 1/24 (`nginx-reverse-proxy-fail`) | 0/26 |
+| **total** | **145/150 = 96.7%** | **2/72 = 2.8%** | **3/78** |
+
+Before the Challenger: 144/150, false pass 3/72. By node type (final): concept 77/81, task 68/69.
+
+Two new scenarios were wrong as written, and were fixed after the first runs, then only those two
+were run again three times and put in place of their old results:
+
+- `linear-function-slope-pass` failed 3/3: its student said "the larger a, the steeper", which is
+  wrong for negative a (steepness is |a|), and the Auditor asked exactly that. The turn now says |a|.
+- `python-read-csv-fail` passed 3/3: asked a follow-up, the LLM student named reading, dropping
+  nulls and averaging, a pass by the rough-action rule. The student now says it cannot name the
+  actions, and the rationale says so for the follow-ups.
+
+Before the fix the total was 139/150 (92.7%), false pass 5/72 (6.9%). Fixing labels after seeing
+results flatters the number a little; both fixes are errors in the scripts, not in the Auditor.
 
 # Fact Keeper evaluation (memory consistency)
 
