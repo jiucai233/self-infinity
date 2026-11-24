@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:self_infinity/api/api_exception.dart';
 import 'package:self_infinity/api/fake_api.dart';
 import 'package:self_infinity/api/models.dart';
 import 'package:self_infinity/app/app.dart';
@@ -359,12 +360,12 @@ void main() {
   // its nodes are cleared one by one, with each node's place on screen.
   group('video', () {
     const size = Size(1440, 900);
-    Future<void> positions(WidgetTester tester, String name, CourseMap map) async {
+    Future<void> positions(WidgetTester tester, String name, List<CourseMap> maps) async {
       if (dir == null) return;
       final state = tester.state<LifeConstellationState>(find.byType(LifeConstellation));
       final box = tester.renderObject<RenderBox>(find.byType(LifeConstellation));
       final out = <String, List<double>>{};
-      for (final node in map.nodes) {
+      for (final node in [for (final m in maps) ...m.nodes]) {
         final at = state.positionOf('s${node.id}');
         if (at == null) continue;
         final g = box.localToGlobal(at);
@@ -393,22 +394,42 @@ void main() {
     });
 
     testWidgets(skip: dir == null, 'video: the tree grows', (tester) async {
+      // The tree gets bigger: nodes are cleared, broken down into parts, and new courses join.
       final api = FakeApiClient(latency: Duration.zero, language: _code);
-      final course = await api.generateCourse(GenerateRequest(topic: _say.math));
-      final courseId = course.course.id;
-      var map = await api.getCourseMap(courseId);
-      final order = <int>[];
-      for (var step = 0; ; step++) {
-        final name = 'v-grow-${step.toString().padLeft(2, '0')}';
-        await scene(tester, size: size, name: name, location: '/map', api: api,
-            act: (t) => positions(t, name, map));
-        final next = map.nodes.where((n) => n.status == SkillStatus.available).toList();
-        if (next.isEmpty || step >= 12) break;
-        order.add(next.first.id);
-        await _passAudit(api, next.first.id);
-        map = await api.getCourseMap(courseId);
+      final courses = [(await api.generateCourse(GenerateRequest(topic: _say.math))).course.id];
+      Future<List<CourseMap>> maps() async => [for (final id in courses) await api.getCourseMap(id)];
+      final first = (await maps()).first.nodes.firstWhere((n) => n.status == SkillStatus.available).id;
+      Future<void> pass() async {
+        for (final m in await maps()) {
+          final open = m.nodes.where((n) => n.status == SkillStatus.available);
+          if (open.isNotEmpty) return _passAudit(api, open.first.id);
+        }
       }
-      if (dir != null) File('$dir/v-grow-order.json').writeAsStringSync(jsonEncode(order));
+      Future<void> expand() async {
+        for (final m in await maps()) {
+          for (final n in m.nodes.where((n) => n.status != SkillStatus.locked)) {
+            try {
+              await api.expandSkill(n.id);
+              return;
+            } on ApiException {
+              continue;
+            }
+          }
+        }
+      }
+      Future<void> course(String topic) async =>
+          courses.add((await api.generateCourse(GenerateRequest(topic: topic))).course.id);
+      final steps = <Future<void> Function()>[
+        pass, expand, () => course(_say.probability), pass, expand, () => course(_say.writing),
+        pass, expand, expand, () => course('파이썬 프로그래밍'), pass, expand, () => course('선형대수'),
+      ];
+      for (var step = 0; step <= steps.length; step++) {
+        final name = 'v-grow-${step.toString().padLeft(2, '0')}';
+        final now = await maps();
+        await scene(tester, size: size, name: name, location: '/map', api: api, act: (t) => positions(t, name, now));
+        if (step < steps.length) await steps[step]();
+      }
+      final order = [first];
 
       // The audit on the first node, turn by turn, on a fresh copy of the course.
       final fresh = FakeApiClient(latency: Duration.zero, language: _code);
