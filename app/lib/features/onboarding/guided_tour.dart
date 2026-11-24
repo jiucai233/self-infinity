@@ -465,6 +465,8 @@ class _GuidedTourState extends State<GuidedTour> implements TourHands {
                 canAuto: stop.act != TourAct.look,
                 busy: _autoLooks != null,
                 guest: widget.guest,
+                // Not on the life tree (home): the tree is the picture there.
+                showGuide: path != AppRoutes.home,
                 text: stop.text(context.l10n),
                 index: _index,
                 count: _stops.length,
@@ -489,6 +491,7 @@ class _TourOverlay extends StatelessWidget {
     required this.canAuto,
     required this.busy,
     required this.guest,
+    required this.showGuide,
     required this.text,
     required this.index,
     required this.count,
@@ -497,6 +500,9 @@ class _TourOverlay extends StatelessWidget {
   });
 
   final Rect? lit;
+
+  /// Whether the card shows her picture beside the text.
+  final bool showGuide;
 
   /// What the user does with [lit]; [TourAct.look] when nothing is lit.
   final TourAct act;
@@ -553,6 +559,7 @@ class _TourOverlay extends StatelessWidget {
               canAuto: canAuto,
               busy: busy,
               guest: guest,
+              showGuide: showGuide,
               text: text,
               index: index,
               count: count,
@@ -681,6 +688,7 @@ class _TourCard extends StatelessWidget {
     required this.canAuto,
     required this.busy,
     required this.guest,
+    required this.showGuide,
     required this.text,
     required this.index,
     required this.count,
@@ -695,6 +703,9 @@ class _TourCard extends StatelessWidget {
   final bool canAuto;
   final bool busy;
   final bool guest;
+
+  /// Her picture beside the text; off on the life tree.
+  final bool showGuide;
   final String text;
   final int index;
   final int count;
@@ -728,13 +739,15 @@ class _TourCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Avatar(
-                      agent: 'front_desk',
-                      mood: AvatarMood.smile,
-                      wave: index == 0,
-                      size: 76,
-                    ),
-                    const SizedBox(width: AppSpacing.md),
+                    if (showGuide) ...[
+                      Avatar(
+                        agent: 'front_desk',
+                        mood: AvatarMood.smile,
+                        wave: index == 0,
+                        size: 76,
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                    ],
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

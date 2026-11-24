@@ -18,9 +18,9 @@ Finder inStage(Finder f) => find.descendant(of: key('stage-panel'), matching: f)
 
 void main() {
   group('Home on a phone', () {
-    testWidgets('her, her bubble and the input over the sky', (tester) async {
+    testWidgets('her bubble and the input over the sky; no figure on the tree', (tester) async {
       await pumpScene(tester, const HomeScene(), api: await seededFakeApi(), size: phoneScreen);
-      expect(key('home-avatar'), findsOneWidget);
+      expect(find.descendant(of: key('night-panel'), matching: find.byType(Avatar)), findsNothing);
       // The greeting is her line, in her bubble.
       expect(
         find.descendant(of: key('greeting-bubble'), matching: key('greeting')),

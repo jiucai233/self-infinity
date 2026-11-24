@@ -187,8 +187,9 @@ AtlasClip _moodClip(AvatarMood mood) => switch (mood) {
 /// The still picture of [mood].
 _Pic _moodPic(AvatarMood mood) => switch (mood) {
   AvatarMood.neutral => const _Pic(idleClip, 0),
-  // Standing, the frame after the long open-eyed one: a softer smile.
-  AvatarMood.smile => _Pic.at(idleClip, 3),
+  // Standing, eyes open, a big smile (idle frame 3 was the blink's
+  // half-closed eyes, which looked sleepy held still).
+  AvatarMood.smile => const _Pic(smileClip, 0),
   AvatarMood.stern => const _Pic(cheerClip, 0),
   // Eyes squeezed shut, fists clenched.
   AvatarMood.angry => _Pic.at(cheerClip, 32),

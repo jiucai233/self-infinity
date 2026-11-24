@@ -26,6 +26,7 @@ PAD = 2
 # name: (keep every n-th frame, head centre x, y and side in the GIF's own pixels)
 CLIPS = {
     "idle": (1, 172, 165, 200),  # standing, full figure, blinks
+    "smile": (1, 172, 165, 200),  # standing, eyes open, a big smile (one still frame)
     "cheer": (2, 118, 100, 110),  # fists up, fired up
     "success": (1, 113, 112, 115),  # check mark, +100 XP
     "wave": (2, 118, 110, 115),  # waves hello

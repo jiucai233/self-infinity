@@ -57,12 +57,12 @@ List<OrbPick> orbPicksOf(BuildContext context, StageController stage, {int max =
 }
 
 /// Drawn over the night panel of the home stage (2026-11-04 review: the home
-/// and the life tree are one page): 大肥鱼 at the bottom left with her line,
-/// and the nodes to do next, each tied by a thin line to its own point in
-/// the sky — the line follows the point as the sky turns. A tap on a node
-/// opens it.
+/// and the life tree are one page): her line at the bottom left, and the
+/// nodes to do next, each tied by a thin line to its own point in the sky —
+/// the line follows the point as the sky turns. A tap on a node opens it.
 ///
-/// On a phone she is smaller and the nodes are a row at the top.
+/// The character herself is not drawn here (2026-11-25): the tree is the
+/// picture on this page. On a phone the nodes are a row at the top.
 class HomeSky extends StatefulWidget {
   const HomeSky({
     super.key,
@@ -70,22 +70,18 @@ class HomeSky extends StatefulWidget {
     required this.box,
     required this.picks,
     required this.greeting,
-    this.avatarState = AvatarState.idle,
   });
 
   final GlobalKey<LifeConstellationState> sky;
   final BoxConstraints box;
   final List<OrbPick> picks;
   final String greeting;
-  final AvatarState avatarState;
 
-  /// Her height on the night panel of [box]; the legend starts right of her.
-  static double avatarSize(BoxConstraints box, {required bool phone}) =>
-      phone ? (box.maxHeight * 0.34).clamp(110.0, 190.0) : (box.maxHeight * 0.5).clamp(150.0, 360.0);
+  /// How wide her line may be.
+  static double lineWidth({required bool phone}) => phone ? 220 : 320;
 
-  /// The width she takes at the bottom left (the legend starts after it).
-  static double avatarRoom(BoxConstraints box, {required bool phone}) =>
-      avatarSize(box, phone: phone) * Avatar.aspect + AppSpacing.md;
+  /// The room her line takes at the bottom left (the legend starts after it).
+  static double lineRoom({required bool phone}) => lineWidth(phone: phone) + AppSpacing.md;
 
   static const double listWidth = 260;
 
@@ -146,8 +142,6 @@ class _HomeSkyState extends State<HomeSky> {
     }
     WidgetsBinding.instance.addPostFrameCallback(_attach);
     final phone = _phone;
-    final box = widget.box;
-    final size = HomeSky.avatarSize(box, phone: phone);
     final tree = context.select<StageController, Map<int, String>>(
       (s) => {
         for (final n in s.lifeTree.nodes)
@@ -170,36 +164,19 @@ class _HomeSkyState extends State<HomeSky> {
               ),
             ),
           ),
-        // Her, at the bottom left, with her line.
+        // Her line at the bottom left; the legend's button is right of it.
         Positioned(
-          left: AppSpacing.md,
-          bottom: phone ? AppSpacing.xl + AppSpacing.md : AppSpacing.sm,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Avatar(
-                key: const Key('home-avatar'),
-                agent: 'front_desk',
-                mood: AvatarMood.smile,
-                state: widget.avatarState,
-                size: size,
-              ),
-              Padding(
-                padding: EdgeInsets.only(bottom: size * 0.55),
-                child: SpeechBubble(
-                  key: const Key('greeting-bubble'),
-                  tail: BubbleTail.left,
-                  maxWidth: phone ? 190 : 300,
-                  child: Text(
-                    keepAll(widget.greeting),
-                    key: const Key('greeting'),
-                    style: phone
-                        ? theme.bodyMedium
-                        : AppTheme.serif(theme.titleLarge)?.copyWith(height: 1.3),
-                  ),
-                ),
-              ),
-            ],
+          left: AppSpacing.lg,
+          bottom: phone ? AppSpacing.xl + AppSpacing.md : AppSpacing.lg,
+          child: SpeechBubble(
+            key: const Key('greeting-bubble'),
+            tail: BubbleTail.none,
+            maxWidth: HomeSky.lineWidth(phone: phone),
+            child: Text(
+              keepAll(widget.greeting),
+              key: const Key('greeting'),
+              style: phone ? theme.bodyMedium : AppTheme.serif(theme.titleLarge)?.copyWith(height: 1.3),
+            ),
           ),
         ),
         if (picks.isNotEmpty)

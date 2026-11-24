@@ -42,13 +42,18 @@ PickedFile file(String name, [String body = '# Course']) =>
 
 void main() {
   group('home is the life board', () {
-    testWidgets('wide: the board, the night panel, her, and the picks; no crystal ball', (
+    testWidgets('wide: the board, the night panel, her line, and the picks; no figure, no crystal ball', (
       tester,
     ) async {
       await pumpHome(tester, await seededFakeApi());
       expect(find.byKey(const Key('life-board')), findsOneWidget);
       expect(find.byKey(const Key('night-panel')), findsOneWidget);
-      expect(find.byKey(const Key('home-avatar')), findsOneWidget);
+      expect(find.byKey(const Key('greeting-bubble')), findsOneWidget);
+      // The character is not drawn on the tree (2026-11-25).
+      expect(
+        find.descendant(of: find.byKey(const Key('night-panel')), matching: find.byType(Avatar)),
+        findsNothing,
+      );
       expect(find.byKey(const Key('orb-picks')), findsOneWidget);
       expect(find.byKey(const Key('crystal-ball')), findsNothing);
     });
@@ -160,11 +165,11 @@ void main() {
       await pumpHome(tester, await seededFakeApi());
       expect(find.byKey(const Key('end-chat')), findsNothing);
       await say(tester, 'Hello there');
-      expect(find.byKey(const Key('home-avatar')), findsNothing);
+      expect(find.byKey(const Key('greeting-bubble')), findsNothing);
 
       await tester.tap(find.byKey(const Key('end-chat')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('home-avatar')), findsOneWidget);
+      expect(find.byKey(const Key('greeting-bubble')), findsOneWidget);
       expect(find.byKey(const Key('end-chat')), findsNothing);
 
       await say(tester, 'Hello again');

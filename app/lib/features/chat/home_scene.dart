@@ -328,8 +328,9 @@ class _HomeSceneState extends State<HomeScene> {
   static double _avatarSize(BoxConstraints box) => (box.maxHeight * 0.3).clamp(120.0, 300.0);
 
   /// Before a chat: the life tree (stats, the night sky, Tree / Outline)
-  /// with her at the bottom left and the nodes to do next tied to their
-  /// points (2026-11-04 review: home and the life tree are one page).
+  /// with her line at the bottom left and the nodes to do next tied to their
+  /// points (2026-11-04 review: home and the life tree are one page). The
+  /// character is not drawn on the tree (2026-11-25).
   Widget _board(BuildContext context, ChatController chat) {
     final map = context.select<StageController, CourseMap?>((s) => s.courseMap);
     final greeting = map == null
@@ -337,13 +338,12 @@ class _HomeSceneState extends State<HomeScene> {
         : context.l10n.greetingContinue(courseNameOf(map));
     final phone = !AppLayout.isWide(context);
     return LifeBoard(
-      legendLeft: (box) => HomeSky.avatarRoom(box, phone: phone),
+      legendLeft: (box) => HomeSky.lineRoom(phone: phone),
       overlay: (context, sky, box) => HomeSky(
         sky: sky,
         box: box,
         picks: orbPicksOf(context, context.watch<StageController>()),
         greeting: greeting,
-        avatarState: _avatarState(chat),
       ),
     );
   }
