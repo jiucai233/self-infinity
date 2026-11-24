@@ -4,6 +4,7 @@
 //   SHOTS_DIR=/some/dir flutter test test/screenshots_test.dart
 //   SHOTS_LANG=zh (or ko) renders them in that language: the UI, the world the
 //   fake backend builds, and the lines typed into it (the `_Say` table).
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -321,6 +322,8 @@ void main() {
     Avatar.animationsEnabled = false;
     debugDisableShadows = false; // flutter_test draws shadows hard-edged otherwise
     final fake = api ?? (seeded ? await _seed() : FakeApiClient(latency: Duration.zero, language: _code));
+    // A fresh app each time, so a second scene in one test does not reuse the first one's state.
+    await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(
       RepaintBoundary(
         key: const Key('shot'),
@@ -351,6 +354,85 @@ void main() {
     PanelLayout.leftStartsFolded = true; // as the app starts
   });
   tearDownAll(() => PanelLayout.leftStartsFolded = false);
+
+  // Frames for the demo video (docs/video): one sentence grows a tree, then
+  // its nodes are cleared one by one, with each node's place on screen.
+  group('video', () {
+    const size = Size(1440, 900);
+    Future<void> positions(WidgetTester tester, String name, CourseMap map) async {
+      if (dir == null) return;
+      final state = tester.state<LifeConstellationState>(find.byType(LifeConstellation));
+      final box = tester.renderObject<RenderBox>(find.byType(LifeConstellation));
+      final out = <String, List<double>>{};
+      for (final node in map.nodes) {
+        final at = state.positionOf('s${node.id}');
+        if (at == null) continue;
+        final g = box.localToGlobal(at);
+        out['${node.id}'] = [g.dx, g.dy];
+      }
+      File('$dir/$name.json').writeAsStringSync(jsonEncode(out));
+    }
+
+    testWidgets(skip: dir == null, 'video: one sentence', (tester) async {
+      final api = FakeApiClient(latency: Duration.zero, language: _code);
+      await scene(tester, size: size, name: 'v-map-empty', location: '/map', api: api);
+      await scene(tester, size: size, name: 'v-chat-0', location: '/', api: api);
+      await scene(
+        tester,
+        size: size,
+        name: 'v-chat-1',
+        location: '/',
+        api: api,
+        act: (t) async {
+          await t.enterText(find.byKey(const Key('stage-input')), _say.learnMath);
+          await t.pump();
+          await t.tap(find.byKey(const Key('send')));
+          await t.pumpAndSettle();
+        },
+      );
+    });
+
+    testWidgets(skip: dir == null, 'video: the tree grows', (tester) async {
+      final api = FakeApiClient(latency: Duration.zero, language: _code);
+      final course = await api.generateCourse(GenerateRequest(topic: _say.math));
+      final courseId = course.course.id;
+      var map = await api.getCourseMap(courseId);
+      final order = <int>[];
+      for (var step = 0; ; step++) {
+        final name = 'v-grow-${step.toString().padLeft(2, '0')}';
+        await scene(tester, size: size, name: name, location: '/map', api: api,
+            act: (t) => positions(t, name, map));
+        final next = map.nodes.where((n) => n.status == SkillStatus.available).toList();
+        if (next.isEmpty || step >= 12) break;
+        order.add(next.first.id);
+        await _passAudit(api, next.first.id);
+        map = await api.getCourseMap(courseId);
+      }
+      if (dir != null) File('$dir/v-grow-order.json').writeAsStringSync(jsonEncode(order));
+
+      // The audit on the first node, turn by turn, on a fresh copy of the course.
+      final fresh = FakeApiClient(latency: Duration.zero, language: _code);
+      await fresh.generateCourse(GenerateRequest(topic: _say.math));
+      for (var turns = 0; turns < 4; turns++) {
+        await scene(
+          tester,
+          size: size,
+          name: 'v-audit-$turns',
+          location: '/skill/${order.first}/audit',
+          api: turns == 0 ? fresh : null,
+          act: (t) async {
+            for (var i = 0; i < turns; i++) {
+              if (find.byKey(const Key('send')).evaluate().isEmpty) break;
+              await t.enterText(find.byKey(const Key('stage-input')), _say.long);
+              await t.pump();
+              await t.tap(find.byKey(const Key('send')));
+              await t.pumpAndSettle();
+            }
+          },
+        );
+      }
+    });
+  });
 
   for (final entry in sizes.entries) {
     final tag = entry.key;
