@@ -69,6 +69,9 @@ final String _code = switch (Platform.environment['SHOTS_LANG']) {
   _ => 'en',
 };
 
+/// `SHOTS_SCALE`: pixels per logical pixel in the PNGs (1 by default; 3 for print).
+final double _scale = double.tryParse(Platform.environment['SHOTS_SCALE'] ?? '') ?? 1;
+
 /// What the screenshots' user types, in the language of the shot. The rules of
 /// the fake hold in every language: an answer of 80 characters passes (one of
 /// 160 or more is not challenged), one saying "not sure" / `모르` / `不确定` fails,
@@ -298,7 +301,7 @@ void main() {
   Future<void> shot(WidgetTester tester, String name) async {
     if (dir == null) return;
     final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const Key('shot')));
-    final image = await tester.runAsync(() => boundary.toImage(pixelRatio: 1));
+    final image = await tester.runAsync(() => boundary.toImage(pixelRatio: _scale));
     final bytes = await tester.runAsync(() => image!.toByteData(format: ui.ImageByteFormat.png));
     File('$dir/$name.png')
       ..createSync(recursive: true)
