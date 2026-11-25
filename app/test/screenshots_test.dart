@@ -27,7 +27,11 @@ import 'package:self_infinity/testing/test_app.dart';
 import 'package:self_infinity/widgets/avatar.dart';
 import 'package:self_infinity/widgets/life_constellation.dart';
 import 'package:self_infinity/l10n/l10n.dart';
+import 'package:self_infinity/l10n/app_language.dart';
 import 'package:self_infinity/theme/tokens.dart';
+import 'package:self_infinity/theme/app_theme.dart';
+import 'package:self_infinity/features/auth/landing_page.dart';
+import 'package:self_infinity/widgets/keep_all.dart';
 
 const _flutterFonts = '/Users/jiucai/development/flutter/bin/cache/artifacts/material_fonts';
 
@@ -138,7 +142,8 @@ class _Say {
     hello: 'Hello there',
     identity: 'I am the type of person who explains it before I memorize it.',
     vision: 'Understand calculus well enough to teach it to a stranger.',
-    visionLong: 'Understand calculus well enough to teach it to a stranger, then ship the capstone.',
+    visionLong:
+        'Understand calculus well enough to teach it to a stranger, then ship the capstone.',
     antiVision: 'Another year of nodding along without really knowing.',
     rules: ['No phone before the first audit', 'Explain, never copy', 'Stop at 23:00'],
     goalTeach: 'Teach calculus to a stranger',
@@ -325,7 +330,8 @@ void main() {
     addTearDown(tester.view.reset);
     Avatar.animationsEnabled = false;
     debugDisableShadows = false; // flutter_test draws shadows hard-edged otherwise
-    final fake = api ?? (seeded ? await _seed() : FakeApiClient(latency: Duration.zero, language: _code));
+    final fake =
+        api ?? (seeded ? await _seed() : FakeApiClient(latency: Duration.zero, language: _code));
     // A fresh app each time, so a second scene in one test does not reuse the first one's state.
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(
@@ -351,13 +357,98 @@ void main() {
     debugDisableShadows = true; // the test binding checks that it is back
   }
 
-  const sizes = {'wide': Size(1440, 900), 'tablet': Size(1180, 820), 'narrow': Size(390, 844)};
+  final sizes = {
+    'wide': const Size(1440, 900),
+    'tablet': const Size(1180, 820),
+    'narrow': const Size(390, 844),
+    // `SHOTS_SLIDE=1` adds a 16:9 slide, for decks.
+    if (Platform.environment['SHOTS_SLIDE'] != null) 'slide': const Size(1920, 1080),
+  };
 
   setUpAll(() async {
     if (dir != null) await _loadFonts();
     PanelLayout.leftStartsFolded = true; // as the app starts
   });
   tearDownAll(() => PanelLayout.leftStartsFolded = false);
+
+  // A three-slide teaser (`SHOTS_TEASER=1`, at 1920 × 1080): the problem, then
+  // the front page's chapters 01 and 02 without the header. The problem slide
+  // comes as the bare stage (teaser-0-stage) and its words on transparent
+  // (teaser-0-words), laid one over the other afterwards.
+  group('teaser', () {
+    const size = Size(1920, 1080);
+    final on = dir != null && Platform.environment['SHOTS_TEASER'] != null;
+
+    Future<void> landing(WidgetTester tester, int screen, String name, {bool words = true}) async {
+      LandingPage.debugChrome = false;
+      LandingPage.debugWords = words;
+      addTearDown(() {
+        LandingPage.debugChrome = true;
+        LandingPage.debugWords = true;
+      });
+      await scene(
+        tester,
+        size: size,
+        name: name,
+        location: '/',
+        auth: FakeAuthService(),
+        act: (t) async {
+          bool filmOn() {
+            final robot = find.byKey(const Key('landing-robot'));
+            if (robot.evaluate().isEmpty) return false;
+            final image = t.widget<Image>(robot).image;
+            return image is AssetImage && image.assetName.contains('frames');
+          }
+
+          for (var i = 0; i < 30 && !filmOn(); i++) {
+            await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+            await t.pump();
+          }
+          for (var i = 0; i < screen; i++) {
+            await t.drag(find.byKey(const Key('landing-scroll')), const Offset(0, -300));
+            await t.pumpAndSettle();
+          }
+          final robot = find.byKey(const Key('landing-robot'));
+          if (robot.evaluate().isNotEmpty) {
+            final image = t.widget<Image>(robot).image;
+            await t.runAsync(() => precacheImage(image, t.element(robot)));
+            await t.pump();
+          }
+        },
+      );
+    }
+
+    testWidgets(skip: !on, 'teaser 0 stage', (tester) async {
+      await landing(tester, 0, 'teaser-0-stage', words: false);
+    });
+    testWidgets(skip: !on, 'teaser 1', (tester) async {
+      await landing(tester, 1, 'teaser-1');
+    });
+    testWidgets(skip: !on, 'teaser 2', (tester) async {
+      await landing(tester, 2, 'teaser-2');
+    });
+
+    testWidgets(skip: !on, 'teaser 0 words', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      debugDisableShadows = false;
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: const Key('shot'),
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light(AppLanguage.ko),
+            color: const Color(0x00000000),
+            home: const Material(type: MaterialType.transparency, child: _ProblemSlide()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await shot(tester, 'teaser-0-words');
+      debugDisableShadows = true;
+    });
+  });
 
   // Frames for the demo video (docs/video): one sentence grows a tree, then
   // its nodes are cleared one by one, with each node's place on screen.
@@ -400,14 +491,19 @@ void main() {
       // The tree gets bigger: nodes are cleared, broken down into parts, and new courses join.
       final api = FakeApiClient(latency: Duration.zero, language: _code);
       final courses = [(await api.generateCourse(GenerateRequest(topic: _say.math))).course.id];
-      Future<List<CourseMap>> maps() async => [for (final id in courses) await api.getCourseMap(id)];
-      final first = (await maps()).first.nodes.firstWhere((n) => n.status == SkillStatus.available).id;
+      Future<List<CourseMap>> maps() async => [
+        for (final id in courses) await api.getCourseMap(id),
+      ];
+      final first = (await maps()).first.nodes
+          .firstWhere((n) => n.status == SkillStatus.available)
+          .id;
       Future<void> pass() async {
         for (final m in await maps()) {
           final open = m.nodes.where((n) => n.status == SkillStatus.available);
           if (open.isNotEmpty) return _passAudit(api, open.first.id);
         }
       }
+
       Future<void> expand() async {
         for (final m in await maps()) {
           for (final n in m.nodes.where((n) => n.status != SkillStatus.locked)) {
@@ -420,16 +516,35 @@ void main() {
           }
         }
       }
+
       Future<void> course(String topic) async =>
           courses.add((await api.generateCourse(GenerateRequest(topic: topic))).course.id);
       final steps = <Future<void> Function()>[
-        pass, expand, () => course(_say.probability), pass, expand, () => course(_say.writing),
-        pass, expand, expand, () => course('파이썬 프로그래밍'), pass, expand, () => course('선형대수'),
+        pass,
+        expand,
+        () => course(_say.probability),
+        pass,
+        expand,
+        () => course(_say.writing),
+        pass,
+        expand,
+        expand,
+        () => course('파이썬 프로그래밍'),
+        pass,
+        expand,
+        () => course('선형대수'),
       ];
       for (var step = 0; step <= steps.length; step++) {
         final name = 'v-grow-${step.toString().padLeft(2, '0')}';
         final now = await maps();
-        await scene(tester, size: size, name: name, location: '/map', api: api, act: (t) => positions(t, name, now));
+        await scene(
+          tester,
+          size: size,
+          name: name,
+          location: '/map',
+          api: api,
+          act: (t) => positions(t, name, now),
+        );
         if (step < steps.length) await steps[step]();
       }
       final order = [first];
@@ -711,7 +826,11 @@ void main() {
         act: (t) async {
           final row = find.byKey(const Key('skill-learn'));
           if (row.evaluate().isEmpty) {
-            await t.scrollUntilVisible(find.byKey(const Key('node-notes')), 200, scrollable: find.byType(Scrollable).first);
+            await t.scrollUntilVisible(
+              find.byKey(const Key('node-notes')),
+              200,
+              scrollable: find.byType(Scrollable).first,
+            );
           } else {
             await t.tap(row);
           }
@@ -1087,14 +1206,16 @@ void main() {
               await t.pumpAndSettle();
             }
             if (find.byKey(const Key('expand-left')).evaluate().isNotEmpty) {
-            await t.tap(find.byKey(const Key('expand-left')));
-            await t.pumpAndSettle();
-          }
-          await t.tap(find.byKey(const Key('settings-button')));
+              await t.tap(find.byKey(const Key('expand-left')));
+              await t.pumpAndSettle();
+            }
+            await t.tap(find.byKey(const Key('settings-button')));
             await t.pumpAndSettle();
             await t.tap(find.byKey(const Key('settings-dev')));
             await t.pumpAndSettle();
-            await t.ensureVisible(find.byKey(Key('dev-tab-$tab'))); // the last tab is off a phone's edge
+            await t.ensureVisible(
+              find.byKey(Key('dev-tab-$tab')),
+            ); // the last tab is off a phone's edge
             await t.pumpAndSettle();
             await t.tap(find.byKey(Key('dev-tab-$tab')));
             await t.pumpAndSettle();
@@ -1250,13 +1371,46 @@ class _ShotCosts extends FakeApiClient {
       ),
     ],
     agents: [
-      DevLlmRow(provider: 'openai', model: 'gpt-6-luna', agent: 'auditor', calls: 31, avgInputTokens: 2600, avgOutputTokens: 380, avgMs: 2900, avgCost: 0.00045),
-      DevLlmRow(provider: 'claude', model: 'claude-haiku-5-5', agent: 'auditor', calls: 22, avgInputTokens: 2650, avgOutputTokens: 460, avgMs: 2100, avgCost: 0.0005),
-      DevLlmRow(provider: 'openai', model: 'gpt-6-luna', agent: 'planner', calls: 4, avgInputTokens: 3900, avgOutputTokens: 2800, avgMs: 21000, avgCost: 0.0018),
+      DevLlmRow(
+        provider: 'openai',
+        model: 'gpt-6-luna',
+        agent: 'auditor',
+        calls: 31,
+        avgInputTokens: 2600,
+        avgOutputTokens: 380,
+        avgMs: 2900,
+        avgCost: 0.00045,
+      ),
+      DevLlmRow(
+        provider: 'claude',
+        model: 'claude-haiku-5-5',
+        agent: 'auditor',
+        calls: 22,
+        avgInputTokens: 2650,
+        avgOutputTokens: 460,
+        avgMs: 2100,
+        avgCost: 0.0005,
+      ),
+      DevLlmRow(
+        provider: 'openai',
+        model: 'gpt-6-luna',
+        agent: 'planner',
+        calls: 4,
+        avgInputTokens: 3900,
+        avgOutputTokens: 2800,
+        avgMs: 21000,
+        avgCost: 0.0018,
+      ),
     ],
     audits: [
       DevLlmRow(provider: 'openai', model: 'gpt-6-luna', audits: 6, avgCalls: 5.2, avgCost: 0.0023),
-      DevLlmRow(provider: 'claude', model: 'claude-haiku-5-5', audits: 4, avgCalls: 5.5, avgCost: 0.0027),
+      DevLlmRow(
+        provider: 'claude',
+        model: 'claude-haiku-5-5',
+        audits: 4,
+        avgCalls: 5.5,
+        avgCost: 0.0027,
+      ),
     ],
     allOn: [
       DevLlmRow(provider: 'openai', model: 'gpt-6-luna', cost: 0.0409),
@@ -1292,10 +1446,200 @@ class _ShotCosts extends FakeApiClient {
     turnsPerMinute: 0.017,
     turnsRateMeasured: true,
     sessions: [
-      DevVoiceSession(id: 18, kind: 'audit', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 12, 4), minutes: 4.6, turns: 6, audioIn: 0, audioOut: 0, cost: 0.233, backendCost: 0.0028, otherCost: 0.078),
-      DevVoiceSession(id: 17, kind: 'audit', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 12, 3), minutes: 3.8, turns: 5, audioIn: 0, audioOut: 0, cost: 0.192, backendCost: 0.0023, otherCost: 0.065),
-      DevVoiceSession(id: 16, kind: 'transcribe', model: 'gpt-live-transcribe', startedAt: DateTime.utc(2026, 10, 11, 21), minutes: 1.6, turns: 5, audioIn: 0, audioOut: 0, cost: 0.027, otherCost: 0.082),
-      DevVoiceSession(id: 7, kind: 'guide', model: 'gpt-live-1', startedAt: DateTime.utc(2026, 10, 9, 15), minutes: 1.1, turns: 2, audioIn: 0, audioOut: 0, cost: 0.053, backendCost: 0.0009, otherCost: 0.086),
+      DevVoiceSession(
+        id: 18,
+        kind: 'audit',
+        model: 'gpt-live-1',
+        startedAt: DateTime.utc(2026, 10, 12, 4),
+        minutes: 4.6,
+        turns: 6,
+        audioIn: 0,
+        audioOut: 0,
+        cost: 0.233,
+        backendCost: 0.0028,
+        otherCost: 0.078,
+      ),
+      DevVoiceSession(
+        id: 17,
+        kind: 'audit',
+        model: 'gpt-live-1',
+        startedAt: DateTime.utc(2026, 10, 12, 3),
+        minutes: 3.8,
+        turns: 5,
+        audioIn: 0,
+        audioOut: 0,
+        cost: 0.192,
+        backendCost: 0.0023,
+        otherCost: 0.065,
+      ),
+      DevVoiceSession(
+        id: 16,
+        kind: 'transcribe',
+        model: 'gpt-live-transcribe',
+        startedAt: DateTime.utc(2026, 10, 11, 21),
+        minutes: 1.6,
+        turns: 5,
+        audioIn: 0,
+        audioOut: 0,
+        cost: 0.027,
+        otherCost: 0.082,
+      ),
+      DevVoiceSession(
+        id: 7,
+        kind: 'guide',
+        model: 'gpt-live-1',
+        startedAt: DateTime.utc(2026, 10, 9, 15),
+        minutes: 1.1,
+        turns: 2,
+        audioIn: 0,
+        audioOut: 0,
+        cost: 0.053,
+        backendCost: 0.0009,
+        otherCost: 0.086,
+      ),
     ],
   );
+}
+
+/// The teaser's first slide: learning has no way to check itself. Laid out
+/// like a front-page chapter (64 px in, 540 px wide, centred).
+class _ProblemSlide extends StatelessWidget {
+  const _ProblemSlide();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+    const points = [
+      '강의·요약·AI 답변은 넘치지만, 이해를 재는 도구는 없어요',
+      '객관식과 퀴즈는 외우거나 찍어도 맞힐 수 있어요',
+      '잘못 이해한 채로 다음 단원으로 넘어가요',
+    ];
+    Widget row(String label, String detail, {bool done = true}) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: done ? AppColors.textPrimary : null,
+              border: done ? null : Border.all(color: AppColors.ember, width: 2),
+            ),
+            alignment: Alignment.center,
+            child: done
+                ? const Icon(Icons.check_rounded, size: 16, color: AppColors.onAccent)
+                : Text('?', style: theme.labelLarge?.copyWith(color: AppColors.ember)),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Text(
+              label,
+              style: theme.titleMedium?.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: done ? FontWeight.w400 : FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            detail,
+            style: theme.bodyMedium?.copyWith(
+              color: done ? AppColors.textTertiary : AppColors.ember,
+            ),
+          ),
+        ],
+      ),
+    );
+    final card = Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.outline),
+        boxShadow: AppShadows.float,
+      ),
+      child: Column(
+        children: [
+          row('강의 영상 3강', '시청 완료'),
+          const Divider(height: 1, color: AppColors.outline),
+          row('노트 정리', '12쪽'),
+          const Divider(height: 1, color: AppColors.outline),
+          row('AI에게 질문', '답변 8개'),
+          const Divider(height: 1, color: AppColors.outline),
+          row('정말 이해했나요?', '확인할 방법 없음', done: false),
+        ],
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(64, 88, 0, AppSpacing.xxl),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          width: 540,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '00 · 문제',
+                style: theme.labelLarge?.copyWith(
+                  color: AppColors.textTertiary,
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                keepAll('공부는 했는데, 이해했는지는 아무도 몰라요.'),
+                style: theme.displaySmall?.copyWith(height: 1.1),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                keepAll(
+                  '강의를 듣고 노트를 정리하고 AI에게 물어봐도, 정말 이해했는지 확인해 주는 곳은 없어요. 아는 느낌만 남고, 설명해 보라고 하면 막혀요.',
+                ),
+                style: theme.titleMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w400,
+                  height: 1.6,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              for (final point in points)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppColors.ember,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Text(
+                          keepAll(point),
+                          style: theme.bodyMedium?.copyWith(
+                            color: AppColors.textPrimary,
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.xl),
+              card,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -51,6 +51,13 @@ class LandingPage extends StatefulWidget {
   /// Screens of scrolling: the hero, four chapters, the end.
   static const int screens = 6;
 
+  /// Renders for slides: false leaves out the header and the next button,
+  /// and [debugWords] false leaves out the words too (only the stage).
+  @visibleForTesting
+  static bool debugChrome = true;
+  @visibleForTesting
+  static bool debugWords = true;
+
   @override
   State<LandingPage> createState() => _LandingPageState();
 }
@@ -280,35 +287,38 @@ class _LandingPageState extends State<LandingPage> {
                         if (e is PointerScrollEvent) _onWheel(e.scrollDelta.dy, size.height);
                       },
                       onPointerPanZoomUpdate: (e) => _onWheel(-e.panDelta.dy, size.height),
-                      child: SingleChildScrollView(
-                        key: const Key('landing-scroll'),
-                        controller: _scroll,
-                        physics: const NeverScrollableScrollPhysics(),
-                        child: Column(
-                          children: [
-                            _HeroScreen(
-                              size: size,
-                              wide: wide,
-                              scroll: _scroll,
-                              onCreate: widget.onCreate,
-                              onSignIn: widget.onSignIn,
-                            ),
-                            for (final (i, chapter) in _chapters(l).indexed)
-                              _ChapterScreen(
-                                index: i + 1,
-                                chapter: chapter,
+                      child: Opacity(
+                        opacity: LandingPage.debugWords ? 1 : 0,
+                        child: SingleChildScrollView(
+                          key: const Key('landing-scroll'),
+                          controller: _scroll,
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: Column(
+                            children: [
+                              _HeroScreen(
                                 size: size,
                                 wide: wide,
                                 scroll: _scroll,
+                                onCreate: widget.onCreate,
+                                onSignIn: widget.onSignIn,
                               ),
-                            _EndScreen(
-                              size: size,
-                              wide: wide,
-                              scroll: _scroll,
-                              onCreate: widget.onCreate,
-                              onSignIn: widget.onSignIn,
-                            ),
-                          ],
+                              for (final (i, chapter) in _chapters(l).indexed)
+                                _ChapterScreen(
+                                  index: i + 1,
+                                  chapter: chapter,
+                                  size: size,
+                                  wide: wide,
+                                  scroll: _scroll,
+                                ),
+                              _EndScreen(
+                                size: size,
+                                wide: wide,
+                                scroll: _scroll,
+                                onCreate: widget.onCreate,
+                                onSignIn: widget.onSignIn,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -334,7 +344,7 @@ class _LandingPageState extends State<LandingPage> {
                   ),
                 // There is more below: a round button that turns to the next
                 // screen (2026-11-04 review), on every screen but the last.
-                if (_screen < LandingPage.screens - 1 && !_menuOpen)
+                if (LandingPage.debugChrome && _screen < LandingPage.screens - 1 && !_menuOpen)
                   Positioned(
                     left: 0,
                     right: 0,
@@ -346,24 +356,25 @@ class _LandingPageState extends State<LandingPage> {
                       ),
                     ),
                   ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  child: AnimatedBuilder(
-                    animation: _scroll,
-                    builder: (context, _) => _Header(
-                      wide: wide,
-                      // Over the night at the end, the header turns light.
-                      dark: !_menuOpen && _growth(_offset, size) > 0.92,
-                      links: links,
-                      onLink: (screen) => _goTo(screen, size.height),
-                      onSignIn: widget.onSignIn,
-                      menuOpen: _menuOpen,
-                      onMenu: () => setState(() => _menuOpen = !_menuOpen),
+                if (LandingPage.debugChrome)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    child: AnimatedBuilder(
+                      animation: _scroll,
+                      builder: (context, _) => _Header(
+                        wide: wide,
+                        // Over the night at the end, the header turns light.
+                        dark: !_menuOpen && _growth(_offset, size) > 0.92,
+                        links: links,
+                        onLink: (screen) => _goTo(screen, size.height),
+                        onSignIn: widget.onSignIn,
+                        menuOpen: _menuOpen,
+                        onMenu: () => setState(() => _menuOpen = !_menuOpen),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -1827,13 +1838,25 @@ class _NextButtonState extends State<_NextButton> with SingleTickerProviderState
                 border: Border.all(color: AppColors.outlineStrong),
               ),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(widget.label, style: theme.labelLarge?.copyWith(color: AppColors.textPrimary)),
+                    Text(
+                      widget.label,
+                      style: theme.labelLarge?.copyWith(color: AppColors.textPrimary),
+                    ),
                     const SizedBox(width: AppSpacing.xs),
-                    const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: AppColors.textPrimary),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 20,
+                      color: AppColors.textPrimary,
+                    ),
                   ],
                 ),
               ),
@@ -1914,10 +1937,17 @@ class _ExamplePromptState extends State<_ExamplePrompt> {
               borderRadius: AppRadius.pillBorder,
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
               child: Row(
                 children: [
-                  const Icon(Icons.add_circle_outline_rounded, size: 20, color: AppColors.textTertiary),
+                  const Icon(
+                    Icons.add_circle_outline_rounded,
+                    size: 20,
+                    color: AppColors.textTertiary,
+                  ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Text.rich(
