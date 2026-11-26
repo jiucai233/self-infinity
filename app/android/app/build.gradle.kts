@@ -16,7 +16,8 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.selfinfinity.self_infinity"
+        // GAI3008: one id per team, so two teams' installs never replace each other.
+        applicationId = "com.yonsei.gai3008.selfinfinity"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
