@@ -142,6 +142,10 @@ class _AuditSceneState extends State<AuditScene> {
 
   // Dialogue.
   final List<_Line> _lines = [];
+
+  /// How many lines were there when the audit opened (a resumed one has
+  /// some): those stand still, only lines after them come in with [EnterIn].
+  int _settled = 0;
   bool _sending = false;
   String? _problem; // shown in the bubble in place of her line
   bool _closed = false;
@@ -234,6 +238,7 @@ class _AuditSceneState extends State<AuditScene> {
         if (_lines.isEmpty) _lines.add(_Line(fromUser: false, text: start.openingQuestion));
         // An answer that never got a reply goes back into the input, to send again.
         if (_lines.last.fromUser) _input.text = _lines.removeLast().text;
+        _settled = _lines.length;
         _starting = false;
       });
     } on Object catch (e) {
@@ -381,7 +386,12 @@ class _AuditSceneState extends State<AuditScene> {
       setState(() {
         _principle = principle;
         _lines.add(
-          _Line(fromUser: false, agent: 'recorder', text: context.l10n.lessonCardCreated, kind: _Kind.lesson),
+          _Line(
+            fromUser: false,
+            agent: 'recorder',
+            text: context.l10n.lessonCardCreated,
+            kind: _Kind.lesson,
+          ),
         );
         _sending = false;
       });
@@ -454,7 +464,9 @@ class _AuditSceneState extends State<AuditScene> {
     final verdict = _verdict;
     final l = context.l10n;
     if (verdict == null) {
-      return StatusChip.primary(_session?.testOut ?? false ? l.challengeInProgress : l.auditInProgress);
+      return StatusChip.primary(
+        _session?.testOut ?? false ? l.challengeInProgress : l.auditInProgress,
+      );
     }
     // A fail is not an alarm: she asks for it once more.
     return verdict.passed ? StatusChip.success(l.auditPassed) : StatusChip.neutral(l.auditOnceMore);
@@ -475,13 +487,15 @@ class _AuditSceneState extends State<AuditScene> {
     if (now == _followed) return;
     _followed = now;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
+      if (!mounted || !_scroll.hasClients) return;
+      final end = _scroll.position.maxScrollExtent;
+      // Reduce motion: no glide, straight to the end.
+      if (!Avatar.animationsEnabled || MediaQuery.disableAnimationsOf(context)) {
+        _scroll.jumpTo(end);
+        return;
+      }
       unawaited(
-        _scroll.animateTo(
-          _scroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        ),
+        _scroll.animateTo(end, duration: const Duration(milliseconds: 250), curve: Curves.easeOut),
       );
     });
   }
@@ -537,9 +551,7 @@ class _AuditSceneState extends State<AuditScene> {
               child: StageInputBar(
                 controller: _input,
                 focusNode: _focus,
-                hint: _verdict == null
-                    ? context.l10n.explainHint
-                    : context.l10n.whatWentWrongHint,
+                hint: _verdict == null ? context.l10n.explainHint : context.l10n.whatWentWrongHint,
                 enabled: !_sending,
                 onSubmit: () => unawaited(_handleInput(_input.text)),
                 voiceMode: _voiceMode,
@@ -642,7 +654,8 @@ class _AuditSceneState extends State<AuditScene> {
                     compact: phone,
                   ),
                 ),
-                if (!phone) const Divider(height: 1, indent: AppSpacing.xl, endIndent: AppSpacing.xl),
+                if (!phone)
+                  const Divider(height: 1, indent: AppSpacing.xl, endIndent: AppSpacing.xl),
                 Expanded(
                   // Everything said here can be selected and copied.
                   child: SelectionArea(
@@ -659,11 +672,15 @@ class _AuditSceneState extends State<AuditScene> {
                         if (_resumed && _verdict == null)
                           _ResumedNote(onStartOver: () => unawaited(_start(restart: true))),
                         for (final (i, line) in _lines.indexed) ...[
-                          _lineView(
-                            context,
-                            line,
-                            current: i == current && _problem == null,
-                            phone: phone,
+                          EnterIn(
+                            key: ObjectKey(line),
+                            animate: i >= _settled,
+                            child: _lineView(
+                              context,
+                              line,
+                              current: i == current && _problem == null,
+                              phone: phone,
+                            ),
                           ),
                           const SizedBox(height: AppSpacing.lg),
                         ],
@@ -672,7 +689,10 @@ class _AuditSceneState extends State<AuditScene> {
                             padding: const EdgeInsets.only(bottom: AppSpacing.lg),
                             child: phone
                                 ? const ThreadBubble(child: ThinkingShimmer(width: 200))
-                                : const Align(alignment: Alignment.centerLeft, child: ThinkingShimmer()),
+                                : const Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: ThinkingShimmer(),
+                                  ),
                           ),
                         if (_problem != null)
                           Text(
@@ -714,7 +734,9 @@ class _AuditSceneState extends State<AuditScene> {
       // The menu that said it is closed: a toast says it was heard.
       showToast(
         context,
-        kind == AuditFeedback.tooHard ? context.l10n.feedbackTooHardNoted : context.l10n.feedbackMisheardNoted,
+        kind == AuditFeedback.tooHard
+            ? context.l10n.feedbackTooHardNoted
+            : context.l10n.feedbackMisheardNoted,
       );
     } on Object catch (e) {
       if (!mounted) return;
@@ -750,8 +772,12 @@ class _AuditSceneState extends State<AuditScene> {
               attempt: _attempt,
               delta: _delta,
               onLesson: verdict.passed || _recorderAsks ? null : _askRecorder,
-              onTooHard: verdict.passed || _telling != null ? null : () => unawaited(_tell(AuditFeedback.tooHard)),
-              onMisheard: verdict.passed || _telling != null ? null : () => unawaited(_tell(AuditFeedback.misheard)),
+              onTooHard: verdict.passed || _telling != null
+                  ? null
+                  : () => unawaited(_tell(AuditFeedback.tooHard)),
+              onMisheard: verdict.passed || _telling != null
+                  ? null
+                  : () => unawaited(_tell(AuditFeedback.misheard)),
               tooHardNoted: _tooHard,
               misheardNoted: _disputed,
               onDetails: switch (_session?.id) {

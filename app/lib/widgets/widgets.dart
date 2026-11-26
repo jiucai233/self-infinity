@@ -5,6 +5,7 @@ export 'avatar.dart';
 export 'character_lines.dart';
 export 'collapsible_section.dart';
 export 'composer.dart';
+export 'enter_in.dart';
 export 'orb_avatar.dart';
 export 'empty_view.dart';
 export 'error_view.dart';
