@@ -42,6 +42,7 @@ flutter:
     - assets/fonts/cjk/
     - assets/landing/
     - assets/landing/frames/
+    - assets/landing/phone/
     - assets/infinity/
 
   # Infinity Sans (Pretendard, Latin subset) for all text, Instrument Serif for headlines, big numbers and the

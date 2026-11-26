@@ -894,17 +894,19 @@ class _HeroScreen extends StatelessWidget {
             ],
           ),
         ),
-        SizedBox(height: wide ? AppSpacing.xxl : AppSpacing.xl),
         // How it is used: what people type, and where it goes (the orb).
-        _DropIn(
-          delay: const Duration(milliseconds: 300),
-          child: _ExamplePrompt(
-            stem: l.heroExampleStem,
-            examples: [l.heroExample1, l.heroExample2, l.heroExample3],
-            // A phone's caption would sit over the robot.
-            caption: wide ? l.heroExampleCaption : null,
+        // Not on a phone: there the robot stands right below the buttons.
+        if (wide) ...[
+          const SizedBox(height: AppSpacing.xxl),
+          _DropIn(
+            delay: const Duration(milliseconds: 300),
+            child: _ExamplePrompt(
+              stem: l.heroExampleStem,
+              examples: [l.heroExample1, l.heroExample2, l.heroExample3],
+              caption: l.heroExampleCaption,
+            ),
           ),
-        ),
+        ],
       ],
     );
     return AnimatedBuilder(
@@ -1029,13 +1031,13 @@ class _ChapterScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   keepAll(chapter.title),
-                  style: theme.headlineMedium?.copyWith(height: 1.1),
+                  style: theme.headlineLarge?.copyWith(height: 1.12),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(width: 84, child: shot),
+                    SizedBox(width: 112, child: shot),
                     const SizedBox(width: AppSpacing.lg),
                     Expanded(
                       child: Text(
